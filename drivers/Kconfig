@@ -50,6 +50,8 @@ source "drivers/pcmcia/Kconfig"
 
 source "drivers/phy/marvell/Kconfig"
 
+source "drivers/phy/hibvt/Kconfig"
+
 source "drivers/pinctrl/Kconfig"
 
 source "drivers/power/Kconfig"
@@ -81,6 +83,8 @@ source "drivers/timer/Kconfig"
 source "drivers/tpm/Kconfig"
 
 source "drivers/usb/Kconfig"
+
+source "drivers/ufs/Kconfig"
 
 source "drivers/video/Kconfig"
 

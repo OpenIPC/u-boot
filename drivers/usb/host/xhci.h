@@ -23,12 +23,14 @@
 #include <linux/list.h>
 #include <linux/compat.h>
 
+#include <usb.h>
+
 #define MAX_EP_CTX_NUM		31
 #define XHCI_ALIGNMENT		64
 /* Generic timeout for XHCI events */
 #define XHCI_TIMEOUT		5000
 /* Max number of USB devices for any host controller - limit in section 6.1 */
-#define MAX_HC_SLOTS            256
+#define MAX_HC_SLOTS            16
 /* Section 5.3.3 - MaxPorts */
 #define MAX_HC_PORTS            127
 

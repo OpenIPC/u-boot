@@ -337,7 +337,7 @@ static u32 xhci_v1_0_td_remainder(int running_total,
 
 	if ((total_packet_count - packets_transferred) > 31)
 		return 31 << 17;
-	return (total_packet_count - packets_transferred) << 17;
+	return (total_packet_count - (unsigned int)packets_transferred) << 17;
 }
 
 /**

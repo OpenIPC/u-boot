@@ -30,6 +30,7 @@
 #include <asm/unaligned.h>
 #include <linux/errno.h>
 #include "xhci.h"
+#include "../drivers/phy/hibvt/usb_hisi.h"
 
 #ifndef CONFIG_USB_MAX_CONTROLLER_COUNT
 #define CONFIG_USB_MAX_CONTROLLER_COUNT 1
@@ -350,7 +351,7 @@ static int xhci_set_configuration(struct usb_device *udev)
 	xhci_slot_copy(ctrl, in_ctx, out_ctx);
 	slot_ctx = xhci_get_slot_ctx(ctrl, in_ctx);
 	slot_ctx->dev_info &= ~(LAST_CTX_MASK);
-	slot_ctx->dev_info |= cpu_to_le32(LAST_CTX(max_ep_flag + 1) | 0);
+	slot_ctx->dev_info |= cpu_to_le32(LAST_CTX((unsigned int)max_ep_flag + 1) | 0);
 
 	xhci_endpoint_copy(ctrl, in_ctx, out_ctx, 0);
 
@@ -547,16 +548,13 @@ int xhci_check_maxpacket(struct usb_device *udev)
 	int max_packet_size;
 	int hw_max_packet_size;
 	int ret = 0;
-	struct usb_interface *ifdesc;
-
-	ifdesc = &udev->config.if_desc[0];
 
 	out_ctx = ctrl->devs[slot_id]->out_ctx;
 	xhci_inval_cache((uintptr_t)out_ctx->bytes, out_ctx->size);
 
 	ep_ctx = xhci_get_ep_ctx(ctrl, out_ctx, ep_index);
 	hw_max_packet_size = MAX_PACKET_DECODED(le32_to_cpu(ep_ctx->ep_info2));
-	max_packet_size = usb_endpoint_maxp(&ifdesc->ep_desc[0]);
+	max_packet_size = udev->descriptor.bMaxPacketSize0;
 	if (hw_max_packet_size != max_packet_size) {
 		debug("Max Packet Size for ep 0 changed.\n");
 		debug("Max packet size in usb_device = %d\n", max_packet_size);
@@ -568,7 +566,8 @@ int xhci_check_maxpacket(struct usb_device *udev)
 				ctrl->devs[slot_id]->out_ctx, ep_index);
 		in_ctx = ctrl->devs[slot_id]->in_ctx;
 		ep_ctx = xhci_get_ep_ctx(ctrl, in_ctx, ep_index);
-		ep_ctx->ep_info2 &= cpu_to_le32(~MAX_PACKET_MASK);
+		ep_ctx->ep_info2 &= cpu_to_le32(~(MAX_PACKET_MASK <<
+					MAX_PACKET_SHIFT));
 		ep_ctx->ep_info2 |= cpu_to_le32(MAX_PACKET(max_packet_size));
 
 		/*
@@ -957,6 +956,7 @@ static int _xhci_submit_control_msg(struct usb_device *udev, unsigned long pipe,
 	return xhci_ctrl_tx(udev, pipe, setup, length, buffer);
 }
 
+
 static int xhci_lowlevel_init(struct xhci_ctrl *ctrl)
 {
 	struct xhci_hccr *hccr;
@@ -1067,6 +1067,8 @@ int usb_lowlevel_init(int index, enum usb_init_type init, void **controller)
 	int ret;
 
 	*controller = NULL;
+
+	phy_hiusb_init(index);
 
 	if (xhci_hcd_init(index, &hccr, (struct xhci_hcor **)&hcor) != 0)
 		return -ENODEV;

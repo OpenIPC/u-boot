@@ -8,6 +8,9 @@ obj-$(CONFIG_$(SPL_)LED)	+= led/
 obj-$(CONFIG_$(SPL_)PINCTRL)	+= pinctrl/
 obj-$(CONFIG_$(SPL_)RAM)	+= ram/
 
+obj-$(CONFIG_UFS) += ufs/
+obj-$(CONFIG_GENERIC_PHY)   += phy/
+
 ifdef CONFIG_SPL_BUILD
 
 obj-$(CONFIG_SPL_CRYPTO_SUPPORT) += crypto/
@@ -56,7 +59,7 @@ obj-$(CONFIG_TPL_SPI_SUPPORT) += spi/
 endif
 
 ifeq ($(CONFIG_SPL_BUILD)$(CONFIG_TPL_BUILD),)
-
+ifndef CONFIG_MINI_BOOT
 obj-y += adc/
 obj-$(CONFIG_DM_DEMO) += demo/
 obj-$(CONFIG_BIOSEMU) += bios_emulator/
@@ -71,6 +74,7 @@ obj-y += pcmcia/
 obj-y += dfu/
 obj-$(CONFIG_X86) += pch/
 obj-y += phy/marvell/
+obj-y += phy/hibvt/
 obj-y += rtc/
 obj-y += sound/
 obj-y += spmi/
@@ -93,4 +97,5 @@ obj-$(CONFIG_REMOTEPROC) += remoteproc/
 obj-y += thermal/
 
 obj-$(CONFIG_MACH_PIC32) += ddr/microchip/
+endif
 endif
