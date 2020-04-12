@@ -98,7 +98,7 @@ int fat_register_device(struct blk_desc *dev_desc, int part_no)
 
 	/* Read the partition table, if present */
 	if (part_get_info(dev_desc, part_no, &info)) {
-		if (part_no != 0) {
+		if (part_no != 1) {
 			printf("** Partition %d not valid on device %d **\n",
 					part_no, dev_desc->devnum);
 			return -1;
