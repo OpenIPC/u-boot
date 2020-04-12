@@ -352,6 +352,7 @@ PYTHON		= python
 DTC		= dtc
 CHECK		= sparse
 
+HW_DIR		= hw_compressed
 CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
 		  -Wbitwise -Wno-return-void -D__CHECK_ENDIAN__ $(CF)
 
@@ -624,24 +625,35 @@ c_flags := $(KBUILD_CFLAGS) $(cpp_flags)
 #########################################################################
 # U-Boot objects....order is important (i.e. start must be first)
 
+ifdef CONFIG_MINI_BOOT
+export ENABLE_MINI_BOOT := y
+endif
+
 HAVE_VENDOR_COMMON_LIB = $(if $(wildcard $(srctree)/board/$(VENDOR)/common/Makefile),y,n)
 
 libs-y += lib/
 libs-$(HAVE_VENDOR_COMMON_LIB) += board/$(VENDOR)/common/
 libs-$(CONFIG_OF_EMBED) += dts/
+ifndef CONFIG_MINI_BOOT
 libs-y += fs/
 libs-y += net/
 libs-y += disk/
+endif
 libs-y += drivers/
+ifndef CONFIG_MINI_BOOT
 libs-y += drivers/dma/
 libs-y += drivers/gpio/
 libs-y += drivers/i2c/
 libs-y += drivers/mmc/
+endif
 libs-y += drivers/mtd/
+ifndef CONFIG_MINI_BOOT
 libs-$(CONFIG_CMD_NAND) += drivers/mtd/nand/
 libs-y += drivers/mtd/onenand/
+endif
 libs-$(CONFIG_CMD_UBI) += drivers/mtd/ubi/
 libs-y += drivers/mtd/spi/
+ifndef CONFIG_MINI_BOOT
 libs-y += drivers/net/
 libs-y += drivers/net/phy/
 libs-y += drivers/pci/
@@ -657,26 +669,114 @@ libs-$(CONFIG_FMAN_ENET) += drivers/net/fm/
 libs-$(CONFIG_SYS_FSL_DDR) += drivers/ddr/fsl/
 libs-$(CONFIG_SYS_FSL_MMDC) += drivers/ddr/fsl/
 libs-$(CONFIG_ALTERA_SDRAM) += drivers/ddr/altera/
+endif
+libs-y += drivers/ddr/hisilicon/$(SOC)/
 libs-y += drivers/serial/
+ifndef CONFIG_MINI_BOOT
 libs-y += drivers/usb/dwc3/
 libs-y += drivers/usb/common/
 libs-y += drivers/usb/emul/
 libs-y += drivers/usb/eth/
 libs-y += drivers/usb/gadget/
+libs-y += drivers/usb/gadget/hiudc3/
 libs-y += drivers/usb/gadget/udc/
 libs-y += drivers/usb/host/
 libs-y += drivers/usb/musb/
 libs-y += drivers/usb/musb-new/
 libs-y += drivers/usb/phy/
 libs-y += drivers/usb/ulpi/
+endif
 libs-y += cmd/
 libs-y += common/
 libs-$(CONFIG_API) += api/
 libs-$(CONFIG_HAS_POST) += post/
+ifndef CONFIG_MINI_BOOT
 libs-y += test/
 libs-y += test/dm/
 libs-$(CONFIG_UT_ENV) += test/env/
 libs-$(CONFIG_UT_OVERLAY) += test/overlay/
+endif
+
+# FOR AUDIO
+ifeq ($(CONFIG_AUDIO_ENABLE), y)
+#libs-y += product/hiaudio/acodec/v800/
+#libs-y += product/hiaudio/ao/hi3559av100/
+ifeq ($(CONFIG_PRODUCTNAME),"hi3516ev200")
+libs-y += product/hiaudio/acodec/v750/
+libs-y += product/hiaudio/ao/hi3516ev200/
+else ifeq ($(CONFIG_PRODUCTNAME),"hi3516ev300")
+libs-y += product/hiaudio/acodec/v750/
+libs-y += product/hiaudio/ao/hi3516ev200/
+else ifeq ($(CONFIG_PRODUCTNAME),"hi3518ev300")
+libs-y += product/hiaudio/acodec/v750/
+libs-y += product/hiaudio/ao/hi3516ev200/
+else ifeq ($(CONFIG_PRODUCTNAME),"hi3516dv200")
+libs-y += product/hiaudio/acodec/v750/
+libs-y += product/hiaudio/ao/hi3516ev200/
+endif
+endif
+
+ifeq ($(CONFIG_OSD_ENABLE),y)
+# FOR DEC of all chip
+ifneq ($(CONFIG_PRODUCTNAME),"hi3516ev200")
+ifneq ($(CONFIG_PRODUCTNAME),"hi3516ev300")
+ifneq ($(CONFIG_PRODUCTNAME),"hi3518ev300")
+ifneq ($(CONFIG_PRODUCTNAME),"hi3516dv200")
+libs-y += product/hiosd/dec/
+endif
+endif
+endif
+endif
+
+# FOR VO,HDMI,MIPI_Tx of hi3559av100
+ifeq ($(CONFIG_PRODUCTNAME),"hi3559av100")
+libs-y += product/hiosd/vo/hi3559av100/
+libs-y += product/hiosd/mipi_tx/hi3559av100/
+libs-y += product/hiosd/hdmi/hi3559av100/drv/
+else ifeq ($(CONFIG_PRODUCTNAME),"hi3519av100")
+libs-y += product/hiosd/vo/hi3519av100/
+libs-y += product/hiosd/mipi_tx/hi3519av100/
+libs-y += product/hiosd/hdmi/hdmi_2_0/drv/
+else ifeq ($(CONFIG_PRODUCTNAME),"hi3516dv300")
+libs-y += product/hiosd/vo/hi3516cv500/
+libs-y += product/hiosd/mipi_tx/hi3516cv500/
+libs-y += product/hiosd/rgb/hi3516cv500/
+libs-y += product/hiosd/hdmi/hdmi_2_0/drv/
+else ifeq ($(CONFIG_PRODUCTNAME),"hi3516av300")
+libs-y += product/hiosd/vo/hi3516cv500/
+libs-y += product/hiosd/mipi_tx/hi3516cv500/
+libs-y += product/hiosd/hdmi/hdmi_2_0/drv/
+libs-y += product/hiosd/rgb/hi3516cv500/
+else ifeq ($(CONFIG_PRODUCTNAME),"hi3516ev300")
+libs-y += product/hiosd/vo/hi3516ev200/
+else ifeq ($(CONFIG_PRODUCTNAME),"hi3516ev200")
+libs-y += product/hiosd/vo/hi3516ev200/
+else ifeq ($(CONFIG_PRODUCTNAME),"hi3518ev300")
+libs-y += product/hiosd/vo/hi3516ev200/
+else ifeq ($(CONFIG_PRODUCTNAME),"hi3516dv200")
+libs-y += product/hiosd/vo/hi3516ev200/
+endif
+
+ifndef CONFIG_MINI_BOOT
+ifeq ($(CONFIG_PRODUCTNAME),$(filter $(CONFIG_PRODUCTNAME), "hi3516cv500" "hi3516dv300" "hi3516av300" "hi3519av100" "hi3556av100" "hi3559av100" "hi3556v200" "hi3559v200" "hi3516ev200" "hi3516ev300" "hi3518ev300" "hi3516dv200"))
+libs-y += product/hiotp/
+libs-y += product/cipher/
+endif
+endif
+
+endif
+
+ifeq ($(CONFIG_AUTO_UPDATE),y)
+libs-y += product/hiupdate/
+endif
+
+ifeq ($(CONFIG_OPTEE),y)
+libs-y += product/hitzasc/
+endif
+
+ifeq ($(CONFIG_I2C_HIBVT),y)
+libs-y += product/hii2c/
+endif
 
 libs-y += $(if $(BOARDDIR),board/$(BOARDDIR)/)
 
@@ -845,6 +945,17 @@ else
 u-boot.bin: u-boot-nodtb.bin FORCE
 	$(call if_changed,copy)
 endif
+
+.PHONY: u-boot-z.bin
+u-boot-z.bin: $(CURDIR)/u-boot.bin
+	make -C $(CURDIR)/arch/$(ARCH)/cpu/$(CPU)/$(SOC)/$(HW_DIR)/ \
+		CROSS_COMPILE=$(CROSS_COMPILE) \
+		BINIMAGE=$(CURDIR)/u-boot.bin TOPDIR=$(CURDIR)
+
+.PHONY: u-boot-z.clean
+u-boot-z.clean: $(CURDIR)/u-boot.bin
+	make -C $(CURDIR)/arch/$(ARCH)/cpu/$(CPU)/$(SOC)/$(HW_DIR) \
+		CROSS_COMPILE=$(CROSS_COMPILE) clean
 
 %.imx: %.bin
 	$(Q)$(MAKE) $(build)=arch/arm/imx-common $@
