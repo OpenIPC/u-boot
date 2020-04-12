@@ -91,6 +91,21 @@ static int do_bootm_subcommand(cmd_tbl_t *cmdtp, int flag, int argc,
 
 int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
+#ifdef CONFIG_ARM64_SUPPORT_LOAD_FIP
+	extern int is_fip(char *buf);
+	extern int load_fip(char *buf);
+	extern int load_fip_amp(char *buf);
+	extern long long kernel_load_addr;
+	if (2 == argc) {
+		char *buf = (char *)simple_strtoul(argv[1], NULL, 16);
+//Modify this configuration according to the system framework
+		kernel_load_addr = CONFIG_KERNEL_LOAD_ADDR;
+		if (is_fip(buf)) {
+			return load_fip(buf);
+		}
+	}
+#endif
+
 #ifdef CONFIG_NEEDS_MANUAL_RELOC
 	static int relocated = 0;
 

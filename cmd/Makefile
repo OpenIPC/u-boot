@@ -93,6 +93,7 @@ obj-$(CONFIG_CMD_MII) += mdio.o
 endif
 obj-$(CONFIG_CMD_MISC) += misc.o
 obj-$(CONFIG_CMD_MMC) += mmc.o
+obj-$(CONFIG_CMD_UFS) += ufs.o
 obj-$(CONFIG_CMD_MMC_SPI) += mmc_spi.o
 obj-$(CONFIG_MP) += mp.o
 obj-$(CONFIG_CMD_MTDPARTS) += mtdparts.o
@@ -104,7 +105,9 @@ obj-$(CONFIG_CMD_PART) += part.o
 ifdef CONFIG_PCI
 obj-$(CONFIG_CMD_PCI) += pci.o
 endif
+ifndef CONFIG_MINI_BOOT
 obj-y += pcmcia.o
+endif #CONFIG_MINI_BOOT
 obj-$(CONFIG_CMD_PORTIO) += portio.o
 obj-$(CONFIG_CMD_PXE) += pxe.o
 obj-$(CONFIG_CMD_QFW) += qfw.o
@@ -142,6 +145,7 @@ obj-$(CONFIG_CMD_USB) += usb.o disk.o
 obj-$(CONFIG_CMD_FASTBOOT) += fastboot.o
 obj-$(CONFIG_CMD_FS_UUID) += fs_uuid.o
 
+obj-$(CONFIG_CMD_USB) += usbtftp.o
 obj-$(CONFIG_CMD_USB_MASS_STORAGE) += usb_mass_storage.o
 obj-$(CONFIG_CMD_THOR_DOWNLOAD) += thordown.o
 obj-$(CONFIG_CMD_XIMG) += ximg.o
@@ -163,3 +167,41 @@ obj-$(CONFIG_CMD_BLOB) += blob.o
 
 # core command
 obj-y += nvedit.o
+
+obj-y += getinfo.o
+
+ifeq ($(CONFIG_AUDIO_ENABLE),y)
+obj-y += cmd_ao.o
+endif
+
+# Osd command
+ifeq ($(CONFIG_OSD_ENABLE),y)
+# for dec
+ifneq ($(CONFIG_PRODUCTNAME),"hi3516ev300")
+ifneq ($(CONFIG_PRODUCTNAME),"hi3516ev200")
+ifneq ($(CONFIG_PRODUCTNAME),"hi3518ev300")
+ifneq ($(CONFIG_PRODUCTNAME),"hi3516dv200")
+obj-y += cmd_dec.o
+endif
+endif
+endif
+endif
+# for vo
+ifeq ($(CONFIG_PRODUCTNAME),"hi3559av100")
+obj-y += cmd_vo_hi3559av100.o
+else ifeq ($(CONFIG_PRODUCTNAME),"hi3519av100")
+obj-y += cmd_vo_hi3519av100.o
+else ifeq ($(CONFIG_PRODUCTNAME),"hi3516dv300")
+obj-y += cmd_vo_hi3516cv500.o
+else ifeq ($(CONFIG_PRODUCTNAME),"hi3516av300")
+obj-y += cmd_vo_hi3516cv500.o
+else ifeq ($(CONFIG_PRODUCTNAME),"hi3516ev200")
+obj-y += cmd_vo_hi3516ev200.o
+else ifeq ($(CONFIG_PRODUCTNAME),"hi3516ev300")
+obj-y += cmd_vo_hi3516ev200.o
+else ifeq ($(CONFIG_PRODUCTNAME),"hi3518ev300")
+obj-y += cmd_vo_hi3516ev200.o
+else ifeq ($(CONFIG_PRODUCTNAME),"hi3516dv200")
+obj-y += cmd_vo_hi3516ev200.o
+endif
+endif

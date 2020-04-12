@@ -34,6 +34,8 @@ static int do_go(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 	printf ("## Starting application at 0x%08lX ...\n", addr);
 
+	cleanup_before_linux();
+
 	/*
 	 * pass address parameter as argv[0] (aka command name),
 	 * and all remaining args
@@ -53,6 +55,7 @@ U_BOOT_CMD(
 	"addr [arg ...]\n    - start application at address 'addr'\n"
 	"      passing 'arg' as arguments"
 );
+
 
 #endif
 

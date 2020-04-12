@@ -200,7 +200,7 @@ void i2c_init_board(void)
  *
  * Returns I2C bus speed in Hz.
  */
-#if !defined(CONFIG_SYS_I2C) && !defined(CONFIG_DM_I2C)
+#if !defined(CONFIG_SYS_I2C) && !defined(CONFIG_DM_I2C) && !defined(CONFIG_I2C_HIBVT)
 /*
  * TODO: Implement architecture-specific get/set functions
  * Should go away, if we switched completely to new multibus support
@@ -958,7 +958,7 @@ static int do_i2c_probe (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv
 	if (argc == 2)
 		addr = simple_strtol(argv[1], 0, 16);
 
-	puts ("Valid chip addresses:");
+	puts ("Valid i2c num:\n");
 	for (j = 0; j < 128; j++) {
 		if ((0 <= addr) && (j != addr))
 			continue;
@@ -1784,7 +1784,7 @@ static int do_i2c_show_bus(cmd_tbl_t *cmdtp, int flag, int argc,
  * on error.
  */
 #if defined(CONFIG_SYS_I2C) || defined(CONFIG_I2C_MULTI_BUS) || \
-		defined(CONFIG_DM_I2C)
+		defined(CONFIG_DM_I2C) || defined(CONFIG_I2C_HIBVT)
 static int do_i2c_bus_num(cmd_tbl_t *cmdtp, int flag, int argc,
 				char * const argv[])
 {
@@ -1910,6 +1910,9 @@ static int do_i2c_nm(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
  */
 static int do_i2c_reset(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 {
+#ifdef CONFIG_I2C_HIBVT
+	printf("Error: Not supported!!\n");
+#else
 #if defined(CONFIG_DM_I2C)
 	struct udevice *bus;
 
@@ -1924,6 +1927,7 @@ static int do_i2c_reset(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv
 #else
 	i2c_init(CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE);
 #endif
+#endif
 	return 0;
 }
 
@@ -1933,7 +1937,7 @@ static cmd_tbl_t cmd_i2c_sub[] = {
 #endif
 	U_BOOT_CMD_MKENT(crc32, 3, 1, do_i2c_crc, "", ""),
 #if defined(CONFIG_SYS_I2C) || \
-	defined(CONFIG_I2C_MULTI_BUS) || defined(CONFIG_DM_I2C)
+	defined(CONFIG_I2C_MULTI_BUS) || defined(CONFIG_DM_I2C) || defined(CONFIG_I2C_HIBVT)
 	U_BOOT_CMD_MKENT(dev, 1, 1, do_i2c_bus_num, "", ""),
 #endif  /* CONFIG_I2C_MULTI_BUS */
 #if defined(CONFIG_I2C_EDID)
@@ -2009,8 +2013,8 @@ static char i2c_help_text[] =
 #endif
 	"crc32 chip address[.0, .1, .2] count - compute CRC32 checksum\n"
 #if defined(CONFIG_SYS_I2C) || \
-	defined(CONFIG_I2C_MULTI_BUS) || defined(CONFIG_DM_I2C)
-	"i2c dev [dev] - show or set current I2C bus\n"
+	defined(CONFIG_I2C_MULTI_BUS) || defined(CONFIG_DM_I2C) || defined(CONFIG_I2C_HIBVT)
+	"i2c dev [i2c num] - show or set current I2C device\n"
 #endif  /* CONFIG_I2C_MULTI_BUS */
 #if defined(CONFIG_I2C_EDID)
 	"i2c edid chip - print EDID configuration information\n"
@@ -2020,7 +2024,7 @@ static char i2c_help_text[] =
 	"i2c mm chip address[.0, .1, .2] - write to I2C device (auto-incrementing)\n"
 	"i2c mw chip address[.0, .1, .2] value [count] - write to I2C device (fill)\n"
 	"i2c nm chip address[.0, .1, .2] - write to I2C device (constant address)\n"
-	"i2c probe [address] - test for and show device(s) on the I2C bus\n"
+	"i2c probe [i2c num] - eg, i2c probe 10, init the i2c 10 \n"
 	"i2c read chip address[.0, .1, .2] length memaddress - read to memory\n"
 	"i2c write memaddress chip address[.0, .1, .2] length [-s] - write memory\n"
 	"          to I2C; the -s option selects bulk write in a single transaction\n"

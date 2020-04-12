@@ -146,8 +146,6 @@ static int do_spi_flash_probe(int argc, char * const argv[])
 		printf("Failed to initialize SPI flash at %u:%u\n", bus, cs);
 		return 1;
 	}
-
-	flash = new;
 #endif
 
 	return 0;
@@ -266,7 +264,7 @@ static int do_spi_flash_read_write(int argc, char * const argv[])
 	char *endp;
 	int ret = 1;
 	int dev = 0;
-	loff_t offset, len, maxsize;
+	loff_t offset, len, maxsize, off_start;
 
 	if (argc < 3)
 		return -1;
@@ -299,12 +297,55 @@ static int do_spi_flash_read_write(int argc, char * const argv[])
 		int read;
 
 		read = strncmp(argv[0], "read", 4) == 0;
-		if (read)
+		if (read) {
 			ret = spi_flash_read(flash, offset, len, buf);
-		else
-			ret = spi_flash_write(flash, offset, len, buf);
+			off_start = offset;
+		} else {
+			unsigned long write_start, write_len, write_step;
+			int percent_complete = -1;
+			char *pbuf = buf;
 
-		printf("SF: %zu bytes @ %#x %s: ", (size_t)len, (u32)offset,
+			off_start = offset;
+			write_start = offset;
+			write_len   = len;
+			write_step  = flash->erase_size;
+
+			while (write_len > 0) {
+				if (write_len < write_step)
+					write_step = write_len;
+
+				ret = spi_flash_write(flash, offset, write_step, pbuf);
+				if (ret)
+					    break;
+
+				offset += write_step;
+				pbuf   += write_step;
+				write_len    -= write_step;
+
+				do {
+					unsigned long long n = (unsigned long long)
+						(offset - write_start) * 100;
+					int percent;
+
+					do_div(n, len);
+					percent = (int)n;
+
+					/* output progress message only at whole percent
+					 *      * steps to reduce the number of messages
+					 *           * printed on (slow) serial consoles
+					 *                */
+					if (percent != percent_complete) {
+						percent_complete = percent;
+
+						printf("\rWriting at 0x%llx -- %3d%% "
+								"complete.", offset, percent);
+					}
+				} while (0);
+			}
+		}
+
+		puts("\n");
+		printf("SF: %zu bytes @ %#x %s: ", (size_t)len, (u32)off_start,
 		       read ? "Read" : "Written");
 		if (ret)
 			printf("ERROR %d\n", ret);
@@ -323,6 +364,9 @@ static int do_spi_flash_erase(int argc, char * const argv[])
 	int dev = 0;
 	loff_t offset, len, maxsize;
 	ulong size;
+	unsigned long erase_start, erase_len, erase_step;
+    unsigned long erase_end = 0;
+	int percent_complete = -1;
 
 	if (argc < 3)
 		return -1;
@@ -342,13 +386,98 @@ static int do_spi_flash_erase(int argc, char * const argv[])
 		return 1;
 	}
 
-	ret = spi_flash_erase(flash, offset, size);
-	printf("SF: %zu bytes @ %#x Erased: %s\n", (size_t)size, (u32)offset,
-	       ret ? "ERROR" : "OK");
+	erase_start = offset;
+	erase_len   = size;
+	erase_step  = flash->erase_size;
+
+	while (size > 0){
+		if (size < erase_step)
+			erase_step = size;
+
+		ret = spi_flash_erase(flash, offset, erase_step);
+		if (ret) {
+			printf("SPI flash %s failed\n", argv[0]);
+			return 1;
+		}
+
+		size -= erase_step;
+		offset += erase_step;
+		erase_end += erase_step;
+
+		do {
+			unsigned long long n = (unsigned long long)
+				(offset - erase_start) * 100;
+			int percent;
+
+			do_div(n, erase_len);
+			percent = (int)n;
+
+			/* output progress message only at whole percent
+			 *      * steps to reduce the number of messages printed
+			 *           * on (slow) serial consoles
+			 *                */
+			if (percent != percent_complete) {
+				percent_complete = percent;
+
+				printf("\rErasing at 0x%llx -- %3d%% complete.",
+						offset, percent);
+			}
+		} while (0);
+	}
+
+	puts("\n");
+
+	printf("SF: %zu bytes @ %#x Erased: %s\n", (size_t)erase_end, (u32)erase_start,
+			ret ? "ERROR" : "OK");
 
 	return ret == 0 ? 0 : 1;
 }
 
+#ifdef CONFIG_SPI_BLOCK_PROTECT
+static int do_spi_flash_lock(int argc, char * const argv[])
+{
+	char *endp;
+	unsigned char level;
+	unsigned char cmp = BP_CMP_BOTTOM;
+
+	if ((argc < 1) || (argc > 2))
+		goto usage;
+
+	/* sf lock */
+	if (argc == 1) {
+		spi_flash_lock(0, 0, BP_OP_GET);
+		puts("\n");
+		goto usage;
+	}
+
+	/* sf lock all/level */
+	if (argc == 2) {
+		if (strcmp(argv[1], "all") == 0) {
+			level = flash->bp_level_max;
+		} else {
+			level = simple_strtoul(argv[1], &endp, 0);
+			if (level > flash->bp_level_max)
+				goto usage;
+			if (*endp != 0)
+				goto usage;
+		}
+	}
+
+	spi_flash_lock(cmp, level, BP_OP_SET);
+
+	return 0;
+usage:
+	puts("\tsf lock level/all\n");
+	printf("Usage:\n\t all: level(%d), lock all blocks.\n",
+			flash->bp_level_max);
+	puts("\tlevel(0): unlock all blocks.\n");
+	printf("\tset spi nor chip block protection level(0 - %d).\n",
+			flash->bp_level_max);
+	printf("\tAs usual: lock_len = chipsize >> (%d - level)\n",
+			flash->bp_level_max);
+	return 1;
+}
+#else
 static int do_spi_protect(int argc, char * const argv[])
 {
 	int ret = 0;
@@ -379,6 +508,7 @@ static int do_spi_protect(int argc, char * const argv[])
 
 	return ret == 0 ? 0 : 1;
 }
+#endif /* CONFIG_SPI_BLOCK_PROTECT */
 
 #ifdef CONFIG_CMD_SF_TEST
 enum {
@@ -572,8 +702,13 @@ static int do_spi_flash(cmd_tbl_t *cmdtp, int flag, int argc,
 		ret = do_spi_flash_read_write(argc, argv);
 	else if (strcmp(cmd, "erase") == 0)
 		ret = do_spi_flash_erase(argc, argv);
+#ifdef CONFIG_SPI_BLOCK_PROTECT
+	else if (strcmp(cmd, "lock") == 0)
+		ret = do_spi_flash_lock(argc, argv);
+#else
 	else if (strcmp(cmd, "protect") == 0)
 		ret = do_spi_protect(argc, argv);
+#endif
 #ifdef CONFIG_CMD_SF_TEST
 	else if (!strcmp(cmd, "test"))
 		ret = do_spi_flash_test(argc, argv);
@@ -615,5 +750,8 @@ U_BOOT_CMD(
 	"					  or to start of mtd `partition'\n"
 	"sf protect lock/unlock sector len	- protect/unprotect 'len' bytes starting\n"
 	"					  at address 'sector'\n"
+#ifdef CONFIG_SPI_BLOCK_PROTECT
+    "sf lock level|all      - set spi block protection level\n"
+#endif
 	SF_TEST_HELP
 );

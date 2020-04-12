@@ -8,13 +8,17 @@
 #include <common.h>
 #include <command.h>
 #include <console.h>
+#include <memalign.h>
 #include <mmc.h>
 
+#ifdef CONFIG_EXT4_SPARSE
+extern int ext4_unsparse(struct mmc *mmc, u32 dev, u8 *pbuf, u32 blk, u32 cnt);
+#endif
 static int curr_device = -1;
 
 static void print_mmcinfo(struct mmc *mmc)
 {
-	int i;
+	unsigned int i;
 
 	printf("Device: %s\n", mmc->cfg->name);
 	printf("Manufacturer ID: %x\n", mmc->cid[0] >> 24);
@@ -82,6 +86,41 @@ static void print_mmcinfo(struct mmc *mmc)
 		}
 	}
 }
+static int print_mmcreg(struct mmc *mmc)
+{
+	int i, err;
+	ALLOC_CACHE_ALIGN_BUFFER(u8, ext_csd, MMC_MAX_BLOCK_LEN);
+
+	printf("OCR register: %08x\n", mmc->ocr);
+	printf("CID register: %08x %08x %08x %08x\n",
+			mmc->cid[0], mmc->cid[1], mmc->cid[2], mmc->cid[3]);
+	printf("CSD register: %08x %08x %08x %08x\n",
+			mmc->csd[0], mmc->csd[1], mmc->csd[2], mmc->csd[3]);
+	printf("RCA register: %08x\n", mmc->rca);
+	if (!IS_SD(mmc)) {
+		err = mmc_send_ext_csd(mmc, ext_csd);
+		if (err) {
+			printf("Get ext_csd fail!\n");
+			return -1;
+		}
+
+		printf("Extended CSD register:\n");
+		for (i = 0; i < 512; i += 8)
+			printf("%03d: %02x %02x %02x %02x"
+					" %02x %02x %02x %02x\n",
+					i,
+					ext_csd[i],
+					ext_csd[i+1],
+					ext_csd[i+2],
+					ext_csd[i+3],
+					ext_csd[i+4],
+					ext_csd[i+5],
+					ext_csd[i+6],
+					ext_csd[i+7]);
+	}
+	printf("\n");
+	return 0;
+}
 static struct mmc *init_mmc_device(int dev, bool force_init)
 {
 	struct mmc *mmc;
@@ -115,6 +154,23 @@ static int do_mmcinfo(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		return CMD_RET_FAILURE;
 
 	print_mmcinfo(mmc);
+	return CMD_RET_SUCCESS;
+}
+static int do_mmcreg(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{
+	struct mmc *mmc;
+	int dev;
+
+	if (argc != 2)
+		return CMD_RET_USAGE;
+
+	dev = simple_strtoul(argv[1], NULL, 16);
+
+	mmc = init_mmc_device(dev, false);
+	if (!mmc)
+		return CMD_RET_FAILURE;
+
+	print_mmcreg(mmc);
 	return CMD_RET_SUCCESS;
 }
 
@@ -273,18 +329,21 @@ static int do_mmc_read(cmd_tbl_t *cmdtp, int flag,
 	struct mmc *mmc;
 	u32 blk, cnt, n;
 	void *addr;
+	int dev;
 
-	if (argc != 4)
+	if (argc != 5)
 		return CMD_RET_USAGE;
 
-	addr = (void *)simple_strtoul(argv[1], NULL, 16);
-	blk = simple_strtoul(argv[2], NULL, 16);
-	cnt = simple_strtoul(argv[3], NULL, 16);
+	dev = simple_strtoul(argv[1], NULL, 16);
+	addr = (void *)simple_strtoul(argv[2], NULL, 16);
+	blk = simple_strtoul(argv[3], NULL, 16);
+	cnt = simple_strtoul(argv[4], NULL, 16);
 
-	mmc = init_mmc_device(curr_device, false);
+	mmc = init_mmc_device(dev, false);
 	if (!mmc)
 		return CMD_RET_FAILURE;
 
+	curr_device = dev;
 	printf("\nMMC read: dev # %d, block # %d, count %d ... ",
 	       curr_device, blk, cnt);
 
@@ -301,25 +360,38 @@ static int do_mmc_write(cmd_tbl_t *cmdtp, int flag,
 	struct mmc *mmc;
 	u32 blk, cnt, n;
 	void *addr;
+	int dev;
 
-	if (argc != 4)
+	if (argc != 5)
 		return CMD_RET_USAGE;
 
-	addr = (void *)simple_strtoul(argv[1], NULL, 16);
-	blk = simple_strtoul(argv[2], NULL, 16);
-	cnt = simple_strtoul(argv[3], NULL, 16);
+	dev = simple_strtoul(argv[1], NULL, 16);
+	addr = (void *)simple_strtoul(argv[2], NULL, 16);
+	blk = simple_strtoul(argv[3], NULL, 16);
+	cnt = simple_strtoul(argv[4], NULL, 16);
 
-	mmc = init_mmc_device(curr_device, false);
+	mmc = init_mmc_device(dev, false);
 	if (!mmc)
 		return CMD_RET_FAILURE;
 
-	printf("\nMMC write: dev # %d, block # %d, count %d ... ",
-	       curr_device, blk, cnt);
+	curr_device = dev;
 
 	if (mmc_getwp(mmc) == 1) {
 		printf("Error: card is write protected!\n");
 		return CMD_RET_FAILURE;
 	}
+
+#ifdef CONFIG_EXT4_SPARSE
+	if (!strcmp(argv[0], "write.ext4sp")) {
+		printf("\nMMC write ext4 sparse: dev # %d, block # %d, count %d ... ",
+				curr_device, blk, cnt);
+		return ext4_unsparse(mmc, dev, addr, blk, cnt);
+	}
+#endif
+
+	printf("\nMMC write: dev # %d, block # %d, count %d ... ",
+	       curr_device, blk, cnt);
+
 	n = blk_dwrite(mmc_get_blk_desc(mmc), blk, cnt, addr);
 	printf("%d blocks written: %s\n", n, (n == cnt) ? "OK" : "ERROR");
 
@@ -731,8 +803,9 @@ static int do_mmc_setdsr(cmd_tbl_t *cmdtp, int flag,
 
 static cmd_tbl_t cmd_mmc[] = {
 	U_BOOT_CMD_MKENT(info, 1, 0, do_mmcinfo, "", ""),
-	U_BOOT_CMD_MKENT(read, 4, 1, do_mmc_read, "", ""),
-	U_BOOT_CMD_MKENT(write, 4, 0, do_mmc_write, "", ""),
+	U_BOOT_CMD_MKENT(reg, 2, 0, do_mmcreg, "", ""),
+	U_BOOT_CMD_MKENT(read, 5, 1, do_mmc_read, "", ""),
+	U_BOOT_CMD_MKENT(write, 5, 0, do_mmc_write, "", ""),
 	U_BOOT_CMD_MKENT(erase, 3, 0, do_mmc_erase, "", ""),
 	U_BOOT_CMD_MKENT(rescan, 1, 1, do_mmc_rescan, "", ""),
 	U_BOOT_CMD_MKENT(part, 1, 1, do_mmc_part, "", ""),
@@ -781,8 +854,9 @@ U_BOOT_CMD(
 	mmc, 29, 1, do_mmcops,
 	"MMC sub system",
 	"info - display info of the current MMC device\n"
-	"mmc read addr blk# cnt\n"
-	"mmc write addr blk# cnt\n"
+	"mmc reg [dev] - display register of the current MMC device\n"
+	"mmc read dev addr blk# cnt\n"
+	"mmc write dev addr blk# cnt\n"
 	"mmc erase blk# cnt\n"
 	"mmc rescan\n"
 	"mmc part - lists available partition on current mmc device\n"
