@@ -775,3 +775,16 @@ bool str2long(const char *p, ulong *num)
 	*num = simple_strtoul(p, &endptr, 16);
 	return *p != '\0' && *endptr == '\0';
 }
+
+char *ultohstr(unsigned long long size)
+{
+	int ix;
+	static char buffer[20];
+	char *fmt[] = {
+		"%u", "%uK", "%uM", "%uG", "%uT", "%uT"};
+	for (ix = 0; (ix < 5) && !(size & 0x3FF) && size; ix++) {
+		size = (size >> 10);
+	}
+	sprintf(buffer, fmt[ix], size);
+	return buffer;
+}

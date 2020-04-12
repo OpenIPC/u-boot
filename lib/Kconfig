@@ -196,7 +196,15 @@ config SMBIOS_PRODUCT_NAME
 
 endmenu
 
+config HWDEC
+	bool "hw decompress"
+	default y
+	depends on TARGET_HI3559AV100 || TARGET_HI3519AV100 || TARGET_HI3556AV100 || TARGET_HI3556V200 || TARGET_HI3559V200 || TARGET_HI3516DV300 || TARGET_HI3516AV300 || TARGET_HI3516CV500 || TARGET_HI3516EV200 || TARGET_HI3516EV300 || TARGET_HI3518EV300 || TARGET_HI3516DV200
+	help
+	  hw decompress.
+
 source lib/efi/Kconfig
 source lib/efi_loader/Kconfig
+source lib/optee/Kconfig
 
 endmenu

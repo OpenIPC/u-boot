@@ -16,6 +16,7 @@ obj-$(CONFIG_BZIP2) += bzip2/
 obj-$(CONFIG_TIZEN) += tizen/
 obj-$(CONFIG_FIT) += libfdt/
 obj-$(CONFIG_CMD_DHRYSTONE) += dhry/
+obj-$(CONFIG_OPTEE) += optee/
 
 obj-$(CONFIG_AES) += aes.o
 obj-$(CONFIG_USB_TTY) += circbuf.o
@@ -43,6 +44,8 @@ obj-$(CONFIG_RBTREE)	+= rbtree.o
 obj-$(CONFIG_BITREVERSE) += bitrev.o
 obj-y += list_sort.o
 endif
+
+obj-$(CONFIG_HWDEC) += hw_dec/
 
 obj-$(CONFIG_$(SPL_)RSA) += rsa/
 obj-$(CONFIG_$(SPL_)SHA1) += sha1.o
@@ -94,7 +97,11 @@ obj-$(SERIAL_SUPPORT) += vsprintf.o panic.o strto.o strmhz.o
 endif
 else
 # Main U-Boot always uses the full printf support
+#ifndef CONFIG_MINI_BOOT
 obj-y += vsprintf.o panic.o strto.o strmhz.o
+#endif
+
 endif
+obj-$(CONFIG_CMD_NAND) +=match_table.o
 
 subdir-ccflags-$(CONFIG_CC_OPTIMIZE_LIBS_FOR_SPEED) += -O2
