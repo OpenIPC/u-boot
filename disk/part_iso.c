@@ -9,6 +9,7 @@
 #include <command.h>
 #include <asm/unaligned.h>
 #include "part_iso.h"
+#include <memalign.h>
 
 #ifdef HAVE_BLOCK_DEVICE
 
@@ -30,17 +31,34 @@ unsigned long iso_dread(struct blk_desc *block_dev, lbaint_t start,
                         lbaint_t blkcnt, void *buffer)
 {
 	unsigned long ret;
+	char * align_buff = NULL;
 
 	if (block_dev->blksz == 512) {
 		/* Convert from 2048 to 512 sector size */
 		start *= 4;
 		blkcnt *= 4;
+
 	}
 
-	ret = blk_dread(block_dev, start, blkcnt, buffer);
+    if (!IS_ALIGNED((unsigned long)buffer, CONFIG_SYS_CACHELINE_SIZE)){
+        align_buff = memalign(CONFIG_SYS_CACHELINE_SIZE, blkcnt << 9);
+        if (align_buff == NULL){
+            printf("memalign error!\n");
+            return 0;
+        }
+        ret = blk_dread(block_dev, start, blkcnt, align_buff);
+    }
+    else{
+        ret = blk_dread(block_dev, start, blkcnt, buffer);
+	}
 
 	if (block_dev->blksz == 512)
 		ret /= 4;
+
+	if (align_buff){
+        memcpy(buffer, align_buff, blkcnt << 9);
+        free(align_buff);
+	}
 
 	return ret;
 }

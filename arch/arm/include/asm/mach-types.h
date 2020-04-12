@@ -1107,6 +1107,18 @@ extern unsigned int __machine_arch_type;
 #define MACH_TYPE_COLIBRI_T30          4493
 #define MACH_TYPE_APALIS_T30           4513
 #define MACH_TYPE_OMAPL138_LCDK        2495
+#define MACH_TYPE_HI3559AV100          8000
+#define MACH_TYPE_HI3516CV500		   8000
+#define MACH_TYPE_HI3516DV300		   8000
+#define MACH_TYPE_HI3516AV300		   8000
+#define MACH_TYPE_HI3556V200		   8000
+#define MACH_TYPE_HI3559V200		   8000
+#define MACH_TYPE_HI3556AV100          8000
+#define MACH_TYPE_HI3519AV100          8000
+#define MACH_TYPE_HI3516EV200		   8000
+#define MACH_TYPE_HI3516EV300		   8000
+#define MACH_TYPE_HI3518EV300		   8000
+#define MACH_TYPE_HI3516DV200		   8000
 
 #ifdef CONFIG_ARCH_EBSA110
 # ifdef machine_arch_type

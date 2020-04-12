@@ -265,7 +265,7 @@ static int load_devicetree(void)
 	char *dtbname = getenv("dtb");
 	char *dtbdev = getenv("dtbdev");
 	char *dtppart = getenv("dtbpart");
-	if (!dtbdev || !dtbdev || !dtbname) {
+	if (!dtbdev || !dtbname) {
 		printf("%s: <dtbdev>/<dtbpart>/<dtb> missing.\n", __func__);
 		return -1;
 	}

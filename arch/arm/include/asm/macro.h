@@ -58,7 +58,8 @@
 /*
  * Register aliases.
  */
-lr	.req	x30
+/*fix warning:gcc 6.3.0 not support*/
+/* lr	.req	x30 */
 
 /*
  * Branch according to exception level

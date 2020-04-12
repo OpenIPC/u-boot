@@ -118,9 +118,9 @@ endif
 
 # limit ourselves to the sections we want in the .bin.
 ifdef CONFIG_ARM64
-OBJCOPYFLAGS += -j .text -j .rodata -j .data -j .u_boot_list -j .rela.dyn
+OBJCOPYFLAGS += -j .text -j .image -j .rodata -j .data -j .u_boot_list -j .rela.dyn
 else
-OBJCOPYFLAGS += -j .text -j .secure_text -j .secure_data -j .rodata -j .hash \
+OBJCOPYFLAGS += -j .text -j .secure_text -j .image -j .secure_data -j .rodata -j .hash \
 		-j .data -j .got -j .got.plt -j .u_boot_list -j .rel.dyn
 endif
 

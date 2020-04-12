@@ -59,7 +59,7 @@ static void print_one_part(dos_partition_t *p, lbaint_t ext_part_sector,
 		(is_extended(p->sys_ind) ? " Extd" : ""),
 		(is_bootable(p) ? " Boot" : ""));
 }
-
+#if 0
 static int test_block_type(unsigned char *buffer)
 {
 	int slot;
@@ -85,19 +85,79 @@ static int test_block_type(unsigned char *buffer)
 	}
 	return DOS_MBR;	    /* Is MBR */
 }
+#endif
+static int test_block_type(unsigned char *buffer)
+{
+	int slot;
+	struct dos_partition *p;
+    int checkpbr = 0;
+
+	if((buffer[DOS_PART_MAGIC_OFFSET + 0] != 0x55) ||
+	    (buffer[DOS_PART_MAGIC_OFFSET + 1] != 0xaa) ) {
+		return (-1);
+	} /* no DOS Signature at all */
+	p = (struct dos_partition *)&buffer[DOS_PART_TBL_OFFSET];
+	for (slot = 0; slot < 3; slot++) {
+        if(p->boot_ind != 0 && p->boot_ind != 0x80){
+            //not valid mbr,need check PBR
+            checkpbr = 1;
+        }else if(p->boot_ind == 0){  //some cases MBR's DOS_PART_TBL_OFFSET value is 0, but paration is valid
+            if(p->size4[0] == 0 && p->size4[1] == 0 && p->size4[2] == 0 && p->size4[3] == 0)
+            {
+                //not valid mbr paratition size, check PBR
+                checkpbr = 1;
+            }else{
+                checkpbr = 0;
+            }
+        }else{
+            checkpbr = 0;
+        }
+
+        if(checkpbr){
+			if (!slot &&
+			    (strncmp((char *)&buffer[DOS_PBR_FSTYPE_OFFSET],
+				     "FAT", 3) == 0 ||
+			     strncmp((char *)&buffer[DOS_PBR32_FSTYPE_OFFSET],
+				     "FAT32", 5) == 0)) {
+				return DOS_PBR; /* is PBR */
+			} else {
+				return -1;
+			}
+		}
+	}
+	return DOS_MBR;	    /* Is MBR */
+}
+
 
 
 static int part_test_dos(struct blk_desc *dev_desc)
 {
 	ALLOC_CACHE_ALIGN_BUFFER(unsigned char, buffer, dev_desc->blksz);
+    int ret = -1;
+    lbaint_t start = 0;
 
-	if (blk_dread(dev_desc, 0, 1, (ulong *)buffer) != 1)
+#if (CONFIG_AUTO_UPDATE == 1)
+#ifdef CONFIG_EMMC
+    extern int target_dev;
+    extern unsigned int dos_start_lba;
+    if(dev_desc->devnum == target_dev){
+        start = dos_start_lba;
+    }
+#endif
+#endif
+
+	if (blk_dread(dev_desc, start, 1, (ulong *)buffer) != 1)
 		return -1;
 
-	if (test_block_type(buffer) != DOS_MBR)
-		return -1;
+	/*if (test_block_type(buffer) != DOS_MBR)
+		return -1;*/
 
-	return 0;
+    ret = test_block_type(buffer);
+    if((ret==DOS_PBR)||(ret==DOS_MBR)){
+        return 0;
+    }else{
+        return -1;
+    }
 }
 
 /*  Print a partition that is relative to its Extended partition table
@@ -110,6 +170,17 @@ static void print_partition_extended(struct blk_desc *dev_desc,
 	ALLOC_CACHE_ALIGN_BUFFER(unsigned char, buffer, dev_desc->blksz);
 	dos_partition_t *pt;
 	int i;
+    lbaint_t start_sector = 0;
+
+#if (CONFIG_AUTO_UPDATE == 1)
+#ifdef CONFIG_EMMC
+        extern int target_dev;
+        extern unsigned int dos_start_lba;
+        if(dev_desc->devnum == target_dev){
+            start_sector = dos_start_lba;
+        }
+#endif
+#endif
 
 	if (blk_dread(dev_desc, ext_part_sector, 1, (ulong *)buffer) != 1) {
 		printf ("** Can't read partition table on %d:" LBAFU " **\n",
@@ -141,7 +212,7 @@ static void print_partition_extended(struct blk_desc *dev_desc,
 		}
 
 		/* Reverse engr the fdisk part# assignment rule! */
-		if ((ext_part_sector == 0) ||
+		if ((ext_part_sector == start_sector) ||
 		    (pt->sys_ind != 0 && !is_extended (pt->sys_ind)) ) {
 			part_num++;
 		}
@@ -155,7 +226,7 @@ static void print_partition_extended(struct blk_desc *dev_desc,
 				= le32_to_int (pt->start4) + relative;
 
 			print_partition_extended(dev_desc, lba_start,
-				ext_part_sector == 0  ? lba_start : relative,
+				ext_part_sector == start_sector  ? lba_start : relative,
 				part_num, disksig);
 		}
 	}
@@ -175,7 +246,17 @@ static int part_get_info_extended(struct blk_desc *dev_desc,
 	dos_partition_t *pt;
 	int i;
 	int dos_type;
+    lbaint_t start_sector = 0;
 
+#if (CONFIG_AUTO_UPDATE == 1)
+#ifdef CONFIG_EMMC
+    extern int target_dev;
+    extern unsigned int dos_start_lba;
+    if(dev_desc->devnum == target_dev){
+        start_sector = dos_start_lba;
+    }
+#endif
+#endif
 	if (blk_dread(dev_desc, ext_part_sector, 1, (ulong *)buffer) != 1) {
 		printf ("** Can't read partition table on %d:" LBAFU " **\n",
 			dev_desc->devnum, ext_part_sector);
@@ -221,7 +302,7 @@ static int part_get_info_extended(struct blk_desc *dev_desc,
 		}
 
 		/* Reverse engr the fdisk part# assignment rule! */
-		if ((ext_part_sector == 0) ||
+		if ((ext_part_sector == start_sector) ||
 		    (pt->sys_ind != 0 && !is_extended (pt->sys_ind)) ) {
 			part_num++;
 		}
@@ -235,7 +316,7 @@ static int part_get_info_extended(struct blk_desc *dev_desc,
 				= le32_to_int (pt->start4) + relative;
 
 			return part_get_info_extended(dev_desc, lba_start,
-				 ext_part_sector == 0 ? lba_start : relative,
+				 ext_part_sector == start_sector ? lba_start : relative,
 				 part_num, which_part, info, disksig);
 		}
 	}
@@ -244,7 +325,7 @@ static int part_get_info_extended(struct blk_desc *dev_desc,
 	dos_type = test_block_type(buffer);
 
 	if (dos_type == DOS_PBR) {
-		info->start = 0;
+		info->start = ext_part_sector;
 		info->size = dev_desc->lba;
 		info->blksz = DOS_PART_DEFAULT_SECTOR;
 		info->bootable = 0;
@@ -261,13 +342,35 @@ static int part_get_info_extended(struct blk_desc *dev_desc,
 void part_print_dos(struct blk_desc *dev_desc)
 {
 	printf("Part\tStart Sector\tNum Sectors\tUUID\t\tType\n");
-	print_partition_extended(dev_desc, 0, 0, 1, 0);
+    lbaint_t start_sector = 0;
+
+#if (CONFIG_AUTO_UPDATE == 1)
+#ifdef CONFIG_EMMC
+    extern int target_dev;
+    extern unsigned int dos_start_lba;
+    if(dev_desc->devnum == target_dev){
+        start_sector = dos_start_lba;
+    }
+#endif
+#endif
+	print_partition_extended(dev_desc, start_sector, 0, 1, 0);
 }
 
 int part_get_info_dos(struct blk_desc *dev_desc, int part,
 		      disk_partition_t *info)
 {
-	return part_get_info_extended(dev_desc, 0, 0, 1, part, info, 0);
+    lbaint_t start_sector = 0;
+
+#if (CONFIG_AUTO_UPDATE == 1)
+#ifdef CONFIG_EMMC
+    extern int target_dev;
+    extern unsigned int dos_start_lba;
+    if(dev_desc->devnum == target_dev){
+        start_sector = dos_start_lba;
+    }
+#endif
+#endif
+	return part_get_info_extended(dev_desc, start_sector, 0, 1, part, info, 0);
 }
 
 int is_valid_dos_buf(void *buf)
@@ -280,8 +383,19 @@ int write_mbr_partition(struct blk_desc *dev_desc, void *buf)
 	if (is_valid_dos_buf(buf))
 		return -1;
 
+    lbaint_t start_sector = 0;
+
+#if (CONFIG_AUTO_UPDATE == 1)
+#ifdef CONFIG_EMMC
+        extern int target_dev;
+        extern unsigned int dos_start_lba;
+        if(dev_desc->devnum == target_dev){
+            start_sector = dos_start_lba;
+        }
+#endif
+#endif
 	/* write MBR */
-	if (blk_dwrite(dev_desc, 0, 1, buf) != 1) {
+	if (blk_dwrite(dev_desc, start_sector, 1, buf) != 1) {
 		printf("%s: failed writing '%s' (1 blks at 0x0)\n",
 		       __func__, "MBR");
 		return 1;

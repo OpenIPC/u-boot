@@ -33,6 +33,8 @@ int do_reset(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 	udelay (50000);				/* wait 50 ms */
 
+	do_shutdown();
+
 	disable_interrupts();
 
 	reset_misc();

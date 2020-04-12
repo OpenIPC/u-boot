@@ -97,9 +97,10 @@ ENTRY(_main)
 	sub	x18, x18, #GD_SIZE		/* new GD is below bd */
 
 	adr	lr, relocation_return
-	ldr	x9, [x18, #GD_RELOC_OFF]	/* x9 <- gd->reloc_off */
-	add	lr, lr, x9	/* new return address after relocation */
 	ldr	x0, [x18, #GD_RELOCADDR]	/* x0 <- gd->relocaddr */
+	adr x9, _start
+	sub x9, x0, x9					/* x9 <- gd->reloc_off */
+	add	lr, lr, x9	/* new return address after relocation */
 	b	relocate_code
 
 relocation_return:

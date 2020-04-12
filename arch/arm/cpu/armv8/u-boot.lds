@@ -24,6 +24,9 @@ SECTIONS
 	}
 
 	. = ALIGN(8);
+	.image : { *(.image) }
+
+	. = ALIGN(8);
 	.rodata : { *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.rodata*))) }
 
 	. = ALIGN(8);

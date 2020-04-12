@@ -12,7 +12,7 @@ config ARCH_SUPPORT_PSCI
 config ARMV7_NONSEC
 	bool "Enable support for booting in non-secure mode" if EXPERT
 	depends on CPU_V7_HAS_NONSEC
-	default y
+	default y if !MINI_BOOT
 	---help---
 	Say Y here to enable support for booting in non-secure / SVC mode.
 

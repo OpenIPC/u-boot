@@ -93,6 +93,8 @@ copy_loop:
 	 */
 	ldr	r2, =__rel_dyn_start	/* r2 <- SRC &__rel_dyn_start */
 	ldr	r3, =__rel_dyn_end	/* r3 <- SRC &__rel_dyn_end */
+	cmp r2, r3
+	beq relocate_done
 fixloop:
 	ldmia	r2!, {r0-r1}		/* (r0,r1) <- (SRC location,fixup) */
 	and	r1, r1, #0xff

@@ -36,6 +36,7 @@
 #endif
 
 reset:
+#ifndef CONFIG_MINI_BOOT
 	/* Allow the board to save important registers */
 	b	save_boot_params
 save_boot_params_ret:
@@ -84,6 +85,7 @@ switch_to_hypervisor_ret:
 	bl	cpu_init_crit
 #endif
 #endif
+#endif
 
 	bl	_main
 
@@ -103,6 +105,7 @@ ENTRY(c_runtime_cpu_setup)
 
 ENDPROC(c_runtime_cpu_setup)
 
+#ifndef CONFIG_MINI_BOOT
 /*************************************************************************
  *
  * void save_boot_params(u32 r0, u32 r1, u32 r2, u32 r3)
@@ -116,6 +119,7 @@ ENTRY(save_boot_params)
 	b	save_boot_params_ret		@ back to my caller
 ENDPROC(save_boot_params)
 	.weak	save_boot_params
+#endif
 
 #ifdef CONFIG_ARMV7_LPAE
 ENTRY(switch_to_hypervisor)

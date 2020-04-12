@@ -117,9 +117,32 @@ void flush_dcache_all(void)
  */
 void invalidate_dcache_range(unsigned long start, unsigned long stop)
 {
-	check_cache_range(start, stop);
+	unsigned int align = 0;
 
-	v7_dcache_maint_range(start, stop, ARMV7_DCACHE_INVAL_RANGE);
+	if (!IS_ALIGNED(start, CONFIG_SYS_CACHELINE_SIZE)){
+		align = 1;
+	}
+
+	if (!IS_ALIGNED(stop, CONFIG_SYS_CACHELINE_SIZE)){
+		align = 1;
+	}
+
+	if (!align){
+		v7_dcache_maint_range(start, stop, ARMV7_DCACHE_INVAL_RANGE);
+	}
+	else{
+		u32 line_len, ccsidr;
+
+		ccsidr = get_ccsidr();
+		line_len = ((ccsidr & CCSIDR_LINE_SIZE_MASK) >>
+				CCSIDR_LINE_SIZE_OFFSET) + 2;
+		/* Converting from words to bytes */
+		line_len += 2;
+		/* converting from log2(linelen) to linelen */
+		line_len = 1 << line_len;
+
+		v7_dcache_clean_inval_range(start, stop, line_len);
+	}
 
 	v7_outer_cache_inval_range(start, stop);
 }
@@ -131,7 +154,6 @@ void invalidate_dcache_range(unsigned long start, unsigned long stop)
  */
 void flush_dcache_range(unsigned long start, unsigned long stop)
 {
-	check_cache_range(start, stop);
 
 	v7_dcache_maint_range(start, stop, ARMV7_DCACHE_CLEAN_INVAL_RANGE);
 

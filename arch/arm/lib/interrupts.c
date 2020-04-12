@@ -118,12 +118,15 @@ int disable_interrupts (void)
 
 void bad_mode (void)
 {
+#ifndef CONFIG_MINI_BOOT
 	panic ("Resetting CPU ...\n");
 	reset_cpu (0);
+#endif
 }
 
 void show_regs (struct pt_regs *regs)
 {
+#ifndef CONFIG_MINI_BOOT
 	unsigned long __maybe_unused flags;
 	const char __maybe_unused *processor_modes[] = {
 	"USER_26",	"FIQ_26",	"IRQ_26",	"SVC_26",
@@ -162,62 +165,77 @@ void show_regs (struct pt_regs *regs)
 		fast_interrupts_enabled (regs) ? "on" : "off",
 		processor_modes[processor_mode (regs)],
 		thumb_mode (regs) ? " (T)" : "");
+#endif
 }
 
 void do_undefined_instruction (struct pt_regs *pt_regs)
 {
+#ifndef CONFIG_MINI_BOOT
 	efi_restore_gd();
 	printf ("undefined instruction\n");
 	show_regs (pt_regs);
 	bad_mode ();
+#endif
 }
 
 void do_software_interrupt (struct pt_regs *pt_regs)
 {
+#ifndef CONFIG_MINI_BOOT
 	efi_restore_gd();
 	printf ("software interrupt\n");
 	show_regs (pt_regs);
 	bad_mode ();
+#endif
 }
 
 void do_prefetch_abort (struct pt_regs *pt_regs)
 {
+#ifndef CONFIG_MINI_BOOT
 	efi_restore_gd();
 	printf ("prefetch abort\n");
 	show_regs (pt_regs);
 	bad_mode ();
+#endif
 }
 
 void do_data_abort (struct pt_regs *pt_regs)
 {
+#ifndef CONFIG_MINI_BOOT
 	efi_restore_gd();
 	printf ("data abort\n");
 	show_regs (pt_regs);
 	bad_mode ();
+#endif
 }
 
 void do_not_used (struct pt_regs *pt_regs)
 {
+#ifndef CONFIG_MINI_BOOT
 	efi_restore_gd();
 	printf ("not used\n");
 	show_regs (pt_regs);
 	bad_mode ();
+#endif
 }
 
 void do_fiq (struct pt_regs *pt_regs)
 {
+#ifndef CONFIG_MINI_BOOT
 	efi_restore_gd();
 	printf ("fast interrupt request\n");
 	show_regs (pt_regs);
 	bad_mode ();
+#endif
 }
 
 #ifndef CONFIG_USE_IRQ
 void do_irq (struct pt_regs *pt_regs)
 {
+#ifndef CONFIG_MINI_BOOT
 	efi_restore_gd();
 	printf ("interrupt request\n");
 	show_regs (pt_regs);
 	bad_mode ();
+#endif
 }
 #endif
