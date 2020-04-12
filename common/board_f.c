@@ -148,6 +148,7 @@ static int init_baud_rate(void)
 	return 0;
 }
 
+#ifndef CONFIG_MINI_BOOT
 static int display_text_info(void)
 {
 #if !defined(CONFIG_SANDBOX) && !defined(CONFIG_EFI_APP)
@@ -173,12 +174,15 @@ static int display_text_info(void)
 
 	return 0;
 }
+#endif
 
+#ifndef CONFIG_MINI_BOOT
 static int announce_dram_init(void)
 {
-	puts("DRAM:  ");
+	//puts("DRAM:  ");
 	return 0;
 }
+#endif
 
 #if defined(CONFIG_MIPS) || defined(CONFIG_PPC) || defined(CONFIG_M68K)
 static int init_func_ram(void)
@@ -220,9 +224,9 @@ static int show_dram_config(void)
 	size = gd->ram_size;
 #endif
 
-	print_size(size, "");
-	board_add_ram_info(0);
-	putc('\n');
+	//print_size(size, "");
+	//board_add_ram_info(0);
+	//putc('\n');
 
 	return 0;
 }
@@ -758,11 +762,12 @@ static int setup_reloc(void)
 #endif
 	memcpy(gd->new_gd, (char *)gd, sizeof(gd_t));
 
-	debug("Relocation Offset is: %08lx\n", gd->reloc_off);
-	debug("Relocating to %08lx, new gd at %08lx, sp at %08lx\n",
+#ifndef CONFIG_MINI_BOOT
+	printf("Relocation Offset is: %08lx\n", gd->reloc_off);
+	printf("Relocating to %08lx, new gd at %08lx, sp at %08lx\n",
 	      gd->relocaddr, (ulong)map_to_sysmem(gd->new_gd),
 	      gd->start_addr_sp);
-
+#endif
 	return 0;
 }
 
@@ -798,6 +803,7 @@ static int jump_to_copy(void)
 }
 #endif
 
+#ifndef CONFIG_MINI_BOOT
 /* Record the board_init_f() bootstage (after arch_cpu_init()) */
 static int mark_bootstage(void)
 {
@@ -805,6 +811,7 @@ static int mark_bootstage(void)
 
 	return 0;
 }
+#endif
 
 static int initf_console_record(void)
 {
@@ -868,7 +875,9 @@ static init_fnc_t init_sequence_f[] = {
 	mach_cpu_init,		/* SoC/machine dependent CPU setup */
 	initf_dm,
 	arch_cpu_init_dm,
+#ifndef CONFIG_MINI_BOOT
 	mark_bootstage,		/* need timer, go after init dm */
+#endif
 #if defined(CONFIG_BOARD_EARLY_INIT_F)
 	board_early_init_f,
 #endif
@@ -879,13 +888,17 @@ static init_fnc_t init_sequence_f[] = {
 		&& !defined(CONFIG_TQM885D)
 	adjust_sdram_tbs_8xx,
 #endif
+#ifndef CONFIG_MINI_BOOT
 	/* TODO: can we rename this to timer_init()? */
 	init_timebase,
+#endif
 #endif
 #if defined(CONFIG_ARM) || defined(CONFIG_MIPS) || \
 		defined(CONFIG_BLACKFIN) || defined(CONFIG_NDS32) || \
 		defined(CONFIG_SPARC)
+#ifndef CONFIG_MINI_BOOT
 	timer_init,		/* initialize timer */
+#endif
 #endif
 #ifdef CONFIG_SYS_ALLOC_DPRAM
 #if !defined(CONFIG_CPM2)
@@ -912,8 +925,10 @@ static init_fnc_t init_sequence_f[] = {
 #ifdef CONFIG_SANDBOX
 	sandbox_early_getopt_check,
 #endif
+#ifndef CONFIG_MINI_BOOT
 	display_options,	/* say that we are here */
 	display_text_info,	/* show debugging info if required */
+#endif
 #if defined(CONFIG_MPC8260)
 	prt_8260_rsr,
 	prt_8260_clks,
@@ -924,7 +939,9 @@ static init_fnc_t init_sequence_f[] = {
 #if defined(CONFIG_PPC) || defined(CONFIG_M68K)
 	checkcpu,
 #endif
+#ifndef CONFIG_MINI_BOOT
 	print_cpuinfo,		/* display cpu info (and speed) */
+#endif
 #if defined(CONFIG_MPC5xxx)
 	prt_mpc5xxx_clks,
 #endif /* CONFIG_MPC5xxx */
@@ -935,14 +952,18 @@ static init_fnc_t init_sequence_f[] = {
 #if defined(CONFIG_MISC_INIT_F)
 	misc_init_f,
 #endif
+#ifndef CONFIG_MINI_BOOT
 	INIT_FUNC_WATCHDOG_RESET
+#endif
 #if defined(CONFIG_HARD_I2C) || defined(CONFIG_SYS_I2C)
 	init_func_i2c,
 #endif
 #if defined(CONFIG_HARD_SPI)
 	init_func_spi,
 #endif
+#ifndef CONFIG_MINI_BOOT
 	announce_dram_init,
+#endif
 	/* TODO: unify all these dram functions? */
 #if defined(CONFIG_ARM) || defined(CONFIG_X86) || defined(CONFIG_NDS32) || \
 		defined(CONFIG_MICROBLAZE) || defined(CONFIG_AVR32)
@@ -954,16 +975,21 @@ static init_fnc_t init_sequence_f[] = {
 #ifdef CONFIG_POST
 	post_init_f,
 #endif
+#ifndef CONFIG_MINI_BOOT
 	INIT_FUNC_WATCHDOG_RESET
+#endif
 #if defined(CONFIG_SYS_DRAM_TEST)
 	testdram,
 #endif /* CONFIG_SYS_DRAM_TEST */
+#ifndef CONFIG_MINI_BOOT
 	INIT_FUNC_WATCHDOG_RESET
-
+#endif
 #ifdef CONFIG_POST
 	init_post,
 #endif
+#ifndef CONFIG_MINI_BOOT
 	INIT_FUNC_WATCHDOG_RESET
+#endif
 	/*
 	 * Now that we have DRAM mapped and working, we can
 	 * relocate the code and continue running from DRAM.

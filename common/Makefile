@@ -9,8 +9,10 @@
 ifndef CONFIG_SPL_BUILD
 obj-y += init/
 obj-y += main.o
+ifndef CONFIG_MINI_BOOT
 obj-y += exports.o
 obj-y += hash.o
+endif
 obj-$(CONFIG_HUSH_PARSER) += cli_hush.o
 obj-$(CONFIG_AUTOBOOT) += autoboot.o
 
@@ -33,6 +35,7 @@ obj-$(CONFIG_CMD_BOOTI) += bootm.o bootm_os.o
 obj-y += env_attr.o
 obj-y += env_callback.o
 obj-y += env_flags.o
+obj-y += env_common_func.o
 obj-$(CONFIG_ENV_IS_IN_DATAFLASH) += env_dataflash.o
 obj-$(CONFIG_ENV_IS_IN_EEPROM) += env_eeprom.o
 extra-$(CONFIG_ENV_IS_EMBEDDED) += env_embedded.o
@@ -41,6 +44,7 @@ extra-$(CONFIG_ENV_IS_IN_FLASH) += env_embedded.o
 obj-$(CONFIG_ENV_IS_IN_NVRAM) += env_embedded.o
 obj-$(CONFIG_ENV_IS_IN_FLASH) += env_flash.o
 obj-$(CONFIG_ENV_IS_IN_MMC) += env_mmc.o
+obj-$(CONFIG_ENV_IS_IN_UFS) += env_ufs.o
 obj-$(CONFIG_ENV_IS_IN_FAT) += env_fat.o
 obj-$(CONFIG_ENV_IS_IN_EXT4) += env_ext4.o
 obj-$(CONFIG_ENV_IS_IN_NAND) += env_nand.o
@@ -177,5 +181,13 @@ obj-$(CONFIG_CMD_DFU) += dfu.o
 obj-y += command.o
 obj-y += s_record.o
 obj-y += xyzModem.o
+obj-y += download_process.o
+obj-$(CONFIG_ARM64_SUPPORT_LOAD_FIP) += load_fip.o
+
+obj-$(CONFIG_CMD_CREAD) += cmd_cycle.o
+
+ifdef CONFIG_CMD_UGZIP
+obj-y += cmd_ugzip.o
+endif
 
 CFLAGS_env_embedded.o := -Wa,--no-warn -DENV_CRC=$(shell tools/envcrc 2>/dev/null)

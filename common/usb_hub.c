@@ -236,6 +236,12 @@ int legacy_hub_port_reset(struct usb_device *dev, int port,
 		      (portstatus & USB_PORT_STAT_CONNECTION) ? 1 : 0,
 		      (portstatus & USB_PORT_STAT_ENABLE) ? 1 : 0);
 
+		if ((portchange & USB_PORT_STAT_C_CONNECTION) ||
+			!(portstatus & USB_PORT_STAT_CONNECTION)) {
+			usb_clear_port_feature(dev, port + 1, USB_PORT_FEAT_C_CONNECTION);
+			usb_clear_port_feature(dev, port + 1, USB_PORT_STAT_CONNECTION);
+			continue;
+		}
 		/*
 		 * Perhaps we should check for the following here:
 		 * - C_CONNECTION hasn't been set.
@@ -258,6 +264,7 @@ int legacy_hub_port_reset(struct usb_device *dev, int port,
 
 		/* Switch to long reset delay for the next round */
 		delay = HUB_LONG_RESET_TIME;
+		mdelay(delay);
 	}
 
 	if (tries == MAX_TRIES) {
@@ -286,8 +293,10 @@ int usb_hub_port_connect_change(struct usb_device *dev, int port)
 	ALLOC_CACHE_ALIGN_BUFFER(struct usb_port_status, portsts, 1);
 	unsigned short portstatus;
 	int ret, speed;
+	int retry_count = 0;
 
 	/* Check status */
+re_enumerate:
 	ret = usb_get_port_status(dev, port + 1, portsts);
 	if (ret < 0) {
 		debug("get_port_status failed\n");
@@ -318,7 +327,7 @@ int usb_hub_port_connect_change(struct usb_device *dev, int port)
 	if (ret < 0) {
 		if (ret != -ENXIO)
 			printf("cannot reset port %i!?\n", port + 1);
-		return ret;
+		goto port_reset;
 	}
 
 	switch (portstatus & USB_PORT_STAT_SPEED_MASK) {
@@ -363,7 +372,14 @@ int usb_hub_port_connect_change(struct usb_device *dev, int port)
 #endif
 	if (ret < 0) {
 		debug("hub: disabling port %d\n", port + 1);
+port_reset:
 		usb_clear_port_feature(dev, port + 1, USB_PORT_FEAT_ENABLE);
+		retry_count++;
+		if (retry_count <= 5) {
+			usb_set_port_feature(dev, port + 1, USB_PORT_FEAT_RESET);
+			mdelay(1000);
+			goto re_enumerate;
+		}
 	}
 
 	return ret;

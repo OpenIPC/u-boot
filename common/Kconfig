@@ -351,6 +351,13 @@ config DEFAULT_FDT_FILE
 	help
 	  This option is used to set the default fdt file to boot OS.
 
+config KERNEL_LOAD_ADDR
+	hex "Set kernel load address"
+	default 0x42080000
+	help
+	  Set the address of kernel to be loaded, because the single and
+	  big-little kernel should be loaded at diffrent address.
+
 config SYS_NO_FLASH
 	bool "Disable support for parallel NOR flash"
 	default n
@@ -382,5 +389,11 @@ config DISPLAY_BOARDINFO
 	  Display information about the board that U-Boot is running on
 	  when U-Boot starts up. The board function checkboard() is called
 	  to do this.
+
+config CMD_CREAD
+	bool "Enable cycle read function"
+	default y if CONFIG_TARGET_HI3556AV100 || CONFIG_TARGET_HI3519AV100
+	help
+	 Enable the function for cycle read. 
 
 source "common/spl/Kconfig"

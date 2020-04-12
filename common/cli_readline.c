@@ -496,8 +496,12 @@ static int cread_line(const char *const prompt, char *buf, unsigned int *len,
 	*len = eol_num;
 	buf[eol_num] = '\0';	/* lose the newline */
 
-	if (buf[0] && buf[0] != CREAD_HIST_CHAR)
+	if (buf[0] == '\0') {
+		return -3;
+	}
+	if (buf[0] && buf[0] != CREAD_HIST_CHAR) {
 		cread_add_to_hist(buf);
+	}
 	hist_cur = hist_add_idx;
 
 	return 0;

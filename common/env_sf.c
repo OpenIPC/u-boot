@@ -41,14 +41,14 @@ static ulong env_new_offset	= CONFIG_ENV_OFFSET_REDUND;
 
 DECLARE_GLOBAL_DATA_PTR;
 
-char *env_name_spec = "SPI Flash";
+char * sf_env_name_spec = "SPI Flash";
 
 static struct spi_flash *env_flash;
 
 #if defined(CONFIG_ENV_OFFSET_REDUND)
-int saveenv(void)
+int sf_saveenv(void)
 {
-	env_t	env_new;
+	__aligned(CONFIG_SYS_CACHELINE_SIZE) env_t	env_new;
 	char	*saved_buffer = NULL, flag = OBSOLETE_FLAG;
 	u32	saved_size, saved_offset, sector = 1;
 	int	ret;
@@ -149,7 +149,7 @@ int saveenv(void)
 	return ret;
 }
 
-void env_relocate_spec(void)
+void sf_env_relocate_spec(void)
 {
 	int ret;
 	int crc1_ok = 0, crc2_ok = 0;
@@ -236,12 +236,12 @@ out:
 	free(tmp_env2);
 }
 #else
-int saveenv(void)
+int sf_saveenv(void)
 {
 	u32	saved_size, saved_offset, sector = 1;
 	char	*saved_buffer = NULL;
 	int	ret = 1;
-	env_t	env_new;
+	__aligned(CONFIG_SYS_CACHELINE_SIZE) env_t	env_new;
 #ifdef CONFIG_DM_SPI_FLASH
 	struct udevice *new;
 
@@ -320,7 +320,7 @@ int saveenv(void)
 	return ret;
 }
 
-void env_relocate_spec(void)
+void sf_env_relocate_spec(void)
 {
 	int ret;
 	char *buf = NULL;
@@ -353,7 +353,7 @@ out:
 }
 #endif
 
-int env_init(void)
+int sf_env_init(void)
 {
 	/* SPI flash isn't usable before relocation */
 	gd->env_addr = (ulong)&default_environment[0];

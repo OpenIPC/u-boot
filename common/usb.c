@@ -144,6 +144,8 @@ int usb_stop(void)
 			if (usb_lowlevel_stop(i))
 				printf("failed to stop USB controller %d\n", i);
 		}
+		/* FIXME:Wait for the stop operation to complete. */
+		mdelay(100);
 	}
 
 	return 0;
@@ -221,6 +223,8 @@ int usb_control_msg(struct usb_device *dev, unsigned int pipe,
 	ALLOC_CACHE_ALIGN_BUFFER(struct devrequest, setup_packet, 1);
 	int err;
 
+	/* FIXME:Avoid some devices not recognized. */
+	dcache_disable();
 	if ((timeout == 0) && (!asynch_allowed)) {
 		/* request for a asynch control pipe is not allowed */
 		return -EINVAL;
@@ -256,6 +260,7 @@ int usb_control_msg(struct usb_device *dev, unsigned int pipe,
 	if (dev->status)
 		return -1;
 
+	dcache_enable();/* FIXME:dcache_disable() */
 	return dev->act_len;
 
 }
@@ -268,6 +273,8 @@ int usb_control_msg(struct usb_device *dev, unsigned int pipe,
 int usb_bulk_msg(struct usb_device *dev, unsigned int pipe,
 			void *data, int len, int *actual_length, int timeout)
 {
+	/* FIXME:Prevent some U disk from reading and writing errors. */
+	dcache_disable();
 	if (len < 0)
 		return -EINVAL;
 	dev->status = USB_ST_NOT_PROC; /*not yet processed */
@@ -279,6 +286,8 @@ int usb_bulk_msg(struct usb_device *dev, unsigned int pipe,
 		mdelay(1);
 	}
 	*actual_length = dev->act_len;
+
+	dcache_enable();/* FIXME:dcache_disable() */
 	if (dev->status == 0)
 		return 0;
 	else
@@ -926,6 +935,14 @@ static int get_descriptor_len(struct usb_device *dev, int len, int expect_len)
 	int err;
 
 	desc = (struct usb_device_descriptor *)tmpbuf;
+
+	err = usb_get_descriptor(dev, USB_DT_DEVICE, 0, tmpbuf, 8);
+	if (err < 8) {
+		printf("\nUSB device not responding, giving up (status=%lX)\n",
+				dev->status);
+		return 1;
+	}
+	memcpy(&dev->descriptor, tmpbuf, 8);
 
 	err = usb_get_descriptor(dev, USB_DT_DEVICE, 0, desc, len);
 	if (err < expect_len) {
