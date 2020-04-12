@@ -45,6 +45,9 @@ extern int board_nand_init(struct nand_chip *nand);
 extern int nand_curr_device;
 extern struct mtd_info *nand_info[];
 
+extern unsigned int ecc0_flag;
+extern unsigned int oobsize_real;
+
 static inline int nand_read(struct mtd_info *info, loff_t ofs, size_t *len,
 			    u_char *buf)
 {
@@ -97,6 +100,13 @@ struct nand_erase_options {
 };
 
 typedef struct nand_erase_options nand_erase_options_t;
+
+void nand_fill_ecc(struct nand_chip *chip, uint8_t *oob, size_t len);
+
+int nand_read_yaffs_skip_bad(struct mtd_info *mtd, loff_t offset, size_t *length,
+		u_char *buffer);
+int nand_write_yaffs_skip_bad(struct mtd_info *mtd, loff_t offset, size_t *length,
+                u_char *buffer);
 
 int nand_read_skip_bad(struct mtd_info *mtd, loff_t offset, size_t *length,
 		       size_t *actual, loff_t lim, u_char *buffer);

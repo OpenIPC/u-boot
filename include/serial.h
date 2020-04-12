@@ -168,6 +168,7 @@ struct serial_dev_priv {
 /* Access the serial operations for a device */
 #define serial_get_ops(dev)	((struct dm_serial_ops *)(dev)->driver->ops)
 
+#ifndef CONFIG_MINI_BOOT
 void amirix_serial_initialize(void);
 void arc_serial_initialize(void);
 void arm_dcc_initialize(void);
@@ -203,7 +204,9 @@ void mxs_auart_initialize(void);
 void ns16550_serial_initialize(void);
 void oc_serial_initialize(void);
 void p3mx_serial_initialize(void);
+#endif
 void pl01x_serial_initialize(void);
+#ifndef CONFIG_MINI_BOOT
 void pxa_serial_initialize(void);
 void s3c24xx_serial_initialize(void);
 void s5p_serial_initialize(void);
@@ -213,5 +216,6 @@ void sconsole_serial_initialize(void);
 void sh_serial_initialize(void);
 void uartlite_serial_initialize(void);
 void zynq_serial_initialize(void);
+#endif
 
 #endif

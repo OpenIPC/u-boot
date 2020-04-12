@@ -12,7 +12,7 @@
 
 #include <asm/io.h>
 #include <mmc.h>
-#include <asm/gpio.h>
+#include <asm-generic/gpio.h>
 
 /*
  * Controller registers
@@ -64,6 +64,7 @@
 #define  SDHCI_CARD_STATE_STABLE	0x00020000
 #define  SDHCI_CARD_DETECT_PIN_LEVEL	0x00040000
 #define  SDHCI_WRITE_PROTECT	0x00080000
+#define  SDHCI_DATA_0_LVL_MASK	0x00100000
 
 #define SDHCI_HOST_CONTROL	0x28
 #define  SDHCI_CTRL_LED		0x01
@@ -98,6 +99,7 @@
 #define  SDHCI_DIV_MASK_LEN	8
 #define  SDHCI_DIV_HI_MASK	0x300
 #define  SDHCI_PROG_CLOCK_MODE  0x0020
+#define  SDHCI_CLOCK_PLL_EN     0x0008
 #define  SDHCI_CLOCK_CARD_EN	0x0004
 #define  SDHCI_CLOCK_INT_STABLE	0x0002
 #define  SDHCI_CLOCK_INT_EN	0x0001
@@ -146,6 +148,15 @@
 #define SDHCI_ACMD12_ERR	0x3C
 
 /* 3E-3F reserved */
+#define SDHCI_HOST_CONTROL2	0x3E
+#define SDHCI_CTRL_UHS_MASK 0x0007
+#define SDHCI_CTRL_UHS_SDR12    0x0000
+#define SDHCI_CTRL_UHS_SDR25    0x0001
+#define SDHCI_CTRL_UHS_SDR50	0x0002
+#define SDHCI_CTRL_UHS_SDR104   0x0003
+#define SDHCI_CTRL_UHS_DDR50    0x0004
+#define SDHCI_CTRL_HS400		0x0007
+#define SDHCI_CTRL_TUNED_CLK	0x0080
 
 #define SDHCI_CAPABILITIES	0x40
 #define  SDHCI_TIMEOUT_CLK_MASK	0x0000003F
@@ -182,6 +193,7 @@
 /* 55-57 reserved */
 
 #define SDHCI_ADMA_ADDRESS	0x58
+#define SDHCI_ADMA_ADDRESS_HI	0x5c
 
 /* 60-FB reserved */
 
@@ -195,6 +207,39 @@
 #define   SDHCI_SPEC_100	0
 #define   SDHCI_SPEC_200	1
 #define   SDHCI_SPEC_300	2
+#define   SDHCI_SPEC_400	3
+#define   SDHCI_SPEC_420	5
+
+/* 0x508 */
+#define SDHCI_MSHC_CTRL         0x508
+#define SDHCI_CMD_CONFLIT_CHECK 0x01
+
+/* 0x510 */
+#define SDHCI_AXI_MBIIU_CTRL	0x510
+#define SDHCI_GM_WR_OSRC_LMT	0x03000000
+#define SDHCI_GM_RD_OSRC_LMT	0x00030000
+#define SDHCI_UNDEFL_INCR_EN	0x1
+
+/* 0x52c */
+#define SDHCI_EMMC_CTRL		0x52c
+#define SDHCI_ENH_STROBE_EN 0x0100
+#define SDHCI_CARD_IS_EMMC	0x0001
+
+/* 0x540 */
+#define SDHCI_AT_CTRL		0x540
+#define SDHCI_SAMPLE_EN		0x00000010
+
+/* 0x544 */
+#define SDHCI_AT_STAT		0x544
+#define SDHCI_PHASE_SEL_MASK    0x000000ff
+
+/* 0x54c */
+#define SDHCI_MULTI_CYCLE   0x54c
+#define SDHCI_FOUND_EDGE		0x00000800
+#define SDHCI_DOUT_EN_F_EDGE    0x00000040
+#define SDHCI_EDGE_DETECT_EN    0x00000100
+#define SDHCI_DATA_DLY_EN		0x00000008
+#define SDHCI_CMD_DLY_EN		0x00000004
 
 #define SDHCI_GET_VERSION(x) (x->version & SDHCI_SPEC_VER_MASK)
 
@@ -204,6 +249,8 @@
 
 #define SDHCI_MAX_DIV_SPEC_200	256
 #define SDHCI_MAX_DIV_SPEC_300	2046
+
+#define SDHCI_DMA_BOUNDARY_SIZE	(0x1 << 27)
 
 /*
  * quirks
@@ -254,11 +301,37 @@ struct sdhci_host {
 	struct gpio_desc cd_gpio;		/* Card Detect GPIO */
 
 	void (*set_control_reg)(struct sdhci_host *host);
-	void (*set_clock)(int dev_index, unsigned int div);
+	int (*set_clock)(struct sdhci_host *host, unsigned int clk);
+	int (*execute_tuning)(struct sdhci_host *host, unsigned int opcode);
+	void (*priv_init)(struct sdhci_host *host);
 	uint	voltages;
 
 	struct mmc_config cfg;
+	void *adma_table;
+	unsigned int adma_table_sz;
+	unsigned int desc_sz;
+	unsigned int max_segs;
+	unsigned int max_seg_size;
+	unsigned int type;
+#define MMC_TYPE_MMC    0       /* MMC card */
+#define MMC_TYPE_SD     1       /* SD card */
+	unsigned int is_tuning;
+	unsigned int tuning_phase;
 };
+
+struct sdhci_adma2_64_desc {
+	__le16  cmd;
+	__le16  len;
+	__le32  addr_lo;
+	__le32  addr_hi;
+} __packed __aligned(4);
+
+struct sdhci_adma2_32_desc {
+	__le16  cmd;
+	__le16  len;
+	__le32  addr_lo;
+} __packed __aligned(4);
+
 
 #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
 

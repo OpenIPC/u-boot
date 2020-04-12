@@ -179,7 +179,7 @@ extern unsigned char env_get_char_spec(int);
 extern void env_reloc(void);
 #endif
 
-#ifdef CONFIG_ENV_IS_IN_MMC
+#if 0
 #include <mmc.h>
 
 extern int mmc_get_env_addr(struct mmc *mmc, int copy, u32 *env_addr);

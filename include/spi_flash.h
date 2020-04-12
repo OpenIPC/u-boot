@@ -13,6 +13,51 @@
 #include <dm.h>	/* Because we dereference struct udevice here */
 #include <linux/types.h>
 
+#ifdef CONFIG_SPI_BLOCK_PROTECT
+#define BP_OP_SET	0
+#define BP_OP_GET	1
+
+#define BT_LOC_RDSR	0
+#define BT_LOC_RDCR	1
+
+#define BP_CMP_TOP      0
+#define BP_CMP_BOTTOM   1
+#define BP_CMP_UPDATE_FLAG      0xff
+
+enum block_protection_level {
+	BP_LEVEL_0      = 0,
+	BP_LEVEL_1      = 1,
+	BP_LEVEL_2      = 2,
+	BP_LEVEL_3      = 3,
+	BP_LEVEL_4      = 4,
+	BP_LEVEL_5      = 5,
+	BP_LEVEL_6      = 6,
+	BP_LEVEL_7      = 7,
+	BP_LEVEL_8      = 8,
+	BP_LEVEL_9      = 9,
+	BP_LEVEL_10     = 10,
+	BP_LEVEL_END,
+};
+
+#define BP_LEVEL_MAX    (BP_LEVEL_END - 1)
+
+#define BP_NUM_3	3
+#define BP_NUM_4	4
+
+void spi_flash_lock(unsigned char cmp, unsigned char level, unsigned char op);
+
+#endif /* CONFIG_SPI_BLOCK_PROTECT */
+
+#define MID_SPANSION    0x01    /* Spansion Manufacture ID */
+#define MID_WINBOND     0xef    /* Winbond  Manufacture ID */
+#define MID_MXIC        0xc2    /* MXIC Manufacture ID */
+#define MID_MICRON      0x20    /* Micron Manufacture ID */
+#define MID_GD          0xc8    /* GD Manufacture ID */
+#define MID_ESMT        0x8c    /* ESMT Manufacture ID */
+#define MID_CFEON       0x1c    /* CFeon Manufacture ID */
+#define MID_MICRON      0x20    /* Micron Manufacture ID */
+#define MID_PARAGON     0xe0    /* Paragon Manufacture ID */
+
 #ifndef CONFIG_SF_DEFAULT_SPEED
 # define CONFIG_SF_DEFAULT_SPEED	1000000
 #endif
@@ -74,6 +119,7 @@ struct spi_flash {
 	u32 page_size;
 	u32 sector_size;
 	u32 erase_size;
+
 #ifdef CONFIG_SPI_FLASH_BAR
 	u8 bank_read_cmd;
 	u8 bank_write_cmd;
@@ -85,7 +131,12 @@ struct spi_flash {
 	u8 dummy_byte;
 
 	void *memory_map;
+#ifdef CONFIG_SPI_BLOCK_PROTECT
+	unsigned int	bp_level_max;
 
+	void		(*lock)(unsigned char cmp, unsigned char level,
+				unsigned char op);
+#endif
 	int (*flash_lock)(struct spi_flash *flash, u32 ofs, size_t len);
 	int (*flash_unlock)(struct spi_flash *flash, u32 ofs, size_t len);
 	int (*flash_is_locked)(struct spi_flash *flash, u32 ofs, size_t len);

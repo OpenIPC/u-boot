@@ -18,6 +18,7 @@
 
 #include <config.h>
 
+#include <asm/cache.h>
 #include <linux/compat.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/flashchip.h>
@@ -804,6 +805,9 @@ static inline void nand_set_controller_data(struct nand_chip *chip, void *priv)
 #define NAND_MFR_SANDISK	0x45
 #define NAND_MFR_INTEL		0x89
 #define NAND_MFR_ATO		0x9b
+#define NAND_MFR_HEYANGTEK	0xc9
+#define NAND_MFR_DOSILICON	0xe5
+#define NAND_MFR_FIDELIX	0xf8
 
 /* The maximum expected count of bytes in the NAND ID sequence */
 #define NAND_MAX_ID_LEN 8
@@ -1101,4 +1105,19 @@ int nand_check_erased_ecc_chunk(void *data, int datalen,
 				void *ecc, int ecclen,
 				void *extraoob, int extraooblen,
 				int threshold);
+
+static inline char *get_ecctype_str(int ecctype)
+{
+#if defined(CONFIG_HIFMC_SPI_NAND)
+	static char *ecctype_string[] = {
+		"None", "1bit/512Byte", "4bits/512Byte", "8bits/512Byte",
+		"24bits/1K", "unknown", "40bits/1K", "unknown"};
+	return ecctype_string[(ecctype + 1) / 2];
+#else
+	static char *ecctype_string[] = {
+		"None", "1bit/512Byte", "4bits/512Byte", "8bits/512Byte",
+		"24bits/1K", "40bits/1K", "unknown", "unknown"};
+	return ecctype_string[(ecctype & 0x0F)];
+#endif
+}
 #endif /* __LINUX_MTD_NAND_H */

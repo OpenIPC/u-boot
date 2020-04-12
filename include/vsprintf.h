@@ -214,4 +214,5 @@ void print_grouped_ull(unsigned long long int_val, int digits);
 
 bool str2off(const char *p, loff_t *num);
 bool str2long(const char *p, ulong *num);
+char *ultohstr(unsigned long long size);
 #endif

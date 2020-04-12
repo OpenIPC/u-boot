@@ -16,6 +16,7 @@
 #include <usb_defs.h>
 #include <linux/usb/ch9.h>
 #include <asm/cache.h>
+#include <asm/types.h>
 #include <part.h>
 
 /*

@@ -621,6 +621,7 @@ void	serial_setbrg (void);
 void	serial_putc   (const char);
 void	serial_putc_raw(const char);
 void	serial_puts   (const char *);
+void	serial_puts_to_hitool(const char *);
 int	serial_getc   (void);
 int	serial_tstc   (void);
 
@@ -854,7 +855,7 @@ char *	strmhz(char *buf, unsigned long hz);
 void srand(unsigned int seed);
 unsigned int rand(void);
 unsigned int rand_r(unsigned int *seedp);
-
+void udc_connect(void);
 /*
  * STDIO based functions (can always be used)
  */
@@ -875,6 +876,7 @@ void	puts(const char *s);
 int	printf(const char *fmt, ...)
 		__attribute__ ((format (__printf__, 1, 2)));
 int	vprintf(const char *fmt, va_list args);
+void	print_to_hitool(const char *fmt, ...);
 #else
 #define	putc(...) do { } while (0)
 #define puts(...) do { } while (0)
@@ -901,6 +903,9 @@ void	fputs(int file, const char *s);
 void	fputc(int file, const char c);
 int	ftstc(int file);
 int	fgetc(int file);
+
+void add_shutdown(void (*shutdown)(void));
+void do_shutdown(void);
 
 /* lib/gzip.c */
 int gzip(void *dst, unsigned long *lenp,
@@ -936,6 +941,15 @@ int cpu_disable(int nr);
 int cpu_release(int nr, int argc, char * const argv[]);
 #endif
 
+#define BOOT_MEDIA_UNKNOWN        (0)
+#define BOOT_MEDIA_UFS            (1)
+#define BOOT_MEDIA_NAND           (2)
+#define BOOT_MEDIA_SPIFLASH       (3)
+#define BOOT_MEDIA_EMMC           (4)
+
+/* get uboot start media. */
+int get_boot_media(void);
+unsigned int get_ddr_size(void);
 #endif /* __ASSEMBLY__ */
 
 #ifdef CONFIG_PPC

@@ -12,7 +12,7 @@
  * features required by distros to support boards in a standardised and
  * consistent manner.
  */
-
+#ifndef CONFIG_MINI_BOOT
 #define CONFIG_BOOTP_BOOTPATH
 #define CONFIG_BOOTP_DNS
 #define CONFIG_BOOTP_GATEWAY
@@ -31,5 +31,7 @@
 #define CONFIG_ISO_PARTITION
 #define CONFIG_SUPPORT_RAW_INITRD
 #define CONFIG_ENV_VARS_UBOOT_CONFIG
+
+#endif
 
 #endif	/* _CONFIG_CMD_DISTRO_DEFAULTS_H */

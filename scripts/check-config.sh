@@ -23,6 +23,7 @@ configs="${path}.configs"
 suspects="${path}.suspects"
 ok="${path}.ok"
 new_adhoc="${path}.adhoc"
+sorted_white_list="sorted_white_list.txt"
 
 export LC_ALL=C
 export LC_COLLATE=C
@@ -30,7 +31,8 @@ export LC_COLLATE=C
 cat ${path} |sed -n 's/^#define \(CONFIG_[A-Za-z0-9_]*\).*/\1/p' |sort |uniq \
 	>${configs}
 
-comm -23 ${configs} ${whitelist} > ${suspects}
+sort ${whitelist} -o ${sorted_white_list}
+comm -23 ${configs} ${sorted_white_list} > ${suspects}
 
 cat `find ${srctree} -name "Kconfig*"` |sed -n \
 	-e 's/^config *\([A-Za-z0-9_]*\).*$/CONFIG_\1/p' \
@@ -46,5 +48,5 @@ if [ -s ${new_adhoc} ]; then
 	# Don't delete the temporary files in case they are useful
 	exit 1
 else
-	rm ${suspects} ${ok} ${new_adhoc}
+	rm ${suspects} ${ok} ${new_adhoc} ${sorted_white_list}
 fi
