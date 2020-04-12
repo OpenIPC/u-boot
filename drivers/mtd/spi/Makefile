@@ -5,6 +5,9 @@
 # SPDX-License-Identifier:	GPL-2.0+
 #
 
+obj-y = hisi_spi_nor.o
+obj-$(CONFIG_HIFMC_SPI_NOR) += hifmc100/
+
 obj-$(CONFIG_DM_SPI_FLASH) += sf-uclass.o
 
 ifdef CONFIG_SPL_BUILD

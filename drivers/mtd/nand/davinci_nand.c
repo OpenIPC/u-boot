@@ -594,7 +594,6 @@ static int nand_davinci_4bit_correct_data(struct mtd_info *mtd, uint8_t *dat,
 	 * Write each parity value one at a time starting from 4bit_ecc_val8
 	 * to 4bit_ecc_val1.
 	 */
-
 	/*Take 2 bits from 8th byte and 8 bits from 9th byte */
 	__raw_writel(((ecc16[4]) >> 6) & 0x3FF,
 			&davinci_emif_regs->nand4biteccload);

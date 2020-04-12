@@ -215,4 +215,10 @@ config PIC32_ETH
 	  This driver implements 10/100 Mbps Ethernet and MAC layer for
 	  Microchip PIC32 microcontrollers.
 
+config NET_HISFV300
+	bool "Hisilicon Ethernet femac family network Support"
+
+config NET_HIGMACV300
+	bool "Hisilicon Ethernet Gmac family network Support"
+
 endif # NETDEVICES

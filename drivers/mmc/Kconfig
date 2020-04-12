@@ -2,7 +2,7 @@ menu "MMC Host controller Support"
 
 config MMC
 	bool "Enable MMC support"
-	depends on ARCH_SUNXI || SANDBOX
+	depends on ARCH_SUNXI || SANDBOX || TARGET_HI3559V200 || TARGET_HI3559AV100 || TARGET_HI3556AV100 || TARGET_HI3519AV100 || TARGET_HI3516DV300 || TARGET_HI3516AV300 || TARGET_HI3516CV500 || TARGET_HI3516EV200 || TARGET_HI3516EV300 || TARGET_HI3518EV300 || TARGET_HI3516DV200
 	help
 	  TODO: Move all architectures to use this option
 
@@ -95,4 +95,9 @@ config SANDBOX_MMC
 	  improves build coverage for sandbox and makes it easier to detect
 	  MMC build errors with sandbox.
 
+config HIMCI
+	bool "Hisilicon MMC controller for Hi35xx support"
+	depends on MMC
+	help
+	  Support for Hisilicon MMC host controller on Hi35xx ARM SoCs platform
 endmenu

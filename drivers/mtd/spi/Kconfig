@@ -128,6 +128,35 @@ config SPI_FLASH_MTD
 
 	  If unsure, say N
 
+config HIFMC_SPI_NOR
+	bool "Hisilicon SPI Nor Flash Interface support"
+	depends on HIFMC
+	help
+	  Enable the Hisilicon SPI Nor flash support.
+
+	  If unsure, say N
+
+config SPI_BLOCK_PROTECT
+    bool "Hisilicon Spi Nor Device BP(Block Protect) Support"
+	depends on HIFMC_SPI_NOR
+    help
+      HISI SFC supports BP(Block Protect) feature to preestablish a series
+      area to avoid writing and erasing, except to reading. With this macro
+      definition we can get the BP info which was setted before. The
+      BOTTOM/TOP bit is setted to BOTTOM, it means the lock area starts
+      from 0 address.
+
+	  If unsure, say N
+
+config DTR_MODE_SUPPORT
+    bool "Hisilicon Spi Nor Device DTR mode Support"
+	depends on HIFMC_SPI_NOR
+	default n
+    help
+	  To support DTR mode
+
+	  If unsure, say N
+
 if SPL
 
 config SPL_SPI_SUNXI

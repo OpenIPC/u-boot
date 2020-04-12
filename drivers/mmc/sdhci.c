@@ -20,6 +20,170 @@ void *aligned_buffer = (void *)CONFIG_FIXED_SDHCI_ALIGNED_BUFFER;
 void *aligned_buffer;
 #endif
 
+static void sdhci_dumpregs(struct sdhci_host *host)
+{
+	printf("=========== REGISTER DUMP (mmc%d)===========\n", host->index);
+
+	printf("Sys addr: 0x%08x | Version:  0x%08x\n",
+			sdhci_readl(host, SDHCI_DMA_ADDRESS),
+			sdhci_readw(host, SDHCI_HOST_VERSION));
+	printf("Blk size: 0x%08x | Blk cnt:  0x%08x\n",
+			sdhci_readw(host, SDHCI_BLOCK_SIZE),
+			sdhci_readw(host, SDHCI_BLOCK_COUNT));
+	printf("Argument: 0x%08x | Trn mode: 0x%08x\n",
+			sdhci_readl(host, SDHCI_ARGUMENT),
+			sdhci_readw(host, SDHCI_TRANSFER_MODE));
+	printf("Present:  0x%08x | Host ctl: 0x%08x\n",
+			sdhci_readl(host, SDHCI_PRESENT_STATE),
+			sdhci_readb(host, SDHCI_HOST_CONTROL));
+	printf("Power:    0x%08x | Blk gap:  0x%08x\n",
+			sdhci_readb(host, SDHCI_POWER_CONTROL),
+			sdhci_readb(host, SDHCI_BLOCK_GAP_CONTROL));
+	printf("Wake-up:  0x%08x | Clock:    0x%08x\n",
+			sdhci_readb(host, SDHCI_WAKE_UP_CONTROL),
+			sdhci_readw(host, SDHCI_CLOCK_CONTROL));
+	printf("Timeout:  0x%08x | Int stat: 0x%08x\n",
+			sdhci_readb(host, SDHCI_TIMEOUT_CONTROL),
+			sdhci_readl(host, SDHCI_INT_STATUS));
+	printf("Int enab: 0x%08x | Sig enab: 0x%08x\n",
+			sdhci_readl(host, SDHCI_INT_ENABLE),
+			sdhci_readl(host, SDHCI_SIGNAL_ENABLE));
+	printf("ACMD err: 0x%08x | Slot int: 0x%08x\n",
+			sdhci_readw(host, SDHCI_ACMD12_ERR),
+			sdhci_readw(host, SDHCI_SLOT_INT_STATUS));
+	printf("Caps:     0x%08x | Caps_1:   0x%08x\n",
+			sdhci_readl(host, SDHCI_CAPABILITIES),
+			sdhci_readl(host, SDHCI_CAPABILITIES_1));
+	printf("Cmd:      0x%08x | Max curr: 0x%08x\n",
+			sdhci_readw(host, SDHCI_COMMAND),
+			sdhci_readl(host, SDHCI_MAX_CURRENT));
+	printf("Host ctl2: 0x%08x | ADMA Err: 0x%08x\n",
+			sdhci_readw(host, SDHCI_HOST_CONTROL2),
+			sdhci_readl(host, SDHCI_ADMA_ERROR));
+
+	printf(" ADMA Ptr: 0x%08x_%08x\n",
+			sdhci_readl(host, SDHCI_ADMA_ADDRESS_HI),
+			sdhci_readl(host, SDHCI_ADMA_ADDRESS));
+
+	printf("===========================================\n");
+}
+
+#ifdef CONFIG_SDHCI_ADMA
+static void sdhci_adma_write_desc(void *desc,
+		dma_addr_t addr, int len, unsigned cmd)
+{
+#ifdef CONFIG_TARGET_HI3559AV100
+	struct sdhci_adma2_64_desc *dma_desc = desc;
+#else
+	struct sdhci_adma2_32_desc *dma_desc = desc;
+#endif
+
+	/* 32-bit and 64-bit descriptors have these members in same position */
+	dma_desc->cmd = cpu_to_le16(cmd);
+	dma_desc->len = cpu_to_le16(len);
+	dma_desc->addr_lo = cpu_to_le32((u32)addr);
+
+#ifdef CONFIG_TARGET_HI3559AV100
+	dma_desc->addr_hi = cpu_to_le32((u64)addr >> 32);
+#endif
+}
+
+#define ADMA2_TRAN_VALID	0x21
+#define ADMA2_NOP_END_VALID 0x3
+
+static int sdhci_adma_table_pre(struct sdhci_host *host,
+		struct mmc_data *data, unsigned int trans_bytes)
+{
+	dma_addr_t addr;
+	void *desc = host->adma_table;
+	unsigned int left = trans_bytes;
+	int len;
+	int is_aligned = 1;
+
+	addr = (dma_addr_t)(data->flags == MMC_DATA_READ ?
+			data->src : data->dest);
+
+	/* If dma buffer isn't cache line aligned, set is_aligned to be zero,
+	 * and return. */
+	if ((addr & (CONFIG_SYS_CACHELINE_SIZE - 1)) != 0x0) {
+		is_aligned = 0;
+		goto exit;
+	}
+
+	while (left >= host->max_seg_size) {
+		if (((addr & (SDHCI_DMA_BOUNDARY_SIZE - 1))
+				+ host->max_seg_size) > SDHCI_DMA_BOUNDARY_SIZE) {
+			len = SDHCI_DMA_BOUNDARY_SIZE -
+				    (addr & (SDHCI_DMA_BOUNDARY_SIZE - 1));
+		} else
+			len = host->max_seg_size;
+		sdhci_adma_write_desc(desc, addr, len, ADMA2_TRAN_VALID);
+		addr += len;
+		left -= len;
+		desc += host->desc_sz;
+	}
+
+	if (left) {
+		if (((addr & (SDHCI_DMA_BOUNDARY_SIZE - 1))
+				+ left) > SDHCI_DMA_BOUNDARY_SIZE) {
+			len = SDHCI_DMA_BOUNDARY_SIZE -
+				    (addr & (SDHCI_DMA_BOUNDARY_SIZE - 1));
+			sdhci_adma_write_desc(desc, addr, len, ADMA2_TRAN_VALID);
+			addr += len;
+			left -= len;
+			desc += host->desc_sz;
+		}
+
+		sdhci_adma_write_desc(desc, addr, left, ADMA2_TRAN_VALID);
+		desc += host->desc_sz;
+	}
+
+	sdhci_adma_write_desc(desc, 0, 0, ADMA2_NOP_END_VALID);
+exit:
+	return is_aligned;
+}
+
+static int sdhci_prep_data(struct sdhci_host *host,
+		struct mmc_data *data, unsigned int trans_bytes)
+{
+	unsigned char ctrl;
+	unsigned long bytes;
+	int is_aligned;
+
+	/* If dma buffer isn't cache line aligned, don't use dma mode. */
+	is_aligned = sdhci_adma_table_pre(host, data, trans_bytes);
+	if (!is_aligned)
+		goto exit;
+
+	ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
+	ctrl &= ~SDHCI_CTRL_DMA_MASK;
+#ifdef CONFIG_TARGET_HI3559AV100
+	ctrl |= SDHCI_CTRL_ADMA64;
+#else
+	ctrl |= SDHCI_CTRL_ADMA32;
+#endif
+	sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
+
+	sdhci_writel(host, (u32)(long)host->adma_table, SDHCI_ADMA_ADDRESS);
+#ifdef CONFIG_PHYS_64BIT
+	sdhci_writel(host, (u64)host->adma_table >> 32,
+			SDHCI_ADMA_ADDRESS_HI);
+#endif
+	bytes = ALIGN(trans_bytes, CONFIG_SYS_CACHELINE_SIZE);
+	if (data->flags != MMC_DATA_READ)
+		flush_cache((unsigned long)data->src, bytes);
+	else
+		invalidate_dcache_range((unsigned long)data->dest,
+				(unsigned long)data->dest + bytes);
+
+	bytes = ALIGN(host->adma_table_sz, CONFIG_SYS_CACHELINE_SIZE);
+	flush_cache((unsigned long)host->adma_table, bytes);
+
+exit:
+	return is_aligned;
+}
+#endif
+
 static void sdhci_reset(struct sdhci_host *host, u8 mask)
 {
 	unsigned long timeout;
@@ -71,7 +235,7 @@ static void sdhci_transfer_pio(struct sdhci_host *host, struct mmc_data *data)
 static int sdhci_transfer_data(struct sdhci_host *host, struct mmc_data *data,
 				unsigned int start_addr)
 {
-	unsigned int stat, rdy, mask, timeout, block = 0;
+	unsigned int stat, rdy, mask, timeout;
 #ifdef CONFIG_MMC_SDMA
 	unsigned char ctrl;
 	ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
@@ -85,8 +249,11 @@ static int sdhci_transfer_data(struct sdhci_host *host, struct mmc_data *data,
 	do {
 		stat = sdhci_readl(host, SDHCI_INT_STATUS);
 		if (stat & SDHCI_INT_ERROR) {
-			printf("%s: Error detected in status(0x%X)!\n",
-			       __func__, stat);
+			if (!host->is_tuning) {
+				printf("%s: Error detected in status(0x%X)!\n",
+						__func__, stat);
+				sdhci_dumpregs(host);
+			}
 			return -EIO;
 		}
 		if (stat & rdy) {
@@ -95,8 +262,6 @@ static int sdhci_transfer_data(struct sdhci_host *host, struct mmc_data *data,
 			sdhci_writel(host, rdy, SDHCI_INT_STATUS);
 			sdhci_transfer_pio(host, data);
 			data->dest += data->blocksize;
-			if (++block >= data->blocks)
-				break;
 		}
 #ifdef CONFIG_MMC_SDMA
 		if (stat & SDHCI_INT_DMA_END) {
@@ -110,9 +275,11 @@ static int sdhci_transfer_data(struct sdhci_host *host, struct mmc_data *data,
 			udelay(10);
 		else {
 			printf("%s: Transfer data timeout\n", __func__);
+			sdhci_dumpregs(host);
 			return -ETIMEDOUT;
 		}
 	} while (!(stat & SDHCI_INT_DATA_END));
+
 	return 0;
 }
 
@@ -141,7 +308,10 @@ static int sdhci_send_command(struct mmc *mmc, struct mmc_cmd *cmd,
 	struct sdhci_host *host = mmc->priv;
 	unsigned int stat = 0;
 	int ret = 0;
-	int trans_bytes = 0, is_aligned = 1;
+#if defined(CONFIG_SDHCI_ADMA) || defined (CONFIG_MMC_SDMA)
+	unsigned int trans_bytes = 0;
+	int is_aligned = 1;
+#endif
 	u32 mask, flags, mode;
 	unsigned int time = 0, start_addr = 0;
 	int mmc_dev = mmc_get_blk_desc(mmc)->devnum;
@@ -197,42 +367,56 @@ static int sdhci_send_command(struct mmc *mmc, struct mmc_cmd *cmd,
 	if (data != 0) {
 		sdhci_writeb(host, 0xe, SDHCI_TIMEOUT_CONTROL);
 		mode = SDHCI_TRNS_BLK_CNT_EN;
+#if defined(CONFIG_SDHCI_ADMA) || defined (CONFIG_MMC_SDMA)
 		trans_bytes = data->blocks * data->blocksize;
+#endif
 		if (data->blocks > 1)
 			mode |= SDHCI_TRNS_MULTI;
 
 		if (data->flags == MMC_DATA_READ)
 			mode |= SDHCI_TRNS_READ;
 
+#ifdef CONFIG_SDHCI_ADMA
+		/* If buffer is cache line aligned, use dma mode, otherwise,
+		 * don't use dma mode. */
+		is_aligned = sdhci_prep_data(host, data, trans_bytes);
+		if (is_aligned)
+			mode |= SDHCI_TRNS_DMA;
+#endif
+
 #ifdef CONFIG_MMC_SDMA
 		if (data->flags == MMC_DATA_READ)
 			start_addr = (unsigned long)data->dest;
 		else
 			start_addr = (unsigned long)data->src;
-		if ((host->quirks & SDHCI_QUIRK_32BIT_DMA_ADDR) &&
-				(start_addr & 0x7) != 0x0) {
+
+		/* If buffer isn't cache line aligned , but defined CONFIG_FIXED_SDHCI_ALIGNED_BUFFER,
+		 * use aligend_buffer to store the data for dma, otherwise, don't use dma mode. */
+		if ((start_addr & (CONFIG_SYS_CACHELINE_SIZE - 1)) != 0x0) {
+#if defined(CONFIG_FIXED_SDHCI_ALIGNED_BUFFER)
+			/*
+			 * Always use this bounce-buffer when
+			 * CONFIG_FIXED_SDHCI_ALIGNED_BUFFER is defined
+			 */
 			is_aligned = 0;
 			start_addr = (unsigned long)aligned_buffer;
 			if (data->flags != MMC_DATA_READ)
 				memcpy(aligned_buffer, data->src, trans_bytes);
+#else
+
+			is_aligned = 0;
+			goto no_dma;
+#endif
 		}
 
-#if defined(CONFIG_FIXED_SDHCI_ALIGNED_BUFFER)
-		/*
-		 * Always use this bounce-buffer when
-		 * CONFIG_FIXED_SDHCI_ALIGNED_BUFFER is defined
-		 */
-		is_aligned = 0;
-		start_addr = (unsigned long)aligned_buffer;
-		if (data->flags != MMC_DATA_READ)
-			memcpy(aligned_buffer, data->src, trans_bytes);
-#endif
 
 		sdhci_writel(host, start_addr, SDHCI_DMA_ADDRESS);
 		mode |= SDHCI_TRNS_DMA;
+no_dma:
+
 #endif
 		sdhci_writew(host, SDHCI_MAKE_BLKSZ(SDHCI_DEFAULT_BOUNDARY_ARG,
-				data->blocksize),
+					data->blocksize),
 				SDHCI_BLOCK_SIZE);
 		sdhci_writew(host, data->blocks, SDHCI_BLOCK_COUNT);
 		sdhci_writew(host, mode, SDHCI_TRANSFER_MODE);
@@ -241,9 +425,20 @@ static int sdhci_send_command(struct mmc *mmc, struct mmc_cmd *cmd,
 	}
 
 	sdhci_writel(host, cmd->cmdarg, SDHCI_ARGUMENT);
+
 #ifdef CONFIG_MMC_SDMA
+	/* Execute to here, if has defined CONFIG_FIXED_SDHCI_ALIGNED_BUFFER or is_aligned
+	 * is 1, we should flush cache for start_addr. Otherwise, we do nothing.*/
+#if defined(CONFIG_FIXED_SDHCI_ALIGNED_BUFFER)
 	trans_bytes = ALIGN(trans_bytes, CONFIG_SYS_CACHELINE_SIZE);
 	flush_cache(start_addr, trans_bytes);
+#else
+	if (is_aligned) {
+		trans_bytes = ALIGN(trans_bytes, CONFIG_SYS_CACHELINE_SIZE);
+		flush_cache(start_addr, trans_bytes);
+	}
+#endif
+
 #endif
 	sdhci_writew(host, SDHCI_MAKE_CMD(cmd->cmdidx, flags), SDHCI_COMMAND);
 	start = get_timer(0);
@@ -278,9 +473,13 @@ static int sdhci_send_command(struct mmc *mmc, struct mmc_cmd *cmd,
 	stat = sdhci_readl(host, SDHCI_INT_STATUS);
 	sdhci_writel(host, SDHCI_INT_ALL_MASK, SDHCI_INT_STATUS);
 	if (!ret) {
-		if ((host->quirks & SDHCI_QUIRK_32BIT_DMA_ADDR) &&
-				!is_aligned && (data->flags == MMC_DATA_READ))
+		/* If used aligend_buffer, we should copy data from
+		 * aliagned_buffer to dest buffer when executing dma
+		 * read operation. */
+#if defined(CONFIG_FIXED_SDHCI_ALIGNED_BUFFER)
+		if (!is_aligned && (data->flags == MMC_DATA_READ))
 			memcpy(data->dest, aligned_buffer, trans_bytes);
+#endif
 		return 0;
 	}
 
@@ -360,7 +559,7 @@ static int sdhci_set_clock(struct mmc *mmc, unsigned int clock)
 	}
 
 	if (host->set_clock)
-		host->set_clock(host->index, div);
+		return host->set_clock(host, clock);
 
 	clk |= (div & SDHCI_DIV_MASK) << SDHCI_DIVIDER_SHIFT;
 	clk |= ((div & SDHCI_DIV_HI_MASK) >> SDHCI_DIV_MASK_LEN)
@@ -419,6 +618,30 @@ static void sdhci_set_power(struct sdhci_host *host, unsigned short power)
 	sdhci_writeb(host, pwr, SDHCI_POWER_CONTROL);
 }
 
+static void sdhci_set_uhs_signaling(struct sdhci_host *host, u8 timing)
+{
+	u16 ctrl_2;
+
+	ctrl_2 = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+	/* Select Bus Speed Mode for host */
+	ctrl_2 &= ~SDHCI_CTRL_UHS_MASK;
+	if ((timing == MMC_TIMING_MMC_HS200) ||
+			(timing == MMC_TIMING_UHS_SDR104))
+		ctrl_2 |= SDHCI_CTRL_UHS_SDR104;
+	else if (timing == MMC_TIMING_UHS_SDR12)
+		ctrl_2 |= SDHCI_CTRL_UHS_SDR12;
+	else if (timing == MMC_TIMING_UHS_SDR25)
+		ctrl_2 |= SDHCI_CTRL_UHS_SDR25;
+	else if (timing == MMC_TIMING_UHS_SDR50)
+		ctrl_2 |= SDHCI_CTRL_UHS_SDR50;
+	else if ((timing == MMC_TIMING_UHS_DDR50) ||
+			(timing == MMC_TIMING_MMC_DDR52))
+		ctrl_2 |= SDHCI_CTRL_UHS_DDR50;
+	else if (timing == MMC_TIMING_MMC_HS400)
+		ctrl_2 |= SDHCI_CTRL_HS400; /* Non-standard */
+	sdhci_writew(host, ctrl_2, SDHCI_HOST_CONTROL2);
+}
+
 #ifdef CONFIG_DM_MMC_OPS
 static int sdhci_set_ios(struct udevice *dev)
 {
@@ -462,6 +685,8 @@ static void sdhci_set_ios(struct mmc *mmc)
 		ctrl &= ~SDHCI_CTRL_HISPD;
 
 	sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
+
+	sdhci_set_uhs_signaling(host, mmc->timing);
 #ifdef CONFIG_DM_MMC_OPS
 	return 0;
 #endif
@@ -472,15 +697,6 @@ static int sdhci_init(struct mmc *mmc)
 	struct sdhci_host *host = mmc->priv;
 
 	sdhci_reset(host, SDHCI_RESET_ALL);
-
-	if ((host->quirks & SDHCI_QUIRK_32BIT_DMA_ADDR) && !aligned_buffer) {
-		aligned_buffer = memalign(8, 512*1024);
-		if (!aligned_buffer) {
-			printf("%s: Aligned buffer alloc failed!!!\n",
-			       __func__);
-			return -ENOMEM;
-		}
-	}
 
 	sdhci_set_power(host, fls(mmc->cfg->voltages) - 1);
 
@@ -504,6 +720,9 @@ static int sdhci_init(struct mmc *mmc)
 #endif
 	}
 
+	if (host->priv_init)
+		host->priv_init(host);
+
 	/* Enable only interrupts served by the SD controller */
 	sdhci_writel(host, SDHCI_INT_DATA_MASK | SDHCI_INT_CMD_MASK,
 		     SDHCI_INT_ENABLE);
@@ -511,6 +730,52 @@ static int sdhci_init(struct mmc *mmc)
 	sdhci_writel(host, 0x0, SDHCI_SIGNAL_ENABLE);
 
 	return 0;
+}
+
+static void sdhci_hs400_enhanced_stobe(struct mmc *mmc, bool enable)
+{
+	struct sdhci_host *host = mmc->priv;
+	u32 ctrl;
+
+	ctrl = sdhci_readl(host, SDHCI_EMMC_CTRL);
+	if (enable)
+		ctrl |= SDHCI_ENH_STROBE_EN;
+	else
+		ctrl &= ~SDHCI_ENH_STROBE_EN;
+
+	sdhci_writel(host, ctrl, SDHCI_EMMC_CTRL);
+
+/* Hi3516dv200 Hi3516ev300 SDHCI_MULTI_CYCLE bit2 need be set in HS400ES mode */
+#if defined(CONFIG_TARGET_HI3516DV200) || defined(CONFIG_TARGET_HI3516EV300)
+	ctrl  = sdhci_readl(host, SDHCI_MULTI_CYCLE);
+	if (enable)
+		ctrl |= SDHCI_CMD_DLY_EN;
+	else
+		ctrl &= ~SDHCI_CMD_DLY_EN;
+
+	sdhci_writel(host, ctrl, SDHCI_MULTI_CYCLE);
+#endif
+}
+
+static int sdhci_execute_tuning(struct mmc *mmc, unsigned int opcode)
+{
+	struct sdhci_host *host = mmc->priv;
+
+	if (host->execute_tuning)
+		return host->execute_tuning(host, opcode);
+
+	return 0;
+}
+
+static int sdhci_card_busy(struct mmc *mmc)
+{
+	struct sdhci_host *host = mmc->priv;
+    u32 present_state;
+
+	/* Check whether DAT[0] is 0 */
+	present_state = sdhci_readl(host, SDHCI_PRESENT_STATE);
+
+	return !(present_state & SDHCI_DATA_0_LVL_MASK);
 }
 
 #ifdef CONFIG_DM_MMC_OPS
@@ -530,6 +795,9 @@ static const struct mmc_ops sdhci_ops = {
 	.send_cmd	= sdhci_send_command,
 	.set_ios	= sdhci_set_ios,
 	.init		= sdhci_init,
+	.hs400_enable_es = sdhci_hs400_enhanced_stobe,
+	.execute_tuning = sdhci_execute_tuning,
+	.card_busy = sdhci_card_busy,
 };
 #endif
 
@@ -594,8 +862,10 @@ int sdhci_setup_cfg(struct mmc_config *cfg, struct sdhci_host *host,
 
 	cfg->host_caps = MMC_MODE_HS | MMC_MODE_HS_52MHz | MMC_MODE_4BIT;
 	if (SDHCI_GET_VERSION(host) >= SDHCI_SPEC_300) {
+#if !defined(CONFIG_TARGET_HI3516EV200) && !defined(CONFIG_TARGET_HI3518EV300)
 		if (caps & SDHCI_CAN_DO_8BIT)
 			cfg->host_caps |= MMC_MODE_8BIT;
+#endif
 	}
 
 	if (host->host_caps)

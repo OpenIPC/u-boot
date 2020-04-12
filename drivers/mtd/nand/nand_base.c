@@ -46,6 +46,8 @@
 #include <asm/io.h>
 #include <linux/errno.h>
 
+#include <hinfc_common.h>
+
 /* Define default oob placement schemes for large and small page devices */
 static struct nand_ecclayout nand_oob_8 = {
 	.eccbytes = 3,
@@ -2372,6 +2374,10 @@ static int nand_do_write_ops(struct mtd_info *mtd, loff_t to,
 	int ret;
 	int oob_required = oob ? 1 : 0;
 
+#if defined(CONFIG_HIFMC_SPI_NAND)|| defined(CONFIG_HIFMC_NAND)
+    oob_required = 1;
+#endif
+
 	ops->retlen = 0;
 	if (!writelen)
 		return 0;
@@ -3593,6 +3599,14 @@ static bool find_full_id_nand(struct mtd_info *mtd, struct nand_chip *chip,
 	return false;
 }
 
+/* The info for hiburn */
+static struct mtd_info_ex nand_info_ex = {.type = 0, };
+
+struct mtd_info_ex *get_nand_info(void)
+{
+	    return &nand_info_ex;
+}
+
 /*
  * Get the flash and manufacturer id and lookup if the type is supported.
  */
@@ -3639,6 +3653,11 @@ static struct nand_flash_dev *nand_get_flash_type(struct mtd_info *mtd,
 			*maf_id, *dev_id, id_data[0], id_data[1]);
 		return ERR_PTR(-ENODEV);
 	}
+
+#ifdef CONFIG_HIFMC
+	if (nand_get_spl_flash_type)
+		type = nand_get_spl_flash_type(mtd, chip, id_data);
+#endif
 
 	if (!type)
 		type = nand_flash_ids;
@@ -3687,6 +3706,11 @@ static struct nand_flash_dev *nand_get_flash_type(struct mtd_info *mtd,
 	if (*maf_id != NAND_MFR_SAMSUNG && !type->pagesize)
 		chip->options &= ~NAND_SAMSUNG_LP_OPTIONS;
 ident_done:
+#ifdef CONFIG_HIFMC
+	if (nand_oob_resize
+			&& nand_oob_resize(mtd))
+		return ERR_PTR(-ENODEV);
+#endif
 
 	/* Try to identify manufacturer */
 	for (maf_idx = 0; nand_manuf_ids[maf_idx].id != 0x0; maf_idx++) {
@@ -3710,6 +3734,30 @@ ident_done:
 			   (chip->options & NAND_BUSWIDTH_16) ? 16 : 8,
 			   busw ? 16 : 8);
 		return ERR_PTR(-EINVAL);
+	}
+
+	if (nand_info_ex.type == 0) {
+		memset(&nand_info_ex, 0, sizeof(struct mtd_info_ex));
+
+		nand_info_ex.type      = MTD_NANDFLASH;
+		nand_info_ex.chipsize  = chip->chipsize;
+		nand_info_ex.erasesize = mtd->erasesize;
+		nand_info_ex.pagesize  = mtd->writesize;
+		/* smaller than nand chip space area */
+		nand_info_ex.oobsize   = mtd->oobsize;
+
+		nand_info_ex.ecctype   = mtd->ecc_strength;
+
+		nand_info_ex.id_length = type->id_len;
+		nand_info_ex.numchips  = 1;
+
+		memcpy(nand_info_ex.ids, id_data,
+				nand_info_ex.id_length);
+
+		strncpy(nand_info_ex.name, mtd->name,
+				sizeof(nand_info_ex.name));
+
+		nand_info_ex.name[sizeof(nand_info_ex.name)-1] = '\0';
 	}
 
 	nand_decode_bbm_options(mtd, chip, id_data);
@@ -3755,9 +3803,6 @@ ident_done:
 	else
 		pr_info("%s %s\n", nand_manuf_ids[maf_idx].name,
 				type->name);
-
-	pr_info("%s %s\n", nand_manuf_ids[maf_idx].name,
-		type->name);
 #endif
 
 	pr_info("%d MiB, %s, erase size: %d KiB, page size: %d, OOB size: %d\n",
@@ -3890,6 +3935,18 @@ int nand_scan_ident(struct mtd_info *mtd, int maxchips,
 	/* Store the number of chips and calc total size for mtd */
 	chip->numchips = i;
 	mtd->size = i * chip->chipsize;
+
+	if (nand_info_ex.type != MTD_NANDFLASH)
+		BUG();
+
+	nand_info_ex.numchips = chip->numchips;
+
+	printf("Block:%sB ", ultohstr(mtd->erasesize));
+	printf("Page:%sB ",  ultohstr(mtd->writesize));
+	printf("OOB:%sB ", ultohstr(mtd->oobsize));
+	printf("ECC:%s ", nand_ecc_name(nand_info_ex.ecctype));
+	printf("\n");
+	printf("Chipsize:");
 
 	return 0;
 }

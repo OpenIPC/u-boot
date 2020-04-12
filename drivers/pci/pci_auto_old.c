@@ -52,7 +52,14 @@ void pciauto_setup_device(struct pci_controller *hose,
 		bar < PCI_BASE_ADDRESS_0 + (bars_num * 4); bar += 4) {
 		/* Tickle the BAR and get the response */
 #ifndef CONFIG_PCI_ENUM_ONLY
+
+#ifdef 	CONFIG_PCIE_BVT
+		pci_hose_write_config_dword(hose, dev, bar, 0xfffffff0);
+
+#else
 		pci_hose_write_config_dword(hose, dev, bar, 0xffffffff);
+#endif
+
 #endif
 		pci_hose_read_config_dword(hose, dev, bar, &bar_response);
 

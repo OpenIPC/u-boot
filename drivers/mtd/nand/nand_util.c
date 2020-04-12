@@ -34,6 +34,9 @@
 typedef struct erase_info	erase_info_t;
 typedef struct mtd_info		mtd_info_t;
 
+/* for ecc0 read and write */
+unsigned int ecc0_flag;
+unsigned int oobsize_real;
 /* support only for native endian JFFS2 */
 #define cpu_to_je16(x) (x)
 #define cpu_to_je32(x) (x)
@@ -602,6 +605,10 @@ int nand_write_skip_bad(struct mtd_info *mtd, loff_t offset, size_t *length,
 
 	need_skip = check_skip_len(mtd, offset, *length, &used_for_write);
 
+	/* add to cooperate with hitool */
+	print_to_hitool("pure data length is %d, len_incl_bad is %d\r\n",
+	       (u_int)*length, (u_int)used_for_write);
+
 	if (actual)
 		*actual = used_for_write;
 
@@ -779,6 +786,317 @@ int nand_read_skip_bad(struct mtd_info *mtd, loff_t offset, size_t *length,
 		p_buffer     += read_length;
 	}
 
+	return 0;
+}
+
+/**
+ * nand_write_yaffs_skip_bad:
+ *
+ * Write image to NAND flash.
+ * Blocks that are marked bad are skipped and the is written to the next
+ * block instead as long as the image is short enough to fit even after
+ * skipping the bad blocks.
+ *
+ * @param nand   NAND device
+ * @param offset offset in flash
+ * @param length buffer length
+ * @param buf           buffer to read from
+ * @return       0 in case of success
+ */
+int nand_write_yaffs_skip_bad(struct mtd_info *mtd, loff_t offset, size_t *length,
+		u_char *buffer)
+{
+	int rval;
+	size_t left_to_write;
+	size_t len_incl_bad = 0;
+	u_char *p_buffer = buffer;
+	mtd_oob_ops_t ops = {0};
+	int     i;
+	size_t  length_data;  /* length without oob */
+	u_int32_t oobsize;
+	int need_skip;
+
+	/*oobsize_real for ecc0 read and write */
+	if (ecc0_flag == 1)
+		oobsize = oobsize_real;
+	else
+		oobsize = mtd->oobsize;
+
+	/* Reject writes, which are not page aligned */
+	if ((offset & (mtd->writesize - 1)) != 0) {
+		printf("Attempt to write non page aligned data, offset %#x\n",
+			(u_int)offset);
+		return -EINVAL;
+	}
+	if ((*length % (mtd->writesize  + oobsize)) != 0) {
+		printf("Attempt to write non page aligned data, length %#x\n",
+			(u_int)*length);
+		printf("Page size %#x, OOB size %d\n", (u_int)mtd->writesize,
+			oobsize);
+		return -EINVAL;
+	}
+
+	length_data = (*length / (mtd->writesize + oobsize))
+			* mtd->writesize;
+	
+	need_skip = check_skip_len(mtd, offset, length_data, &len_incl_bad);
+	if (need_skip < 0) {
+		printf("Attempt to read outside the flash area\n");
+		*length = 0;
+		return -EINVAL;
+	}
+
+	if (len_incl_bad != length_data)
+		printf("data length:%#x, include bad block length: %#x\n",
+			(u_int)length_data, (u_int)len_incl_bad);
+
+	if ((offset + len_incl_bad) >= mtd->size) {
+		printf("Attempt to write outside the flash area\n");
+		return -EINVAL;
+	}
+
+	/* add to cooperate with hitool */
+	print_to_hitool("pure data length is %d, len_incl_bad is %d\r\n",
+		length_data, len_incl_bad);
+
+	if (len_incl_bad == length_data) {
+		for (i = 0; i < length_data / mtd->writesize; i++) {
+			ops.datbuf = buffer
+					+ i * (mtd->writesize + oobsize);
+			ops.oobbuf = buffer
+					+ i * (mtd->writesize + oobsize)
+					+ mtd->writesize;
+			ops.len = mtd->writesize;
+			ops.ooblen = oobsize;
+			ops.mode = MTD_OPS_RAW;
+
+			rval = mtd_write_oob(mtd, offset
+						+ i * mtd->writesize, &ops);
+			if (rval != 0) {
+				printf("NAND write to offset %llx failed %d\n",
+					offset + i*mtd->writesize, rval);
+				return rval;
+			}
+		}
+
+		printf("NAND write yaffs finished\n");
+		return 0;
+	}
+
+	left_to_write = length_data;
+
+	while (left_to_write > 0) {
+		size_t block_offset = offset & (mtd->erasesize - 1);
+		size_t write_size;
+
+		if (nand_block_isbad(mtd, offset
+					& ~((loff_t)mtd->erasesize - 1))) {
+			printf("Skip bad block 0x%08llx\n",
+				offset & ~((loff_t)mtd->erasesize - 1));
+			offset += mtd->erasesize - block_offset;
+			continue;
+		}
+
+		if (left_to_write < (mtd->erasesize - block_offset))
+			write_size = left_to_write;
+		else
+			write_size = mtd->erasesize - block_offset;
+
+		for (i = 0; i < write_size / mtd->writesize; i++) {
+			ops.datbuf = p_buffer;
+			ops.oobbuf = p_buffer + mtd->writesize;
+			ops.len = mtd->writesize;
+			ops.ooblen = oobsize;
+			ops.ooboffs = 0;
+			ops.mode = MTD_OPS_RAW;
+
+			rval = mtd_write_oob(mtd, offset, &ops);
+			if (rval != 0) {
+				printf("NAND write to offset %llx failed %d\n",
+						offset, rval);
+				*length -= left_to_write;
+				return rval;
+			}
+
+			p_buffer += mtd->writesize + oobsize;
+			left_to_write -= mtd->writesize;
+			offset        += mtd->writesize;
+		}
+	}
+
+	printf("\n");
+	return 0;
+}
+
+
+/**
+ * nand_fill_ecc - [Internal] Process oob to client buffer
+ * @chip:	nand chip structure
+ * @oob:	oob destination address
+ * @len:	size of oob to process
+ */
+void nand_fill_ecc(struct nand_chip *chip, uint8_t *oob, size_t len)
+{
+	struct nand_oobfree *free = chip->ecc.layout->oobfree;
+	uint32_t offset = 0, bytes;
+
+	for (; free->length && offset < len; free++) {
+		if (offset < free->offset) {
+			bytes = min_t(size_t, len, free->offset) - offset;
+			memset(oob + offset, 0xff, bytes);
+		}
+
+		offset = free->offset + free->length;
+	}
+
+	if (offset < len)
+		memset(oob + offset, 0xff, len - offset);
+}
+
+/**
+ * nand_read_yaffs_skip_bad:
+ * Read image from NAND flash.
+ * Blocks that are marked bad are skipped and the next block is readen
+ * instead as long as the image is short enough to fit even after skipping the
+ * bad blocks.
+ *
+ * @param nand NAND device
+ * @param offset offset in flash, alignment with pagesize
+ * @param length buffer length, on return holds remaining bytes to read,
+ *		alignment with (pagesize + oobsize)
+ * @param buffer buffer to read to
+ * @return 0 in case of success
+ */
+int nand_read_yaffs_skip_bad(struct mtd_info *mtd, loff_t offset, size_t *length,
+		    u_char *buffer)
+{
+	struct nand_chip *chip = mtd_to_nand(mtd);
+	u_int32_t oobsize;
+	size_t left_to_read;
+	size_t len_incl_bad = 0;
+	size_t length_data;  /* length without oob */
+	u_char *p_buffer = buffer;
+	mtd_oob_ops_t ops = {0};
+	int need_skip;
+	int rval;
+	int i;
+
+	/*oobsize_real for ecc0 read and write */
+	if (ecc0_flag == 1)
+		oobsize = oobsize_real;
+	else
+		oobsize = mtd->oobsize;
+
+	/* Reject reads, which are not page aligned */
+	if ((offset & (mtd->writesize - 1)) != 0) {
+		printf("Attempt to read non page aligned data, offset %lld\n",
+				offset);
+		return -EINVAL;
+	}
+
+	if ((*length % (mtd->writesize  + oobsize)) != 0) {
+		printf("Attempt to read non aligned data, read length should "\
+				"be aligned with (pagesize + oobsize), length:%lu "
+				"pagesize:%d oobsize:%d\n",
+				(unsigned long)*length, mtd->writesize, oobsize);
+		return -EINVAL;
+	}
+
+	length_data = *length / (mtd->writesize + oobsize) * mtd->writesize;
+
+	need_skip = check_skip_len(mtd, offset, length_data, &len_incl_bad);
+	if (need_skip < 0) {
+		printf("Attempt to read outside the flash area\n");
+		*length = 0;
+		return -EINVAL;
+	}
+
+	if (len_incl_bad != length_data)
+		printf("data length:%#x, include bad block length: %#x\n",
+				(u_int)length_data, (u_int)len_incl_bad);
+
+	if ((offset + len_incl_bad) >= mtd->size) {
+		printf("Attempt to read outside the flash area\n");
+		return -EINVAL;
+	}
+
+	/* add to cooperate with hitool */
+	print_to_hitool("pure data length is %d, len_incl_bad is %d\r\n",
+		length_data, len_incl_bad);
+
+	if (len_incl_bad == length_data) {
+		for (i = 0; i < length_data / mtd->writesize; i++) {
+			ops.datbuf = buffer +
+				 i*(mtd->writesize + oobsize);
+			ops.oobbuf = buffer +
+				 i*(mtd->writesize + oobsize) +
+				 mtd->writesize;
+			ops.len = mtd->writesize;
+			ops.ooblen = oobsize;
+			ops.mode = MTD_OPS_RAW;
+
+			rval = mtd_read_oob(mtd, offset + i*mtd->writesize,&ops);
+			if (rval != 0) {
+				printf("NAND read to offset %llx failed %d\n",
+					offset + i*mtd->writesize, rval);
+				return rval;
+			}
+
+			if (ecc0_flag != 1)
+				nand_fill_ecc(chip, ops.oobbuf, ops.ooblen);
+
+			*length -= mtd->writesize + oobsize;
+		}
+
+
+		return 0;
+	}
+
+	left_to_read = length_data;
+
+	while (left_to_read > 0) {
+		size_t block_offset = offset & (mtd->erasesize - 1);
+		size_t read_size;
+
+		if (nand_block_isbad(mtd, offset &
+			 ~((loff_t)mtd->erasesize - 1))) {
+			printf("Skip bad block 0x%08llx\n",
+				offset & ~((loff_t)mtd->erasesize - 1));
+			offset += mtd->erasesize - block_offset;
+			continue;
+		}
+
+		if (left_to_read < (mtd->erasesize - block_offset))
+			read_size = left_to_read;
+		else
+			read_size = mtd->erasesize - block_offset;
+
+		for (i = 0; i < read_size / mtd->writesize; i++) {
+			ops.datbuf = p_buffer;
+			ops.oobbuf = p_buffer + mtd->writesize;
+			ops.len = mtd->writesize;
+			ops.ooblen = oobsize;
+			ops.ooboffs = 0;
+			ops.mode = MTD_OPS_RAW;
+
+			rval = mtd_read_oob(mtd, offset, &ops);
+			if (rval != 0) {
+				printf("NAND read to offset %llx failed %d\n",
+				offset, rval);
+				return rval;
+			}
+
+			if (ecc0_flag != 1)
+				nand_fill_ecc(chip, ops.oobbuf, ops.ooblen);
+
+			p_buffer += mtd->writesize + oobsize;
+			left_to_read -= mtd->writesize;
+			offset += mtd->writesize;
+			*length -= mtd->writesize + oobsize;
+		}
+	}
+
+	printf("\n");
 	return 0;
 }
 

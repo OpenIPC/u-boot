@@ -6,6 +6,8 @@
  */
 
 #include <common.h>
+#include <asm/io.h>
+#include <memalign.h>
 #include <mmc.h>
 #include "mmc_private.h"
 
@@ -116,4 +118,112 @@ int mmc_set_rst_n_function(struct mmc *mmc, u8 enable)
 {
 	return mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_RST_N_FUNCTION,
 			  enable);
+}
+
+int mmc_set_boot_config(struct mmc *mmc)
+{
+	int err, changed = 0;
+#if defined(CONFIG_TARGET_HI3519AV100) || defined(CONFIG_TARGET_HI3556AV100) ||\
+    defined(CONFIG_TARGET_HI3516DV300) || defined(CONFIG_TARGET_HI3516CV500) ||\
+    defined(CONFIG_TARGET_HI3559V200)  || defined(CONFIG_TARGET_HI3556V200) ||\
+    defined(CONFIG_TARGET_HI3516AV300)
+	u32 reg_val;
+#endif
+	u8 val, rev, rst_n_en;
+	u8 boot_part, boot_bus_width, part_conf, bus_cond, boot_mode;
+	ALLOC_CACHE_ALIGN_BUFFER(u8, ext_csd, MMC_MAX_BLOCK_LEN);
+
+	err = mmc_send_ext_csd(mmc, ext_csd);
+	if (err) {
+		printf("Get ext_csd error!\n");
+		return err;
+	}
+
+	rev = ext_csd[EXT_CSD_REV];
+	rst_n_en = ext_csd[EXT_CSD_RST_N_FUNCTION] & EXT_CSD_RST_N_EN_MASK;
+	if ((rev >= 5) && (rst_n_en != EXT_CSD_RST_N_ENABLED)) {
+		err = mmc_set_rst_n_function(mmc, EXT_CSD_RST_N_ENABLED);
+		if (err) {
+			printf("mmc_set_rst_n_function error!\n");
+			return err;
+		}
+	}
+
+	if ((rev >= 5) &&
+			(ext_csd[EXT_CSD_WR_REL_PARAM] & EXT_CSD_HS_CTRL_REL)) {
+		val = ext_csd[EXT_CSD_WR_REL_SET];
+		if (val != EXT_CSD_WR_REL_VALUE) {
+			err = mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL,
+					EXT_CSD_WR_REL_SET,
+					EXT_CSD_WR_REL_VALUE);
+			if (err) {
+				printf("Set EXT_CSD_WR_REL_SET error!\n");
+				return err;
+			}
+		}
+	}
+
+	boot_part = 0x7; /*user area enable for boot*/
+	if (readl(REG_BASE_SCTL + REG_SYSSTAT) & NF_BOOTBW_MASK)
+		boot_bus_width = EXT_CSD_BUS_WIDTH_8; /* 8bits */
+	else
+		boot_bus_width = EXT_CSD_BUS_WIDTH_4; /* 4bits */
+#if defined(CONFIG_TARGET_HI3519AV100) || defined(CONFIG_TARGET_HI3556AV100) ||\
+    defined(CONFIG_TARGET_HI3516DV300) || defined(CONFIG_TARGET_HI3516CV500) ||\
+    defined(CONFIG_TARGET_HI3559V200)  || defined(CONFIG_TARGET_HI3556V200) ||\
+    defined(CONFIG_TARGET_HI3516AV300)	
+	reg_val = readl(REG_BASE_SCTL + REG_PERISTAT);
+	if (MMC_BOOT_CLK_SEL(reg_val) == MMC_BOOT_CLK_50M)
+		boot_mode = 1;
+	else
+		boot_mode = 0;
+
+#else
+		boot_mode = 0;
+#endif
+
+	part_conf = EXT_CSD_BOOT_ACK(0) |
+		EXT_CSD_BOOT_PART_NUM(boot_part) |
+		EXT_CSD_PARTITION_ACCESS(0);
+	bus_cond = EXT_CSD_BOOT_BUS_WIDTH_MODE(boot_mode) |
+		EXT_CSD_BOOT_BUS_WIDTH_RESET(0) |
+		EXT_CSD_BOOT_BUS_WIDTH_WIDTH(boot_bus_width);
+
+	if (ext_csd[EXT_CSD_PART_CONF] != part_conf) {
+		err = mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL,
+				EXT_CSD_PART_CONF, part_conf);
+		if (err) {
+			printf("Set EXT_CSD_PART_CONF error!\n");
+			return err;
+		}
+		changed = 1;
+	}
+
+	if (ext_csd[EXT_CSD_BOOT_BUS_WIDTH] != bus_cond) {
+		err = mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL,
+				EXT_CSD_BOOT_BUS_WIDTH, bus_cond);
+		if (err) {
+			printf("Set EXT_CSD_BOOT_BUS_WIDTH error!\n");
+			return err;
+		}
+		changed = 1;
+	}
+
+	if (!changed)
+		return 0;
+
+	err = mmc_send_ext_csd(mmc, ext_csd);
+	if (err) {
+		printf("Check ext_csd error!\n");
+		return err;
+	}
+
+	if (part_conf != ext_csd[EXT_CSD_PART_CONF] ||
+			bus_cond != ext_csd[EXT_CSD_BOOT_BUS_WIDTH]) {
+		printf("EXT_CSD CONFIG Fail!\n");
+		return -1;
+	}
+
+	printf("EXT_CSD CONFIG OK!\n");
+	return 0;
 }

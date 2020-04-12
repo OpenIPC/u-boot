@@ -255,7 +255,6 @@ static void pmecc_get_sigma(struct mtd_info *mtd)
 	dmu_0_count = 0;
 
 	/* First Row */
-
 	/* Mu */
 	mu[0] = -1;
 
@@ -269,7 +268,6 @@ static void pmecc_get_sigma(struct mtd_info *mtd)
 	delta[0] = -1;
 
 	/* Second Row */
-
 	/* Mu */
 	mu[1] = 0;
 	/* Sigma(x) set to 1 */

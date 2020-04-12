@@ -146,7 +146,6 @@ static void bfin_nfc_write_buf(struct mtd_info *mtd, const uint8_t *buf, int len
  * These allow the bfin to use the controller's ECC
  * generator block to ECC the data as it passes through
  */
-
 /*
  * ECC error correction function
  */

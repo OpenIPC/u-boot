@@ -74,7 +74,6 @@
 #define ECC_60_BYTE			7
 
 /*** Register Mask and bit definitions */
-
 /* NFC_FLASH_CMD1 Field */
 #define CMD_BYTE2_MASK				0xFF000000
 #define CMD_BYTE2_SHIFT				24

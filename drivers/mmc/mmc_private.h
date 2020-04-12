@@ -12,6 +12,7 @@
 
 #include <mmc.h>
 
+extern int mmc_send_tuning(struct mmc *mmc, u32 opcode);
 extern int mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 			struct mmc_data *data);
 extern int mmc_send_status(struct mmc *mmc, int timeout);

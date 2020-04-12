@@ -195,6 +195,9 @@ struct nand_manufacturers nand_manuf_ids[] = {
 	{NAND_MFR_SANDISK, "SanDisk"},
 	{NAND_MFR_INTEL, "Intel"},
 	{NAND_MFR_ATO, "ATO"},
+	{NAND_MFR_HEYANGTEK, "HeYangTek"},
+	{NAND_MFR_DOSILICON, "Dosilicon"},
+	{NAND_MFR_FIDELIX, "Fidelix/Dosi"}, /* Fidelix was purchased by Dosilicon */
 	{0x0, "Unknown"}
 };
 

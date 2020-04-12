@@ -57,6 +57,7 @@ obj-$(CONFIG_TEGRA_MMC) += tegra_mmc.o
 obj-$(CONFIG_MMC_UNIPHIER) += uniphier-sd.o
 obj-$(CONFIG_ZYNQ_SDHCI) += zynq_sdhci.o
 obj-$(CONFIG_ROCKCHIP_SDHCI) += rockchip_sdhci.o
+obj-$(CONFIG_HISI_SDHCI) += hisi_sdhci.o
 
 ifdef CONFIG_SPL_BUILD
 obj-$(CONFIG_SPL_MMC_BOOT) += fsl_esdhc_spl.o
@@ -66,3 +67,4 @@ obj-$(CONFIG_GENERIC_MMC) += mmc_write.o
 endif
 obj-$(CONFIG_PIC32_SDHCI) += pic32_sdhci.o
 obj-$(CONFIG_MSM_SDHCI) += msm_sdhci.o
+obj-$(CONFIG_HIMCI) += himci.o

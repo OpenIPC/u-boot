@@ -35,6 +35,14 @@ config FLASH_PIC32
 	  This enables access to Microchip PIC32 internal non-CFI flash
 	  chips through PIC32 Non-Volatile-Memory Controller.
 
+config HIFMC
+	bool "Enable HIFMC - Hisilicon Flash Memory Controller"
+	depends on TARGET_HI3516EV200 || TARGET_HI3516EV300 || TARGET_HI3518EV300 || TARGET_HI3516DV200 || TARGET_HI3559AV100 || TARGET_HI3556AV100 || TARGET_HI3519AV100 || TARGET_HI3516CV500 || TARGET_HI3516DV300 || TARGET_HI3516AV300 || TARGET_HI3556V200 || TARGET_HI3559V200
+	help
+	  Hisilicon Flash Memory Controller support SPI Nor SPI Nand and parallel
+	  Nand Flash. often used on embedded chip. This option will provide the
+	  generic support for FMC drivers to register.
+
 endmenu
 
 source "drivers/mtd/nand/Kconfig"
