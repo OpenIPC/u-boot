@@ -220,6 +220,9 @@ static inline bool mmc_is_tuning_cmd(uint cmdidx)
 #define EXT_CSD_PARTITIONS_ATTRIBUTE	156	/* R/W */
 #define EXT_CSD_MAX_ENH_SIZE_MULT	157	/* R */
 #define EXT_CSD_PARTITIONING_SUPPORT	160	/* RO */
+#define EXT_CSD_WR_REL_VALUE		(0x1f)
+#define EXT_CSD_RST_N_EN_MASK		0x3
+#define EXT_CSD_RST_N_ENABLED		(1 << 0)	/* RST_n is enabled on card */
 #define EXT_CSD_RST_N_FUNCTION		162	/* R/W */
 #define EXT_CSD_BKOPS_EN		163	/* R/W & R/W/E */
 #define EXT_CSD_WR_REL_PARAM		166	/* R */
@@ -731,6 +734,7 @@ struct mmc {
 				  */
 	u32 quirks;
 	u8 hs400_tuning;
+	u8 strobe_enhanced;
 
 	enum bus_mode user_speed_mode; /* input speed mode from user */
 };

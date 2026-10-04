@@ -112,3 +112,13 @@ obj-$(CONFIG_$(SPL_TPL_)STACKPROTECTOR) += stackprot.o
 obj-$(CONFIG_SCP03) += scp03.o
 
 obj-$(CONFIG_QFW) += qfw.o
+obj-$(CONFIG_ARCH_BSP) += boot_image.o
+obj-$(CONFIG_ARCH_BSP) += download_process.o
+ifneq ($(CONFIG_ARCH_BSP),y)
+ifndef CONFIG_XMEDIA_DISABLE_DOWNLOAD
+obj-y += download_process.o
+endif
+endif
+obj-$(CONFIG_ARM64_SUPPORT_LOAD_FIP) += load_fip.o
+obj-y += flash_read.o
+obj-y += openipc.o

@@ -127,3 +127,4 @@ ifndef CONFIG_CPU_V7M
 #extra-$(CONFIG_CMD_BOOTEFI_SELFTEST) += $(EFI_CRT0) $(EFI_RELOC)
 endif
 extra-$(CONFIG_EFI) += $(EFI_CRT0) $(EFI_RELOC)
+obj-y += process.o

@@ -5,11 +5,9 @@ comment "USB Host Controller Drivers"
 
 config USB_HOST
 	bool
-	select DM_USB
 
 config USB_XHCI_HCD
 	bool "xHCI HCD (USB 3.0) support"
-	depends on DM && OF_CONTROL
 	select USB_HOST
 	---help---
 	  The eXtensible Host Controller Interface (xHCI) is standard for USB 3.0

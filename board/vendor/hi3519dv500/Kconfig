@@ -1,0 +1,16 @@
+if TARGET_HI3519DV500_FAMILY
+
+config SYS_BOARD
+	default "hi3519dv500"
+
+config SYS_VENDOR
+	default "vendor"
+
+config SYS_SOC
+	default "hi3519dv500"
+
+config SYS_CONFIG_NAME
+	default "hi3519dv500"
+
+endif
+

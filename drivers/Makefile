@@ -13,10 +13,12 @@ obj-$(CONFIG_$(SPL_TPL_)DRIVERS_MISC) += misc/
 obj-$(CONFIG_$(SPL_TPL_)SYSRESET) += sysreset/
 obj-$(CONFIG_$(SPL_TPL_)FIRMWARE) +=firmware/
 obj-$(CONFIG_$(SPL_TPL_)I2C) += i2c/
+obj-$(CONFIG_LHS_I2C) += lhs/i2c/
 obj-$(CONFIG_$(SPL_TPL_)INPUT) += input/
 obj-$(CONFIG_$(SPL_TPL_)LED) += led/
 obj-$(CONFIG_$(SPL_TPL_)MMC) += mmc/
 obj-y += mtd/
+obj-y += lhs/
 obj-$(CONFIG_$(SPL_)MULTIPLEXER) += mux/
 obj-$(CONFIG_$(SPL_TPL_)ETH) += net/
 obj-$(CONFIG_$(SPL_TPL_)PCH) += pch/
@@ -122,3 +124,4 @@ obj-$(CONFIG_DM_RNG) += rng/
 endif
 
 obj-y += soc/
+obj-$(CONFIG_ARCH_BSP) += ddr/vendor/boot_adaptation/uboot/

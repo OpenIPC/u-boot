@@ -1,0 +1,19 @@
+config WRITE_OTP_CMD
+bool "writre otp cmd enable"
+depends on SECURITY_SUBSYS_ENABLE
+help
+  writre otp cmd enable.
+  
+  The `write_otp` command by default does not burn (or program) any OTP.
+  
+  If you need to burn (or program) custom OTP according to the actual situation, you will need to:
+  
+  1. Open the `cmd_write_otp.c` file and find the two tables `g_otp_fields_big_endian_num` and `g_otp_fields_raw`.
+  2. Fill in the OTP values to be programmed in the `g_otp_fields_big_endian_num` table. The `val` will be programmed in big-endian format to the corresponding position of OTP.
+  3. Fill in the naked byte to be programmed in the `g_otp_fields_raw` table. The naked byte will be directly programmed into OTP.
+  
+  Note:
+  1. The position of OTP is represented by a byte-bit tuple.
+  2. OTP programming should be performed with caution. Once the programming is incorrect, it cannot be repaired.
+  3. Be sure to back up OTP data to prevent data loss.
+default n

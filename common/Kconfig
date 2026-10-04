@@ -1006,3 +1006,43 @@ config FDT_SIMPLEFB
 	  These functions can be used by board to indicate to the OS
 	  the presence of the simple frame buffer with associated reserved
 	  memory
+
+menu "xmedia_setup"
+
+config TINY_BOOT
+	bool "tiny boot solution"
+	default n
+	help
+	  support for xmedia tiny boot solution
+
+config XMEDIA_SPIFLASH_SPEED
+	bool "xmedia spinor and spinand  speed "
+	default n
+	depends on FMC_SPI_NAND || FMC_SPI_NOR || FMC_NAND
+	help
+	  Support for flash speed  testing.
+
+config XMEDIA_UPGRADE_BY_SEGMENT
+	bool "xmedia Upgrade by segment write"
+	default n
+	help
+	  Support for upgrade by segment,this option is used only when the memory
+	  is small and the upgrade file is large. If you are not sure, select n by default.
+
+config XMEDIA_DISABLE_CONSOLE
+	bool "xmedia disable console"
+	default n
+	help
+	  The console in uboot is not secure. In formal commercial products,
+	  the input and output of the console should be turned off to avoid being attacked.
+	  Only during debugging, enable the input and output functions of the console.
+
+config XMEDIA_DISABLE_DOWNLOAD
+	bool "xmedia disable chip download"
+	default n
+	help
+	  The bare chip download programming function and the network download programming
+	  function are not safe in a commercial environment and may be used by hackers.
+	  Therefore, it needs to be disabled in the official product.
+
+endmenu

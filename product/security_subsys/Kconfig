@@ -1,0 +1,3 @@
+config SECURITY_SUBSYS_ENABLE
+	bool "security_subsys enable"
+    default n

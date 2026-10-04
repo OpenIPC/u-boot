@@ -90,6 +90,8 @@ struct tag_header {
 
 /* The list must start with an ATAG_CORE node */
 #define ATAG_CORE	0x54410001
+#define ATAG_PARAM      0x70000001
+#define ATAG_FDT        0x70000002
 
 struct tag_core {
 	u32 flags;		/* bit 0 = read-only */

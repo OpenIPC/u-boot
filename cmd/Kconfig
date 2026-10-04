@@ -908,6 +908,25 @@ config CMD_ZIP
 	help
 	  Compress a memory region with zlib deflate method.
 
+config CMD_DDR_TRAINING
+	bool "ddr training"
+	default y
+	help
+	  ddr training function
+
+config CMD_CREAD
+	bool "Enable cycle read function"
+	default y if TARGET_XM72020300
+	help
+	 Enable the function for cycle read.
+
+config CMD_UGZIP
+	bool "ugzip"
+	default y if TARGET_XM72020300
+	select HWDEC
+	help
+	  UnCompress a gzip file with hardware umcompress ip of chip.
+
 endmenu
 
 menu "Device access commands"
@@ -1412,7 +1431,7 @@ config CMD_SDRAM
 
 config CMD_SF
 	bool "sf"
-	depends on DM_SPI_FLASH || SPI_FLASH
+	depends on DM_SPI_FLASH || SPI_FLASH || FMC_SPI_NOR
 	default y if DM_SPI_FLASH
 	help
 	  SPI Flash support

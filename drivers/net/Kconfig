@@ -94,7 +94,7 @@ config DSA_SANDBOX
 menuconfig NETDEVICES
 	bool "Network device support"
 	depends on NET
-	select DM_ETH
+	default y if DM_ETH
 	help
 	  You must select Y to enable any network device support
 	  Generally if you have any networking support this is a given
@@ -832,6 +832,35 @@ config HIGMACV300_ETH
 	help
 	  This driver supports HIGMACV300 Ethernet controller found on
 	  HiSilicon SoCs.
+
+config NET_FEMAC
+	bool "XMEDIA Fast Ethernet Controller"
+	help
+	  XMEDIA FEMAC ethernet support.
+
+config NET_HISFV300
+	bool "Hisilicon Fast Ethernet Controller v300"
+	help
+	  This driver supports the Hisilicon Hi35xx Fast Ethernet
+	  controller (hisfv300).
+
+config NET_HIGMACV300
+	bool "Hisilicon Gigabit Ethernet Controller v300"
+	help
+	  This driver supports the Hisilicon Hi35xx Gigabit Ethernet
+	  controller (higmacv300).
+
+config SFV300_ETH
+	bool "Fast Ethernet Controller"
+	help
+	  This driver supports SFV300 Ethernet controller found on
+	  SoCs.
+
+config GMACV300_ETH
+	bool "Gigabit Ethernet Controller"
+	help
+	  This driver supports GMACV300 Ethernet controller found on
+	  SoCs.
 
 config FSL_ENETC
 	bool "NXP ENETC Ethernet controller"

@@ -260,3 +260,25 @@ $(obj)/license_data_size.h: $(srctree)/Licenses/gpl-2.0.txt FORCE
 	$(call filechk,data_size)
 
 CFLAGS_ethsw.o := -Wno-enum-conversion
+
+obj-$(CONFIG_TARGET_XM72020300) += hwzimage.o
+obj-$(CONFIG_TARGET_XM72010200) += hwzimage.o
+obj-$(CONFIG_TARGET_XM72010300) += hwzimage.o
+obj-$(CONFIG_TARGET_XM72050200) += hwzimage.o
+obj-$(CONFIG_TARGET_XM72050300) += hwzimage.o
+obj-$(CONFIG_TARGET_XM72050500) += hwzimage.o
+obj-$(CONFIG_TARGET_XM720XXX) += hwzimage.o
+obj-$(CONFIG_TARGET_XM76050100) += hwzimage.o
+CFLAGS_hwzimage.o += -I$(srctree)/lib/hw_dec
+obj-y += xmedia/getinfo.o
+obj-$(CONFIG_USB_GADGET) += usbtftp.o
+obj-$(CONFIG_CMD_CREAD) += cmd_cycle.o
+obj-$(CONFIG_TARGET_XM72020300) += cmd_ugzip.o
+obj-$(CONFIG_TARGET_XM72010200) += cmd_ugzip.o
+obj-$(CONFIG_TARGET_XM72010300) += cmd_ugzip.o
+obj-$(CONFIG_TARGET_XM72050200) += cmd_ugzip.o
+obj-$(CONFIG_TARGET_XM72050300) += cmd_ugzip.o
+obj-$(CONFIG_TARGET_XM72050500) += cmd_ugzip.o
+obj-$(CONFIG_TARGET_XM720XXX) += cmd_ugzip.o
+obj-$(CONFIG_TARGET_XM76050100) += cmd_ugzip.o
+sinclude $(srctree)/cmd/Makefile-product

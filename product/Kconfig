@@ -1,0 +1,9 @@
+menu "Product"
+
+source "product/ot_osd/Kconfig"
+source "product/update/Kconfig"
+source "product/security_subsys/Kconfig"
+source "product/write_otp/scripts/Kconfig"
+source "product/verify_boot/Kconfig"
+
+endmenu

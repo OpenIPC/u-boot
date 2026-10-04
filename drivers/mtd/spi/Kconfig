@@ -97,13 +97,6 @@ config SPI_FLASH_SMART_HWCAPS
 	 can support a type of operation in a much more refined way compared
 	 to using flags like SPI_RX_DUAL, SPI_TX_QUAD, etc.
 
-config SPI_NOR_BOOT_SOFT_RESET_EXT_INVERT
-	bool "Command extension type is INVERT for Software Reset on boot"
-	default n
-	help
-	 Because of SFDP information can not be get before boot.
-	 So define command extension type is INVERT when Software Reset on boot only.
-
 config SPI_FLASH_SOFT_RESET
 	bool "Software Reset support for SPI NOR flashes"
 	help
@@ -255,10 +248,56 @@ config SPI_FLASH_MTD
 
 config SPL_SPI_FLASH_MTD
 	bool "SPI flash MTD support for SPL"
-	depends on SPI_FLASH && SPL
+	depends on SPI_FLASH
 	help
           Enable the MTD support for the SPI flash layer in SPL.
 
 	  If unsure, say N
+
+config FMC_SPI_NOR
+	bool "SPI Nor Flash Interface support"
+	depends on FMC
+	help
+	  Enable the SPI Nor flash support.
+
+	  If unsure, say N
+
+config SPI_BLOCK_PROTECT
+    bool "Spi Nor Device BP(Block Protect) Support"
+	depends on FMC_SPI_NOR
+    help
+      SFC supports BP(Block Protect) feature to preestablish a series
+      area to avoid writing and erasing, except to reading. With this macro
+      definition we can get the BP info which was setted before. The
+      BOTTOM/TOP bit is setted to BOTTOM, it means the lock area starts
+      from 0 address.
+
+	  If unsure, say N
+
+config DTR_MODE_SUPPORT
+    bool "Spi Nor Device DTR mode Support"
+	depends on FMC_SPI_NOR
+	default n
+    help
+	  To support DTR mode
+
+	  If unsure, say N
+
+config BSP_SYSSTAT_MODE
+    bool "Check the SYSSTAT register to select the boot mode"
+	depends on FMC_SPI_NOR
+
+config BSP_SEC_MODE
+    bool "Check the OTP_USER_LOCKABLE14 register to select the boot mode"
+	depends on FMC_SPI_NOR
+	default y if TARGET_HI3519DV500_FAMILY 
+
+config BSP_NAND_ECC_STATUS_REPORT
+       tristate "Report the ecc status to MTD for Nand Driver"
+       depends on MTD_RAW_NAND
+       default n
+       help
+         Flash Memory Controller reports the ecc status include ECC error
+         and ECC corrected to MTD to monitor the aging of devices.
 
 endmenu # menu "SPI Flash Support"

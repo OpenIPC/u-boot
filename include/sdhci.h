@@ -100,6 +100,7 @@
 #define  SDHCI_DIV_MASK	0xFF
 #define  SDHCI_DIV_MASK_LEN	8
 #define  SDHCI_DIV_HI_MASK	0x300
+#define  SDHCI_CLOCK_PLL_EN     BIT(3)
 #define  SDHCI_PROG_CLOCK_MODE  BIT(5)
 #define  SDHCI_CLOCK_CARD_EN	BIT(2)
 #define  SDHCI_CLOCK_INT_STABLE	BIT(1)
@@ -227,6 +228,39 @@
  * End of controller registers.
  */
 
+/* 0x508 */
+#define SDHCI_MSHC_CTRL         0x508
+#define  SDHCI_CMD_CONFLIT_CHECK	0x01
+
+/* 0x510 */
+#define SDHCI_AXI_MBIIU_CTRL	0x510
+#define  SDHCI_GM_WR_OSRC_LMT	0x03000000
+#define  SDHCI_GM_RD_OSRC_LMT	0x00030000
+#define SDHCI_UNDEFL_INCR_EN	0x00000001
+
+/* 0x52c */
+#define SDHCI_EMMC_CTRL		0x52c
+#define  SDHCI_ENH_STROBE_EN	0x0100
+#define  SDHCI_CARD_IS_EMMC	0x0001
+
+/* 0x540 */
+#define SDHCI_AT_CTRL		0x540
+#define  SDHCI_SAMPLE_EN	0x00000010
+
+/* 0x544 */
+#define SDHCI_AT_STAT		0x544
+#define  SDHCI_PHASE_SEL_MASK	0x000000ff
+
+/* 0x54c */
+#define SDHCI_MULTI_CYCLE	0x54c
+#define  SDHCI_FOUND_EDGE	0x00000800
+#define  SDHCI_DOUT_EN_F_EDGE	0x00000040
+#define  SDHCI_EDGE_DETECT_EN	0x00000100
+#define  SDHCI_DATA_DLY_EN	0x00000008
+#define  SDHCI_CMD_DLY_EN	0x00000004
+
+#define SDHCI_GET_VERSION(x) (x->version & SDHCI_SPEC_VER_MASK)
+
 #define SDHCI_MAX_DIV_SPEC_200	256
 #define SDHCI_MAX_DIV_SPEC_300	2046
 
@@ -269,6 +303,10 @@ struct sdhci_ops {
 	void	(*set_control_reg)(struct sdhci_host *host);
 	int	(*set_ios_post)(struct sdhci_host *host);
 	void	(*set_clock)(struct sdhci_host *host, u32 div);
+	void	(*priv_init)(struct sdhci_host *host);
+#ifdef MMC_SUPPORTS_TUNING
+	int	(*execute_tuning)(struct sdhci_host *host, unsigned int opcode);
+#endif
 	int (*platform_execute_tuning)(struct mmc *host, u8 opcode);
 	int (*set_delay)(struct sdhci_host *host);
 	int	(*deferred_probe)(struct sdhci_host *host);
@@ -349,6 +387,17 @@ struct sdhci_host {
 #if CONFIG_IS_ENABLED(MMC_SDHCI_ADMA)
 	struct sdhci_adma_desc *adma_desc_table;
 #endif
+	void (*set_control_reg)(struct sdhci_host *host);
+	int (*set_clock)(struct sdhci_host *host, unsigned int clk);
+#ifdef MMC_SUPPORTS_TUNING
+	int (*execute_tuning)(struct sdhci_host *host, unsigned int opcode);
+#endif
+	void (*priv_init)(struct sdhci_host *host);
+	unsigned int type;
+#define MMC_TYPE_MMC    0       /* MMC card */
+#define MMC_TYPE_SD     1       /* SD card */
+	unsigned int is_tuning;
+	unsigned int tuning_phase;
 };
 
 #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS

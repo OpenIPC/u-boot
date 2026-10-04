@@ -36,8 +36,18 @@ static struct pl01x_regs *base_regs __section(".data");
 
 #endif
 
+static bool g_uart_fputc_en = true;
+
+void serial_enable_output(bool is_enable)
+{
+	g_uart_fputc_en = is_enable;
+}
+
 static int pl01x_putc(struct pl01x_regs *regs, char c)
 {
+	if (g_uart_fputc_en == false)
+		return 0;
+
 	/* Wait until there is space in the FIFO */
 	if (readl(&regs->fr) & UART_PL01x_FR_TXFF)
 		return -EAGAIN;

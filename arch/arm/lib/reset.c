@@ -36,6 +36,8 @@ int do_reset(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 
 	mdelay(50);				/* wait 50 ms */
 
+	do_shutdown();
+
 	disable_interrupts();
 
 	reset_misc();

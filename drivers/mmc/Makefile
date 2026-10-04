@@ -84,3 +84,12 @@ obj-$(CONFIG_RENESAS_SDHI)		+= tmio-common.o renesas-sdhi.o
 obj-$(CONFIG_MMC_BCM2835)		+= bcm2835_sdhost.o
 obj-$(CONFIG_MMC_MTK)			+= mtk-sd.o
 obj-$(CONFIG_MMC_SDHCI_F_SDH30)		+= f_sdh30.o
+
+obj-$(CONFIG_TARGET_XM72020300)		+= xm72020300.o mmc_boot.o sdhci-adma.o
+obj-$(CONFIG_TARGET_XM72010200)		+= xm72010200.o mmc_boot.o sdhci-adma.o
+obj-$(CONFIG_TARGET_XM72010300)		+= xm72010300.o mmc_boot.o sdhci-adma.o
+obj-$(CONFIG_TARGET_XM72050200)		+= xm72050200.o mmc_boot.o sdhci-adma.o
+obj-$(CONFIG_TARGET_XM72050300)		+= xm72050300.o mmc_boot.o sdhci-adma.o
+obj-$(CONFIG_TARGET_XM72050500)		+= xm72050500.o mmc_boot.o sdhci-adma.o
+obj-$(CONFIG_TARGET_XM720XXX)		+= xm720xxx.o mmc_boot.o sdhci-adma.o
+obj-$(CONFIG_TARGET_XM76050100)		+= xm76050100.o mmc_boot.o sdhci-adma.o

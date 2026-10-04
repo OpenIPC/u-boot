@@ -49,6 +49,7 @@ source "drivers/gpio/Kconfig"
 source "drivers/hwspinlock/Kconfig"
 
 source "drivers/i2c/Kconfig"
+source "drivers/lhs/i2c/Kconfig"
 
 source "drivers/input/Kconfig"
 

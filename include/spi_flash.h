@@ -11,6 +11,67 @@
 
 #include <linux/types.h>
 #include <linux/mtd/spi-nor.h>
+#include <spi.h>
+
+#ifdef CONFIG_SPI_BLOCK_PROTECT
+#define BP_OP_SET	0
+#define BP_OP_GET	1
+
+#define BT_LOC_RDSR	0
+#define BT_LOC_RDCR	1
+
+#define BP_CMP_TOP      0
+#define BP_CMP_BOTTOM   1
+#define BP_CMP_UPDATE_FLAG      0xff
+
+enum block_protection_level {
+	BP_LEVEL_0      = 0,
+	BP_LEVEL_1      = 1,
+	BP_LEVEL_2      = 2,
+	BP_LEVEL_3      = 3,
+	BP_LEVEL_4      = 4,
+	BP_LEVEL_5      = 5,
+	BP_LEVEL_6      = 6,
+	BP_LEVEL_7      = 7,
+	BP_LEVEL_8      = 8,
+	BP_LEVEL_9      = 9,
+	BP_LEVEL_10     = 10,
+	BP_LEVEL_END,
+};
+
+#define BP_LEVEL_MAX    (BP_LEVEL_END - 1)
+
+#define BP_NUM_3	3
+#define BP_NUM_4	4
+#define BP_NUM_5	5
+
+void spi_flash_lock(unsigned char cmp, unsigned char level, unsigned char op);
+
+#endif /* CONFIG_SPI_BLOCK_PROTECT */
+
+#define MID_SPANSION    0x01    /* Spansion Manufacture ID */
+#define MID_WINBOND     0xef    /* Winbond  Manufacture ID */
+#define MID_MXIC        0xc2    /* MXIC Manufacture ID */
+#define MID_MICRON      0x20    /* Micron Manufacture ID */
+#define MID_GD          0xc8    /* GD Manufacture ID */
+#define MID_ESMT        0x8c    /* ESMT Manufacture ID */
+#define MID_CFEON       0x1c    /* CFeon Manufacture ID */
+#define MID_MICRON      0x20    /* Micron Manufacture ID */
+#define MID_PARAGON     0xe0    /* Paragon Manufacture ID */
+
+
+#ifndef CONFIG_SF_DEFAULT_SPEED
+# define CONFIG_SF_DEFAULT_SPEED	1000000
+#endif
+#ifndef CONFIG_SF_DEFAULT_MODE
+# define CONFIG_SF_DEFAULT_MODE		SPI_MODE_3
+#endif
+#ifndef CONFIG_SF_DEFAULT_CS
+# define CONFIG_SF_DEFAULT_CS		0
+#endif
+#ifndef CONFIG_SF_DEFAULT_BUS
+# define CONFIG_SF_DEFAULT_BUS		0
+#endif
 
 struct udevice;
 
@@ -147,6 +208,7 @@ void spi_flash_free(struct spi_flash *flash);
 static inline int spi_flash_read(struct spi_flash *flash, u32 offset,
 		size_t len, void *buf)
 {
+#ifndef CONFIG_FMC
 	struct mtd_info *mtd = &flash->mtd;
 	size_t retlen;
 
@@ -154,11 +216,15 @@ static inline int spi_flash_read(struct spi_flash *flash, u32 offset,
 		return 0;
 
 	return mtd->_read(mtd, offset, len, &retlen, buf);
+#else
+	return flash->read(flash, offset, len, buf);
+#endif
 }
 
 static inline int spi_flash_write(struct spi_flash *flash, u32 offset,
 		size_t len, const void *buf)
 {
+#ifndef CONFIG_FMC
 	struct mtd_info *mtd = &flash->mtd;
 	size_t retlen;
 
@@ -166,11 +232,15 @@ static inline int spi_flash_write(struct spi_flash *flash, u32 offset,
 		return 0;
 
 	return mtd->_write(mtd, offset, len, &retlen, buf);
+#else
+	return flash->write(flash, offset, len, buf);
+#endif
 }
 
 static inline int spi_flash_erase(struct spi_flash *flash, u32 offset,
 		size_t len)
 {
+#ifndef CONFIG_FMC
 	struct mtd_info *mtd = &flash->mtd;
 	struct erase_info instr;
 
@@ -187,6 +257,15 @@ static inline int spi_flash_erase(struct spi_flash *flash, u32 offset,
 	instr.len = len;
 
 	return mtd->_erase(mtd, &instr);
+#else
+#ifdef CONFIG_FMC_SPI_NOR
+	extern int fmc100_reg_erase(struct spi_flash *spiflash, u32 offset,
+				size_t length);
+	return fmc100_reg_erase(flash, offset, len);
+#else
+	return 0;
+#endif
+#endif
 }
 #endif
 

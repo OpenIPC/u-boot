@@ -31,4 +31,17 @@
 # include <env_internal.h>
 #endif
 
+#define BOOT_MEDIA_UNKNOWN        (0)
+#define BOOT_MEDIA_UFS            (1)
+#define BOOT_MEDIA_NAND           (2)
+#define BOOT_MEDIA_SPIFLASH       (3)
+#define BOOT_MEDIA_EMMC           (4)
+
+void add_shutdown(void (*shutdown)(void));
+void do_shutdown(void);
+
+/* get uboot start media. */
+int get_boot_media(void);
+unsigned int get_ddr_size(void);
+
 #endif	/* __COMMON_H_ */

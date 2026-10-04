@@ -1,0 +1,26 @@
+config AUTO_UPDATE
+	bool "auto update"
+	select FS_FAT
+
+config AUTO_SD_UPDATE
+        bool "auto sd update"
+	depends on AUTO_UPDATE
+	default y if AUTO_UPDATE
+
+config AUTO_SD_UPDATE_IS_IN_SDIO0
+	bool "auto sd update is in sdio0"
+	depends on AUTO_SD_UPDATE && !ENV_IS_IN_MMC
+	default y
+
+config AUTO_USB_UPDATE
+        bool "auto usb update"
+        select USB
+	select USB_GADGET
+	depends on AUTO_UPDATE
+	default y if AUTO_UPDATE
+
+config AUTO_UPDATE_ADAPTATION
+	bool "auto update adaptation"
+	depends on AUTO_UPDATE
+	default y if AUTO_UPDATE
+

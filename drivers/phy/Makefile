@@ -42,3 +42,5 @@ obj-$(CONFIG_PHY_IMX8MQ_USB) += phy-imx8mq-usb.o
 obj-$(CONFIG_PHY_XILINX_ZYNQMP) += phy-zynqmp.o
 obj-y += cadence/
 obj-y += ti/
+obj-$(CONFIG_PHY_HISI_USB) += hibvt/
+obj-$(CONFIG_PHY_VENDOR_USB) += xmedia/

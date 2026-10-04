@@ -300,3 +300,5 @@ source "drivers/phy/cadence/Kconfig"
 source "drivers/phy/ti/Kconfig"
 
 endmenu
+source "drivers/phy/hibvt/Kconfig"
+source "drivers/phy/xmedia/Kconfig"

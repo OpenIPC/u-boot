@@ -1,0 +1,4 @@
+config VERIFY_BOOT_ENABLE
+	bool "verify boot enable"
+    default n
+    select SECURITY_SUBSYS_ENABLE

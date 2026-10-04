@@ -1033,6 +1033,9 @@ static inline void *nand_get_manufacturer_data(struct nand_chip *chip)
 #define NAND_MFR_RENESAS	0x07
 #define NAND_MFR_STMICRO	0x20
 #define NAND_MFR_HYNIX		0xad
+#define NAND_MFR_HEYANGTEK	0xc9
+#define NAND_MFR_DOSILICON	0xe5
+#define NAND_MFR_FIDELIX	0xf8
 #define NAND_MFR_MICRON		0x2c
 #define NAND_MFR_AMD		0x01
 #define NAND_MFR_MACRONIX	0xc2
@@ -1363,5 +1366,20 @@ int nand_write_data_op(struct nand_chip *chip, const void *buf,
 
 /* Default extended ID decoding function */
 void nand_decode_ext_id(struct nand_chip *chip);
+
+static inline char *get_ecctype_str(int ecctype)
+{
+#if defined(CONFIG_FMC_SPI_NAND)
+	static char *ecctype_string[] = {
+		"None", "1bit/512Byte", "4bits/512Byte", "8bits/512Byte",
+		"24bits/1K", "unknown", "40bits/1K", "unknown"};
+	return ecctype_string[(ecctype + 1) / 2];
+#else
+	static char *ecctype_string[] = {
+		"None", "1bit/512Byte", "4bits/512Byte", "8bits/512Byte",
+		"24bits/1K", "40bits/1K", "unknown", "unknown"};
+	return ecctype_string[((unsigned int)ecctype & 0x0F)];
+#endif
+}
 
 #endif /* __LINUX_MTD_RAWNAND_H */

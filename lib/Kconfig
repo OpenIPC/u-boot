@@ -689,6 +689,25 @@ config SPL_ZSTD
 	help
 	  This enables Zstandard decompression library in the SPL.
 
+config HWDEC
+	bool "hw decompress"
+	default y
+	depends on HI35XX_FAMILY_V500 || ARCH_BSP || TARGET_XM72050200 || TARGET_XM72050300 || TARGET_XM72020300 || TARGET_XM76050100 || TARGET_XM72050500 || TARGET_XM720XXX || TARGET_XM72010200 || TARGET_XM72010300
+	help
+	  hw decompress.
+
+config HWDEC_V1
+	bool "hw decompress v1"
+	depends on HWDEC
+	help
+	  hw decompress v1.
+
+config HWDEC_V2
+	bool "hw decompress v2"
+	depends on HWDEC
+	help
+	  hw decompress v2.
+
 endmenu
 
 config ERRNO_STR

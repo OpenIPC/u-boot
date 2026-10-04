@@ -422,6 +422,8 @@ DTC_MIN_VERSION	:= 010406
 
 CHECK		= sparse
 
+HW_DIR		= hw_compressed
+
 CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
 		  -Wbitwise -Wno-return-void -D__CHECK_ENDIAN__ $(CF)
 
@@ -459,7 +461,7 @@ UBOOTRELEASE = $(shell cat include/config/uboot.release 2> /dev/null)
 UBOOTVERSION = $(VERSION)$(if $(PATCHLEVEL),.$(PATCHLEVEL)$(if $(SUBLEVEL),.$(SUBLEVEL)))$(EXTRAVERSION)
 
 export VERSION PATCHLEVEL SUBLEVEL UBOOTRELEASE UBOOTVERSION
-export ARCH CPU BOARD VENDOR SOC CPUDIR BOARDDIR
+export ARCH CPU BOARD VENDOR SOC CPUDIR BOARDDIR VENDER_CHIP
 export CONFIG_SHELL HOSTCC KBUILD_HOSTCFLAGS CROSS_COMPILE AS LD CC
 export CPP AR NM LDR STRIP OBJCOPY OBJDUMP KBUILD_HOSTLDFLAGS KBUILD_HOSTLDLIBS
 export MAKE LEX YACC AWK PERL PYTHON PYTHON2 PYTHON3
@@ -863,6 +865,22 @@ libs-$(CONFIG_$(SPL_TPL_)UNIT_TEST) += test/
 libs-$(CONFIG_UT_ENV) += test/env/
 libs-$(CONFIG_UT_OPTEE) += test/optee/
 libs-$(CONFIG_UT_OVERLAY) += test/overlay/
+# FOR osd
+# sinclude Makefile-product
+
+libs-y += securec/src/
+
+sinclude Makefile-otproduct
+
+ifdef CONFIG_DDR_TRAINING_V2
+ifeq ($(CONFIG_HI35XX_FAMILY_V500),y)
+libs-y += drivers/ddr/hisilicon/$(SOC)/
+else ifeq ($(CONFIG_ARCH_BSP),y)
+# vendor DDR training lives in drivers/ddr/vendor/boot_adaptation
+else
+libs-y += drivers/ddr/xmedia/default/
+endif
+endif
 
 libs-y += $(if $(BOARDDIR),board/$(BOARDDIR)/)
 
@@ -1237,6 +1255,61 @@ endif
 
 %.vyb: %.imx
 	$(Q)$(MAKE) $(build)=arch/arm/cpu/armv7/vf610 $@
+
+ifeq ($(CONFIG_ARCH_BSP),y)
+.PHONY: u-boot-z.bin
+u-boot-z.bin: $(CURDIR)/u-boot.bin
+	$(Q)mkdir -p $(CURDIR)/arch/$(ARCH)/cpu/$(CPU)/$(SOC)/$(HW_DIR)
+	$(Q)cp -rf $(srctree)/arch/$(ARCH)/cpu/$(CPU)/$(SOC)/$(HW_DIR)/* \
+		$(CURDIR)/arch/$(ARCH)/cpu/$(CPU)/$(SOC)/$(HW_DIR)/
+	make -C $(CURDIR)/arch/$(ARCH)/cpu/$(CPU)/$(SOC)/$(HW_DIR)/ \
+		CROSS_COMPILE=$(CROSS_COMPILE) \
+		BINIMAGE=$(CURDIR)/u-boot.bin TOPDIR=$(srctree) BOOT_OUTDIR=$(CURDIR)
+
+.PHONY: u-boot-z.clean
+u-boot-z.clean:
+	pushd $(CURDIR)/arch/$(ARCH)/cpu/$(CPU)/$(SOC)/$(HW_DIR);\
+	make CROSS_COMPILE=$(CROSS_COMPILE) clean;\
+	popd
+else
+_U_BOOT_Z_DIR = arch/$(ARCH)/cpu/$(CPU)/$(SOC)/$(HW_DIR)
+U_BOOT_Z_OUT  = $(CURDIR)/$(_U_BOOT_Z_DIR)
+ifneq ($(KBUILD_SRC),)
+UBOOT_TOPDIR  = $(srctree)
+else
+UBOOT_TOPDIR  = $(CURDIR)
+endif
+.PHONY: u-boot-z.bin u-boot-z.prepare
+u-boot-z.bin: $(CURDIR)/u-boot.bin $(U_BOOT_Z_OUT)/.reg u-boot-z.prepare
+	make -C $(CURDIR)/$(_U_BOOT_Z_DIR) \
+		-f $(CURDIR)/$(_U_BOOT_Z_DIR)/Makefile \
+		CROSS_COMPILE=$(CROSS_COMPILE) \
+		BINIMAGE=$(CURDIR)/u-boot.bin \
+		BOOT_TOPDIR=$(UBOOT_TOPDIR) \
+		BOOT_OUTDIR=$(CURDIR) \
+		SOC=$(SOC) \
+		all
+
+$(U_BOOT_Z_OUT)/.reg: $(CURDIR)/.reg
+	$(Q)mkdir -p $(dir $@)
+	$(Q)$(call if_changed,copy)
+
+u-boot-z.prepare: FORCE
+ifneq ($(KBUILD_SRC),)
+	$(Q)mkdir -p $(CURDIR)/$(_U_BOOT_Z_DIR)
+	$(Q)cp -rf $(UBOOT_TOPDIR)/$(_U_BOOT_Z_DIR)/* $(CURDIR)/$(_U_BOOT_Z_DIR)/
+endif
+
+.PHONY: u-boot-z.clean
+u-boot-z.clean:
+	make -C $(CURDIR)/$(_U_BOOT_Z_DIR) \
+		-f $(UBOOT_TOPDIR)/$(_U_BOOT_Z_DIR)/Makefile \
+		CROSS_COMPILE=$(CROSS_COMPILE) \
+		BOOT_TOPDIR=$(UBOOT_TOPDIR) \
+		BOOT_OUTDIR=$(CURDIR) \
+		SOC=$(SOC) \
+	        clean
+endif
 
 quiet_cmd_copy = COPY    $@
       cmd_copy = cp $< $@
@@ -1934,7 +2007,12 @@ prepare0: archprepare FORCE
 	$(Q)$(MAKE) $(build)=.
 
 # All the preparing..
+ifneq ($(or $(CONFIG_ARCH_BSP),$(CONFIG_DDR_TRAINING_V2)),)
+prepare: ddr_training_prepare
+ddr_training_prepare: prepare0
+else
 prepare: prepare0
+endif
 
 # Generate some files
 # ---------------------------------------------------------------------------
@@ -2210,7 +2288,7 @@ PHONY += $(clean-dirs) clean archclean
 $(clean-dirs):
 	$(Q)$(MAKE) $(clean)=$(patsubst _clean_%,%,$@)
 
-clean: $(clean-dirs)
+clean: $(clean-dirs) ddr_training_clean
 	$(call cmd,rmdirs)
 	$(call cmd,rmfiles)
 	@find $(if $(KBUILD_EXTMOD), $(KBUILD_EXTMOD), .) $(RCS_FIND_IGNORE) \
@@ -2476,6 +2554,51 @@ endif    #ifeq ($(config-targets),1)
 endif    #ifeq ($(mixed-targets),1)
 endif	# skip-makefile
 
+DDRT_DEFAULT := default
+
+ifneq ($(CONFIG_ARCH_BSP),)
+ddr_training_prepare:
+	make -C $(srctree)/drivers/ddr/vendor/boot_adaptation/uboot/cmd_bin \
+		TOPDIR=$(srctree) BOOT_OUTDIR=$(CURDIR) all
+	$(Q)if [ "$(CURDIR)" != "$(abspath $(srctree))" ]; then \
+		mkdir -p $(CURDIR)/drivers/ddr/vendor/boot_adaptation/uboot/cmd_bin; \
+		cp -f $(srctree)/drivers/ddr/vendor/boot_adaptation/uboot/cmd_bin/ddr_cmd.bin \
+			$(CURDIR)/drivers/ddr/vendor/boot_adaptation/uboot/cmd_bin/; \
+	fi
+
+ddr_training_clean:
+	make -C $(srctree)/drivers/ddr/vendor/boot_adaptation/uboot/cmd_bin \
+		TOPDIR=$(srctree) BOOT_OUTDIR=$(CURDIR) clean
+	@if [ -f $(srctree)/drivers/ddr/vendor/boot_adaptation/uboot/cmd_bin/ddr_cmd.bin ]; \
+	then rm  $(srctree)/drivers/ddr/vendor/boot_adaptation/uboot/cmd_bin/ddr_cmd.bin; fi;
+else ifeq ($(CONFIG_HI35XX_FAMILY_V500),y)
+# Hisilicon keeps ddr_training_custom.* in the per-SoC dir and builds
+# the command binary from its own default/Makefile.
+ddr_training_prepare:
+	make -C $(CURDIR)/drivers/ddr/hisilicon/$(DDRT_DEFAULT)/cmd_bin \
+		TOPDIR=$(CURDIR) BOOT_SRCDIR=$(abspath $(srctree)) \
+		CROSS_COMPILE=$(CROSS_COMPILE) CPU=$(CPU) SOC=$(SOC) all
+
+ddr_training_clean:
+	make -C $(CURDIR)/drivers/ddr/hisilicon/$(DDRT_DEFAULT)/cmd_bin \
+		TOPDIR=$(CURDIR) BOOT_SRCDIR=$(abspath $(srctree)) \
+		CROSS_COMPILE=$(CROSS_COMPILE) CPU=$(CPU) SOC=$(SOC) clean
+else
+DDR_SSRC := ddr_training_custom.h ddr_training_custom.c
+
+ddr_training_prepare:$(DDR_SSRC)
+	make -C $(CURDIR)/drivers/ddr/xmedia/$(DDRT_DEFAULT)/cmd_bin all
+
+ddr_training_clean:
+	-make -C $(CURDIR)/drivers/ddr/xmedia/$(DDRT_DEFAULT)/cmd_bin clean
+	@for file in $(DDR_SSRC); \
+	do \
+		rm -f $(CURDIR)/drivers/ddr/xmedia/$(DDRT_DEFAULT)/$$file; \
+	done
+	@if [ -f $(CURDIR)/ddr_cmd.bin ]; then rm  $(CURDIR)/ddr_cmd.bin; fi;
+$(DDR_SSRC):
+	ln -sf  ../$(SOC)/$@  $(CURDIR)/drivers/ddr/xmedia/$(DDRT_DEFAULT)/$@
+endif
 PHONY += FORCE
 FORCE:
 

@@ -36,6 +36,8 @@ endif
 obj-y += crc8.o
 obj-y += crc16.o
 obj-y += crc16-ccitt.o
+obj-$(CONFIG_HWDEC) += hw_dec/
+obj-$(CONFIG_CMD_NAND) += match_table.o
 obj-$(CONFIG_ERRNO_STR) += errno_str.o
 obj-$(CONFIG_FIT) += fdtdec_common.o
 obj-$(CONFIG_TEST_FDTDEC) += fdtdec_test.o
@@ -124,6 +126,14 @@ obj-$(CONFIG_TRACE) += trace.o
 obj-$(CONFIG_LIB_UUID) += uuid.o
 obj-$(CONFIG_LIB_RAND) += rand.o
 obj-y += panic.o
+obj-$(CONFIG_TARGET_XM72020300) += xmedia/
+obj-$(CONFIG_TARGET_XM72010200) += xmedia/
+obj-$(CONFIG_TARGET_XM72010300) += xmedia/
+obj-$(CONFIG_TARGET_XM72050200) += xmedia/
+obj-$(CONFIG_TARGET_XM72050300) += xmedia/
+obj-$(CONFIG_TARGET_XM72050500) += xmedia/
+obj-$(CONFIG_TARGET_XM720XXX) += xmedia/
+obj-$(CONFIG_TARGET_XM76050100) += xmedia/
 
 ifeq ($(CONFIG_$(SPL_TPL_)BUILD),y)
 # SPL U-Boot may use full-printf, tiny-printf or none at all

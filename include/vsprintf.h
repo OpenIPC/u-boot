@@ -345,3 +345,4 @@ int vsscanf(const char *inp, char const *fmt0, va_list ap);
 int sscanf(const char *buf, const char *fmt, ...);
 
 #endif
+char *ultohstr(unsigned long long size);

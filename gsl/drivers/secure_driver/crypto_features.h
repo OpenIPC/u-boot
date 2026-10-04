@@ -1,0 +1,143 @@
+/*
+  Copyright (c), 2001-2025, Shenshu Tech. Co., Ltd.
+*/
+
+#ifndef CRYPTO_FEATURES_H
+#define CRYPTO_FEATURES_H
+
+
+/*
+ * TRNG Configuration
+ */
+#define CONFIG_TRNG_SUPPORT 1
+
+/*
+ * Symc Configuration
+ */
+#define CONFIG_SYMC_SUPPORT 1
+
+/*
+ * Hash Configuration
+ */
+#define CONFIG_HASH_SUPPORT 1
+#define CONFIG_HASH_SM3_SUPPORT 1
+
+/*
+ * FAPC Configuration
+ */
+
+/*
+ * KM Configuration
+ */
+#define CONFIG_KM_SUPPORT 1
+#define CONFIG_KM_EFFECTIVE_KEY_SUPPORT 1
+
+/*
+ * KM RootKey support
+ */
+#define CONFIG_KM_ERK_TEE_SUPPORT 1
+#define CONFIG_KM_ERK_REE_SUPPORT 1
+
+/*
+ * OTP Configuration
+ */
+#define CONFIG_OTP_SUPPORT 1
+#define CONFIG_OTP_MEMORY_MAX_ADDR 0x1ff
+
+/*
+ * PKE Configuration
+ */
+#define CONFIG_PKE_SUPPORT 1
+
+/*
+ * PKE RSA Configuration
+ */
+#define CONFIG_PKE_ECC_SUPPORT 1
+#define CONFIG_PKE_ECC_SM2_DSA_HASH_SUPPORT 1
+#define CONFIG_PKE_SUPPORT_SM2 1
+#define CONFIG_PKE_ECC_SM2_VERIFY_SUPPORT 1
+/*
+ * PKE ECC Configuration
+ */
+#define CONFIG_PKE_CAL_HASH_SUPPORT 1
+
+/*
+ * UAPI Layer Configuration
+ */
+
+/*
+ * DISPATCH Layer Configuration
+ */
+
+/*
+ * KAPI Layer Configuration
+ */
+#define CONFIG_SYMC_KAPI_DMA_BUF_LEN 0
+#define CONFIG_HASH_KAPI_DMA_BUF_LEN 0
+#define CONFIG_HASH_VIRT_CHN_NUM 2
+#define CONFIG_SYMC_VIRT_CHN_NUM 2
+#define CONFIG_MAX_PROCESS_NUM 2
+#define CONFIG_DRV_AAD_SIZE 1024
+
+/*
+ * DRV Layer Configuration
+ */
+#define CONFIG_DRV_PKE_SUPPORT 1
+#define CONFIG_DRV_HASH_SUPPORT 1
+#define CONFIG_DRV_OTP_SUPPORT 1
+
+/*
+ * HAL Layer Configuration
+ */
+#define CONFIG_HAL_TRNG_V4_SUPPORT 1
+#define CONFIG_HAL_SPACC_V4_SUPPORT 1
+#define CONFIG_HAL_PKE_V5_SUPPORT 1
+#define CONFIG_PKE_ROM_LIB_START_ADDR 0x0
+#define CONFIG_HAL_KM_V4_SUPPORT 1
+#define CONFIG_KM_KEYSLOT_SOFT_SUPPORT 1
+
+/*
+ * Parameters Configuration
+ */
+#define CONFIG_SYMC_HARD_CHN_CNT 3
+#define CONFIG_SYMC_HARD_CHANNEL_MASK 0xFFFE
+#define CONFIG_HASH_HARD_CHN_CNT 3
+#define CONFIG_HASH_HARD_CHN_MASK 0xFFFE
+#define CONFIG_HASH_ADDR_ALIGN_LEN 1
+
+/*
+ * Timeout Parameters Configuration
+ */
+#define CONFIG_HASH_CLEAR_CHN_TIMEOUT 10000
+#define CONFIG_HASH_CALC_TIMEOUT 1000000
+#define CONFIG_PKE_TIMEOUT_IN_US 10000
+#define CONFIG_TRNG_TIMEOUT_IN_US 10000
+#define CONFIG_SYMC_WAIT_TIMEOUT_IN_US 1000000
+#define CONFIG_SYMC_CLEAR_TIMEOUT_IN_US 10000
+#define CONFIG_RKP_WAIT_TIMEOUT_IN_US 10000
+#define CONFIG_KLAD_COM_ROUTE_TIMEOUT_IN_US 10000
+
+/*
+ * Romable API Configuration
+ */
+#define CONFIG_ROMABLE_API_SUPPORT 1
+#define CONFIG_TRNG_ROMABLE_API_SUPPORT 1
+#define CONFIG_SYMC_ROMABLE_API_SUPPORT 1
+#define CONFIG_SYMC_MINIMAL_ROMABLE_API_SUPPORT 1
+#define CONFIG_PKE_RSA_ROMABLE_API_SUPPORT 1
+#define CONFIG_OTP_ROMABLE_API_SUPPORT 1
+#define CONFIG_KM_ROMABLE_API_SUPPORT 1
+#define CONFIG_KM_MINIMAL_ROMABLE_API_SUPPORT 1
+#define CONFIG_HASH_ROMABLE_API_SUPPORT 1
+
+/*
+ * Test Configuration
+ */
+#define CONFIG_UT_SUPPORT 1
+
+/*
+ * Application Configuration
+ */
+
+#endif /* CRYPTO_FEATURES_H */
+

@@ -1,0 +1,113 @@
+if ARCH_BSP
+
+config TARGET_HI3516CV610
+	bool "Support HI3516CV610"
+	select TARGET_HI3516CV610_FAMILY
+	help
+	  Support for HI3516CV610 platform.
+
+config TARGET_HI3516CV608
+	bool "Support HI3516CV608"
+	select TARGET_HI3516CV610_FAMILY
+	help
+	  Support for HI3516CV608 platform.
+
+config TARGET_HI3519DV500
+	bool "Support HI3519DV500"
+	select ARM64
+	select DM
+	select TARGET_HI3519DV500_FAMILY
+	help
+	  Support for HI3519DV500 platform.
+
+config TARGET_HI3516DV500
+	bool "Support HI3516DV500"
+	select ARM64
+	select DM
+	select TARGET_HI3519DV500_FAMILY
+	help
+	  Support for HI3516DV500 platform.
+
+config TARGET_HI3516CV610_FAMILY
+	bool "Support HI3516CV610 FAMILY"
+	select CPU_V7A
+	help
+	  Support for HI3516CV610 FAMILY.
+
+config TARGET_HI3519DV500_FAMILY
+	bool "Support HI3519DV500 FAMILY"
+	select ARM64
+	select DM
+	help
+	  Support for HI3519DV500 FAMILY.
+
+config VENDER_UBOOT_NAME
+	string "Final name of u-boot.bin"
+
+config FDT_LOAD_ADDR
+	hex "Address at which to load devicetree"
+	default "0x40000000"
+
+menu "vendor_setup"
+
+config VENDOR_MC
+	bool "mc platform solution"
+	default n
+	help
+	  support for mc platform solution
+
+config VENDOR_SPIFLASH_SPEED
+	bool "spinor and spinand  speed "
+	default n
+	depends on FMC_SPI_NAND || FMC_SPI_NOR || FMC_NAND
+	help
+	  Support for flash speed  testing.
+
+config VENDOR_UPGRADE_BY_SEGMENT
+	bool "Upgrade by segment write"
+	default n
+	help
+	  Support for upgrade by segment,this option is used only when the memory
+	  is small and the upgrade file is large. If you are not sure, select n by default.
+
+config BSP_DISABLE_CONSOLE
+	bool "disable console"
+	default n
+	help
+	  The console in uboot is not secure. In formal commercial products,
+	  the input and output of the console should be turned off to avoid being attacked.
+	  Only during debugging, enable the input and output functions of the console.
+
+config BSP_DISABLE_DOWNLOAD
+	bool "disable chip download"
+	default n
+	help
+	  The bare chip download programming function and the network download programming
+	  function are not safe in a commercial environment and may be used by hackers.
+	  Therefore, it needs to be disabled in the official product.
+
+config DELAY_ENVIRONMENT
+	bool "delay load environment"
+	default n
+	help
+	  Normally the environment is loaded from flash when the board is
+	  initialised so that it is available to U-Boot. This inhibits
+	  that so that the environment in flash is not available until
+	  explicitly loaded later by U-Boot code and U-Boot will use the
+	  default environment which defined in code.
+          It is recommended to set following configs if open DELAY_ENVIRONMENT:
+	  USE_BOOTARGS and BOOTARGS and USE_BOOTCOMMAND and BOOTCOMMAND
+
+config TIME_ADDR_OFFSET
+	hex "record timestamp addr offset"
+	default 0xC800
+	help
+		record the timestamp addr,base addr is fdt, TIME_ADDR_OFFSET is offset
+
+endmenu
+
+source "board/vendor/hi3519dv500/Kconfig"
+
+source "board/vendor/hi3516cv610/Kconfig"
+
+endif

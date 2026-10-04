@@ -44,3 +44,4 @@ obj-y += core.o
 obj-y += ep0.o
 endif
 endif
+obj-$(CONFIG_USB_GADGET) += udc3/

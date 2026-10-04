@@ -1,0 +1,15 @@
+if TARGET_HI3516CV610_FAMILY
+
+config SYS_VENDOR
+	default "vendor"
+
+config SYS_SOC
+	default "hi3516cv610"
+
+config SYS_BOARD
+	default "hi3516cv610"
+
+config SYS_CONFIG_NAME
+	default "hi3516cv610"
+
+endif

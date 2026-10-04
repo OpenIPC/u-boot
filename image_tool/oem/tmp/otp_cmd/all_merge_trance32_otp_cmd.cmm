@@ -1,0 +1,85 @@
+
+SYStem.RESet
+SYStem.CONFIG AXIACCESSPORT 1.
+SYStem.Mode Prepare
+        ;OTP write cmd:
+
+Data.Set EAXI:0x101e1038 %Long 0x1
+Data.Set EAXI:0x101e1004 %Long 0x17
+Data.Set EAXI:0x101e1008 %Long 0x42
+Data.Set EAXI:0x101e1000 %Long 0x5
+wait 10ms
+
+Data.Set EAXI:0x101e1038 %Long 0x3
+
+
+;OTP read cmd:
+
+Data.Set EAXI:0x101e1038 %Long 0x1
+Data.Set EAXI:0x101e1004 %Long 0x17
+Data.Set EAXI:0x101e1000 %Long 0x3
+Data.In EAXI:0x101e100C /Long
+wait 10ms
+
+Data.Set EAXI:0x101e1038 %Long 0x3
+area;OTP write cmd:
+
+Data.Set EAXI:0x101e1038 %Long 0x1
+Data.Set EAXI:0x101e1004 %Long 0x0
+Data.Set EAXI:0x101e1008 %Long 0x02
+Data.Set EAXI:0x101e1000 %Long 0x5
+wait 10ms
+
+Data.Set EAXI:0x101e1038 %Long 0x3
+
+
+;OTP read cmd:
+
+Data.Set EAXI:0x101e1038 %Long 0x1
+Data.Set EAXI:0x101e1004 %Long 0x0
+Data.Set EAXI:0x101e1000 %Long 0x3
+Data.In EAXI:0x101e100C /Long
+wait 10ms
+
+Data.Set EAXI:0x101e1038 %Long 0x3
+area;OTP write cmd:
+
+Data.Set EAXI:0x101e1038 %Long 0x1
+Data.Set EAXI:0x101e1004 %Long 0x16
+Data.Set EAXI:0x101e1008 %Long 0x42
+Data.Set EAXI:0x101e1000 %Long 0x5
+wait 10ms
+
+Data.Set EAXI:0x101e1038 %Long 0x3
+
+
+;OTP read cmd:
+
+Data.Set EAXI:0x101e1038 %Long 0x1
+Data.Set EAXI:0x101e1004 %Long 0x16
+Data.Set EAXI:0x101e1000 %Long 0x3
+Data.In EAXI:0x101e100C /Long
+wait 10ms
+
+Data.Set EAXI:0x101e1038 %Long 0x3
+area;OTP write cmd:
+
+Data.Set EAXI:0x101e1038 %Long 0x1
+Data.Set EAXI:0x101e1004 %Long 0x12
+Data.Set EAXI:0x101e1008 %Long 0x42
+Data.Set EAXI:0x101e1000 %Long 0x5
+wait 10ms
+
+Data.Set EAXI:0x101e1038 %Long 0x3
+
+
+;OTP read cmd:
+
+Data.Set EAXI:0x101e1038 %Long 0x1
+Data.Set EAXI:0x101e1004 %Long 0x12
+Data.Set EAXI:0x101e1000 %Long 0x3
+Data.In EAXI:0x101e100C /Long
+wait 10ms
+
+Data.Set EAXI:0x101e1038 %Long 0x3
+area

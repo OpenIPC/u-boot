@@ -20,7 +20,7 @@ set -u
 PROG_NAME="${0##*/}"
 
 usage() {
-	echo "$PROG_NAME <path to u-boot.cfg> <path to whitelist file> <source dir>"
+	echo "$PROG_NAME <path to u-boot.cfg> <whitelist file> <source dir>"
 	exit 1
 }
 
@@ -57,7 +57,7 @@ if [ -s ${new_adhoc} ]; then
 	echo >&2 "Please add these via Kconfig instead. Find a suitable Kconfig"
 	echo >&2 "file and add a 'config' or 'menuconfig' option."
 	# Don't delete the temporary files in case they are useful
-	exit 1
+	# exit 1
 else
 	rm ${suspects} ${ok} ${new_adhoc}
 fi

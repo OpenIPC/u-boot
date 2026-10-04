@@ -35,5 +35,11 @@ config SYS_SPD_BUS_NUM
 	depends on DDR_SPD || SYS_I2C_LEGACY || SPL_SYS_I2C_LEGACY
 	default 0
 
+config DDR_TRAINING_V2
+	bool "ddr training test tool"
+	default n
+	help
+	  DDR training test tool.
+
 source "drivers/ddr/altera/Kconfig"
 source "drivers/ddr/imx/Kconfig"

@@ -1,0 +1,6 @@
+  Notes:
+* When U-Boot performs kernel verification, the root key configuration must be tailored to the 
+  specific board’s conditions. If the board does not have a root key burned into it, the RootKey 
+  value in bsp/tools/pc/kdf_customer/key.ini should be set to all zeros. If a root key has been 
+  previously burned into the board, the value should be filled in according to the actual 
+  burnedvalue.

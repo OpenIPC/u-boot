@@ -42,6 +42,7 @@
 #include <linux/mtd/rawnand.h>
 #include <linux/mtd/nand_ecc.h>
 #include <linux/mtd/nand_bch.h>
+#include <nfc_common.h>
 #ifdef CONFIG_MTD_PARTITIONS
 #include <linux/mtd/partitions.h>
 #endif
@@ -1445,8 +1446,13 @@ int nand_erase_op(struct nand_chip *chip, unsigned int eraseblock)
 	if (status < 0)
 		return status;
 
-	if (status & NAND_STATUS_FAIL)
+	if (status & NAND_STATUS_FAIL) {
+#if defined(CONFIG_FMC_SPI_NAND) || defined(CONFIG_FMC_NAND)
+		printf("\nmakbad erase fail blk: 0x%x\n", page * mtd->writesize);
+		chip->block_markbad(mtd, page * mtd->writesize);
+#endif
 		return -EIO;
+	}
 
 	return 0;
 }
@@ -3213,6 +3219,10 @@ static int nand_do_write_ops(struct mtd_info *mtd, loff_t to,
 	int ret;
 	int oob_required = oob ? 1 : 0;
 
+#if defined(CONFIG_FMC_SPI_NAND) || defined(CONFIG_FMC_NAND)
+	oob_required = 1;
+#endif
+
 	ops->retlen = 0;
 	if (!writelen)
 		return 0;
@@ -4276,6 +4286,13 @@ static const struct nand_manufacturers *nand_get_manufacturer_desc(u8 id)
 /*
  * Get the flash and manufacturer id and lookup if the type is supported.
  */
+static struct mtd_info_ex nand_info_ex = {.type = 0, };
+
+struct mtd_info_ex *get_nand_info(void)
+{
+	return &nand_info_ex;
+}
+
 struct nand_flash_dev *nand_get_flash_type(struct nand_chip *chip, int *maf_id,
 					   int *dev_id,
 					   struct nand_flash_dev *type)
@@ -4328,6 +4345,11 @@ struct nand_flash_dev *nand_get_flash_type(struct nand_chip *chip, int *maf_id,
 	/* Try to identify manufacturer */
 	manufacturer_desc = nand_get_manufacturer_desc(*maf_id);
 	chip->manufacturer.desc = manufacturer_desc;
+
+#ifdef CONFIG_FMC
+	if (get_flash_type)
+		type = get_flash_type(mtd, chip, id_data);
+#endif
 
 	if (!type)
 		type = nand_flash_ids;
@@ -4404,6 +4426,24 @@ ident_done:
 		return ERR_PTR(-EINVAL);
 	}
 
+	if (nand_info_ex.type == 0) {
+		memset(&nand_info_ex, 0, sizeof(struct mtd_info_ex));
+
+		nand_info_ex.type      = MTD_NANDFLASH;
+		nand_info_ex.chipsize  = chip->chipsize;
+		nand_info_ex.erasesize = mtd->erasesize;
+		nand_info_ex.pagesize  = mtd->writesize;
+		/* smaller than nand chip space area */
+		nand_info_ex.oobsize   = mtd->oobsize;
+
+		nand_info_ex.ecctype   = mtd->ecc_strength;
+
+		nand_info_ex.id_length = type->id_len;
+		nand_info_ex.numchips  = 1;
+
+		memcpy(nand_info_ex.ids, id_data, nand_info_ex.id_length);
+	}
+
 	nand_decode_bbm_options(mtd, chip);
 
 	/* Calculate the address shift from the page size */
@@ -4429,6 +4469,11 @@ ident_done:
 	/* Do not replace user supplied command function! */
 	if (mtd->writesize > 512 && chip->cmdfunc == nand_command)
 		chip->cmdfunc = nand_command_lp;
+
+#ifdef CONFIG_FMC
+	if (nand_oob_resize && nand_oob_resize(mtd))
+		return ERR_PTR(-ENODEV);
+#endif
 
 	ret = nand_manufacturer_init(chip);
 	if (ret)

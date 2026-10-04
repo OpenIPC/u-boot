@@ -33,6 +33,9 @@ endif
 ifneq ($(CONFIG_SYS_SOC),)
 SOC := $(CONFIG_SYS_SOC:"%"=%)
 endif
+ifneq ($(CONFIG_VENDER_UBOOT_NAME),)
+VENDER_CHIP := $(CONFIG_VENDER_UBOOT_NAME:"%"=%)
+endif
 
 # Some architecture config.mk files need to know what CPUDIR is set to,
 # so calculate CPUDIR before including ARCH/SOC/CPU config.mk files.

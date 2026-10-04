@@ -5050,4 +5050,18 @@
 #define MACH_TYPE_NASM25               5112
 #define MACH_TYPE_TOMATO               5113
 #define MACH_TYPE_OMAP3_MRC3D          5114
+#define MACH_TYPE_HI3516CV500          8000
+#define MACH_TYPE_HI3516DV300          8000
+#define MACH_TYPE_HI3516AV300          8000
+#define MACH_TYPE_HI3516CV610          8000
+#define MACH_TYPE_HI3519DV500          8000
 #endif
+
+#define MACH_TYPE_XM72020300           8000
+#define MACH_TYPE_XM72010200           8000
+#define MACH_TYPE_XM72010300           8000
+#define MACH_TYPE_XM72050200           8000
+#define MACH_TYPE_XM72050300           8000
+#define MACH_TYPE_XM76050100           8000
+#define MACH_TYPE_XM72050500           8000
+#define MACH_TYPE_XM720XXX             8000

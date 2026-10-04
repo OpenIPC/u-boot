@@ -3,6 +3,11 @@
 # (C) Copyright 2006
 # Wolfgang Denk, DENX Software Engineering, wd@denx.de.
 
+obj-$(CONFIG_FMC_SPI_NOR) = vendor_spi_nor.o
+obj-$(CONFIG_FMC_SPI_NAND) += vendor_spi_nor.o
+
+obj-$(CONFIG_FMC_SPI_NOR) += fmc100/
+
 obj-$(CONFIG_$(SPL_TPL_)DM_SPI_FLASH) += sf-uclass.o
 spi-nor-y := sf_probe.o spi-nor-ids.o
 

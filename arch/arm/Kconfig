@@ -2092,7 +2092,115 @@ config ARCH_GXP
 	select OF_CONTROL
 	imply CMD_DM
 
+config TARGET_HI3516CV500
+	bool "Support Hi3516CV500"
+	select CPU_V7A
+	select DM
+	select CPU_V7A_HAS_NONSEC
+	select HI35XX_FAMILY_V500
+	help
+	  Support for Hisilicon Hi3516CV500 platform.
+
+config TARGET_HI3516DV300
+	bool "Support Hi3516DV300"
+	select CPU_V7A
+	select DM
+	select CPU_V7A_HAS_NONSEC
+	select HI35XX_FAMILY_V500
+	help
+	  Support for Hisilicon Hi3516DV300 platform.
+
+config TARGET_HI3516AV300
+	bool "Support Hi3516AV300"
+	select CPU_V7A
+	select DM
+	select CPU_V7A_HAS_NONSEC
+	select HI35XX_FAMILY_V500
+	help
+	  Support for Hisilicon Hi3516AV300 platform.
+
+config ARCH_HI35XX
+	bool "Hisilicon Hi35XX SoCs"
+	select DM
+
+config ARCH_BSP
+	bool "Support vendor Platform"
+	select DM if !MINI_BOOT
+
+config TARGET_XM72050200
+	bool "Support XM72050200"
+	select CPU_V7A
+	select DM
+	select CPU_V7A_HAS_NONSEC
+	help
+	  Support for xmedia XM72050200 platform.
+
+config TARGET_XM72020300
+	bool "Support XM72020300"
+	select CPU_V7A
+	select DM
+	select CPU_V7A_HAS_NONSEC
+	help
+	  Support for xmedia XM72020300 platform.
+
+config TARGET_XM76050100
+	bool "Support XM76050100"
+	select CPU_V7A
+	select DM
+	select CPU_V7A_HAS_NONSEC
+	help
+	  Support for xmedia XM76050100 platform.
+
+config TARGET_XM72050300
+	bool "Support XM72050300"
+	select CPU_V7A
+	select DM
+	select CPU_V7A_HAS_NONSEC
+	help
+	  Support for xmedia XM72050300 platform.
+
+config TARGET_XM72050500
+	bool "Support XM72050500"
+	select CPU_V7A
+	select DM
+	select CPU_V7A_HAS_NONSEC
+	help
+	  Support for xmedia XM72050500 platform.
+
+config TARGET_XM720XXX
+	bool "Support XM72050500/XM72050510/XM72050530/XM72050230/XM72020330"
+	select CPU_V7A
+	select DM
+	select CPU_V7A_HAS_NONSEC
+	help
+	  Support for xmedia XM72050500/XM72050510/XM72050530/XM72050230/XM72020330 platform.
+
+config TARGET_XM72010200
+	bool "Support XM72010200"
+	select CPU_V7A
+	select DM
+	select CPU_V7A_HAS_NONSEC
+	help
+	  Support for xmedia XM72010200 platform.
+
+config TARGET_XM72010300
+	bool "Support XM72010300"
+	select CPU_V7A
+	select DM
+	select CPU_V7A_HAS_NONSEC
+	help
+	  Support for xmedia XM72010300 platform.
+
+config ARCH_XMEDIA
+	bool "XMEDIA SoCs"
+	select DM
+
 endchoice
+
+config HI35XX_FAMILY_V500
+	bool
+	help
+	  Hisilicon V500-generation IPC SoCs (Hi3516CV500/DV300/AV300).
 
 config SUPPORT_PASSING_ATAGS
 	bool "Support pre-devicetree ATAG-based booting"
@@ -2195,6 +2303,8 @@ source "arch/arm/mach-exynos/Kconfig"
 source "arch/arm/mach-hpe/gxp/Kconfig"
 
 source "arch/arm/mach-highbank/Kconfig"
+source "arch/arm/mach-hi35xx/Kconfig"
+source "arch/arm/mach-vendor/Kconfig"
 
 source "arch/arm/mach-integrator/Kconfig"
 
@@ -2331,6 +2441,9 @@ source "board/freescale/ls1012ardb/Kconfig"
 source "board/freescale/ls1012afrdm/Kconfig"
 source "board/freescale/lx2160a/Kconfig"
 source "board/grinn/chiliboard/Kconfig"
+source "board/hisilicon/hi3516cv500/Kconfig"
+source "board/hisilicon/hi3516dv300/Kconfig"
+source "board/hisilicon/hi3516av300/Kconfig"
 source "board/hisilicon/hikey/Kconfig"
 source "board/hisilicon/hikey960/Kconfig"
 source "board/hisilicon/poplar/Kconfig"
@@ -2348,6 +2461,14 @@ source "board/vscom/baltos/Kconfig"
 source "board/phytium/durian/Kconfig"
 source "board/phytium/pomelo/Kconfig"
 source "board/xen/xenguest_arm64/Kconfig"
+source "board/xmedia/xm72050200/Kconfig"
+source "board/xmedia/xm72010200/Kconfig"
+source "board/xmedia/xm72010300/Kconfig"
+source "board/xmedia/xm72050300/Kconfig"
+source "board/xmedia/xm72020300/Kconfig"
+source "board/xmedia/xm76050100/Kconfig"
+source "board/xmedia/xm72050500/Kconfig"
+source "board/xmedia/xm720xxx/Kconfig"
 
 source "arch/arm/Kconfig.debug"
 

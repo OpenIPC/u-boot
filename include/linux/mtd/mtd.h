@@ -445,6 +445,32 @@ int mtd_block_isreserved(struct mtd_info *mtd, loff_t ofs);
 int mtd_block_isbad(struct mtd_info *mtd, loff_t ofs);
 int mtd_block_markbad(struct mtd_info *mtd, loff_t ofs);
 
+/*
+ *  this interface for iTools and application used.
+ */
+#define MAX_FLASH_ID_LEN	8
+#define MAX_FLASH_NAME_LEN	32
+struct mtd_info_ex
+{
+	u_char    type;  /* chip type  MTD_NORFLASH / MTD_NANDFLASH */
+	uint64_t  chipsize; /* total size of the nand/spi chip */
+	uint32_t erasesize;
+	uint32_t pagesize;
+	uint32_t numchips; /* number of nand chips */
+
+	uint32_t oobsize;
+	uint32_t addrcycle;
+	uint32_t ecctype;
+
+	u_char    ids[MAX_FLASH_ID_LEN];
+	uint32_t id_length;
+	char      name[MAX_FLASH_NAME_LEN]; /* chip names */
+	int hostver; /* host controller version */
+};
+
+extern struct mtd_info_ex * get_nand_info(void);
+extern struct mtd_info_ex * get_spiflash_info(void);
+
 #ifndef __UBOOT__
 static inline int mtd_suspend(struct mtd_info *mtd)
 {
