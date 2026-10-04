@@ -15,6 +15,20 @@ build_gzip() {
         return
     fi
     echo "Building gzip from source (extras/gzip-1.11, WSIZE=0x2000)"
+    # Keep autotools from regenerating Makefile.in/configure on a fresh checkout
+    touch "${BOOT_SRCDIR}/extras/gzip-1.11/aclocal.m4" \
+          "${BOOT_SRCDIR}/extras/gzip-1.11/configure" \
+          "${BOOT_SRCDIR}/extras/gzip-1.11/Makefile.in" \
+          "${BOOT_SRCDIR}/extras/gzip-1.11/lib/Makefile.in" \
+          "${BOOT_SRCDIR}/extras/gzip-1.11/lib/config.hin" \
+          "${BOOT_SRCDIR}/extras/gzip-1.11/doc/Makefile.in" \
+          "${BOOT_SRCDIR}/extras/gzip-1.11/tests/Makefile.in" \
+          "${BOOT_SRCDIR}/extras/gzip-1.11/doc/stamp-vti" \
+          "${BOOT_SRCDIR}/extras/gzip-1.11/doc/version.texi" \
+          "${BOOT_SRCDIR}/extras/gzip-1.11/doc/gzip.info" \
+          "${BOOT_SRCDIR}/extras/gzip-1.11/gzip.1" \
+          "${BOOT_SRCDIR}/extras/gzip-1.11/gunzip.1" \
+          "${BOOT_SRCDIR}/extras/gzip-1.11/gzexe.1"
     rm -rf output/gzip-build
     mkdir -p output/gzip-build tools/utils/bin
     ( cd output/gzip-build && \
