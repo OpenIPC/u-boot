@@ -111,3 +111,10 @@ __pycache__
 !image_tool/input/gsl.bin
 !arch/arm/cpu/armv7/xm72050500/auxcode_sign.img
 !arch/arm/cpu/armv7/xm720xxx/auxcode_sign.img
+
+# OpenIPC build outputs and generated host tools
+/output/
+/tools/utils/bin/gzip
+
+# gzip source: .tarball-version is required by the build (hidden file)
+!extras/gzip-1.11/.tarball-version

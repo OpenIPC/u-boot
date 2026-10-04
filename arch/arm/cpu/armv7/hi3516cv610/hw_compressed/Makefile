@@ -6,6 +6,7 @@ PWD = $(shell pwd)
 HW_CROSS_COMPILE = $(CROSS_COMPILE)
 TOPDIR        =
 BOOT_OUTDIR   ?= $(TOPDIR)
+GZIP          ?= $(TOPDIR)/tools/utils/bin/gzip
 
 ################################################################################
 CC       := $(HW_CROSS_COMPILE)gcc
@@ -77,7 +78,7 @@ start.o: start.S
 # -1 : --fast      -9 : --best
 image_data.gzip: $(BINIMAGE)
 	cp  $<  $@
-	./gzip -fNqc -7 $< > $@
+	$(GZIP) -fNqc -7 $< > $@
 
 %.o: %.c
 	$(CC) $(CFLAGS) -Wall -Wstrict-prototypes \

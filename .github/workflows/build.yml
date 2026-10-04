@@ -26,7 +26,7 @@ jobs:
           install() {
             sudo timeout 180 apt-get update && \
             sudo timeout 240 apt-get install -y --no-install-recommends \
-              gcc-arm-linux-gnueabi u-boot-tools device-tree-compiler \
+              build-essential gcc-arm-linux-gnueabi u-boot-tools device-tree-compiler \
               bison flex bc lzop libssl-dev python3 python3-pip
           }
           for i in 1 2 3 4; do

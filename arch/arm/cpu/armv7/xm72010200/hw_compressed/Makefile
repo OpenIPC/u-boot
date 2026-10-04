@@ -3,7 +3,7 @@ PWD                = $(shell pwd)
 HW_CROSS_COMPILE   = $(CROSS_COMPILE)
 BOOT_TOPDIR       ?= $(PWD)/../../../../../../
 BOOT_OUTDIR       ?= $(BOOT_TOPDIR)
-GZIP              ?= $(if $(wildcard $(SRCDIR)/gzip), $(SRCDIR)/gzip, $(BOOT_TOPDIR)/../../../tools/utils/bin/gzip)
+GZIP              ?= $(BOOT_TOPDIR)/tools/utils/bin/gzip
 SRCDIR            := $(BOOT_TOPDIR)/arch/arm/cpu/armv7/$(SOC)/hw_compressed
 
 ################################################################################
