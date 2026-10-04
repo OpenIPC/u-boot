@@ -1,6 +1,8 @@
 #!/bin/sh
 set -e
 
+cd "$(dirname "$0")"
+
 export ARCH=arm
 export CROSS_COMPILE=${CROSS_COMPILE:-arm-linux-gnueabi-}
 
