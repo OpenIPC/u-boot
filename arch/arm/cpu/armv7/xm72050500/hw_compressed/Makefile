@@ -168,9 +168,9 @@ TMPS := $(COBJS) $(START) $(SRC) \
 
 distclean: clean
 clean:
-	[[ -n "$(REG)" && "$(REG)" != "*" ]] && rm -f $(REG)
-	[[ -n "$(TMPS)" && "$(TMPS)" != "*" ]] && rm -f $(TMPS)
-	[[ -n "$(SRC)" && "$(SRC)" != "*" ]] && rm -f $(addprefix $(SRCDIR), $(SRC))
+	-[ -n "$(REG)" ] && [ "$(REG)" != "*" ] && rm -f $(REG)
+	-[ -n "$(TMPS)" ] && [ "$(TMPS)" != "*" ] && rm -f $(TMPS)
+	-[ -n "$(SRC)" ] && [ "$(SRC)" != "*" ] && rm -f $(addprefix $(SRCDIR)/, $(SRC))
 
 ################################################################################
 .PHONY: clean

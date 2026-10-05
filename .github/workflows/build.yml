@@ -37,6 +37,8 @@ jobs:
           done
           python3 -m pip install --upgrade pip
           python3 -m pip install pycryptodome
+          # build.sh/vendor recipes rely on bash features when invoked as /bin/sh
+          sudo ln -sf /bin/bash /bin/sh
 
       - name: Build
         run: bash build.sh

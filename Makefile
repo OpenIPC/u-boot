@@ -1268,9 +1268,8 @@ u-boot-z.bin: $(CURDIR)/u-boot.bin
 
 .PHONY: u-boot-z.clean
 u-boot-z.clean:
-	pushd $(CURDIR)/arch/$(ARCH)/cpu/$(CPU)/$(SOC)/$(HW_DIR);\
-	make CROSS_COMPILE=$(CROSS_COMPILE) clean;\
-	popd
+	$(Q)cd $(CURDIR)/arch/$(ARCH)/cpu/$(CPU)/$(SOC)/$(HW_DIR) && \
+		make CROSS_COMPILE=$(CROSS_COMPILE) clean
 else
 _U_BOOT_Z_DIR = arch/$(ARCH)/cpu/$(CPU)/$(SOC)/$(HW_DIR)
 U_BOOT_Z_OUT  = $(CURDIR)/$(_U_BOOT_Z_DIR)
