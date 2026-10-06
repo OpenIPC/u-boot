@@ -81,11 +81,13 @@
  * imported. Keep the historical per-family forms. */
 #if defined(CONFIG_HI35XX_FAMILY_V500) || defined(CONFIG_TARGET_HI3516CV200_FAMILY) || defined(CONFIG_TARGET_HI3516CV300_FAMILY)
 #define OPENIPC_BOOTARGSNFS "mem=\\${osmem} console=ttyAMA0,115200 panic=20 root=/dev/nfs rootfstype=nfs ip=${ipaddr}:::255.255.255.0::eth0 nfsroot=${serverip}:${nfsroot},v3,nolock rw \\${extras}"
-#define OPENIPC_NOR_MTDPARTS "\\${mtdids}:256k(boot),64k(env),2048k(kernel),5120k(rootfs),7168k@0x50000(firmware),-(rootfs_data)"
 #else
 #define OPENIPC_BOOTARGSNFS "mem=\${osmem} console=ttyAMA0,115200 panic=20 root=/dev/nfs rootfstype=nfs ip=${ipaddr}:::255.255.255.0::eth0 nfsroot=${serverip}:${nfsroot},v3,nolock rw \${extras}"
-#define OPENIPC_NOR_MTDPARTS "${mtdids}:256k(boot),64k(env),2048k(kernel),5120k(rootfs),7168k@0x50000(firmware),-(rootfs_data)"
 #endif
+
+/* NOR partition list; the runtime mtdparts value is this list, the bootargs
+ * compose it as ${mtdids}:${mtdparts} (same as CV610). */
+#define OPENIPC_MTDPARTS "256k(boot),64k(env),2048k(kernel),5120k(rootfs),7168k@0x50000(firmware),-(rootfs_data)"
 
 #ifndef CONFIG_FMC_SPI_NAND
 
@@ -97,13 +99,16 @@
 #define SFC "sfc"
 #endif
 
-#ifdef VENDOR_HISILICON
 #define CONFIG_BOOTARGS "mem=\\${osmem} console=ttyAMA0,115200 panic=20 root=/dev/mtdblock3 rootfstype=squashfs init=/init mtdparts=\\${mtdids}:\\${mtdparts} \\${extras}"
-#else
-#define CONFIG_BOOTARGS "mem=\\${osmem} console=ttyAMA0,115200 panic=20 root=/dev/mtdblock3 rootfstype=squashfs init=/init mtdparts=" SFC ":256k(boot),64k(env),2048k(kernel),\\${rootmtd}(rootfs),-(rootfs_data) \\${extras}"
-#endif
 
 #define CONFIG_BOOTCOMMAND "run bootnor"
+
+#ifdef CONFIG_TARGET_HI3516CV610_FAMILY
+#define OPENIPC_FWUPD \
+	"fwupd=${fetchcmd} ${baseaddr} " OPENIPC_FW_FILE " && run fwwrite\0"
+#else
+#define OPENIPC_FWUPD "fwupd=run uknor; run urnor\0"
+#endif
 
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"baseaddr=" __stringify(OPENIPC_BASEADDR) "\0" \
@@ -111,10 +116,9 @@
 	"kernsize=" __stringify(CONFIG_ENV_KERNSIZE) "\0" \
 	"rootaddr=" __stringify(CONFIG_ENV_ROOTADDR) "\0" \
 	"rootsize=" __stringify(CONFIG_ENV_ROOTSIZE) "\0" \
-	"rootmtd=5120k\0" \
 	"cmdnor=sf probe 0; setenv setargs setenv bootargs ${bootargs}; run setargs; sf read ${baseaddr} ${kernaddr} ${kernsize}; bootm ${baseaddr}\0" \
 	"bootnor=run fwrecovery; sf probe 0; setenv setargs setenv bootargs ${bootargs}; run setargs; sf read ${baseaddr} ${kernaddr} ${kernsize}; bootm ${baseaddr}\0" \
-	"fwupd=${fetchcmd} ${baseaddr} " OPENIPC_FW_FILE " && run fwwrite\0" \
+	OPENIPC_FWUPD \
 	"fwrecovery=if env exists bootfail; then run fwupd; sleep 5; reset; fi\0" \
 	"fwwrite=sf probe 0; sf erase ${kernaddr} ${filesize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0" \
 	"ubnor=${updatetool} ${baseaddr} u-boot-${soc}-nor.bin && run ubwrite\0" \
@@ -133,7 +137,7 @@
 	"updatetool=tftpboot\0" \
 	"osmem=" OPENIPC_OSMEM "\0" \
 	"mtdids=" SFC "\0" \
-	"mtdparts=" OPENIPC_NOR_MTDPARTS "\0" \
+	"mtdparts=" OPENIPC_MTDPARTS "\0" \
 	"bootargs=" CONFIG_BOOTARGS "\0" \
 	"board_name\0" \
 	"board=" CONFIG_PRODUCT_SOC "\0" \

@@ -4,12 +4,16 @@
 #include <env.h>
 #include <fs.h>
 #include <image.h>
+#include <init.h>
 #include <malloc.h>
 #include <memalign.h>
 #include <spi.h>
 #include <spi_flash.h>
 #ifdef CONFIG_USB
 #include <usb.h>
+#endif
+#ifdef CONFIG_MMC
+#include <mmc.h>
 #endif
 
 #define SCAN_FROM CONFIG_ENV_OFFSET + CONFIG_ENV_SIZE
@@ -193,27 +197,33 @@ int firmware_recovery(void) {
     return -1;
 
 #ifdef CONFIG_MMC
-  if (!recovery_mount("mmc")) {
-    for (i = 0; i < 2; i++) {
-      sprintf(name, fmt[i], CONFIG_PRODUCT_SOC);
-      ret = recovery_write(name);
-      if (ret > 0)
-        found = 1;
-    }
-  }
+	{
+		struct mmc *mmc = find_mmc_device(0);
+
+		if (mmc && !mmc_init(mmc)) {
+			if (!recovery_mount("mmc")) {
+				for (i = 0; i < 2; i++) {
+					sprintf(name, fmt[i], CONFIG_PRODUCT_SOC);
+					ret = recovery_write(name);
+					if (ret > 0)
+						found = 1;
+				}
+			}
+		}
+	}
 #endif
 
 #ifdef CONFIG_USB_STORAGE
-  usb_init();
-  usb_stor_scan(1);
-  if (!recovery_mount("usb")) {
-    for (i = 0; i < 2; i++) {
-      sprintf(name, fmt[i], CONFIG_PRODUCT_SOC);
-      ret = recovery_write(name);
-      if (ret > 0)
-        found = 1;
-    }
-  }
+	if (!usb_init() && usb_stor_scan(1) == 0) {
+		if (!recovery_mount("usb")) {
+			for (i = 0; i < 2; i++) {
+				sprintf(name, fmt[i], CONFIG_PRODUCT_SOC);
+				ret = recovery_write(name);
+				if (ret > 0)
+					found = 1;
+			}
+		}
+	}
 #endif
 
   fs_close();
