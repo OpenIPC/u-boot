@@ -148,6 +148,15 @@ int firmware_scan(void) {
 
   scan_spi_device(flash, &kernel_off, &rootfs_off, &kernel_size, &rootfs_size);
 
+#ifndef CONFIG_TARGET_HI3516CV610_FAMILY
+  if (kernel_size <= 0x200000)
+    kernel_size = 0x200000;
+  if (rootfs_size < 0x500000)
+    rootfs_size = 0x500000;
+  else if (rootfs_size > 0x500000 && flash->size > 0x800000)
+    rootfs_size = 0xa00000;
+#endif
+
   spi_flash_free(flash);
 
   if (kernel_off) {
