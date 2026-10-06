@@ -1286,11 +1286,7 @@ ifeq ($(or $(CONFIG_TARGET_HI3516CV300_FAMILY),$(CONFIG_TARGET_HI3518EV100_FAMIL
 UBOOT_Z_TEXTBASE = TEXTBASE=$(shell printf '0x%x' $$(($(CONFIG_SYS_TEXT_BASE) - 0x100000)))
 endif
 
-ifeq ($(CONFIG_TARGET_HI3520DV100_FAMILY),y)
-U_BOOT_Z_REG_DEPS = $(U_BOOT_Z_OUT)/.reg1 $(U_BOOT_Z_OUT)/.reg2
-else
 U_BOOT_Z_REG_DEPS = $(U_BOOT_Z_OUT)/.reg
-endif
 
 .PHONY: u-boot-z.bin u-boot-z.prepare
 u-boot-z.bin: $(CURDIR)/u-boot.bin $(U_BOOT_Z_REG_DEPS) u-boot-z.prepare
@@ -1304,18 +1300,9 @@ u-boot-z.bin: $(CURDIR)/u-boot.bin $(U_BOOT_Z_REG_DEPS) u-boot-z.prepare
 		$(UBOOT_Z_TEXTBASE) \
 		all
 
-ifeq ($(CONFIG_TARGET_HI3520DV100_FAMILY),y)
-$(U_BOOT_Z_OUT)/.reg1: $(CURDIR)/.reg1
-	$(Q)mkdir -p $(dir $@)
-	$(Q)$(call if_changed,copy)
-$(U_BOOT_Z_OUT)/.reg2: $(CURDIR)/.reg2
-	$(Q)mkdir -p $(dir $@)
-	$(Q)$(call if_changed,copy)
-else
 $(U_BOOT_Z_OUT)/.reg: $(CURDIR)/.reg
 	$(Q)mkdir -p $(dir $@)
 	$(Q)$(call if_changed,copy)
-endif
 
 u-boot-z.prepare: FORCE
 ifneq ($(KBUILD_SRC),)

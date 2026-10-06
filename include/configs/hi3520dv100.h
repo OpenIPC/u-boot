@@ -13,7 +13,6 @@
 
 /* mini-boot reg_info blank zones (two reg_info files, 2400 bytes each) */
 #define ENABLE_HI3520D_BLANK
-#define ENABLE_HI3515A_BLANK
 #define REG_INFO_BLANK_SIZE         2400
 
 /* Physical Memory Map */

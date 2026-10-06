@@ -49,8 +49,7 @@ SSRC  := arch/arm/cpu/armv7/$(SOC)/start.S \
 
 SRC := $(notdir $(SSRC))
 
-REG1 := $(wildcard *.reg1 .reg1)
-REG2 := $(wildcard *.reg2 .reg2)
+REG := $(wildcard *.reg .reg)
 IMAGE_DATA_Z := image_data.lzma
 
 ################################################################################
@@ -58,11 +57,10 @@ IMAGE_DATA_Z := image_data.lzma
 all: $(BOOT).bin
 $(BOOT).bin: $(BOOT).tmp regfile
 	$(Q)dd if=$(BOOT).tmp of=./tmp1 bs=1 count=64 2>/dev/null
-	$(Q)dd if=$(REG1) of=./tmp2 bs=2400 conv=sync 2>/dev/null
-	$(Q)dd if=$(REG2) of=./tmp3 bs=2400 conv=sync 2>/dev/null
-	$(Q)dd if=$(BOOT).tmp of=./tmp4 bs=1 skip=4864 2>/dev/null
-	$(Q)cat tmp1 tmp2 tmp3 tmp4 > $(BOOT).bin
-	$(Q)rm -f tmp1 tmp2 tmp3 tmp4
+	$(Q)dd if=$(REG) of=./tmp2 bs=2400 conv=sync 2>/dev/null
+	$(Q)dd if=$(BOOT).tmp of=./tmp3 bs=1 skip=2464 2>/dev/null
+	$(Q)cat tmp1 tmp2 tmp3 > $(BOOT).bin
+	$(Q)rm -f tmp1 tmp2 tmp3
 	$(Q)chmod 754 $(BOOT).bin
 	$(Q)cp -fv $@ $(BOOT_OUTDIR)
 	$(Q)echo $(BOOT).bin is Ready.
@@ -79,8 +77,8 @@ $(BOOT).elf: $(IMAGE_DATA_Z) $(SRC) $(START) $(COBJS)
 
 .PHONY: regfile
 regfile:
-	@if [ "$(words $(REG1))" = "0" ] || [ "$(words $(REG2))" = "0" ]; then ( \
-		echo '***' Need '.reg1' and '.reg2' files in directory $(PWD); \
+	@if [ "$(words $(REG))" = "0" ]; then ( \
+		echo '***' Need '.reg' file in directory $(PWD); \
 		exit 1; \
 	) fi
 
@@ -111,4 +109,4 @@ TMPS := $(COBJS) $(START) $(SRC) \
 
 clean:
 	-rm -f $(TMPS)
-	-rm -f $(REG1) $(REG2)
+	-rm -f $(REG)
