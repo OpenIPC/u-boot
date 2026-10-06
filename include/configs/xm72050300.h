@@ -234,6 +234,6 @@
 
 #define SECUREBOOT_OTP_REG_BASE_ADDR_PHY            (0x10090000)
 
-#include "xm-common.h"
+#include "openipc-common.h"
 
 #endif /* __XM72050300_H */

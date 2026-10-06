@@ -74,6 +74,6 @@
 #define HISFV_PHY_D                 2
 #endif
 
-#include "hi-common.h"
+#include "openipc-common.h"
 
 #endif /* __HI3516CV200_H */

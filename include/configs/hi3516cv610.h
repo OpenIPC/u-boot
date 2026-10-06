@@ -387,6 +387,6 @@ func(DHCP, dhcp, na)
 #define TIME_RECORD_ADDR (FDR_ADDR_BASE + 0xC800)
 #endif
 
-#include "hi-common.h"
+#include "openipc-common.h"
 
 #endif /* __HI3516CV610_H */

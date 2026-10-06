@@ -338,6 +338,6 @@
 
 #define CONFIG_BOOT_HEAD_SIZE		(CONFIG_KEY_AREA_LEN + CONFIG_AUXAREA_LEN)
 
-#include "xm-common.h"
+#include "openipc-common.h"
 
 #endif /* __XM720XXX_H */
