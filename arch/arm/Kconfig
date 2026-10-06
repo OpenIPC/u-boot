@@ -2205,6 +2205,34 @@ config TARGET_HI3518EV200
 	help
 	  Support for HiSilicon Hi3518EV200 platform.
 
+config TARGET_HI3515AV100
+	bool "Support HI3515AV100"
+	select CPU_V7A
+	select TARGET_HI3520DV100_FAMILY
+	help
+	  Support for HiSilicon Hi3515AV100 platform.
+
+config TARGET_HI3520AV100
+	bool "Support HI3520AV100"
+	select CPU_V7A
+	select TARGET_HI3520DV100_FAMILY
+	help
+	  Support for HiSilicon Hi3520AV100 platform.
+
+config TARGET_HI3520DV200
+	bool "Support HI3520DV200"
+	select CPU_V7A
+	select TARGET_HI3520DV100_FAMILY
+	help
+	  Support for HiSilicon Hi3520DV200 platform.
+
+config TARGET_HI3520DV100
+	bool "Support HI3520DV100"
+	select CPU_V7A
+	select TARGET_HI3520DV100_FAMILY
+	help
+	  Support for HiSilicon Hi3520DV100 platform.
+
 config TARGET_HI3536CV100
 	bool "Support HI3536CV100"
 	select CPU_V7A
@@ -2297,6 +2325,9 @@ config TARGET_HI3536DV100_FAMILY
 	bool
 
 config TARGET_HI3536CV100_FAMILY
+	bool
+
+config TARGET_HI3520DV100_FAMILY
 	bool
 
 config HI35XX_FAMILY_V500
@@ -2549,6 +2580,7 @@ source "board/hisilicon/hi3518ev100/Kconfig"
 source "board/hisilicon/hi3516av100/Kconfig"
 source "board/hisilicon/hi3536dv100/Kconfig"
 source "board/hisilicon/hi3536c/Kconfig"
+source "board/hisilicon/hi3520dv100/Kconfig"
 source "board/hisilicon/hi3516cv300/Kconfig"
 source "board/hisilicon/hi3516dv300/Kconfig"
 source "board/hisilicon/hi3516av300/Kconfig"

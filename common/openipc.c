@@ -314,7 +314,6 @@ ulong openipc_ram_size(void)
 
 int openipc_helper() {
   char msize[16];
-  printf("RAM size: %ldMB\n", gd->ram_size / 1024 / 1024);
   sprintf(msize, "%ldM", gd->ram_size / 1024 / 1024);
   env_set("totalmem", msize);
   firmware_recovery();

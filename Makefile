@@ -1282,12 +1282,18 @@ UBOOT_TOPDIR  = $(srctree)
 else
 UBOOT_TOPDIR  = $(CURDIR)
 endif
-ifeq ($(or $(CONFIG_TARGET_HI3516CV300_FAMILY),$(CONFIG_TARGET_HI3518EV100_FAMILY),$(CONFIG_TARGET_HI3516AV100_FAMILY),$(CONFIG_TARGET_HI3536DV100_FAMILY),$(CONFIG_TARGET_HI3536CV100_FAMILY)),y)
+ifeq ($(or $(CONFIG_TARGET_HI3516CV300_FAMILY),$(CONFIG_TARGET_HI3518EV100_FAMILY),$(CONFIG_TARGET_HI3516AV100_FAMILY),$(CONFIG_TARGET_HI3536DV100_FAMILY),$(CONFIG_TARGET_HI3536CV100_FAMILY),$(CONFIG_TARGET_HI3520DV100_FAMILY)),y)
 UBOOT_Z_TEXTBASE = TEXTBASE=$(shell printf '0x%x' $$(($(CONFIG_SYS_TEXT_BASE) - 0x100000)))
 endif
 
+ifeq ($(CONFIG_TARGET_HI3520DV100_FAMILY),y)
+U_BOOT_Z_REG_DEPS = $(U_BOOT_Z_OUT)/.reg1 $(U_BOOT_Z_OUT)/.reg2
+else
+U_BOOT_Z_REG_DEPS = $(U_BOOT_Z_OUT)/.reg
+endif
+
 .PHONY: u-boot-z.bin u-boot-z.prepare
-u-boot-z.bin: $(CURDIR)/u-boot.bin $(U_BOOT_Z_OUT)/.reg u-boot-z.prepare
+u-boot-z.bin: $(CURDIR)/u-boot.bin $(U_BOOT_Z_REG_DEPS) u-boot-z.prepare
 	make -C $(CURDIR)/$(_U_BOOT_Z_DIR) \
 		-f $(CURDIR)/$(_U_BOOT_Z_DIR)/Makefile \
 		CROSS_COMPILE=$(CROSS_COMPILE) \
@@ -1298,9 +1304,18 @@ u-boot-z.bin: $(CURDIR)/u-boot.bin $(U_BOOT_Z_OUT)/.reg u-boot-z.prepare
 		$(UBOOT_Z_TEXTBASE) \
 		all
 
+ifeq ($(CONFIG_TARGET_HI3520DV100_FAMILY),y)
+$(U_BOOT_Z_OUT)/.reg1: $(CURDIR)/.reg1
+	$(Q)mkdir -p $(dir $@)
+	$(Q)$(call if_changed,copy)
+$(U_BOOT_Z_OUT)/.reg2: $(CURDIR)/.reg2
+	$(Q)mkdir -p $(dir $@)
+	$(Q)$(call if_changed,copy)
+else
 $(U_BOOT_Z_OUT)/.reg: $(CURDIR)/.reg
 	$(Q)mkdir -p $(dir $@)
 	$(Q)$(call if_changed,copy)
+endif
 
 u-boot-z.prepare: FORCE
 ifneq ($(KBUILD_SRC),)
@@ -2591,7 +2606,7 @@ ddr_training_clean:
 	make -C $(CURDIR)/drivers/ddr/hisilicon/$(DDRT_DEFAULT)/cmd_bin \
 		TOPDIR=$(CURDIR) BOOT_SRCDIR=$(abspath $(srctree)) \
 		CROSS_COMPILE=$(CROSS_COMPILE) CPU=$(CPU) SOC=$(SOC) clean
-else ifeq ($(or $(CONFIG_TARGET_HI3518EV100_FAMILY),$(CONFIG_TARGET_HI3516AV100_FAMILY),$(CONFIG_TARGET_HI3536DV100_FAMILY),$(CONFIG_TARGET_HI3536CV100_FAMILY)),y)
+else ifeq ($(or $(CONFIG_TARGET_HI3518EV100_FAMILY),$(CONFIG_TARGET_HI3516AV100_FAMILY),$(CONFIG_TARGET_HI3536DV100_FAMILY),$(CONFIG_TARGET_HI3536CV100_FAMILY),$(CONFIG_TARGET_HI3520DV100_FAMILY)),y)
 # These SoCs have no DDR training in the main U-Boot (mini-boot does it)
 ddr_training_prepare:
 ddr_training_clean:

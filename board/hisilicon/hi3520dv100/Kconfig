@@ -1,0 +1,15 @@
+if TARGET_HI3515AV100 || TARGET_HI3520AV100 || TARGET_HI3520DV100 || TARGET_HI3520DV200
+
+config SYS_BOARD
+	default "hi3520dv100"
+
+config SYS_VENDOR
+	default "hisilicon"
+
+config SYS_SOC
+	default "hi3520d"
+
+config SYS_CONFIG_NAME
+	default "hi3520dv100"
+
+endif
