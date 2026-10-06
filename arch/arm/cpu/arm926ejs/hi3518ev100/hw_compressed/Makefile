@@ -55,13 +55,19 @@ SRC := $(notdir $(SSRC))
 REG := $(wildcard *.reg .reg)
 IMAGE_DATA_Z := image_data.lzma
 
+# reg_info is spliced at offset 64 padded to a 4K boundary; the U-Boot code
+# must stay at its linked offset, so the skip depends on the reg_info size.
+REG_SIZE := $(shell stat -c%s $(REG) 2>/dev/null || echo 4096)
+REG_PAD  := $(shell echo $$(( ($(REG_SIZE) + 4095) / 4096 * 4096 )))
+REG_SKIP := $(shell echo $$(( 64 + $(REG_PAD) )))
+
 ################################################################################
 .PHONY: all $(BOOT).bin
 all: $(BOOT).bin
 $(BOOT).bin: $(BOOT).tmp regfile
 	$(Q)dd if=$(BOOT).tmp of=./tmp1 bs=1 count=64 2>/dev/null
 	$(Q)dd if=$(REG) of=./tmp2 bs=4096 conv=sync 2>/dev/null
-	$(Q)dd if=$(BOOT).tmp of=./tmp3 bs=1 skip=4160 2>/dev/null
+	$(Q)dd if=$(BOOT).tmp of=./tmp3 bs=1 skip=$(REG_SKIP) 2>/dev/null
 	$(Q)cat tmp1 tmp2 tmp3 > $(BOOT).bin
 	$(Q)rm -f tmp1 tmp2 tmp3
 	$(Q)chmod 754 $(BOOT).bin
