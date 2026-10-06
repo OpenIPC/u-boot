@@ -59,16 +59,19 @@ for soc in hi3516cv500 hi3516dv300 hi3516av300; do
     # NOR
     cat ${BOOT_SRCDIR}/openipc/openipc_config > ${BOOT_BUILDDIR}/.config && \
     cat ${BOOT_SRCDIR}/openipc/${soc}_config >> ${BOOT_BUILDDIR}/.config && \
+    echo "CONFIG_PRODUCT_SOC=\"${soc}\"" >> ${BOOT_BUILDDIR}/.config && \
+    echo "CONFIG_PRODUCT_SOCMODEL=\"${model}\"" >> ${BOOT_BUILDDIR}/.config && \
     make ${MAKE_OPTS} olddefconfig </dev/null >/dev/null && \
-    make ${MAKE_OPTS} KCFLAGS="-DPRODUCT_SOC=${soc} -DVENDOR_HISILICON" </dev/null && \
+    make ${MAKE_OPTS} KCFLAGS="-DVENDOR_HISILICON" </dev/null && \
     make ${MAKE_OPTS} u-boot-z.bin </dev/null && \
     cp ${BOOT_BUILDDIR}/u-boot-${soc}.bin ${BOOT_BUILDDIR}/../u-boot-${soc}-nor.bin
     # NAND
     cat ${BOOT_SRCDIR}/openipc/openipc_config > ${BOOT_BUILDDIR}/.config && \
     cat ${BOOT_SRCDIR}/openipc/${soc}_config >> ${BOOT_BUILDDIR}/.config && \
     cat ${BOOT_SRCDIR}/openipc/nand_config >> ${BOOT_BUILDDIR}/.config && \
+    echo "CONFIG_PRODUCT_SOC=\"${soc}\"" >> ${BOOT_BUILDDIR}/.config && \
     make ${MAKE_OPTS} olddefconfig </dev/null >/dev/null && \
-    make ${MAKE_OPTS} KCFLAGS="-DPRODUCT_SOC=${soc} -DVENDOR_HISILICON" </dev/null && \
+    make ${MAKE_OPTS} KCFLAGS="-DVENDOR_HISILICON" </dev/null && \
     make ${MAKE_OPTS} u-boot-z.bin </dev/null && \
     cp ${BOOT_BUILDDIR}/u-boot-${soc}.bin ${BOOT_BUILDDIR}/../u-boot-${soc}-nand.bin
 done
@@ -84,8 +87,9 @@ cv6xx_build() {
     mkdir -p ${BOOT_BUILDDIR}
     cat ${BOOT_SRCDIR}/openipc/openipc_config > ${BOOT_BUILDDIR}/.config && \
     cat ${BOOT_SRCDIR}/openipc/${soc}_config >> ${BOOT_BUILDDIR}/.config && \
+    echo "CONFIG_PRODUCT_SOC=\"${soc}\"" >> ${BOOT_BUILDDIR}/.config && \
     make ${MAKE_OPTS} olddefconfig </dev/null >/dev/null && \
-    make ${MAKE_OPTS} KCFLAGS="-DPRODUCT_SOC=${soc} -DPRODUCT_SOCMODEL=${model} -DVENDOR_HISILICON" </dev/null && \
+    make ${MAKE_OPTS} KCFLAGS="-DVENDOR_HISILICON" </dev/null && \
     make ${MAKE_OPTS} u-boot-z.bin </dev/null && \
     make ${MAKE_OPTS} u-boot-z.clean </dev/null && \
     cp ${BOOT_BUILDDIR}/u-boot-${soc}.bin image_tool/input/u-boot-original.bin && \
@@ -106,6 +110,24 @@ cv6xx_build hi3516cv610 00s "Hi3516CV610-DMEB_4L_DDR3_2133M_512MB_16bit-A7_950M_
 cv6xx_build hi3516cv610 00g "Hi3516CV610-DMEB_4L_DDR3_2133M_512MB_16bit-A7_950M_BGA.bin"
 cv6xx_build hi3516cv608 ""  "Hi3516CV608-DMEB_4L_DDR2_1333M_64MB_16bit-A7_950M_QFN.bin"
 
+# CV200 family (hi3516cv200 / hi3518ev200), ARM926EJS
+for soc in hi3516cv200 hi3518ev200; do
+    mkflags
+
+    rm -rf ${BOOT_BUILDDIR}
+    mkdir -p ${BOOT_BUILDDIR}/drivers/ddr/
+    cp -arf ${BOOT_SRCDIR}/drivers/ddr/hisilicon ${BOOT_BUILDDIR}/drivers/ddr/
+    cp openipc/${soc}_reginfo.bin ${BOOT_BUILDDIR}/.reg
+    # NOR
+    cat ${BOOT_SRCDIR}/openipc/openipc_config > ${BOOT_BUILDDIR}/.config && \
+    cat ${BOOT_SRCDIR}/openipc/${soc}_config >> ${BOOT_BUILDDIR}/.config && \
+    echo "CONFIG_PRODUCT_SOC=\"${soc}\"" >> ${BOOT_BUILDDIR}/.config && \
+    make ${MAKE_OPTS} olddefconfig </dev/null >/dev/null && \
+    make ${MAKE_OPTS} KCFLAGS="-DVENDOR_HISILICON" BOOT_SRCDIR=${BOOT_SRCDIR} </dev/null && \
+    make ${MAKE_OPTS} u-boot-z.bin </dev/null && \
+    cp ${BOOT_BUILDDIR}/u-boot-hi3518ev200.bin ${BOOT_BUILDDIR}/../u-boot-${soc}-nor.bin
+done
+
 # Goke/XMedia family (gk7205v200 / gk7205v300 / gk7202v300 / gk7605v100)
 for soc in gk7201v200 gk7201v300 gk7205v200 gk7205v300 gk7202v300 gk7605v100; do
     mkflags
@@ -117,16 +139,18 @@ for soc in gk7201v200 gk7201v300 gk7205v200 gk7205v300 gk7202v300 gk7605v100; do
     # NOR
     cat ${BOOT_SRCDIR}/openipc/openipc_config > ${BOOT_BUILDDIR}/.config && \
     cat ${BOOT_SRCDIR}/openipc/${soc}_config >> ${BOOT_BUILDDIR}/.config && \
+    echo "CONFIG_PRODUCT_SOC=\"${soc}\"" >> ${BOOT_BUILDDIR}/.config && \
     make ${MAKE_OPTS} olddefconfig </dev/null >/dev/null && \
-    make ${MAKE_OPTS} KCFLAGS="-DPRODUCT_SOC=${soc}" BOOT_SRCDIR=${BOOT_SRCDIR} </dev/null && \
+    make ${MAKE_OPTS} BOOT_SRCDIR=${BOOT_SRCDIR} </dev/null && \
     make ${MAKE_OPTS} u-boot-z.bin </dev/null && \
     cp ${BOOT_BUILDDIR}/u-boot-xm*.bin ${BOOT_BUILDDIR}/../u-boot-${soc}-nor.bin
     # NAND
     cat ${BOOT_SRCDIR}/openipc/openipc_config > ${BOOT_BUILDDIR}/.config && \
     cat ${BOOT_SRCDIR}/openipc/${soc}_config >> ${BOOT_BUILDDIR}/.config && \
     cat ${BOOT_SRCDIR}/openipc/nand_config >> ${BOOT_BUILDDIR}/.config && \
+    echo "CONFIG_PRODUCT_SOC=\"${soc}\"" >> ${BOOT_BUILDDIR}/.config && \
     make ${MAKE_OPTS} olddefconfig </dev/null >/dev/null && \
-    make ${MAKE_OPTS} KCFLAGS="-DPRODUCT_SOC=${soc}" BOOT_SRCDIR=${BOOT_SRCDIR} </dev/null && \
+    make ${MAKE_OPTS} BOOT_SRCDIR=${BOOT_SRCDIR} </dev/null && \
     make ${MAKE_OPTS} u-boot-z.bin </dev/null && \
     cp ${BOOT_BUILDDIR}/u-boot-xm*.bin ${BOOT_BUILDDIR}/../u-boot-${soc}-nand.bin
 done
@@ -142,16 +166,18 @@ for soc in gk7205v500 gk7205v510 gk7205v530; do
     # NOR
     cat ${BOOT_SRCDIR}/openipc/openipc_config > ${BOOT_BUILDDIR}/.config && \
     cat ${BOOT_SRCDIR}/openipc/xm720xxx_config >> ${BOOT_BUILDDIR}/.config && \
+    echo "CONFIG_PRODUCT_SOC=\"${soc}\"" >> ${BOOT_BUILDDIR}/.config && \
     make ${MAKE_OPTS} olddefconfig </dev/null >/dev/null && \
-    make ${MAKE_OPTS} KCFLAGS="-DPRODUCT_SOC=${soc}" BOOT_SRCDIR=${BOOT_SRCDIR} </dev/null && \
+    make ${MAKE_OPTS} BOOT_SRCDIR=${BOOT_SRCDIR} </dev/null && \
     make ${MAKE_OPTS} u-boot-z.bin </dev/null && \
     cp ${BOOT_BUILDDIR}/u-boot-xm*.bin ${BOOT_BUILDDIR}/../u-boot-${soc}-nor.bin
     # NAND
     cat ${BOOT_SRCDIR}/openipc/openipc_config > ${BOOT_BUILDDIR}/.config && \
     cat ${BOOT_SRCDIR}/openipc/xm720xxx_config >> ${BOOT_BUILDDIR}/.config && \
     cat ${BOOT_SRCDIR}/openipc/nand_config >> ${BOOT_BUILDDIR}/.config && \
+    echo "CONFIG_PRODUCT_SOC=\"${soc}\"" >> ${BOOT_BUILDDIR}/.config && \
     make ${MAKE_OPTS} olddefconfig </dev/null >/dev/null && \
-    make ${MAKE_OPTS} KCFLAGS="-DPRODUCT_SOC=${soc}" BOOT_SRCDIR=${BOOT_SRCDIR} </dev/null && \
+    make ${MAKE_OPTS} BOOT_SRCDIR=${BOOT_SRCDIR} </dev/null && \
     make ${MAKE_OPTS} u-boot-z.bin </dev/null && \
     cp ${BOOT_BUILDDIR}/u-boot-xm*.bin ${BOOT_BUILDDIR}/../u-boot-${soc}-nand.bin
 done

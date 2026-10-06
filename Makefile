@@ -875,6 +875,8 @@ sinclude Makefile-otproduct
 ifdef CONFIG_DDR_TRAINING_V2
 ifeq ($(CONFIG_HI35XX_FAMILY_V500),y)
 libs-y += drivers/ddr/hisilicon/$(SOC)/
+else ifeq ($(CONFIG_TARGET_HI3516CV200_FAMILY),y)
+libs-y += drivers/ddr/hisilicon/$(SOC)/
 else ifeq ($(CONFIG_ARCH_BSP),y)
 # vendor DDR training lives in drivers/ddr/vendor/boot_adaptation
 else
@@ -2570,7 +2572,7 @@ ddr_training_clean:
 		TOPDIR=$(srctree) BOOT_OUTDIR=$(CURDIR) clean
 	@if [ -f $(srctree)/drivers/ddr/vendor/boot_adaptation/uboot/cmd_bin/ddr_cmd.bin ]; \
 	then rm  $(srctree)/drivers/ddr/vendor/boot_adaptation/uboot/cmd_bin/ddr_cmd.bin; fi;
-else ifeq ($(CONFIG_HI35XX_FAMILY_V500),y)
+else ifeq ($(or $(CONFIG_HI35XX_FAMILY_V500),$(CONFIG_TARGET_HI3516CV200_FAMILY)),y)
 # Hisilicon keeps ddr_training_custom.* in the per-SoC dir and builds
 # the command binary from its own default/Makefile.
 ddr_training_prepare:

@@ -1,3 +1,5 @@
+#include "openipc-common.h"
+
 
 #ifdef VENDOR_HISILICON
 #define SFC "hi_sfc"
@@ -5,10 +7,6 @@
 #else
 #define SFC "sfc"
 #define VENDOR "goke"
-#endif
-
-#ifndef PRODUCT_SOCMODEL
-#define PRODUCT_SOCMODEL
 #endif
 
 #undef CONFIG_SYS_CBSIZE
@@ -26,11 +24,6 @@
 #define CONFIG_SYS_CBSIZE 1024
 #define CONFIG_SYS_LOAD_ADDR 0x42000000
 
-#define CONFIG_SERVERIP 192.168.1.1
-#define CONFIG_GATEWAYIP 192.168.1.1
-#define CONFIG_IPADDR 192.168.1.107
-#define CONFIG_NETMASK 255.255.255.0
-
 #define CONFIG_CMD_ECHO
 #define CONFIG_CMD_LOADB 1
 #define CONFIG_CMD_SOURCE
@@ -40,16 +33,13 @@
 #define CONFIG_CMD_MMC
 #endif
 
-#undef CONFIG_ENV_OFFSET
-#define CONFIG_ENV_OFFSET 0x40000
-
 #define CONFIG_ENV_KERNADDR 0x50000
 #define CONFIG_ENV_KERNSIZE 0x200000
 #define CONFIG_ENV_ROOTADDR 0x250000
 #define CONFIG_ENV_ROOTSIZE 0x500000
 
 #define CONFIG_BOOTARGS "mem=\\${osmem} console=ttyAMA0,115200 panic=20 root=/dev/mtdblock3 rootfstype=squashfs init=/init mtdparts=" SFC ":256k(boot),64k(env),2048k(kernel),\\${rootmtd}(rootfs),-(rootfs_data) \\${extras}"
-#define CONFIG_BOOTCOMMAND "setenv bootcmd ${bootnor}; sf probe 0; saveenv; run bootcmd"
+#define CONFIG_BOOTCOMMAND "run bootnor"
 
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"baseaddr=" __stringify(CONFIG_SYS_LOAD_ADDR) "\0" \
@@ -69,7 +59,7 @@
 	"ubwrite=sf probe 0; sf erase 0x0 ${kernaddr}; sf write ${baseaddr} 0x0 ${kernaddr}\0" \
 	"ukwrite=sf probe 0; sf erase ${kernaddr} ${kernsize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0" \
 	"urwrite=sf probe 0; sf erase ${rootaddr} ${rootsize}; sf write ${baseaddr} ${rootaddr} ${filesize}\0" \
-	"nfsroot=/srv/nfs/" __stringify(PRODUCT_SOC) "\0" \
+	"nfsroot=/srv/nfs/" CONFIG_PRODUCT_SOC "\0" \
 	"bootargsnfs=mem=\${osmem} console=ttyAMA0,115200 panic=20 root=/dev/nfs rootfstype=nfs ip=${ipaddr}:::255.255.255.0::eth0 nfsroot=${serverip}:${nfsroot},v3,nolock rw \${extras}\0" \
 	"bootnfs=setenv setargs setenv bootargs ${bootargsnfs}; run setargs; tftpboot ${baseaddr} uImage.${soc}; bootm ${baseaddr}\0" \
 	"sdload=setenv fetchcmd fatload mmc 0\0" \
@@ -80,10 +70,10 @@
 	"osmem=32M\0" \
 	"bootargs=" CONFIG_BOOTARGS"\0" \
 	"board_name\0" \
-	"board=" __stringify(PRODUCT_SOC) "\0" \
+	"board=" CONFIG_PRODUCT_SOC "\0" \
 	"vendor=" VENDOR"\0" \
-	"soc=" __stringify(PRODUCT_SOC) "\0" \
-	"socmodel=" __stringify(PRODUCT_SOCMODEL)
+	"soc=" CONFIG_PRODUCT_SOC "\0" \
+	"socmodel=" CONFIG_PRODUCT_SOCMODEL
 
 #ifdef CONFIG_FMC_SPI_NAND
 
@@ -109,17 +99,17 @@
 	"fetchcmd=tftpboot\0" \
 	"urnand=tftpboot ${baseaddr} rootfs.ubi.${soc} && nand erase 0x100000 0x7f00000; nand write ${baseaddr} 0x100000 ${filesize}\0" \
 	"mtdparts=mtdparts="SFC":768k(boot),256k(env),-(ubi)\0" \
-	"nfsroot=/srv/nfs/" __stringify(PRODUCT_SOC) "\0" \
+	"nfsroot=/srv/nfs/" CONFIG_PRODUCT_SOC "\0" \
 	"bootargsnfs=mem=\${osmem} console=ttyAMA0,115200 panic=20 root=/dev/nfs rootfstype=nfs ip=${ipaddr}:::255.255.255.0::eth0 nfsroot=${serverip}:${nfsroot},v3,nolock rw \${extras}\0" \
 	"bootargs="CONFIG_BOOTARGS"\0" \
 	"bootnfs=setenv setargs setenv bootargs ${bootargsnfs}; run setargs; tftpboot ${baseaddr} uImage.${soc}; bootm ${baseaddr}\0" \
 	"osmem=32M\0" \
 	"mtdids=nand0="SFC"\0" \
 	"board_name\0" \
-	"board=" __stringify(PRODUCT_SOC) "\0" \
+	"board=" CONFIG_PRODUCT_SOC "\0" \
 	"vendor=" VENDOR"\0" \
-	"soc=" __stringify(PRODUCT_SOC) "\0" \
-	"socmodel=" __stringify(PRODUCT_SOCMODEL)
+	"soc=" CONFIG_PRODUCT_SOC "\0" \
+	"socmodel=" CONFIG_PRODUCT_SOCMODEL
 
 #define CONFIG_SYS_MALLOC_LEN (32 * SZ_128K)
 #endif

@@ -2191,11 +2191,28 @@ config TARGET_XM72010300
 	help
 	  Support for xmedia XM72010300 platform.
 
+config TARGET_HI3516CV200
+	bool "Support HI3516CV200"
+	select CPU_ARM926EJS
+	select TARGET_HI3516CV200_FAMILY
+	help
+	  Support for HiSilicon Hi3516CV200 platform.
+
+config TARGET_HI3518EV200
+	bool "Support HI3518EV200"
+	select CPU_ARM926EJS
+	select TARGET_HI3516CV200_FAMILY
+	help
+	  Support for HiSilicon Hi3518EV200 platform.
+
 config ARCH_XMEDIA
 	bool "XMEDIA SoCs"
 	select DM
 
 endchoice
+
+config TARGET_HI3516CV200_FAMILY
+	bool
 
 config HI35XX_FAMILY_V500
 	bool
@@ -2442,6 +2459,7 @@ source "board/freescale/ls1012afrdm/Kconfig"
 source "board/freescale/lx2160a/Kconfig"
 source "board/grinn/chiliboard/Kconfig"
 source "board/hisilicon/hi3516cv500/Kconfig"
+source "board/hisilicon/hi3518ev200/Kconfig"
 source "board/hisilicon/hi3516dv300/Kconfig"
 source "board/hisilicon/hi3516av300/Kconfig"
 source "board/hisilicon/hikey/Kconfig"

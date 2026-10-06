@@ -262,6 +262,44 @@ config FMC_SPI_NOR
 
 	  If unsure, say N
 
+config FMC_SPI_NOR_QUAD_DISABLE
+	bool "Disable QUAD read for SPI Nor"
+	depends on FMC_SPI_NOR
+	default n
+	help
+	  Never select QUAD/DUAL/FAST read commands even if the SPI Nor
+	  flash advertises them. Reads use the plain standard read command
+	  (0x03) only. Useful for flashes that are unstable in other modes.
+
+	  If unsure, say N
+
+config FMC_SPI_NOR_ERASE_CLK_MAX
+	int "Maximum SPI clock (MHz) for SPI Nor erase"
+	depends on FMC_SPI_NOR
+	default 50
+	help
+	  Clamp the SPI Nor erase clock to this value (MHz). The driver then
+	  selects the highest supported controller clock not exceeding it.
+	  Set to 0 to disable the clamp.
+
+config FMC_SPI_NOR_WRITE_CLK_MAX
+	int "Maximum SPI clock (MHz) for SPI Nor write"
+	depends on FMC_SPI_NOR
+	default 50
+	help
+	  Clamp the SPI Nor page program clock to this value (MHz). The driver
+	  then selects the highest supported controller clock not exceeding it.
+	  Set to 0 to disable the clamp.
+
+config FMC_SPI_NOR_READ_CLK_MAX
+	int "Maximum SPI clock (MHz) for SPI Nor read"
+	depends on FMC_SPI_NOR
+	default 80
+	help
+	  Clamp the SPI Nor read clock to this value (MHz). The driver then
+	  selects the highest supported controller clock not exceeding it.
+	  Set to 0 to disable the clamp.
+
 config SPI_BLOCK_PROTECT
     bool "Spi Nor Device BP(Block Protect) Support"
 	depends on FMC_SPI_NOR

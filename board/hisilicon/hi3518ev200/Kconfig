@@ -1,0 +1,16 @@
+if TARGET_HI3516CV200 || TARGET_HI3518EV200
+
+config SYS_BOARD
+	default "hi3518ev200"
+
+config SYS_VENDOR
+	default "hisilicon"
+
+config SYS_SOC
+	default "hi3518ev200"
+
+config SYS_CONFIG_NAME
+	default "hi3516cv200" if TARGET_HI3516CV200
+	default "hi3518ev200" if TARGET_HI3518EV200
+
+endif

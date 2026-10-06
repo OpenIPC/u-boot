@@ -5059,6 +5059,7 @@
 
 #define MACH_TYPE_XM72020300           8000
 #define MACH_TYPE_XM72010200           8000
+#define MACH_TYPE_HI3518EV200          8000
 #define MACH_TYPE_XM72010300           8000
 #define MACH_TYPE_XM72050200           8000
 #define MACH_TYPE_XM72050300           8000

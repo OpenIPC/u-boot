@@ -1301,6 +1301,9 @@ static void fmc_map_iftype_and_clock(struct fmc_spi *spi)
 			break;
 		}
 	}
+	if (CONFIG_FMC_SPI_NOR_WRITE_CLK_MAX &&
+	    spi->write->clock > CONFIG_FMC_SPI_NOR_WRITE_CLK_MAX)
+		spi->write->clock = CONFIG_FMC_SPI_NOR_WRITE_CLK_MAX;
 	fmc_get_fmc_best_2x_clock(&spi->write->clock);
 
 	/* Only an even number of values is required,so increase length is 2 */
@@ -1310,6 +1313,9 @@ static void fmc_map_iftype_and_clock(struct fmc_spi *spi)
 			break;
 		}
 	}
+	if (CONFIG_FMC_SPI_NOR_READ_CLK_MAX &&
+	    spi->read->clock > CONFIG_FMC_SPI_NOR_READ_CLK_MAX)
+		spi->read->clock = CONFIG_FMC_SPI_NOR_READ_CLK_MAX;
 #ifdef CONFIG_DTR_MODE_SUPPORT
 	if (spi->dtr_mode_support)
 		/* get the div4 clock */
@@ -1320,6 +1326,9 @@ static void fmc_map_iftype_and_clock(struct fmc_spi *spi)
 	fmc_get_fmc_best_2x_clock(&spi->read->clock);
 #endif
 
+	if (CONFIG_FMC_SPI_NOR_ERASE_CLK_MAX &&
+	    spi->erase->clock > CONFIG_FMC_SPI_NOR_ERASE_CLK_MAX)
+		spi->erase->clock = CONFIG_FMC_SPI_NOR_ERASE_CLK_MAX;
 	fmc_get_fmc_best_2x_clock(&spi->erase->clock);
 	spi->erase->iftype = IF_TYPE_STD;
 }
@@ -1433,13 +1442,13 @@ static void fmc_init_print(struct fmc_spi* const spi)
 	fmc_pr(FMC_INFO, "Chip:%sB ", ulltostr(spi->chipsize));
 	fmc_pr(FMC_INFO, "Name:\"%s\"\n", spi->name);
 
-	fmc_pr(BT_DBG, "\t|||-Read if: %s, cmd: %#X, clock reg: %#x\n",
+	printf("read if: %s, cmd: %#x, clock reg: %#x\n",
 			str[spi->read->iftype],
 			spi->read->cmd, spi->read->clock);
-	fmc_pr(BT_DBG, "\t|||-Write if: %s, cmd: %#X, clock reg: %#x\n",
+	printf("write if: %s, cmd: %#x, clock reg: %#x\n",
 			str[spi->write->iftype],
 			spi->write->cmd, spi->write->clock);
-	fmc_pr(BT_DBG, "\t|||-Erase if: %s, cmd: %#X, clock reg: %#x\n",
+	printf("erase if: %s, cmd: %#x, clock reg: %#x\n",
 			str[spi->erase[0].iftype],
 			spi->erase[0].cmd, spi->erase[0].clock);
 }

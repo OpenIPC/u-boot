@@ -68,20 +68,28 @@ static void fmc100_dma_transfer(struct fmc_spi* const spi,
 		r_cmd = spi->read->cmd;
 	}
 
+#ifndef CONFIG_TARGET_HI3516CV200_FAMILY
 	regval = op_cfg_fm_cs(spi->chipselect) | OP_CFG_OEN_EN |
 		 op_cfg_mem_if_type(if_type) | op_cfg_addr_num(spi->addrcycle) |
 		 op_cfg_dummy_num(dummy);
+#else
+	regval = op_cfg_fm_cs(spi->chipselect) |
+		 op_cfg_mem_if_type(if_type) | op_cfg_addr_num(spi->addrcycle) |
+		 op_cfg_dummy_num(dummy);
+#endif
 	fmc_write(host, FMC_OP_CFG, regval);
 	fmc_pr(DMA_DB, "\t\t   Set OP_CFG[%#x]%#x\n", FMC_OP_CFG, regval);
 
 	regval = fmc_dma_len_set(size);
 	fmc_write(host, FMC_DMA_LEN, regval);
 	fmc_pr(DMA_DB, "\t\t   Set DMA_LEN[%#x]%#x\n", FMC_DMA_LEN, regval);
+#ifndef CONFIG_TARGET_HI3516CV200_FAMILY
 	/* get hight 32 bits */
 	regval = (((uintptr_t)dma_buffer & FMC_DMA_SADDRH_MASK) >> 32);
 	fmc_write(host, FMC_DMA_SADDRH_D0, regval);
 	fmc_pr(DMA_DB, "\t\t   Set DMA_SADDRH_D0[%#x]%#x\n", FMC_DMA_SADDRH_D0,
 	       regval);
+#endif
 
 	regval = (unsigned int)((uintptr_t)dma_buffer);
 	fmc_write(host, FMC_DMA_SADDR_D0, regval);
@@ -414,11 +422,18 @@ static int fmc100_reg_erase_one_block(struct spi_flash *spiflash, loff_t offs)
 	fmc_write(host, FMC_ADDRL, regval);
 	fmc_pr(OP_DBG, "\t\t   Set ADDRL[%#x]%#x\n", FMC_ADDRL, regval);
 
+#ifndef CONFIG_TARGET_HI3516CV200_FAMILY
 	regval = op_cfg_fm_cs(spi->chipselect) |
 		 OP_CFG_OEN_EN |
 		 op_cfg_mem_if_type(spi->erase->iftype) |
 		 op_cfg_addr_num(spi->addrcycle) |
 		 op_cfg_dummy_num(spi->erase->dummy);
+#else
+	regval = op_cfg_fm_cs(spi->chipselect) |
+		 op_cfg_mem_if_type(spi->erase->iftype) |
+		 op_cfg_addr_num(spi->addrcycle) |
+		 op_cfg_dummy_num(spi->erase->dummy);
+#endif
 	fmc_write(host, FMC_OP_CFG, regval);
 	fmc_pr(OP_DBG, "\t\t   Set OP_CFG[%#x]%#x\n", FMC_OP_CFG, regval);
 
@@ -429,6 +444,12 @@ static int fmc100_reg_erase_one_block(struct spi_flash *spiflash, loff_t offs)
 	fmc_pr(OP_DBG, "\t\t   Set OP[%#x]%#x\n", FMC_OP, regval);
 
 	fmc_cmd_wait_cpu_finish(host);
+
+	regval = fmc_read(host, FMC_INT);
+	if (regval & (FMC_INT_WR_LOCK | FMC_INT_OP_FAIL | FMC_INT_ERR_VALID |
+		      FMC_INT_ERR_INVALID | FMC_INT_ERR_ALARM))
+		printf("FMC erase err: int=%#x addr=%#x\n", regval,
+		       (unsigned int)offs);
 
 	fmc_pr(OP_DBG, "\t\t * End erase one block.\n");
 
@@ -483,6 +504,12 @@ static ssize_t fmc100_dma_write(struct spi_flash *spiflash, loff_t to, size_t le
 		goto fail;
 
 	result = 0;
+
+	if (fmc_read(host, FMC_INT) & (FMC_INT_WR_LOCK | FMC_INT_OP_FAIL |
+			FMC_INT_DMA_ERR | FMC_INT_ERR_VALID |
+			FMC_INT_ERR_INVALID | FMC_INT_ERR_ALARM))
+		printf("FMC write err: int=%#x to=%#llx\n",
+		       fmc_read(host, FMC_INT), to);
 fail:
 	(*fmc_ip)--;
 	fmc_pr(WR_DBG, "\t\t* End dma write.\n");
@@ -899,6 +926,62 @@ int fmc100_spi_nor_init(struct fmc_host *host)
 
 #ifdef CONFIG_SPI_BLOCK_PROTECT
 
+void fmc100_global_unlock(struct fmc_host *host)
+{
+	struct fmc_spi *spi = host->spi;
+	unsigned int reg, sr1, sr2, sr3, mask;
+
+	sr1 = spi_general_get_flash_register(spi, SPI_CMD_RDSR);
+	sr2 = spi_general_get_flash_register(spi, SPI_CMD_RDSR2);
+	sr3 = spi_general_get_flash_register(spi, SPI_CMD_RDSR3);
+
+	printf("SR1[%#x] SR2[%#x] SR3[%#x]\n", sr1, sr2, sr3);
+
+	mask = ((1 << 2) | (1 << 3) | (1 << 4) | (1 << 5));
+	if (sr1 & mask) {
+		spi->driver->write_enable(spi);
+		printf("Unlocking flash: SR1 [%#x]->[%#x]\n", sr1, sr1 & ~mask);
+		writeb(sr1 & ~mask, host->iobase);
+
+		reg = fmc_cmd_cmd1(SPI_CMD_WRSR);
+		fmc_write(host, FMC_CMD, reg);
+
+		reg = op_cfg_fm_cs(spi->chipselect) | OP_CFG_OEN_EN;
+		fmc_write(host, FMC_OP_CFG, reg);
+
+		reg = fmc_data_num_cnt(SPI_NOR_SR_LEN);
+		fmc_write(host, FMC_DATA_NUM, reg);
+
+		reg = fmc_op_cmd1_en(ENABLE) | fmc_op_write_data_en(ENABLE) |
+			FMC_OP_REG_OP_START;
+		fmc_write(host, FMC_OP, reg);
+
+		fmc_cmd_wait_cpu_finish(host);
+	}
+
+	mask = (1 << 3);
+	if (sr2 & mask) {
+		spi->driver->write_enable(spi);
+		printf("Disabling WPS: SR2 [%#x]->[%#x]\n", sr2, sr2 & ~mask);
+		writeb(sr2 & ~mask, host->iobase);
+
+		reg = fmc_cmd_cmd1(SPI_CMD_WRSR2);
+		fmc_write(host, FMC_CMD, reg);
+
+		reg = op_cfg_fm_cs(spi->chipselect) | OP_CFG_OEN_EN;
+		fmc_write(host, FMC_OP_CFG, reg);
+
+		reg = fmc_data_num_cnt(SPI_NOR_SR_LEN);
+		fmc_write(host, FMC_DATA_NUM, reg);
+
+		reg = fmc_op_cmd1_en(ENABLE) | fmc_op_write_data_en(ENABLE) |
+			FMC_OP_REG_OP_START;
+		fmc_write(host, FMC_OP, reg);
+
+		fmc_cmd_wait_cpu_finish(host);
+	}
+}
+
 void spi_lock_update_address(struct fmc_host *host)
 {
 	unsigned int lock_level_max, erasesize, chipsize;
@@ -984,6 +1067,8 @@ void fmc100_get_bp_lock_level(struct fmc_host *host)
 	unsigned char mid = host->spi_nor_info->ids[0];
 
 	fmc_pr(BP_DBG, "Get manufacturer ID: [%#x]\n", mid);
+
+	fmc100_global_unlock(host);
 
 	/* match the manufacture ID to get the block protect info */
 	switch (mid) {

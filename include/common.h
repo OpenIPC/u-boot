@@ -37,11 +37,13 @@
 #define BOOT_MEDIA_SPIFLASH       (3)
 #define BOOT_MEDIA_EMMC           (4)
 
+#ifndef __ASSEMBLY__
 void add_shutdown(void (*shutdown)(void));
 void do_shutdown(void);
 
 /* get uboot start media. */
 int get_boot_media(void);
 unsigned int get_ddr_size(void);
+#endif
 
 #endif	/* __COMMON_H_ */

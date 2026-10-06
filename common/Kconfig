@@ -1046,3 +1046,17 @@ config XMEDIA_DISABLE_DOWNLOAD
 	  Therefore, it needs to be disabled in the official product.
 
 endmenu
+config PRODUCT_SOC
+	string "Product SoC name"
+	default SYS_CONFIG_NAME
+	help
+	  Target SoC name exposed as 'soc=' (and 'board=') in the default
+	  environment. Set per target by the build system.
+
+config PRODUCT_SOCMODEL
+	string "Product SoC model"
+	default ""
+	help
+	  Optional board/binning model exposed as 'socmodel=' in the default
+	  environment (e.g. hi3516cv610 DDR binnings).
+

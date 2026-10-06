@@ -383,7 +383,7 @@
 		(((host)->addr_value[0] >> 16) | ((host)->addr_value[1] << 16))
 
 #define db_msg(_fmt, arg...) \
-	printf("%s(%d): " _fmt, __func__, __LINE__, ##arg);
+	printf(_fmt, ##arg);
 
 #define db_bug(fmt, args...) \
 	do { \
