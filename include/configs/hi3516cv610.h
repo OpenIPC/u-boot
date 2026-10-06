@@ -140,6 +140,7 @@ e* ---------------------------------------------------------------------*/
 #define CONFIG_CMD_MMC
 #define CONFIG_SYS_MMC_ENV_DEV	0
 #define CONFIG_EXT4_SPARSE
+#define CONFIG_BSP_SDHCI
 #define CONFIG_BSP_SDHCI_MAX_FREQ  200000000
 #define CONFIG_FS_EXT4
 #define CONFIG_SDHCI_ADMA

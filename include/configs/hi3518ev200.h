@@ -74,6 +74,19 @@
 #define HISFV_PHY_D                 2
 #endif
 
+
+#ifdef CONFIG_MMC
+#define CONFIG_HIMCI_V200
+#define CONFIG_GENERIC_MMC
+#define CONFIG_CMD_MMC
+#define CONFIG_MMC_DEVID		0
+#define CONFIG_MMC_BOOT_ADDR		0
+#define CONFIG_MMC_POWER_OFF_TIMEOUT	5
+#define CONFIG_MMC_POWER_ON_TIMEROUT	40
+#define CONFIG_MMC_RESET_LOW_TIMEOUT	10
+#define CONFIG_MMC_RESET_HIGH_TIMEROUT	300
+#endif
+
 #include "openipc-common.h"
 
 #endif /* __HI3518EV200_H */

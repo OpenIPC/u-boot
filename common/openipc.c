@@ -2,11 +2,15 @@
 #include <asm/unaligned.h>
 #include <common.h>
 #include <env.h>
+#include <fs.h>
 #include <image.h>
 #include <malloc.h>
 #include <memalign.h>
 #include <spi.h>
 #include <spi_flash.h>
+#ifdef CONFIG_USB
+#include <usb.h>
+#endif
 
 #define SCAN_FROM CONFIG_ENV_OFFSET + CONFIG_ENV_SIZE
 #define SCAN_STEP 0x10000
@@ -131,6 +135,98 @@ static int scan_spi_device(struct spi_flash *flash, ulong *kernel_off, ulong *ro
   return 0;
 }
 
+#if (defined(CONFIG_MMC) || defined(CONFIG_USB_STORAGE)) && defined(CONFIG_FS_FAT)
+static struct spi_flash *recovery_flash;
+
+static int recovery_write(const char *name) {
+  struct image_header hdr;
+  loff_t actread;
+  ulong addr, size, erase_len;
+  int ret;
+
+  if (!fs_exists(name))
+    return 0;
+
+  ret = fs_read(name, (ulong)&hdr, 0, sizeof(hdr), &actread);
+  if (ret || actread != sizeof(hdr) || !image_check_magic(&hdr)) {
+    printf("Recovery: no valid uImage header in %s\n", name);
+    return -1;
+  }
+
+  addr = image_get_load(&hdr);
+  size = sizeof(hdr) + image_get_data_size(&hdr);
+
+  ret = fs_read(name, CONFIG_SYS_LOAD_ADDR, 0, size, &actread);
+  if (ret || actread != size) {
+    printf("Recovery: failed to read %s\n", name);
+    return -1;
+  }
+
+  erase_len = (size + recovery_flash->sector_size - 1) &
+              ~(recovery_flash->sector_size - 1);
+  spi_flash_erase(recovery_flash, addr, erase_len);
+  spi_flash_write(recovery_flash, addr, size, (void *)CONFIG_SYS_LOAD_ADDR);
+
+  printf("Recovery: wrote %s (%lu bytes) to flash at 0x%lx\n", name, size,
+         addr);
+
+  return 1;
+}
+
+static int recovery_mount(const char *ifname) {
+  if (!fs_set_blk_dev(ifname, "0:1", FS_TYPE_FAT))
+    return 0;
+  if (!fs_set_blk_dev(ifname, "0", FS_TYPE_FAT))
+    return 0;
+  return -1;
+}
+
+int firmware_recovery(void) {
+  char name[64];
+  int i, ret, found = 0;
+  static const char *fmt[] = { "uImage.%s.img", "rootfs.squashfs.%s.img" };
+
+  recovery_flash = spi_flash_probe(CONFIG_SF_DEFAULT_BUS, CONFIG_SF_DEFAULT_CS,
+                                   CONFIG_SF_DEFAULT_SPEED,
+                                   CONFIG_SF_DEFAULT_MODE);
+  if (!recovery_flash)
+    return -1;
+
+#ifdef CONFIG_MMC
+  if (!recovery_mount("mmc")) {
+    for (i = 0; i < 2; i++) {
+      sprintf(name, fmt[i], CONFIG_PRODUCT_SOC);
+      ret = recovery_write(name);
+      if (ret > 0)
+        found = 1;
+    }
+  }
+#endif
+
+#ifdef CONFIG_USB_STORAGE
+  usb_init();
+  usb_stor_scan(1);
+  if (!recovery_mount("usb")) {
+    for (i = 0; i < 2; i++) {
+      sprintf(name, fmt[i], CONFIG_PRODUCT_SOC);
+      ret = recovery_write(name);
+      if (ret > 0)
+        found = 1;
+    }
+  }
+#endif
+
+  fs_close();
+  spi_flash_free(recovery_flash);
+
+  return found ? 0 : -1;
+}
+#else
+int firmware_recovery(void) {
+  return -1;
+}
+#endif
+
 int firmware_scan(void) {
   struct spi_flash *flash;
   ulong kernel_off = 0;
@@ -197,5 +293,6 @@ int openipc_helper() {
   char msize[16];
   sprintf(msize, "%ldM", gd->ram_size / 1024 / 1024);
   env_set("totalmem", msize);
+  firmware_recovery();
   firmware_scan();
 }

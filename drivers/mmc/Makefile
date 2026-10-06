@@ -93,3 +93,6 @@ obj-$(CONFIG_TARGET_XM72050300)		+= xm72050300.o mmc_boot.o sdhci-adma.o
 obj-$(CONFIG_TARGET_XM72050500)		+= xm72050500.o mmc_boot.o sdhci-adma.o
 obj-$(CONFIG_TARGET_XM720XXX)		+= xm720xxx.o mmc_boot.o sdhci-adma.o
 obj-$(CONFIG_TARGET_XM76050100)		+= xm76050100.o mmc_boot.o sdhci-adma.o
+obj-$(CONFIG_BSP_SDHCI)		+= bsp_sdhci_cv6xx.o bsp_mmc_intf.o
+obj-$(CONFIG_HIMCI)		+= himci.o
+obj-$(CONFIG_HIMCI_V200)		+= himciv200.o

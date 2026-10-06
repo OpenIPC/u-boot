@@ -68,6 +68,9 @@ struct bd_info;
 #define MMC_MODE_HS_52MHz	MMC_CAP(MMC_HS_52)
 #define MMC_MODE_DDR_52MHz	MMC_CAP(MMC_DDR_52)
 #define MMC_MODE_HS200		MMC_CAP(MMC_HS_200)
+#if defined(CONFIG_HIMCI)
+#define MMC_MODE_HS200_1_8V	MMC_MODE_HS200
+#endif
 #define MMC_MODE_HS400		MMC_CAP(MMC_HS_400)
 #define MMC_MODE_HS400_ES	MMC_CAP(MMC_HS_400_ES)
 
@@ -569,6 +572,12 @@ struct mmc_ops {
 	int (*host_power_cycle)(struct mmc *mmc);
 	int (*get_b_max)(struct mmc *mmc, void *dst, lbaint_t blkcnt);
 	int (*wait_dat0)(struct mmc *mmc, int state, int timeout_us);
+#if (defined(CONFIG_ARCH_BSP) && defined(CONFIG_BSP_SDHCI)) || \
+	defined(CONFIG_HIMCI)
+	int (*execute_tuning)(struct mmc *mmc, u32 opcode);
+	void (*hs400_enable_es)(struct mmc *mmc, bool enable);
+	int (*card_busy)(struct mmc *mmc);
+#endif
 };
 
 static inline int mmc_hs400_prepare_ddr(struct mmc *mmc)
@@ -735,6 +744,13 @@ struct mmc {
 	u32 quirks;
 	u8 hs400_tuning;
 	u8 strobe_enhanced;
+#if defined(CONFIG_HIMCI)
+	u8 timing;
+#endif
+#if defined(CONFIG_ARCH_BSP) && defined(CONFIG_BSP_SDHCI)
+	u8 dev_num;
+	u32 ocr_from_bootrom;
+#endif
 
 	enum bus_mode user_speed_mode; /* input speed mode from user */
 };
