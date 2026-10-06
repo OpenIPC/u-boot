@@ -4470,7 +4470,7 @@ ident_done:
 	if (mtd->writesize > 512 && chip->cmdfunc == nand_command)
 		chip->cmdfunc = nand_command_lp;
 
-#ifdef CONFIG_FMC
+#if defined(CONFIG_FMC) || defined(CONFIG_NAND_HINFC301)
 	if (nand_oob_resize && nand_oob_resize(mtd))
 		return ERR_PTR(-ENODEV);
 #endif

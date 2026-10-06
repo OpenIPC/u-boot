@@ -28,6 +28,12 @@ struct spi_flash *spi_flash_probe(unsigned int bus, unsigned int cs,
 	spiflash = fmc100_spi_nor_probe(&spiinfo_ex);
 	spiflash->erase_size = spiinfo_ex->erasesize;
 #endif
+#ifdef CONFIG_HISFC350_SPI_NOR
+	if (hisfc350_spiflash_init(&spiflash, &spiinfo_ex))
+		spiflash->erase_size = spiinfo_ex->erasesize;
+	else
+		spiflash = NULL;
+#endif
 
 	return spiflash;
 }

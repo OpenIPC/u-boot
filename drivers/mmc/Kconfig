@@ -14,14 +14,23 @@ config MMC
 config HIMCI
 	bool "Hisilicon MMC controller for Hi35xx support"
 	depends on MMC
+	default y if HI35XX_FAMILY_V500
 	help
 	  Support for Hisilicon MMC host controller on Hi35xx ARM SoCs platform
 
 config HIMCI_V200
 	bool "Hisilicon MMC controller v200 for Hi3518EV200"
 	depends on MMC
+	default y if TARGET_HI3516CV200_FAMILY || TARGET_HI3516CV300_FAMILY
 	help
 	  Support for the HiSilicon MMC v200 controller on Hi3518EV200.
+
+config HIMCI_V100
+	bool "Hisilicon MMC controller v100 for Hi3518EV100"
+	depends on MMC
+	default y if TARGET_HI3518EV100_FAMILY
+	help
+	  Support for the HiSilicon MMC v100 controller on Hi3518EV100.
 
 config GENERIC_MMC
 	bool

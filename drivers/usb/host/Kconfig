@@ -309,6 +309,14 @@ config USB_EHCI_TXFIFO_THRESH
 
 endif # USB_EHCI_HCD
 
+config USB_OHCI_LEGACY
+	bool "OHCI HCD (USB 1.1) support, legacy non-DM"
+	select USB_OHCI_NEW
+	select USB_HOST
+	help
+	  Legacy (non-DM) OHCI host controller support for platforms that
+	  use the CONFIG_SYS_USB_OHCI_REGS_BASE interface.
+
 config USB_OHCI_NEW
 	bool
 

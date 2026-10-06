@@ -1282,7 +1282,7 @@ UBOOT_TOPDIR  = $(srctree)
 else
 UBOOT_TOPDIR  = $(CURDIR)
 endif
-ifeq ($(CONFIG_TARGET_HI3516CV300_FAMILY),y)
+ifeq ($(or $(CONFIG_TARGET_HI3516CV300_FAMILY),$(CONFIG_TARGET_HI3518EV100_FAMILY)),y)
 UBOOT_Z_TEXTBASE = TEXTBASE=$(shell printf '0x%x' $$(($(CONFIG_SYS_TEXT_BASE) - 0x100000)))
 endif
 
@@ -2591,6 +2591,10 @@ ddr_training_clean:
 	make -C $(CURDIR)/drivers/ddr/hisilicon/$(DDRT_DEFAULT)/cmd_bin \
 		TOPDIR=$(CURDIR) BOOT_SRCDIR=$(abspath $(srctree)) \
 		CROSS_COMPILE=$(CROSS_COMPILE) CPU=$(CPU) SOC=$(SOC) clean
+else ifeq ($(CONFIG_TARGET_HI3518EV100_FAMILY),y)
+# Hi3518EV100 has no DDR training in U-Boot (BootROM does it via reg_info)
+ddr_training_prepare:
+ddr_training_clean:
 else
 DDR_SSRC := ddr_training_custom.h ddr_training_custom.c
 

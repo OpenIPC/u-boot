@@ -145,6 +145,22 @@ for soc in hi3516cv300 hi3516ev100; do
     cp ${BOOT_BUILDDIR}/u-boot-hi3516cv300.bin ${BOOT_BUILDDIR}/../u-boot-${soc}-nor.bin
 done
 
+# Hi3518EV100 family (hi3518a/c/e, hi3516c): mini-boot + reg_info splice
+for soc in hi3518av100 hi3518cv100 hi3518ev100 hi3516cv100; do
+    mkflags
+
+    rm -rf ${BOOT_BUILDDIR}
+    mkdir -p ${BOOT_BUILDDIR}
+    cp openipc/${soc}_reginfo.bin ${BOOT_BUILDDIR}/.reg
+    cat ${BOOT_SRCDIR}/openipc/openipc_config > ${BOOT_BUILDDIR}/.config && \
+    cat ${BOOT_SRCDIR}/openipc/${soc}_config >> ${BOOT_BUILDDIR}/.config && \
+    echo "CONFIG_PRODUCT_SOC=\"${soc}\"" >> ${BOOT_BUILDDIR}/.config && \
+    make ${MAKE_OPTS} olddefconfig </dev/null >/dev/null && \
+    make ${MAKE_OPTS} KCFLAGS="-DVENDOR_HISILICON" BOOT_SRCDIR=${BOOT_SRCDIR} </dev/null && \
+    make ${MAKE_OPTS} u-boot-z.bin </dev/null && \
+    cp ${BOOT_BUILDDIR}/u-boot-hi3518ev100.bin ${BOOT_BUILDDIR}/../u-boot-${soc}-nor.bin
+done
+
 # Goke/XMedia family (gk7205v200 / gk7205v300 / gk7202v300 / gk7605v100)
 for soc in gk7201v200 gk7201v300 gk7205v200 gk7205v300 gk7202v300 gk7605v100; do
     mkflags

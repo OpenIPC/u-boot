@@ -262,6 +262,14 @@ config FMC_SPI_NOR
 
 	  If unsure, say N
 
+config HISFC350_SPI_NOR
+	bool "SPI Nor Flash Interface support (HiSFC350)"
+	help
+	  Enable the SPI Nor flash support on the HiSFC350 controller
+	  (Hi3518EV100 and friends).
+
+	  If unsure, say N
+
 config FMC_SPI_NOR_QUAD_DISABLE
 	bool "Disable QUAD read for SPI Nor"
 	depends on FMC_SPI_NOR

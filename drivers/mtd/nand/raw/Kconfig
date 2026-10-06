@@ -125,6 +125,13 @@ config NAND_BRCMNAND_63158
        help
          Enable support for broadcom nand driver on bcm63158.
 
+config NAND_HINFC301
+	bool "Hisilicon NAND Flash Controller V301"
+	depends on MTD_RAW_NAND
+	help
+	  Support for the Hisilicon HINFC301 NAND controller (Hi3518EV100
+	  family and friends).
+
 config NAND_DAVINCI
 	bool "Support TI Davinci NAND controller"
 	select SYS_NAND_SELF_INIT if TARGET_DA850EVM

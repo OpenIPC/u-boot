@@ -208,7 +208,7 @@ void spi_flash_free(struct spi_flash *flash);
 static inline int spi_flash_read(struct spi_flash *flash, u32 offset,
 		size_t len, void *buf)
 {
-#ifndef CONFIG_FMC
+#if !defined(CONFIG_FMC) && !defined(CONFIG_HISFC350_SPI_NOR)
 	struct mtd_info *mtd = &flash->mtd;
 	size_t retlen;
 
@@ -224,7 +224,7 @@ static inline int spi_flash_read(struct spi_flash *flash, u32 offset,
 static inline int spi_flash_write(struct spi_flash *flash, u32 offset,
 		size_t len, const void *buf)
 {
-#ifndef CONFIG_FMC
+#if !defined(CONFIG_FMC) && !defined(CONFIG_HISFC350_SPI_NOR)
 	struct mtd_info *mtd = &flash->mtd;
 	size_t retlen;
 
@@ -240,7 +240,7 @@ static inline int spi_flash_write(struct spi_flash *flash, u32 offset,
 static inline int spi_flash_erase(struct spi_flash *flash, u32 offset,
 		size_t len)
 {
-#ifndef CONFIG_FMC
+#if !defined(CONFIG_FMC) && !defined(CONFIG_HISFC350_SPI_NOR)
 	struct mtd_info *mtd = &flash->mtd;
 	struct erase_info instr;
 
@@ -262,6 +262,10 @@ static inline int spi_flash_erase(struct spi_flash *flash, u32 offset,
 	extern int fmc100_reg_erase(struct spi_flash *spiflash, u32 offset,
 				size_t length);
 	return fmc100_reg_erase(flash, offset, len);
+#elif defined(CONFIG_HISFC350_SPI_NOR)
+	extern int hisfc350_reg_erase(struct spi_flash *spiflash, u32 offset,
+				size_t length);
+	return hisfc350_reg_erase(flash, offset, len);
 #else
 	return 0;
 #endif

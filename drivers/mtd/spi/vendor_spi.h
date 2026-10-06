@@ -9,6 +9,10 @@
 
 struct spi_flash *fmc100_spi_nor_probe(struct mtd_info_ex **spi_nor_info);
 struct mtd_info_ex *fmc100_get_spi_nor_info(struct spi_flash *spi_nor_flash);
+#ifdef CONFIG_HISFC350_SPI_NOR
+int hisfc350_spiflash_init(struct spi_flash **spiflash,
+			   struct mtd_info_ex **spiinfo);
+#endif
 
 #endif
 

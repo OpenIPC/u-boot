@@ -96,3 +96,4 @@ obj-$(CONFIG_TARGET_XM76050100)		+= xm76050100.o mmc_boot.o sdhci-adma.o
 obj-$(CONFIG_BSP_SDHCI)		+= bsp_sdhci_cv6xx.o bsp_mmc_intf.o
 obj-$(CONFIG_HIMCI)		+= himci.o
 obj-$(CONFIG_HIMCI_V200)		+= himciv200.o
+obj-$(CONFIG_HIMCI_V100)		+= himciv100.o
