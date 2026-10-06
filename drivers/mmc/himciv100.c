@@ -18,6 +18,10 @@
 #ifdef CONFIG_HIMCI_HI3518
 #include "himciv100_3518.c"
 #endif
+
+#ifdef CONFIG_HIMCI_HI3516a
+#include "himciv100_3516a.c"
+#endif
 /*************************************************************************/
 #ifdef CONFIG_HIMCI_HI3516a
 

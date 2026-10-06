@@ -26,9 +26,9 @@ config HIMCI_V200
 	  Support for the HiSilicon MMC v200 controller on Hi3518EV200.
 
 config HIMCI_V100
-	bool "Hisilicon MMC controller v100 for Hi3518EV100"
+	bool "Hisilicon MMC controller v100 for Hi3518EV100/Hi3516AV100"
 	depends on MMC
-	default y if TARGET_HI3518EV100_FAMILY
+	default y if TARGET_HI3518EV100_FAMILY || TARGET_HI3516AV100_FAMILY
 	help
 	  Support for the HiSilicon MMC v100 controller on Hi3518EV100.
 

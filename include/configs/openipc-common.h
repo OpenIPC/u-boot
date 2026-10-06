@@ -32,6 +32,10 @@
 #define VENDOR "goke"
 #endif
 
+#define CONFIG_ENV_OFFSET 0x40000
+#define CONFIG_ENV_SIZE 0x10000
+#define CONFIG_ENV_SECT_SIZE 0x10000
+
 /* Kernel/rootfs offsets (shared by all NOR layouts) */
 #define CONFIG_ENV_KERNADDR 0x50000
 #define CONFIG_ENV_KERNSIZE 0x200000
@@ -54,7 +58,8 @@
 #elif defined(CONFIG_TARGET_HI3516CV300_FAMILY)
 #define OPENIPC_BASEADDR 0x80008000
 #define OPENIPC_OSMEM "32M"
-#elif defined(CONFIG_TARGET_HI3518EV100_FAMILY)
+#elif defined(CONFIG_TARGET_HI3518EV100_FAMILY) || \
+	defined(CONFIG_TARGET_HI3516AV100_FAMILY)
 #define OPENIPC_BASEADDR 0x82000000
 #define OPENIPC_OSMEM "32M"
 #elif defined(CONFIG_HI35XX_FAMILY_V500)
@@ -82,7 +87,7 @@
 /* Environment entries whose variables must be expanded lazily keep the
  * backslash; the others are expanded when the default environment is
  * imported. Keep the historical per-family forms. */
-#if defined(CONFIG_HI35XX_FAMILY_V500) || defined(CONFIG_TARGET_HI3516CV200_FAMILY) || defined(CONFIG_TARGET_HI3516CV300_FAMILY) || defined(CONFIG_TARGET_HI3518EV100_FAMILY)
+#if defined(CONFIG_HI35XX_FAMILY_V500) || defined(CONFIG_TARGET_HI3516CV200_FAMILY) || defined(CONFIG_TARGET_HI3516CV300_FAMILY) || defined(CONFIG_TARGET_HI3518EV100_FAMILY) || defined(CONFIG_TARGET_HI3516AV100_FAMILY)
 #define OPENIPC_BOOTARGSNFS "mem=\\${osmem} console=ttyAMA0,115200 panic=20 root=/dev/nfs rootfstype=nfs ip=${ipaddr}:::255.255.255.0::eth0 nfsroot=${serverip}:${nfsroot},v3,nolock rw \\${extras}"
 #else
 #define OPENIPC_BOOTARGSNFS "mem=\${osmem} console=ttyAMA0,115200 panic=20 root=/dev/nfs rootfstype=nfs ip=${ipaddr}:::255.255.255.0::eth0 nfsroot=${serverip}:${nfsroot},v3,nolock rw \${extras}"
@@ -119,7 +124,6 @@
 	"kernsize=" __stringify(CONFIG_ENV_KERNSIZE) "\0" \
 	"rootaddr=" __stringify(CONFIG_ENV_ROOTADDR) "\0" \
 	"rootsize=" __stringify(CONFIG_ENV_ROOTSIZE) "\0" \
-	"cmdnor=sf probe 0; setenv setargs setenv bootargs ${bootargs}; run setargs; sf read ${baseaddr} ${kernaddr} ${kernsize}; bootm ${baseaddr}\0" \
 	"bootnor=run fwrecovery; sf probe 0; setenv setargs setenv bootargs ${bootargs}; run setargs; sf read ${baseaddr} ${kernaddr} ${kernsize}; bootm ${baseaddr}\0" \
 	OPENIPC_FWUPD \
 	"fwrecovery=if env exists bootfail; then run fwupd; sleep 5; reset; fi\0" \
@@ -207,7 +211,8 @@
 #elif !defined(CONFIG_HI35XX_FAMILY_V500) && \
 	!defined(CONFIG_TARGET_HI3516CV200_FAMILY) && \
 	!defined(CONFIG_TARGET_HI3516CV300_FAMILY) && \
-	!defined(CONFIG_TARGET_HI3518EV100_FAMILY)
+	!defined(CONFIG_TARGET_HI3518EV100_FAMILY) && \
+	!defined(CONFIG_TARGET_HI3516AV100_FAMILY)
 #define CONFIG_SYS_INIT_RAM_ADDR 0x04000000
 #define CONFIG_SYS_INIT_RAM_SIZE 0x14000
 #endif
@@ -234,7 +239,8 @@
 #if defined(CONFIG_HI35XX_FAMILY_V500) || \
 	defined(CONFIG_TARGET_HI3516CV200_FAMILY) || \
 	defined(CONFIG_TARGET_HI3516CV300_FAMILY) || \
-	defined(CONFIG_TARGET_HI3518EV100_FAMILY)
+	defined(CONFIG_TARGET_HI3518EV100_FAMILY) || \
+	defined(CONFIG_TARGET_HI3516AV100_FAMILY)
 #define CONFIG_BOOTDELAY 1
 #endif
 

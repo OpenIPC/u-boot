@@ -7,6 +7,8 @@
  */
 
 #include <console.h>
+#include <linux/delay.h>
+#include <linux/bug.h>
 #include "higmac.h"
 #include "ctrl.h"
 #include "mdio.h"
@@ -126,7 +128,7 @@ static void set_gmac_debug_switch(void)
 	char evn_buf[ENV_BUF_LEN] = {0};
 	int i = 0;
 
-	s = getenv("gmac_debug");
+	s = env_get("gmac_debug");
 	if (s != NULL) {
 		while (*s != '\0' && i < sizeof(evn_buf) - 1)
 			evn_buf[i++] = *s++;
@@ -144,7 +146,7 @@ static void set_phy_link_times(void)
 	char evn_buf[ENV_BUF_LEN] = {0};
 	int i = 0;
 
-	s = getenv("phy_link_times");
+	s = env_get("phy_link_times");
 	if (s != NULL) {
 		while (*s != '\0' && i < sizeof(evn_buf) - 1)
 			evn_buf[i++] = *s++;
@@ -162,7 +164,7 @@ static void set_mdio_intf(void)
 	char evn_buf[ENV_BUF_LEN] = {0};
 	int i = 0;
 
-	s = getenv("mdio_intf");
+	s = env_get("mdio_intf");
 	if (s != NULL) {
 		while (*s != '\0' && i < sizeof(evn_buf) - 1)
 			evn_buf[i++] = *s++;
@@ -216,7 +218,7 @@ static void set_use_mdio(void)
 	char *e = NULL;
 
 	/* use_mdio=0 or use_mdio=1 or use_mdio=0,1 or ... */
-	s = getenv("use_mdio");
+	s = env_get("use_mdio");
 next_mdio:
 	if (s && gmac < CONFIG_GMAC_NUMS) {
 		while (*s == ' ' || *s == ',')
@@ -251,7 +253,7 @@ static void set_phy_addr(void)
 	char *e = NULL;
 
 	/* get phy addr */
-	s = getenv("phy_addr");
+	s = env_get("phy_addr");
 next_phyaddr:
 	if (s && gmac < CONFIG_GMAC_NUMS) {
 		while (*s == ' ' || *s == ',')
@@ -327,13 +329,13 @@ static int higmac_net_set_mac_address(struct eth_device *dev)
 	unsigned char mac[MAC_LEN] = {0};
 	int ret;
 
-	ret = eth_getenv_enetaddr("ethaddr", mac);
+	ret = eth_env_get_enetaddr("ethaddr", mac);
 	if (ret == 0) {
 		printf("MAC address invalid!\n");
 #ifdef CONFIG_NET_RANDOM_ETHADDR
 		net_random_ethaddr(mac);
 		printf("Set Random MAC address!\n");
-		eth_setenv_enetaddr("ethaddr", mac);
+		eth_env_set_enetaddr("ethaddr", mac);
 #endif
 	}
 

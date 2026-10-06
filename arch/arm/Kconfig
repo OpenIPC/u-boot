@@ -2205,6 +2205,20 @@ config TARGET_HI3518EV200
 	help
 	  Support for HiSilicon Hi3518EV200 platform.
 
+config TARGET_HI3516AV100
+	bool "Support HI3516AV100"
+	select CPU_V7A
+	select TARGET_HI3516AV100_FAMILY
+	help
+	  Support for HiSilicon Hi3516AV100 platform.
+
+config TARGET_HI3516DV100
+	bool "Support HI3516DV100"
+	select CPU_V7A
+	select TARGET_HI3516AV100_FAMILY
+	help
+	  Support for HiSilicon Hi3516DV100 platform.
+
 config TARGET_HI3518AV100
 	bool "Support HI3518AV100"
 	select CPU_ARM926EJS
@@ -2260,6 +2274,9 @@ config TARGET_HI3516CV300_FAMILY
 	bool
 
 config TARGET_HI3518EV100_FAMILY
+	bool
+
+config TARGET_HI3516AV100_FAMILY
 	bool
 
 config HI35XX_FAMILY_V500
@@ -2509,6 +2526,7 @@ source "board/grinn/chiliboard/Kconfig"
 source "board/hisilicon/hi3516cv500/Kconfig"
 source "board/hisilicon/hi3518ev200/Kconfig"
 source "board/hisilicon/hi3518ev100/Kconfig"
+source "board/hisilicon/hi3516av100/Kconfig"
 source "board/hisilicon/hi3516cv300/Kconfig"
 source "board/hisilicon/hi3516dv300/Kconfig"
 source "board/hisilicon/hi3516av300/Kconfig"
