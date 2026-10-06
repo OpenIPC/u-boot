@@ -68,7 +68,8 @@ static void fmc100_dma_transfer(struct fmc_spi* const spi,
 		r_cmd = spi->read->cmd;
 	}
 
-#ifndef CONFIG_TARGET_HI3516CV200_FAMILY
+#if !defined(CONFIG_TARGET_HI3516CV200_FAMILY) && \
+	!defined(CONFIG_TARGET_HI3516CV300_FAMILY)
 	regval = op_cfg_fm_cs(spi->chipselect) | OP_CFG_OEN_EN |
 		 op_cfg_mem_if_type(if_type) | op_cfg_addr_num(spi->addrcycle) |
 		 op_cfg_dummy_num(dummy);
@@ -83,7 +84,8 @@ static void fmc100_dma_transfer(struct fmc_spi* const spi,
 	regval = fmc_dma_len_set(size);
 	fmc_write(host, FMC_DMA_LEN, regval);
 	fmc_pr(DMA_DB, "\t\t   Set DMA_LEN[%#x]%#x\n", FMC_DMA_LEN, regval);
-#ifndef CONFIG_TARGET_HI3516CV200_FAMILY
+#if !defined(CONFIG_TARGET_HI3516CV200_FAMILY) && \
+	!defined(CONFIG_TARGET_HI3516CV300_FAMILY)
 	/* get hight 32 bits */
 	regval = (((uintptr_t)dma_buffer & FMC_DMA_SADDRH_MASK) >> 32);
 	fmc_write(host, FMC_DMA_SADDRH_D0, regval);
@@ -422,7 +424,8 @@ static int fmc100_reg_erase_one_block(struct spi_flash *spiflash, loff_t offs)
 	fmc_write(host, FMC_ADDRL, regval);
 	fmc_pr(OP_DBG, "\t\t   Set ADDRL[%#x]%#x\n", FMC_ADDRL, regval);
 
-#ifndef CONFIG_TARGET_HI3516CV200_FAMILY
+#if !defined(CONFIG_TARGET_HI3516CV200_FAMILY) && \
+	!defined(CONFIG_TARGET_HI3516CV300_FAMILY)
 	regval = op_cfg_fm_cs(spi->chipselect) |
 		 OP_CFG_OEN_EN |
 		 op_cfg_mem_if_type(spi->erase->iftype) |

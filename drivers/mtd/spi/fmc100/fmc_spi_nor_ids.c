@@ -1436,21 +1436,9 @@ static void mtd_data_set(struct mtd_info_ex* const mtd, struct spi_nor_info* con
 
 static void fmc_init_print(struct fmc_spi* const spi)
 {
-	const char *str[] = {"STD", "DUAL", "DIO", "QUAD", "QIO"};
-
 	fmc_pr(FMC_INFO, "Block:%sB ", ulltostr(spi->erasesize));
 	fmc_pr(FMC_INFO, "Chip:%sB ", ulltostr(spi->chipsize));
 	fmc_pr(FMC_INFO, "Name:\"%s\"\n", spi->name);
-
-	printf("read if: %s, cmd: %#x, clock reg: %#x\n",
-			str[spi->read->iftype],
-			spi->read->cmd, spi->read->clock);
-	printf("write if: %s, cmd: %#x, clock reg: %#x\n",
-			str[spi->write->iftype],
-			spi->write->cmd, spi->write->clock);
-	printf("erase if: %s, cmd: %#x, clock reg: %#x\n",
-			str[spi->erase[0].iftype],
-			spi->erase[0].cmd, spi->erase[0].clock);
 }
 
 static void fmc_spi_map_op(struct spi_nor_info *spiinfo, struct fmc_spi *spi)

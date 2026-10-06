@@ -304,20 +304,9 @@ int is_auto_update(void)
 #endif
 }
 
-void detect_memory(void) {
-	ulong tested_ram = get_ram_size((long *)PHYS_SDRAM_1, PHYS_SDRAM_1_SIZE)
-		/ 1024 / 1024;
-	printf("RAM size: %dMB\n", tested_ram);
-
-	char msize[128];
-	sprintf(msize, "%dM", tested_ram);
-	env_set("totalmem", msize);
-}
-
 int misc_init_r(void)
 {
 	openipc_helper();
-	detect_memory();
 #ifdef CONFIG_RANDOM_ETHADDR
 	random_init_r();
 #endif
@@ -374,7 +363,7 @@ int dram_init(void)
 {
 	DECLARE_GLOBAL_DATA_PTR;
 
-	gd->ram_size = PHYS_SDRAM_1_SIZE;
+	gd->ram_size = openipc_ram_size();
 	return 0;
 }
 

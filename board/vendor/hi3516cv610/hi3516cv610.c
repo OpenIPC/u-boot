@@ -394,7 +394,7 @@ int dram_init(void)
 {
 	DECLARE_GLOBAL_DATA_PTR;
 
-	gd->ram_size = get_ram_size((void *)CONFIG_SYS_SDRAM_BASE, 0x20000000);
+	gd->ram_size = openipc_ram_size();
 	return 0;
 }
 

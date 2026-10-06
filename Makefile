@@ -877,6 +877,8 @@ ifeq ($(CONFIG_HI35XX_FAMILY_V500),y)
 libs-y += drivers/ddr/hisilicon/$(SOC)/
 else ifeq ($(CONFIG_TARGET_HI3516CV200_FAMILY),y)
 libs-y += drivers/ddr/hisilicon/$(SOC)/
+else ifeq ($(CONFIG_TARGET_HI3516CV300_FAMILY),y)
+libs-y += drivers/ddr/hisilicon/$(SOC)/
 else ifeq ($(CONFIG_ARCH_BSP),y)
 # vendor DDR training lives in drivers/ddr/vendor/boot_adaptation
 else
@@ -1280,6 +1282,10 @@ UBOOT_TOPDIR  = $(srctree)
 else
 UBOOT_TOPDIR  = $(CURDIR)
 endif
+ifeq ($(CONFIG_TARGET_HI3516CV300_FAMILY),y)
+UBOOT_Z_TEXTBASE = TEXTBASE=$(shell printf '0x%x' $$(($(CONFIG_SYS_TEXT_BASE) - 0x100000)))
+endif
+
 .PHONY: u-boot-z.bin u-boot-z.prepare
 u-boot-z.bin: $(CURDIR)/u-boot.bin $(U_BOOT_Z_OUT)/.reg u-boot-z.prepare
 	make -C $(CURDIR)/$(_U_BOOT_Z_DIR) \
@@ -1289,6 +1295,7 @@ u-boot-z.bin: $(CURDIR)/u-boot.bin $(U_BOOT_Z_OUT)/.reg u-boot-z.prepare
 		BOOT_TOPDIR=$(UBOOT_TOPDIR) \
 		BOOT_OUTDIR=$(CURDIR) \
 		SOC=$(SOC) \
+		$(UBOOT_Z_TEXTBASE) \
 		all
 
 $(U_BOOT_Z_OUT)/.reg: $(CURDIR)/.reg
@@ -2572,7 +2579,7 @@ ddr_training_clean:
 		TOPDIR=$(srctree) BOOT_OUTDIR=$(CURDIR) clean
 	@if [ -f $(srctree)/drivers/ddr/vendor/boot_adaptation/uboot/cmd_bin/ddr_cmd.bin ]; \
 	then rm  $(srctree)/drivers/ddr/vendor/boot_adaptation/uboot/cmd_bin/ddr_cmd.bin; fi;
-else ifeq ($(or $(CONFIG_HI35XX_FAMILY_V500),$(CONFIG_TARGET_HI3516CV200_FAMILY)),y)
+else ifeq ($(or $(CONFIG_HI35XX_FAMILY_V500),$(CONFIG_TARGET_HI3516CV200_FAMILY),$(CONFIG_TARGET_HI3516CV300_FAMILY)),y)
 # Hisilicon keeps ddr_training_custom.* in the per-SoC dir and builds
 # the command binary from its own default/Makefile.
 ddr_training_prepare:

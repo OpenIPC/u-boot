@@ -289,10 +289,26 @@ int firmware_scan(void) {
   return 0;
 }
 
+#ifndef OPENIPC_RAM_MAX_SIZE
+#ifdef PHYS_SDRAM_1_SIZE
+#define OPENIPC_RAM_MAX_SIZE PHYS_SDRAM_1_SIZE
+#endif
+#endif
+
+#if defined(OPENIPC_RAM_MAX_SIZE) && defined(CONFIG_SYS_SDRAM_BASE)
+ulong openipc_ram_size(void)
+{
+  return get_ram_size((long *)CONFIG_SYS_SDRAM_BASE, OPENIPC_RAM_MAX_SIZE);
+}
+#endif
+
 int openipc_helper() {
   char msize[16];
+  printf("RAM size: %ldMB\n", gd->ram_size / 1024 / 1024);
   sprintf(msize, "%ldM", gd->ram_size / 1024 / 1024);
   env_set("totalmem", msize);
   firmware_recovery();
   firmware_scan();
+
+  return 0;
 }

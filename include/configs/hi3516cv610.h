@@ -25,6 +25,8 @@
 
 #define PHYS_SDRAM_1			0x40000000
 #define PHYS_SDRAM_1_SIZE		0x4000000
+/* RAM detection probe size (DDR up to 512MB) */
+#define OPENIPC_RAM_MAX_SIZE	0x20000000
 
 #define CONFIG_SYS_SDRAM_BASE		PHYS_SDRAM_1
 

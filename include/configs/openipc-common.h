@@ -51,6 +51,9 @@
 #if defined(CONFIG_TARGET_HI3516CV200_FAMILY)
 #define OPENIPC_BASEADDR 0x80008000
 #define OPENIPC_OSMEM "32M"
+#elif defined(CONFIG_TARGET_HI3516CV300_FAMILY)
+#define OPENIPC_BASEADDR 0x80008000
+#define OPENIPC_OSMEM "32M"
 #elif defined(CONFIG_HI35XX_FAMILY_V500)
 #define OPENIPC_BASEADDR 0x82000000
 #define OPENIPC_OSMEM "128M"
@@ -76,7 +79,7 @@
 /* Environment entries whose variables must be expanded lazily keep the
  * backslash; the others are expanded when the default environment is
  * imported. Keep the historical per-family forms. */
-#if defined(CONFIG_HI35XX_FAMILY_V500) || defined(CONFIG_TARGET_HI3516CV200_FAMILY)
+#if defined(CONFIG_HI35XX_FAMILY_V500) || defined(CONFIG_TARGET_HI3516CV200_FAMILY) || defined(CONFIG_TARGET_HI3516CV300_FAMILY)
 #define OPENIPC_BOOTARGSNFS "mem=\\${osmem} console=ttyAMA0,115200 panic=20 root=/dev/nfs rootfstype=nfs ip=${ipaddr}:::255.255.255.0::eth0 nfsroot=${serverip}:${nfsroot},v3,nolock rw \\${extras}"
 #define OPENIPC_NOR_MTDPARTS "\\${mtdids}:256k(boot),64k(env),2048k(kernel),5120k(rootfs),7168k@0x50000(firmware),-(rootfs_data)"
 #else
@@ -195,7 +198,8 @@
 #define CONFIG_SYS_INIT_RAM_ADDR 0x41700000
 #define CONFIG_SYS_INIT_RAM_SIZE 0x4000
 #elif !defined(CONFIG_HI35XX_FAMILY_V500) && \
-	!defined(CONFIG_TARGET_HI3516CV200_FAMILY)
+	!defined(CONFIG_TARGET_HI3516CV200_FAMILY) && \
+	!defined(CONFIG_TARGET_HI3516CV300_FAMILY)
 #define CONFIG_SYS_INIT_RAM_ADDR 0x04000000
 #define CONFIG_SYS_INIT_RAM_SIZE 0x14000
 #endif
@@ -220,7 +224,8 @@
 #endif
 
 #if defined(CONFIG_HI35XX_FAMILY_V500) || \
-	defined(CONFIG_TARGET_HI3516CV200_FAMILY)
+	defined(CONFIG_TARGET_HI3516CV200_FAMILY) || \
+	defined(CONFIG_TARGET_HI3516CV300_FAMILY)
 #define CONFIG_BOOTDELAY 1
 #endif
 

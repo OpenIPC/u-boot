@@ -824,7 +824,13 @@ int himciv200_mmc_init(int dev_num)
 
 int board_mmc_init(struct bd_info *bis)
 {
+#if defined(CONFIG_TARGET_HI3516CV300) || defined(CONFIG_TARGET_HI3516EV100)
+	himciv200_mmc_init(0);
+	himciv200_mmc_init(2);
+	return 0;
+#else
 	return himciv200_mmc_init(0);
+#endif
 }
 
 void check_ext_csd(struct mmc *mmc)

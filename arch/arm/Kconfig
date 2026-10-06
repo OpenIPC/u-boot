@@ -2205,6 +2205,20 @@ config TARGET_HI3518EV200
 	help
 	  Support for HiSilicon Hi3518EV200 platform.
 
+config TARGET_HI3516CV300
+	bool "Support HI3516CV300"
+	select CPU_ARM926EJS
+	select TARGET_HI3516CV300_FAMILY
+	help
+	  Support for HiSilicon Hi3516CV300 platform.
+
+config TARGET_HI3516EV100
+	bool "Support HI3516EV100"
+	select CPU_ARM926EJS
+	select TARGET_HI3516CV300_FAMILY
+	help
+	  Support for HiSilicon Hi3516EV100 platform.
+
 config ARCH_XMEDIA
 	bool "XMEDIA SoCs"
 	select DM
@@ -2212,6 +2226,9 @@ config ARCH_XMEDIA
 endchoice
 
 config TARGET_HI3516CV200_FAMILY
+	bool
+
+config TARGET_HI3516CV300_FAMILY
 	bool
 
 config HI35XX_FAMILY_V500
@@ -2460,6 +2477,7 @@ source "board/freescale/lx2160a/Kconfig"
 source "board/grinn/chiliboard/Kconfig"
 source "board/hisilicon/hi3516cv500/Kconfig"
 source "board/hisilicon/hi3518ev200/Kconfig"
+source "board/hisilicon/hi3516cv300/Kconfig"
 source "board/hisilicon/hi3516dv300/Kconfig"
 source "board/hisilicon/hi3516av300/Kconfig"
 source "board/hisilicon/hikey/Kconfig"

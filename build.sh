@@ -128,6 +128,23 @@ for soc in hi3516cv200 hi3518ev200; do
     cp ${BOOT_BUILDDIR}/u-boot-hi3518ev200.bin ${BOOT_BUILDDIR}/../u-boot-${soc}-nor.bin
 done
 
+# CV300 family (hi3516cv300 / hi3516ev100), ARM926EJS
+for soc in hi3516cv300 hi3516ev100; do
+    mkflags
+
+    rm -rf ${BOOT_BUILDDIR}
+    mkdir -p ${BOOT_BUILDDIR}/drivers/ddr/
+    cp -arf ${BOOT_SRCDIR}/drivers/ddr/hisilicon ${BOOT_BUILDDIR}/drivers/ddr/
+    cp openipc/${soc}_reginfo.bin ${BOOT_BUILDDIR}/.reg
+    cat ${BOOT_SRCDIR}/openipc/openipc_config > ${BOOT_BUILDDIR}/.config && \
+    cat ${BOOT_SRCDIR}/openipc/${soc}_config >> ${BOOT_BUILDDIR}/.config && \
+    echo "CONFIG_PRODUCT_SOC=\"${soc}\"" >> ${BOOT_BUILDDIR}/.config && \
+    make ${MAKE_OPTS} olddefconfig </dev/null >/dev/null && \
+    make ${MAKE_OPTS} KCFLAGS="-DVENDOR_HISILICON" BOOT_SRCDIR=${BOOT_SRCDIR} </dev/null && \
+    make ${MAKE_OPTS} u-boot-z.bin </dev/null && \
+    cp ${BOOT_BUILDDIR}/u-boot-hi3516cv300.bin ${BOOT_BUILDDIR}/../u-boot-${soc}-nor.bin
+done
+
 # Goke/XMedia family (gk7205v200 / gk7205v300 / gk7202v300 / gk7605v100)
 for soc in gk7201v200 gk7201v300 gk7205v200 gk7205v300 gk7202v300 gk7605v100; do
     mkflags

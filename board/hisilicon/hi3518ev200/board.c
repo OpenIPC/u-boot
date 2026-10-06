@@ -90,21 +90,9 @@ int board_init(void)
 	return 0;
 }
 
-void detect_memory(void)
-{
-	ulong tested_ram = get_ram_size((long *)PHYS_SDRAM_1,
-					PHYS_SDRAM_1_SIZE) / 1024 / 1024;
-	char msize[128];
-
-	printf("RAM size: %dMB\n", tested_ram);
-	sprintf(msize, "%dM", tested_ram);
-	env_set("totalmem", msize);
-}
-
 int misc_init_r(void)
 {
 	openipc_helper();
-	detect_memory();
 	env_set("verify", "n");
 
 	return 0;
@@ -113,9 +101,9 @@ int misc_init_r(void)
 int dram_init(void)
 {
 	DECLARE_GLOBAL_DATA_PTR;
-	gd->ram_size = PHYS_SDRAM_1_SIZE;
+	gd->ram_size = openipc_ram_size();
 	gd->bd->bi_dram[0].start = PHYS_SDRAM_1;
-	gd->bd->bi_dram[0].size = PHYS_SDRAM_1_SIZE;
+	gd->bd->bi_dram[0].size = gd->ram_size;
 
 	return 0;
 }
