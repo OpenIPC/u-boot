@@ -1,0 +1,15 @@
+if TARGET_HI3519V101
+
+config SYS_BOARD
+	default "hi3519v101"
+
+config SYS_VENDOR
+	default "hisilicon"
+
+config SYS_SOC
+	default "hi3519v101"
+
+config SYS_CONFIG_NAME
+	default "hi3519v101"
+
+endif

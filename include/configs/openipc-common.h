@@ -52,17 +52,14 @@
 #define UNCOMPRESSED_SIZE_OFFSET    0x4
 
 /* Per-family defaults */
-#if defined(CONFIG_TARGET_HI3516CV200_FAMILY)
-#define OPENIPC_BASEADDR 0x80008000
-#define OPENIPC_OSMEM "32M"
-#elif defined(CONFIG_TARGET_HI3516CV300_FAMILY)
-#define OPENIPC_BASEADDR 0x80008000
-#define OPENIPC_OSMEM "32M"
-#elif defined(CONFIG_TARGET_HI3518EV100_FAMILY) || \
+#if defined(CONFIG_TARGET_HI3516CV200_FAMILY) || \
+	defined(CONFIG_TARGET_HI3516CV300_FAMILY) || \
+	defined(CONFIG_TARGET_HI3518EV100_FAMILY) || \
 	defined(CONFIG_TARGET_HI3516AV100_FAMILY) || \
 	defined(CONFIG_TARGET_HI3536DV100_FAMILY) || \
 	defined(CONFIG_TARGET_HI3536CV100_FAMILY) || \
-	defined(CONFIG_TARGET_HI3520DV100_FAMILY)
+	defined(CONFIG_TARGET_HI3520DV100_FAMILY) || \
+	defined(CONFIG_TARGET_HI3519V101_FAMILY)
 #define OPENIPC_BASEADDR 0x82000000
 #define OPENIPC_OSMEM "32M"
 #elif defined(CONFIG_HI35XX_FAMILY_V500)
@@ -87,14 +84,7 @@
 #define OPENIPC_FW_FILE "firmware.${soc}"
 #endif
 
-/* Environment entries whose variables must be expanded lazily keep the
- * backslash; the others are expanded when the default environment is
- * imported. Keep the historical per-family forms. */
-#if defined(CONFIG_HI35XX_FAMILY_V500) || defined(CONFIG_TARGET_HI3516CV200_FAMILY) || defined(CONFIG_TARGET_HI3516CV300_FAMILY) || defined(CONFIG_TARGET_HI3518EV100_FAMILY) || defined(CONFIG_TARGET_HI3516AV100_FAMILY) || defined(CONFIG_TARGET_HI3536DV100_FAMILY) || defined(CONFIG_TARGET_HI3536CV100_FAMILY) || defined(CONFIG_TARGET_HI3520DV100_FAMILY)
 #define OPENIPC_BOOTARGSNFS "mem=\\${osmem} console=ttyAMA0,115200 panic=20 root=/dev/nfs rootfstype=nfs ip=${ipaddr}:::255.255.255.0::eth0 nfsroot=${serverip}:${nfsroot},v3,nolock rw \\${extras}"
-#else
-#define OPENIPC_BOOTARGSNFS "mem=\${osmem} console=ttyAMA0,115200 panic=20 root=/dev/nfs rootfstype=nfs ip=${ipaddr}:::255.255.255.0::eth0 nfsroot=${serverip}:${nfsroot},v3,nolock rw \${extras}"
-#endif
 
 /* NOR partition list; the runtime mtdparts value is this list, the bootargs
  * compose it as ${mtdids}:${mtdparts} (same as CV610). */
@@ -191,7 +181,7 @@
 	"sdcard=setenv updatetool fatload mmc 0\0" \
 	"updatetool=tftpboot\0" \
 	"nfsroot=/srv/nfs/" CONFIG_PRODUCT_SOC "\0" \
-	"bootargsnfs=mem=\${osmem} console=ttyAMA0,115200 panic=20 root=/dev/nfs rootfstype=nfs ip=${ipaddr}:::255.255.255.0::eth0 nfsroot=${serverip}:${nfsroot},v3,nolock rw \${extras}\0" \
+	"bootargsnfs=" OPENIPC_BOOTARGSNFS "\0" \
 	"bootargs=" CONFIG_BOOTARGS "\0" \
 	"bootnfs=setenv setargs setenv bootargs ${bootargsnfs}; run setargs; tftpboot ${baseaddr} uImage.${soc}; bootm ${baseaddr}\0" \
 	"osmem=" OPENIPC_OSMEM "\0" \
@@ -218,7 +208,8 @@
 	!defined(CONFIG_TARGET_HI3516AV100_FAMILY) && \
 	!defined(CONFIG_TARGET_HI3536DV100_FAMILY) && \
 	!defined(CONFIG_TARGET_HI3536CV100_FAMILY) && \
-	!defined(CONFIG_TARGET_HI3520DV100_FAMILY)
+	!defined(CONFIG_TARGET_HI3520DV100_FAMILY) && \
+	!defined(CONFIG_TARGET_HI3519V101_FAMILY)
 #define CONFIG_SYS_INIT_RAM_ADDR 0x04000000
 #define CONFIG_SYS_INIT_RAM_SIZE 0x14000
 #endif
@@ -249,7 +240,8 @@
 	defined(CONFIG_TARGET_HI3516AV100_FAMILY) || \
 	defined(CONFIG_TARGET_HI3536DV100_FAMILY) || \
 	defined(CONFIG_TARGET_HI3536CV100_FAMILY) || \
-	defined(CONFIG_TARGET_HI3520DV100_FAMILY)
+	defined(CONFIG_TARGET_HI3520DV100_FAMILY) || \
+	defined(CONFIG_TARGET_HI3519V101_FAMILY)
 #define CONFIG_BOOTDELAY 1
 #endif
 

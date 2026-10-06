@@ -145,6 +145,22 @@ for soc in hi3516cv300 hi3516ev100; do
     cp ${BOOT_BUILDDIR}/u-boot-hi3516cv300.bin ${BOOT_BUILDDIR}/../u-boot-${soc}-nor.bin
 done
 
+# Hi3519V101 family: mini-boot + reg_info splice
+for soc in hi3516av200 hi3519v101; do
+    mkflags
+
+    rm -rf ${BOOT_BUILDDIR}
+    mkdir -p ${BOOT_BUILDDIR}
+    cp openipc/${soc}_reginfo.bin ${BOOT_BUILDDIR}/.reg
+    cat ${BOOT_SRCDIR}/openipc/openipc_config > ${BOOT_BUILDDIR}/.config && \
+    cat ${BOOT_SRCDIR}/openipc/${soc}_config >> ${BOOT_BUILDDIR}/.config && \
+    echo "CONFIG_PRODUCT_SOC=\"${soc}\"" >> ${BOOT_BUILDDIR}/.config && \
+    make ${MAKE_OPTS} olddefconfig </dev/null >/dev/null && \
+    make ${MAKE_OPTS} KCFLAGS="-DVENDOR_HISILICON" BOOT_SRCDIR=${BOOT_SRCDIR} </dev/null && \
+    make ${MAKE_OPTS} u-boot-z.bin </dev/null && \
+    cp ${BOOT_BUILDDIR}/u-boot-${soc}.bin ${BOOT_BUILDDIR}/../u-boot-${soc}-nor.bin
+done
+
 # Hi3520 family (hi3515av100/hi3520av100/hi3520dv100/hi3520dv200)
 for soc in hi3515av100 hi3520av100 hi3520dv100 hi3520dv200; do
     mkflags
