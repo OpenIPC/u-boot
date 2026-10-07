@@ -52,6 +52,24 @@ static int check_squashfs(void *buf) {
 static int check_ubifs(void *buf) {
   return get_unaligned_le32(buf) == UBIFS_SB_MAGIC;
 }
+
+/* Check for the UBI marker without attaching: attaching an empty MTD
+ * would create a fresh UBI on flash. */
+static int ubi_marker_present(void) {
+  struct mtd_info *mtd = get_mtd_device_nm("ubi");
+  u8 buf[4];
+  size_t retlen;
+  int ret;
+
+  if (IS_ERR(mtd))
+    return 0;
+
+  ret = mtd_read(mtd, 0, sizeof(buf), &retlen, buf);
+  put_mtd_device(mtd);
+
+  return !ret && retlen == sizeof(buf) &&
+         get_unaligned_be32(buf) == UBI_EC_HDR_MAGIC;
+}
 #endif
 
 static int check_kernel(void *buf) {
@@ -235,6 +253,12 @@ static int recovery_write(const char *name, int type) {
     return -1;
   }
 
+  /* Attach only now that there is something to write */
+  if (ubi_part("ubi", NULL)) {
+    printf("Recovery: cannot attach UBI\n");
+    return -1;
+  }
+
   if (type == RECOVERY_ROOTFS) {
     ret = recovery_ensure_volume("rootfs", "0");
     if (ret) {
@@ -355,11 +379,6 @@ int firmware_recovery(void) {
                                    CONFIG_SF_DEFAULT_MODE);
   if (!recovery_flash)
     return -1;
-#else
-  if (ubi_part("ubi", NULL)) {
-    printf("Recovery: cannot attach UBI\n");
-    return -1;
-  }
 #endif
 
 #ifdef CONFIG_MMC
@@ -395,6 +414,13 @@ int firmware_scan(void) {
   int ret;
 
   printf("Checking UBI firmware...\n");
+
+  /* Only attach when the UBI actually exists, so we never create one */
+  if (!ubi_marker_present()) {
+    printf("Firmware is absent/corrupt (no UBI)\n");
+    env_set("bootfail", "1");
+    return 0;
+  }
 
   if (ubi_part("ubi", NULL)) {
     printf("Firmware is absent/corrupt (cannot attach UBI)\n");
