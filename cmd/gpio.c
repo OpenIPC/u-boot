@@ -17,6 +17,9 @@
 #endif
 #include <asm/gpio.h>
 #include <linux/err.h>
+#ifdef CONFIG_HI_GPIO
+#include <hi_padmux.h>
+#endif
 
 __weak int name_to_gpio(const char *name)
 {
@@ -134,6 +137,9 @@ static int do_gpio(struct cmd_tbl *cmdtp, int flag, int argc,
 #ifdef CONFIG_CMD_GPIO_READ
 	const char *str_var = NULL;
 #endif
+#ifdef CONFIG_HI_GPIO
+	const char *str_func = NULL;
+#endif
 	int ret;
 #ifdef CONFIG_DM_GPIO
 	bool all = false;
@@ -159,6 +165,31 @@ static int do_gpio(struct cmd_tbl *cmdtp, int flag, int argc,
 		str_var = *argv;
 		argc--;
 		argv++;
+	}
+#endif
+#ifdef CONFIG_HI_GPIO
+	if (!strncmp(str_cmd, "mux", 3)) {
+		if (argc < 1)
+			goto show_usage;
+		str_gpio = argv[0];
+		if (argc > 1)
+			str_func = argv[1];
+		gpio = name_to_gpio(str_gpio);
+		if (gpio < 0)
+			goto show_usage;
+		if (str_func) {
+			ret = hi_padmux_set_func(gpio, str_func);
+			if (ret) {
+				printf("padmux: cannot set '%s' on GPIO%d_%d (%d)\n",
+				       str_func, gpio / 8, gpio % 8, ret);
+				return CMD_RET_FAILURE;
+			}
+			printf("padmux: GPIO%d_%d -> %s\n", gpio / 8,
+			       gpio % 8, str_func);
+		} else {
+			hi_padmux_show(gpio);
+		}
+		return CMD_RET_SUCCESS;
 	}
 #endif
 	if (argc > 0)
@@ -253,18 +284,29 @@ static int do_gpio(struct cmd_tbl *cmdtp, int flag, int argc,
 		}
 		gpio_direction_output(gpio, value);
 	}
-	printf("gpio: pin %s (gpio %u) value is ", str_gpio, gpio);
-
 	if (IS_ERR_VALUE(value)) {
-		printf("unknown (ret=%d)\n", value);
+		printf("gpio: pin %s (gpio %u) value is unknown (ret=%d)\n",
+		       str_gpio, gpio, value);
 		goto err;
-	} else {
-		printf("%d\n", value);
-#ifdef CONFIG_CMD_GPIO_READ
-		if (sub_cmd == GPIOC_READ)
-			env_set_ulong(str_var, (ulong)value);
-#endif
 	}
+
+	/*
+	 * `gpio set/clear/toggle` are script primitives: they stay quiet on
+	 * success and answer with their exit status. Only the commands that
+	 * exist to report a level print one.
+	 */
+	if (sub_cmd == GPIOC_INPUT
+#ifdef CONFIG_CMD_GPIO_READ
+			|| sub_cmd == GPIOC_READ
+#endif
+			)
+		printf("gpio: pin %s (gpio %u) value is %d\n",
+		       str_gpio, gpio, value);
+
+#ifdef CONFIG_CMD_GPIO_READ
+	if (sub_cmd == GPIOC_READ)
+		env_set_ulong(str_var, (ulong)value);
+#endif
 
 	if (sub_cmd != GPIOC_INPUT && !IS_ERR_VALUE(value)
 #ifdef CONFIG_CMD_GPIO_READ
@@ -302,6 +344,10 @@ U_BOOT_CMD(gpio, 4, 0, do_gpio,
 	   "query and control gpio pins",
 	   "<input|set|clear|toggle> <pin>\n"
 	   "    - input/set/clear/toggle the specified pin\n"
+#ifdef CONFIG_HI_GPIO
+	   "gpio mux <pin> [function]\n"
+	   "    - show or set the pad's mux function\n"
+#endif
 #ifdef CONFIG_CMD_GPIO_READ
 	   "gpio read <name> <pin>\n"
 	   "    - set environment variable 'name' to the specified pin\n"

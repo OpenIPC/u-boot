@@ -269,6 +269,15 @@ config MSM_GPIO
 	  - APQ8016
 	  - MSM8916
 
+config HI_GPIO
+	bool "Hisilicon/XMedia GPIO driver"
+	depends on !DM_GPIO
+	help
+	  Legacy GPIO driver for HiSilicon/Goke SoCs. The controllers are
+	  PL061-compatible (8 lines per bank, data at 0x000, direction at
+	  0x400) and every access puts the pad back into GPIO mode using
+	  pad-mux tables ported from OpenIPC ipctool.
+
 config MXC_GPIO
 	bool "Freescale/NXP MXC GPIO driver"
 	help

@@ -198,16 +198,17 @@
 #define UART2_REG_BASE          0x11042000
 
 /* -------------------------------------------------------------------- */
-#define GPIO0_REG_BASE          0x120B0000
-#define GPIO1_REG_BASE          0x120B1000
-#define GPIO2_REG_BASE          0x120B2000
-#define GPIO3_REG_BASE          0x120B3000
-#define GPIO4_REG_BASE          0x120B4000
-#define GPIO5_REG_BASE          0x120B5000
-#define GPIO6_REG_BASE          0x120B6000
-#define GPIO7_REG_BASE          0x120B7000
-#define GPIO8_REG_BASE          0x120B8000
-#define GPIO9_REG_BASE          0x120B9000
+#define GPIO0_REG_BASE          0x11090000
+#define GPIO1_REG_BASE          0x11091000
+#define GPIO2_REG_BASE          0x11092000
+#define GPIO3_REG_BASE          0x11093000
+#define GPIO4_REG_BASE          0x11094000
+#define GPIO5_REG_BASE          0x11095000
+#define GPIO6_REG_BASE          0x11096000
+#define GPIO7_REG_BASE          0x11097000
+#define GPIO8_REG_BASE          0x11098000
+#define GPIO9_REG_BASE          0x11099000
+#define GPIO10_REG_BASE         0x1109A000
 
 #define FMC_MEM_BASE            0x0F000000
 #define FMC_TEXT_ADRS           FMC_MEM_BASE

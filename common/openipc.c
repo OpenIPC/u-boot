@@ -574,17 +574,29 @@ static int env_crc_is_blank(void) {
 
 #if defined(CONFIG_ENV_IS_IN_SPI_FLASH)
   struct spi_flash *flash;
+  u8 *buf;
 
   flash = spi_flash_probe(CONFIG_SF_DEFAULT_BUS, CONFIG_SF_DEFAULT_CS,
                           CONFIG_SF_DEFAULT_SPEED, CONFIG_SF_DEFAULT_MODE);
   if (!flash)
     return 0;
 
-  if (spi_flash_read(flash, CONFIG_ENV_OFFSET, sizeof(crc), &crc)) {
+  /* Cache-aligned: the DMA path invalidates cache lines around the
+   * buffer and a plain malloc buffer can share lines with heap metadata */
+  buf = malloc_cache_aligned(CONFIG_ENV_SIZE);
+  if (!buf) {
     spi_flash_free(flash);
     return 0;
   }
 
+  if (spi_flash_read(flash, CONFIG_ENV_OFFSET, CONFIG_ENV_SIZE, buf)) {
+    free(buf);
+    spi_flash_free(flash);
+    return 0;
+  }
+
+  memcpy(&crc, buf, sizeof(crc));
+  free(buf);
   spi_flash_free(flash);
 #elif defined(CONFIG_ENV_IS_IN_NAND)
   struct mtd_info *mtd = get_nand_dev_by_index(0);
