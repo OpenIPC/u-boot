@@ -1,5 +1,6 @@
 #include <asm/byteorder.h>
 #include <asm/unaligned.h>
+#include <command.h>
 #include <common.h>
 #include <env.h>
 #include <fs.h>
@@ -20,7 +21,6 @@
 #include <nand.h>
 #endif
 #ifdef CONFIG_FMC_SPI_NAND
-#include <command.h>
 #include <linux/err.h>
 #include <linux/mtd/ubi.h>
 #include <mtd.h>
@@ -56,11 +56,14 @@ static int check_ubifs(void *buf) {
 /* Check for the UBI marker without attaching: attaching an empty MTD
  * would create a fresh UBI on flash. */
 static int ubi_marker_present(void) {
-  struct mtd_info *mtd = get_mtd_device_nm("ubi");
+  struct mtd_info *mtd;
   u8 buf[4];
   size_t retlen;
   int ret;
 
+  /* Register the mtdparts partitions before looking one up by name */
+  mtd_probe_devices();
+  mtd = get_mtd_device_nm("ubi");
   if (IS_ERR(mtd))
     return 0;
 
@@ -341,9 +344,49 @@ static int recovery_write(const char *name, int type) {
 }
 #endif
 
+/* If a script.txt is present on the medium, execute it (uImage script or
+ * plain text) instead of searching for kernel/rootfs images. */
+static int recovery_run_script(const char *name) {
+  loff_t size, actread;
+  int ret;
+  char cmd[32];
+
+  if (!fs_exists(name))
+    return 0;
+
+  ret = fs_size(name, &size);
+  if (ret || size == 0) {
+    printf("Recovery: failed to stat %s\n", name);
+    return 1;
+  }
+
+  ret = fs_read(name, CONFIG_SYS_LOAD_ADDR, 0, size, &actread);
+  if (ret || actread != size) {
+    printf("Recovery: failed to read %s\n", name);
+    return 1;
+  }
+
+  if (image_check_magic((void *)CONFIG_SYS_LOAD_ADDR)) {
+    /* uImage-wrapped script (mkimage -A arm -T script -d ...) */
+    sprintf(cmd, "source 0x%lx", (ulong)CONFIG_SYS_LOAD_ADDR);
+    ret = run_command(cmd, 0);
+  } else {
+    /* Plain text script */
+    ret = run_command_list((char *)CONFIG_SYS_LOAD_ADDR, size, 0);
+  }
+
+  printf("Recovery: executed %s (%lld bytes)\n", name, size);
+
+  return 1;
+}
+
 static int recovery_try(void) {
   char name[64];
   int ret, found = 0;
+
+  /* script.txt takes precedence over the kernel/rootfs search */
+  if (recovery_run_script("script.txt"))
+    return 1;
 
   /* Kernel: uImage preferred, FIT fallback (creates the kernel volume) */
   sprintf(name, "uImage.%s.img", CONFIG_PRODUCT_SOC);
