@@ -8,6 +8,7 @@
 #include <malloc.h>
 #include <memalign.h>
 #include <spi.h>
+#include <vsprintf.h>
 #include <spi_flash.h>
 #ifdef CONFIG_USB
 #include <usb.h>
@@ -15,7 +16,15 @@
 #ifdef CONFIG_MMC
 #include <mmc.h>
 #endif
+#ifdef CONFIG_ENV_IS_IN_NAND
+#include <nand.h>
+#endif
 #ifdef CONFIG_FMC_SPI_NAND
+#include <command.h>
+#include <linux/err.h>
+#include <linux/mtd/ubi.h>
+#include <mtd.h>
+#include <mtd/ubi-user.h>
 #include <ubi_uboot.h>
 #endif
 
@@ -36,6 +45,14 @@ static int check_squashfs(void *buf) {
     return 1;
   return 0;
 }
+
+#ifdef CONFIG_FMC_SPI_NAND
+#define UBIFS_SB_MAGIC 0x06101831
+
+static int check_ubifs(void *buf) {
+  return get_unaligned_le32(buf) == UBIFS_SB_MAGIC;
+}
+#endif
 
 static int check_kernel(void *buf) {
   struct image_header *hdr = (struct image_header *)buf;
@@ -147,6 +164,9 @@ static int scan_spi_device(struct spi_flash *flash, ulong *kernel_off, ulong *ro
 #endif /* !CONFIG_FMC_SPI_NAND */
 
 #if (defined(CONFIG_MMC) || defined(CONFIG_USB_STORAGE)) && defined(CONFIG_FS_FAT)
+#define RECOVERY_KERNEL 0
+#define RECOVERY_ROOTFS 1
+
 static int recovery_mount(const char *ifname) {
   if (!fs_set_blk_dev(ifname, "0:1", FS_TYPE_FAT))
     return 0;
@@ -156,9 +176,23 @@ static int recovery_mount(const char *ifname) {
 }
 
 #ifdef CONFIG_FMC_SPI_NAND
-static const char *recovery_vol[] = { "kernel", "rootfs" };
+static int recovery_ensure_volume(const char *name, const char *size) {
+  struct ubi_volume_desc *desc;
+  char cmd[64];
 
-static int recovery_write(const char *name, const char *volume) {
+  desc = ubi_open_volume_nm(0, name, UBI_READONLY);
+  if (!IS_ERR(desc)) {
+    ubi_close_volume(desc);
+    return 0;
+  }
+
+  printf("Recovery: creating volume %s\n", name);
+  snprintf(cmd, sizeof(cmd), "ubi create %s %s d", name, size);
+
+  return run_command(cmd, 0);
+}
+
+static int recovery_write(const char *name, int type) {
   struct image_header hdr;
   loff_t actread;
   ulong size;
@@ -167,13 +201,33 @@ static int recovery_write(const char *name, const char *volume) {
   if (!fs_exists(name))
     return 0;
 
-  ret = fs_read(name, (ulong)&hdr, 0, sizeof(hdr), &actread);
-  if (ret || actread != sizeof(hdr) || !image_check_magic(&hdr)) {
-    printf("Recovery: no valid uImage header in %s\n", name);
-    return -1;
-  }
+  if (type == RECOVERY_ROOTFS) {
+    /* Raw ubifs image, written into the rootfs volume */
+    loff_t fsize;
 
-  size = sizeof(hdr) + image_get_data_size(&hdr);
+    ret = fs_size(name, &fsize);
+    if (ret || fsize == 0) {
+      printf("Recovery: failed to stat %s\n", name);
+      return -1;
+    }
+    size = fsize;
+  } else {
+    /* Kernel: uImage or FIT, written to the kernel volume */
+    ret = fs_read(name, (ulong)&hdr, 0, sizeof(hdr), &actread);
+    if (ret || actread != sizeof(hdr)) {
+      printf("Recovery: failed to read %s\n", name);
+      return -1;
+    }
+
+    if (image_check_magic(&hdr)) {
+      size = sizeof(hdr) + image_get_data_size(&hdr);
+    } else if (fdt_magic(&hdr) == FDT_MAGIC && fdt_check_header(&hdr) == 0) {
+      size = fdt_totalsize(&hdr);
+    } else {
+      printf("Recovery: no valid uImage/FIT header in %s\n", name);
+      return -1;
+    }
+  }
 
   ret = fs_read(name, CONFIG_SYS_LOAD_ADDR, 0, size, &actread);
   if (ret || actread != size) {
@@ -181,20 +235,42 @@ static int recovery_write(const char *name, const char *volume) {
     return -1;
   }
 
-  ret = ubi_volume_write((char *)volume, (void *)CONFIG_SYS_LOAD_ADDR, size);
-  if (ret) {
-    printf("Recovery: failed to write volume %s (%d)\n", volume, ret);
-    return -1;
-  }
+  if (type == RECOVERY_ROOTFS) {
+    ret = recovery_ensure_volume("rootfs", "0");
+    if (ret) {
+      printf("Recovery: cannot create rootfs volume (%d)\n", ret);
+      return -1;
+    }
 
-  printf("Recovery: wrote %s (%lu bytes) to volume %s\n", name, size, volume);
+    ret = ubi_volume_write("rootfs", (void *)CONFIG_SYS_LOAD_ADDR, size);
+    if (ret) {
+      printf("Recovery: failed to write rootfs volume (%d)\n", ret);
+      return -1;
+    }
+
+    printf("Recovery: wrote %s (%lu bytes) to rootfs volume\n", name, size);
+  } else {
+    ret = recovery_ensure_volume("kernel", "0x400000");
+    if (ret) {
+      printf("Recovery: cannot create kernel volume (%d)\n", ret);
+      return -1;
+    }
+
+    ret = ubi_volume_write("kernel", (void *)CONFIG_SYS_LOAD_ADDR, size);
+    if (ret) {
+      printf("Recovery: failed to write kernel volume (%d)\n", ret);
+      return -1;
+    }
+
+    printf("Recovery: wrote %s (%lu bytes) to kernel volume\n", name, size);
+  }
 
   return 1;
 }
 #else
 static struct spi_flash *recovery_flash;
 
-static int recovery_write(const char *name) {
+static int recovery_write(const char *name, int type) {
   struct image_header hdr;
   loff_t actread;
   ulong addr, size, erase_len;
@@ -204,13 +280,24 @@ static int recovery_write(const char *name) {
     return 0;
 
   ret = fs_read(name, (ulong)&hdr, 0, sizeof(hdr), &actread);
-  if (ret || actread != sizeof(hdr) || !image_check_magic(&hdr)) {
-    printf("Recovery: no valid uImage header in %s\n", name);
+  if (ret || actread != sizeof(hdr)) {
+    printf("Recovery: failed to read %s\n", name);
     return -1;
   }
 
-  addr = image_get_load(&hdr);
-  size = sizeof(hdr) + image_get_data_size(&hdr);
+  if (image_check_magic(&hdr)) {
+    addr = image_get_load(&hdr);
+    size = sizeof(hdr) + image_get_data_size(&hdr);
+  } else if (type == RECOVERY_KERNEL && fdt_magic(&hdr) == FDT_MAGIC &&
+             fdt_check_header(&hdr) == 0) {
+    const char *str = env_get("kernaddr");
+
+    addr = str ? hextoul(str, NULL) : CONFIG_ENV_KERNADDR;
+    size = fdt_totalsize(&hdr);
+  } else {
+    printf("Recovery: no valid uImage/FIT header in %s\n", name);
+    return -1;
+  }
 
   ret = fs_read(name, CONFIG_SYS_LOAD_ADDR, 0, size, &actread);
   if (ret || actread != size) {
@@ -232,19 +319,29 @@ static int recovery_write(const char *name) {
 
 static int recovery_try(void) {
   char name[64];
-  int i, ret, found = 0;
-  static const char *fmt[] = { "uImage.%s.img", "rootfs.squashfs.%s.img" };
+  int ret, found = 0;
 
-  for (i = 0; i < 2; i++) {
-    sprintf(name, fmt[i], CONFIG_PRODUCT_SOC);
-#ifdef CONFIG_FMC_SPI_NAND
-    ret = recovery_write(name, recovery_vol[i]);
-#else
-    ret = recovery_write(name);
-#endif
+  /* Kernel: uImage preferred, FIT fallback (creates the kernel volume) */
+  sprintf(name, "uImage.%s.img", CONFIG_PRODUCT_SOC);
+  ret = recovery_write(name, RECOVERY_KERNEL);
+  if (ret > 0) {
+    found = 1;
+  } else if (ret == 0) {
+    sprintf(name, "fitImage.%s.img", CONFIG_PRODUCT_SOC);
+    ret = recovery_write(name, RECOVERY_KERNEL);
     if (ret > 0)
       found = 1;
   }
+
+  /* Rootfs (creates its volume with the remaining space) */
+#ifdef CONFIG_FMC_SPI_NAND
+  sprintf(name, "rootfs.ubifs.%s.img", CONFIG_PRODUCT_SOC);
+#else
+  sprintf(name, "rootfs.squashfs.%s.img", CONFIG_PRODUCT_SOC);
+#endif
+  ret = recovery_write(name, RECOVERY_ROOTFS);
+  if (ret > 0)
+    found = 1;
 
   return found;
 }
@@ -313,7 +410,7 @@ int firmware_scan(void) {
   }
 
   ret = ubi_volume_read("rootfs", (char *)buf, sizeof(buf));
-  if (ret || !check_squashfs(buf)) {
+  if (ret || !(check_ubifs(buf) || check_squashfs(buf))) {
     printf("Firmware is absent/corrupt (rootfs volume)\n");
     env_set("bootfail", "1");
     return 0;
@@ -401,12 +498,57 @@ ulong openipc_ram_size(void)
 }
 #endif
 
+/* Check whether the device environment area is still blank (donor-style
+ * CRC check): only then it is safe to write the default environment. */
+static int env_crc_is_blank(void) {
+  u32 crc;
+
+#if defined(CONFIG_ENV_IS_IN_SPI_FLASH)
+  struct spi_flash *flash;
+
+  flash = spi_flash_probe(CONFIG_SF_DEFAULT_BUS, CONFIG_SF_DEFAULT_CS,
+                          CONFIG_SF_DEFAULT_SPEED, CONFIG_SF_DEFAULT_MODE);
+  if (!flash)
+    return 0;
+
+  if (spi_flash_read(flash, CONFIG_ENV_OFFSET, sizeof(crc), &crc)) {
+    spi_flash_free(flash);
+    return 0;
+  }
+
+  spi_flash_free(flash);
+#elif defined(CONFIG_ENV_IS_IN_NAND)
+  struct mtd_info *mtd = get_nand_dev_by_index(0);
+  size_t len = sizeof(crc);
+
+  if (!mtd)
+    return 0;
+
+  if (nand_read_skip_bad(mtd, CONFIG_ENV_OFFSET, &len, NULL, mtd->size,
+                         (u_char *)&crc))
+    return 0;
+
+  if (len != sizeof(crc))
+    return 0;
+#else
+  return 0;
+#endif
+
+  return crc == 0xffffffff;
+}
+
 int openipc_helper(void) {
   char msize[16];
   sprintf(msize, "%ldM", gd->ram_size / 1024 / 1024);
   env_set("totalmem", msize);
   firmware_recovery();
   firmware_scan();
+
+  /* Persist the default environment on first start (or after a bad env);
+   * only if the device env area is still blank so we never overwrite
+   * foreign data (e.g. a RAM-booted U-Boot on another device). */
+  if ((gd->flags & GD_FLG_ENV_DEFAULT) && env_crc_is_blank())
+    env_save();
 
   return 0;
 }

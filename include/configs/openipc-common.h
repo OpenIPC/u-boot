@@ -99,15 +99,6 @@
 /* NAND partition list; composed the same way. */
 #define OPENIPC_NAND_MTDPARTS "768k(boot),256k(env),-(ubi)"
 
-/* Automatic recovery: CV610 writes a single firmware blob, all other
- * targets write the split kernel/rootfs images. */
-#ifdef CONFIG_TARGET_HI3516CV610_FAMILY
-#define OPENIPC_FWUPD \
-	"fwupd=${source} ${baseaddr} " OPENIPC_FW_FILE " && run fwwrite\0"
-#else
-#define OPENIPC_FWUPD "fwupd=run ur; run uk\0"
-#endif
-
 /* Environment shared by all boot media: identity, network boot, update
  * source selection and the medium-agnostic update commands. The selected
  * medium provides ubfile/ubwrite/ukwrite/urwrite/loadkernel/mtdids/
@@ -128,8 +119,8 @@
 	"srcmmc=setenv source fatload mmc 0\0" \
 	"srcusb=usb start; setenv source fatload usb 0\0" \
 	"ub=${source} ${baseaddr} ${ubfile} && run ubwrite\0" \
-	"uk=${source} ${baseaddr} uImage.${soc} && run ukwrite\0" \
-	"ur=${source} ${baseaddr} rootfs.squashfs.${soc} && run urwrite\0" \
+	"uk=if ${source} ${baseaddr} uImage.${soc}; then run ukwrite; elif ${source} ${baseaddr} fitImage.${soc}; then run ukwrite; fi\0" \
+	"ur=${source} ${baseaddr} ${urfile} && run urwrite\0" \
 	OPENIPC_FWUPD \
 	"fwrecovery=if env exists bootfail; then run fwupd; sleep 5; reset; fi\0" \
 	"bootflash=run fwrecovery; setenv setargs setenv bootargs ${bootargs}; run setargs; run loadkernel; bootm ${baseaddr}; reset\0"
@@ -146,8 +137,18 @@
 
 #define CONFIG_BOOTARGS "mem=\\${osmem} console=ttyAMA0,115200 panic=20 root=/dev/mtdblock3 rootfstype=squashfs init=/init mtdparts=\\${mtdids}:\\${mtds} \\${extras}"
 
+/* Recovery: CV610 writes a single firmware blob, the others split images;
+ * the rootfs is fetched first so its size selects the NOR schema. */
+#ifdef CONFIG_TARGET_HI3516CV610_FAMILY
+#define OPENIPC_FWUPD \
+	"fwupd=${source} ${baseaddr} " OPENIPC_FW_FILE " && run fwwrite\0"
+#else
+#define OPENIPC_FWUPD "fwupd=run ur; run uk\0"
+#endif
+
 #define OPENIPC_ENV_MEDIUM \
-	"ubfile=u-boot-${soc}-nor.bin\0" \
+	"ubfile=u-boot-" CONFIG_PRODUCT_SOC "-nor.bin\0" \
+	"urfile=rootfs.squashfs." CONFIG_PRODUCT_SOC "\0" \
 	"kernaddr=" __stringify(CONFIG_ENV_KERNADDR) "\0" \
 	"kernsize=" __stringify(CONFIG_ENV_KERNSIZE) "\0" \
 	"rootaddr=" __stringify(CONFIG_ENV_ROOTADDR) "\0" \
@@ -174,6 +175,9 @@
 #define SFC "nand"
 #endif
 
+/* NAND releases may ship a FIT kernel (fitImage.${soc}) */
+#define CONFIG_FIT 1
+
 /* Environment lives in the NAND 'env' partition */
 #undef CONFIG_ENV_OFFSET
 #undef CONFIG_ENV_SIZE
@@ -182,13 +186,18 @@
 #define CONFIG_ENV_SIZE 0x40000
 #define CONFIG_ENV_SECT_SIZE 0x20000
 
-#define CONFIG_BOOTARGS "mem=\\${osmem} console=ttyAMA0,115200 panic=20 init=/init root=/dev/ubiblock0_1 ubi.mtd=2,2048 ubi.block=0,1 mtdparts=\\${mtdids}:\\${mtds} \\${extras}"
+#define CONFIG_BOOTARGS "mem=\\${osmem} console=ttyAMA0,115200 panic=20 init=/init root=ubi0:rootfs rootfstype=ubifs ubi.mtd=2,2048 mtdparts=\\${mtdids}:\\${mtds} \\${extras}"
+
+/* Recovery: create the volumes manually; kernel first so the rootfs
+ * volume can take all the remaining space. */
+#define OPENIPC_FWUPD "fwupd=run uk; run ur\0"
 
 #define OPENIPC_ENV_MEDIUM \
-	"ubfile=u-boot-${soc}-nand.bin\0" \
+	"ubfile=u-boot-" CONFIG_PRODUCT_SOC "-nand.bin\0" \
+	"urfile=rootfs.ubifs." CONFIG_PRODUCT_SOC "\0" \
 	"ubwrite=nand erase 0x0 0xc0000; nand write ${baseaddr} 0x0 ${filesize}\0" \
-	"ukwrite=ubi part ubi; ubi write ${baseaddr} kernel ${filesize}\0" \
-	"urwrite=ubi part ubi; ubi write ${baseaddr} rootfs ${filesize}\0" \
+	"ukwrite=ubi part ubi; ubi create kernel 0x400000 d; ubi write ${baseaddr} kernel ${filesize}\0" \
+	"urwrite=ubi part ubi; ubi create rootfs 0 d; ubi write ${baseaddr} rootfs ${filesize}\0" \
 	"loadkernel=ubi part ubi; ubi read ${baseaddr} kernel\0" \
 	"mtdids=nand0=" SFC "\0" \
 	"mtds=" OPENIPC_NAND_MTDPARTS "\0" \
