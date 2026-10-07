@@ -15,6 +15,9 @@
 #ifdef CONFIG_MMC
 #include <mmc.h>
 #endif
+#ifdef CONFIG_FMC_SPI_NAND
+#include <ubi_uboot.h>
+#endif
 
 #define SCAN_FROM CONFIG_ENV_OFFSET + CONFIG_ENV_SIZE
 #define SCAN_STEP 0x10000
@@ -34,19 +37,6 @@ static int check_squashfs(void *buf) {
   return 0;
 }
 
-static uint64_t get_squashfs_size(void *buf) {
-  uint32_t magic = get_unaligned_be32(buf);
-  uint64_t size;
-
-  if (magic == SQSH_MAGIC_BE) {
-    size = get_unaligned_be64((u8 *)buf + SQSH_SIZE_OFF);
-  } else {
-    size = get_unaligned_le64((u8 *)buf + SQSH_SIZE_OFF);
-  }
-
-  return size;
-}
-
 static int check_kernel(void *buf) {
   struct image_header *hdr = (struct image_header *)buf;
   if (image_check_magic(hdr)) {
@@ -60,6 +50,21 @@ static int check_kernel(void *buf) {
   }
 
   return 0;
+}
+
+#ifndef CONFIG_FMC_SPI_NAND
+
+static uint64_t get_squashfs_size(void *buf) {
+  uint32_t magic = get_unaligned_be32(buf);
+  uint64_t size;
+
+  if (magic == SQSH_MAGIC_BE) {
+    size = get_unaligned_be64((u8 *)buf + SQSH_SIZE_OFF);
+  } else {
+    size = get_unaligned_le64((u8 *)buf + SQSH_SIZE_OFF);
+  }
+
+  return size;
 }
 
 static int check_rootfs(void *buf, uint64_t *rootfs_size) {
@@ -139,7 +144,54 @@ static int scan_spi_device(struct spi_flash *flash, ulong *kernel_off, ulong *ro
   return 0;
 }
 
+#endif /* !CONFIG_FMC_SPI_NAND */
+
 #if (defined(CONFIG_MMC) || defined(CONFIG_USB_STORAGE)) && defined(CONFIG_FS_FAT)
+static int recovery_mount(const char *ifname) {
+  if (!fs_set_blk_dev(ifname, "0:1", FS_TYPE_FAT))
+    return 0;
+  if (!fs_set_blk_dev(ifname, "0", FS_TYPE_FAT))
+    return 0;
+  return -1;
+}
+
+#ifdef CONFIG_FMC_SPI_NAND
+static const char *recovery_vol[] = { "kernel", "rootfs" };
+
+static int recovery_write(const char *name, const char *volume) {
+  struct image_header hdr;
+  loff_t actread;
+  ulong size;
+  int ret;
+
+  if (!fs_exists(name))
+    return 0;
+
+  ret = fs_read(name, (ulong)&hdr, 0, sizeof(hdr), &actread);
+  if (ret || actread != sizeof(hdr) || !image_check_magic(&hdr)) {
+    printf("Recovery: no valid uImage header in %s\n", name);
+    return -1;
+  }
+
+  size = sizeof(hdr) + image_get_data_size(&hdr);
+
+  ret = fs_read(name, CONFIG_SYS_LOAD_ADDR, 0, size, &actread);
+  if (ret || actread != size) {
+    printf("Recovery: failed to read %s\n", name);
+    return -1;
+  }
+
+  ret = ubi_volume_write((char *)volume, (void *)CONFIG_SYS_LOAD_ADDR, size);
+  if (ret) {
+    printf("Recovery: failed to write volume %s (%d)\n", volume, ret);
+    return -1;
+  }
+
+  printf("Recovery: wrote %s (%lu bytes) to volume %s\n", name, size, volume);
+
+  return 1;
+}
+#else
 static struct spi_flash *recovery_flash;
 
 static int recovery_write(const char *name) {
@@ -176,58 +228,61 @@ static int recovery_write(const char *name) {
 
   return 1;
 }
+#endif
 
-static int recovery_mount(const char *ifname) {
-  if (!fs_set_blk_dev(ifname, "0:1", FS_TYPE_FAT))
-    return 0;
-  if (!fs_set_blk_dev(ifname, "0", FS_TYPE_FAT))
-    return 0;
-  return -1;
-}
-
-int firmware_recovery(void) {
+static int recovery_try(void) {
   char name[64];
   int i, ret, found = 0;
   static const char *fmt[] = { "uImage.%s.img", "rootfs.squashfs.%s.img" };
 
+  for (i = 0; i < 2; i++) {
+    sprintf(name, fmt[i], CONFIG_PRODUCT_SOC);
+#ifdef CONFIG_FMC_SPI_NAND
+    ret = recovery_write(name, recovery_vol[i]);
+#else
+    ret = recovery_write(name);
+#endif
+    if (ret > 0)
+      found = 1;
+  }
+
+  return found;
+}
+
+int firmware_recovery(void) {
+  int found = 0;
+
+#ifndef CONFIG_FMC_SPI_NAND
   recovery_flash = spi_flash_probe(CONFIG_SF_DEFAULT_BUS, CONFIG_SF_DEFAULT_CS,
                                    CONFIG_SF_DEFAULT_SPEED,
                                    CONFIG_SF_DEFAULT_MODE);
   if (!recovery_flash)
     return -1;
+#else
+  if (ubi_part("ubi", NULL)) {
+    printf("Recovery: cannot attach UBI\n");
+    return -1;
+  }
+#endif
 
 #ifdef CONFIG_MMC
 	{
 		struct mmc *mmc = find_mmc_device(0);
 
-		if (mmc && !mmc_init(mmc)) {
-			if (!recovery_mount("mmc")) {
-				for (i = 0; i < 2; i++) {
-					sprintf(name, fmt[i], CONFIG_PRODUCT_SOC);
-					ret = recovery_write(name);
-					if (ret > 0)
-						found = 1;
-				}
-			}
-		}
+		if (mmc && !mmc_init(mmc) && !recovery_mount("mmc"))
+			found |= recovery_try();
 	}
 #endif
 
 #ifdef CONFIG_USB_STORAGE
-	if (!usb_init() && usb_stor_scan(1) == 0) {
-		if (!recovery_mount("usb")) {
-			for (i = 0; i < 2; i++) {
-				sprintf(name, fmt[i], CONFIG_PRODUCT_SOC);
-				ret = recovery_write(name);
-				if (ret > 0)
-					found = 1;
-			}
-		}
-	}
+	if (!usb_init() && usb_stor_scan(1) == 0 && !recovery_mount("usb"))
+		found |= recovery_try();
 #endif
 
   fs_close();
+#ifndef CONFIG_FMC_SPI_NAND
   spi_flash_free(recovery_flash);
+#endif
 
   return found ? 0 : -1;
 }
@@ -238,6 +293,36 @@ int firmware_recovery(void) {
 #endif
 
 int firmware_scan(void) {
+#ifdef CONFIG_FMC_SPI_NAND
+  u8 buf[64];
+  int ret;
+
+  printf("Checking UBI firmware...\n");
+
+  if (ubi_part("ubi", NULL)) {
+    printf("Firmware is absent/corrupt (cannot attach UBI)\n");
+    env_set("bootfail", "1");
+    return 0;
+  }
+
+  ret = ubi_volume_read("kernel", (char *)buf, sizeof(buf));
+  if (ret || !check_kernel(buf)) {
+    printf("Firmware is absent/corrupt (kernel volume)\n");
+    env_set("bootfail", "1");
+    return 0;
+  }
+
+  ret = ubi_volume_read("rootfs", (char *)buf, sizeof(buf));
+  if (ret || !check_squashfs(buf)) {
+    printf("Firmware is absent/corrupt (rootfs volume)\n");
+    env_set("bootfail", "1");
+    return 0;
+  }
+
+  env_set("bootfail", NULL);
+
+  return 0;
+#else
   struct spi_flash *flash;
   ulong kernel_off = 0;
   ulong rootfs_off = 0;
@@ -282,10 +367,13 @@ int firmware_scan(void) {
     sprintf(str, "0x%llx", rootfs_size);
     env_set("rootsize", str);
 
-    char mtdparts[128];
-    sprintf(mtdparts, "%dk(u-boot),%dk(env),%lldk(kernel),%lldk(rootfs),%lldk@0x%lx(firmware),-(rootfs_data)",
+    char mtds[128], mtdparts[160];
+    const char *mtdids = env_get("mtdids");
+    sprintf(mtds, "%dk(u-boot),%dk(env),%lldk(kernel),%lldk(rootfs),%lldk@0x%lx(firmware),-(rootfs_data)",
             CONFIG_ENV_OFFSET / 1024, CONFIG_ENV_SIZE / 1024, kernel_size / 1024, rootfs_size / 1024,
             (kernel_size + rootfs_size) / 1024, kernel_off);
+    env_set("mtds", mtds);
+    sprintf(mtdparts, "%s:%s", mtdids ? mtdids : "", mtds);
     env_set("mtdparts", mtdparts);
   }
 
@@ -297,6 +385,7 @@ int firmware_scan(void) {
   }
 
   return 0;
+#endif
 }
 
 #ifndef OPENIPC_RAM_MAX_SIZE
@@ -312,7 +401,7 @@ ulong openipc_ram_size(void)
 }
 #endif
 
-int openipc_helper() {
+int openipc_helper(void) {
   char msize[16];
   sprintf(msize, "%ldM", gd->ram_size / 1024 / 1024);
   env_set("totalmem", msize);

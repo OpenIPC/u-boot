@@ -472,7 +472,7 @@ CONFIG_CMD_LHS_I2C=y
 # Shell scripting commands
 #
 # CONFIG_CMD_ECHO is not set
-# CONFIG_CMD_ITEST is not set
+CONFIG_CMD_ITEST=y
 # CONFIG_CMD_SOURCE is not set
 # CONFIG_CMD_SETEXPR is not set
 
