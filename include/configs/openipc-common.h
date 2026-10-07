@@ -25,6 +25,14 @@
 #define CONFIG_SYS_NAND_MAX_CHIPS 1
 #endif
 
+/* Legacy `gpio status` prints banks and the live pad-mux function */
+#ifdef CONFIG_HI_GPIO
+#ifndef __ASSEMBLY__
+void hi_gpio_status(void);
+#endif
+#define gpio_status() hi_gpio_status()
+#endif
+
 /* All targets boot legacy kernels via ATAGs (no DTB in the boot flow) */
 #define CONFIG_SUPPORT_PASSING_ATAGS 1
 #define CONFIG_SETUP_MEMORY_TAGS 1
@@ -135,7 +143,7 @@
 #define SFC "sfc"
 #endif
 
-#define CONFIG_BOOTARGS "mem=\\${osmem} console=ttyAMA0,115200 panic=20 root=/dev/mtdblock3 rootfstype=squashfs init=/init mtdparts=\\${mtdids}:\\${mtds} \\${extras}"
+#define CONFIG_BOOTARGS "mem=\\${osmem} console=ttyAMA0,115200 panic=20 root=/dev/mtdblock3 rootfstype=squashfs init=/init mtdparts=\\${mtdparts} \\${extras}"
 
 /* Recovery: CV610 writes a single firmware blob, the others split images;
  * the rootfs is fetched first so its size selects the NOR schema. */
@@ -155,7 +163,7 @@
 	"rootsize=" __stringify(CONFIG_ENV_ROOTSIZE) "\0" \
 	"mtdslite=setenv kernsize 0x200000; setenv rootaddr 0x250000; setenv rootsize 0x500000\0" \
 	"mtdsultimate=setenv kernsize 0x300000; setenv rootaddr 0x350000; setenv rootsize 0xa00000\0" \
-	"ubwrite=sf probe 0; sf erase 0x0 ${kernaddr}; sf write ${baseaddr} 0x0 ${kernaddr}\0" \
+	"ubwrite=sf probe 0; sf erase 0x0 ${kernaddr}; sf write ${baseaddr} 0x0 ${filesize}\0" \
 	"ukwrite=sf probe 0; sf erase ${kernaddr} ${kernsize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0" \
 	"urwrite=sf probe 0; if itest ${filesize} -gt 500000; then run mtdsultimate; fi; sf erase ${rootaddr} ${rootsize}; sf write ${baseaddr} ${rootaddr} ${filesize}\0" \
 	"fwwrite=sf probe 0; sf erase ${kernaddr} ${filesize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0" \
@@ -186,7 +194,7 @@
 #define CONFIG_ENV_SIZE 0x40000
 #define CONFIG_ENV_SECT_SIZE 0x20000
 
-#define CONFIG_BOOTARGS "mem=\\${osmem} console=ttyAMA0,115200 panic=20 init=/init root=ubi0:rootfs rootfstype=ubifs ubi.mtd=2,2048 mtdparts=\\${mtdids}:\\${mtds} \\${extras}"
+#define CONFIG_BOOTARGS "mem=\\${osmem} console=ttyAMA0,115200 panic=20 init=/init root=ubi0:rootfs rootfstype=ubifs ubi.mtd=2,2048 mtdparts=\\${mtdparts} \\${extras}"
 
 /* Recovery: create the volumes manually; kernel first so the rootfs
  * volume can take all the remaining space. */
