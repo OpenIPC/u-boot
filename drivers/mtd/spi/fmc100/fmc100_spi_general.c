@@ -51,6 +51,43 @@ cmd_config_done:
 }
 
 /*
+ * Same as above but without the hardware status-engine shortcut: the
+ * command goes out as a plain SPI transaction and the byte is taken
+ * from the data buffer. FMC_STATUS mixes controller state with the
+ * flash status, so it is only trusted for the busy bit elsewhere.
+ */
+unsigned char spi_general_get_flash_register_raw(struct fmc_spi *spi,
+						 u_char cmd)
+{
+	unsigned char status;
+	unsigned int reg;
+	struct fmc_host *host = (struct fmc_host *)spi->host;
+
+	host->set_system_clock(NULL, ENABLE);
+
+	reg = op_cfg_fm_cs(spi->chipselect) | OP_CFG_OEN_EN;
+	fmc_write(host, FMC_OP_CFG, reg);
+
+	fmc_write(host, FMC_CMD, cmd);
+
+	reg = fmc_data_num_cnt(SPI_NOR_CR_LEN);
+	fmc_write(host, FMC_DATA_NUM, reg);
+
+	reg = fmc_op_cmd1_en(ENABLE) | fmc_op_read_data_en(ENABLE) |
+		FMC_OP_REG_OP_START;
+	fmc_write(host, FMC_OP, reg);
+
+	fmc_cmd_wait_cpu_finish(host);
+
+	status = readb(host->iobase);
+
+	fmc_pr(SR_DBG, "\t * Raw get flash Register[%#x], val: %#x\n", cmd,
+		status);
+
+	return status;
+}
+
+/*
     Read status[C0H]:[0]bit OIP, judge whether the device is busy or not
 */
 static int spi_general_wait_ready(struct fmc_spi * const spi)

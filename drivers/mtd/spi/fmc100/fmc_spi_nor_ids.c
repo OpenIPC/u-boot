@@ -265,6 +265,23 @@ static struct spi_drv spi_driver_nm25q128 = {
 	.qe_enable = spi_do_not_qe_enable,
 };
 
+/*
+ * Last-resort profile for parts whose ID is in neither pass of the
+ * lookup. The geometry is filled in from SFDP when the chip answers and
+ * the operations are the plain 3V ones every part implements.
+ */
+static struct spi_nor_info fmc_spi_nor_generic_info = {
+	.name = "unknown",
+	.id_len = 0,
+	.chipsize = _4M,
+	.erasesize = _64K,
+	.addrcycle = SPI_NOR_3BYTE_ADDR_LEN,
+	.read = { &read_std_0INFINITE50, NULL },
+	.write = { &write_std_025680, NULL },
+	.erase = { &erase_sector_64k_0_64K50, NULL },
+	.driver = &spi_driver_no_qe,
+};
+
 #define SPI_NOR_ID_TBL_VER     "1.0"
 
 /******************************************************************************
@@ -2034,13 +2051,17 @@ static struct spi_nor_info fmc_spi_nor_info_table[] = {
 	{0, {0}, 0, 0, 0, 0, {0}, {0}, {0}, NULL},
 };
 
-static struct spi_nor_info *fmc_spi_nor_serach_ids(u_char* const ids, int len)
+static struct spi_nor_info *fmc_spi_nor_serach_ids(u_char* const ids, int len,
+						   bool *compatible)
 {
 	struct spi_nor_info *info = fmc_spi_nor_info_table;
 	struct spi_nor_info *fit_info = NULL;
 
 	if (len <= 0)
 		return NULL;
+
+	if (compatible)
+		*compatible = false;
 
 	for (; info->name; info++) {
 		if (memcmp(info->id, ids, info->id_len))
@@ -2049,6 +2070,26 @@ static struct spi_nor_info *fmc_spi_nor_serach_ids(u_char* const ids, int len)
 		if ((fit_info == NULL) || (fit_info->id_len < info->id_len))
 			fit_info = info;
 	}
+	if (fit_info)
+		return fit_info;
+
+	/*
+	 * No known manufacturer. New vendors ship fully compatible parts
+	 * that only change the MID byte, so retry on the product bytes
+	 * alone; the density lives in them, so the profile still fits.
+	 */
+	for (info = fmc_spi_nor_info_table; info->name; info++) {
+		if (info->id_len < 2)
+			continue;
+		if (memcmp(info->id + 1, ids + 1, info->id_len - 1))
+			continue;
+
+		if ((fit_info == NULL) || (fit_info->id_len < info->id_len))
+			fit_info = info;
+	}
+	if (fit_info && compatible)
+		*compatible = true;
+
 	return fit_info;
 }
 
@@ -2308,6 +2349,95 @@ static int chip_spi_init(struct mtd_info_ex *mtd,
 	return ret;
 }
 
+#define SFDP_HEADER_LEN		0x10
+#define SFDP_PARAM_HDR_OFF	0x08
+
+/*
+ * JESD216 layout: the 8-byte SFDP header (whose byte 6 is the number of
+ * parameter headers) followed by 8-byte parameter headers, one per
+ * table. Find the Basic Flash Parameter Table and take the density and
+ * the address width out of it.
+ */
+static int fmc_spi_nor_sfdp_size(struct fmc_spi *spi, u_char cs,
+				 unsigned long *size, unsigned int *addrcycle)
+{
+	unsigned char hdr[SFDP_HEADER_LEN];
+	unsigned char ph[8];
+	unsigned char bfpt[2 * 4];
+	unsigned int i, nph, ptr, ndw, d1, d2, density;
+	unsigned long long bits;
+
+	if (fmc100_read_sfdp(spi, cs, 0, hdr, sizeof(hdr)))
+		return -1;
+
+	/* "SFDP" */
+	if (hdr[0] != 0x53 || hdr[1] != 0x46 ||
+	    hdr[2] != 0x44 || hdr[3] != 0x50)
+		return -1;
+
+	nph = hdr[6];
+	if (!nph || nph > 8)
+		return -1;
+
+	ptr = 0;
+	ndw = 0;
+	for (i = 0; i < nph; i++) {
+		if (fmc100_read_sfdp(spi, cs, SFDP_PARAM_HDR_OFF + i * 8,
+				     ph, sizeof(ph)))
+			return -1;
+		if (ph[0] == 0x00) {	/* Basic Flash Parameter Table */
+			ptr = ph[4] | (ph[5] << 8) | (ph[6] << 16);
+			ndw = ph[3];
+			break;
+		}
+	}
+	if (ndw < 2 || fmc100_read_sfdp(spi, cs, ptr, bfpt, sizeof(bfpt)))
+		return -1;
+
+	/* DWORD 1 bits [18:17] hold the address width, DWORD 2 the
+	 * density: either 2^n bits (bit 31 set) or n + 1 bits. */
+	d1 = bfpt[0] | (bfpt[1] << 8) | (bfpt[2] << 16) |
+	     ((unsigned int)bfpt[3] << 24);
+	d2 = bfpt[4] | (bfpt[5] << 8) | (bfpt[6] << 16) |
+	     ((unsigned int)bfpt[7] << 24);
+
+	density = d2;
+	if (density & (1U << 31)) {
+		density &= ~(1U << 31);
+		if (density > 40)
+			return -1;
+		bits = 1ULL << density;
+	} else {
+		bits = (unsigned long long)density + 1;
+	}
+	*size = (unsigned long)(bits >> 3);
+	if (*size < (4 * _64K) || *size > 0x80000000UL)
+		return -1;
+
+	/* Only leave 3-byte addressing when SFDP asks for more. */
+	*addrcycle = (*size > _16M && ((d1 >> 17) & 0x3)) ?
+		     SPI_NOR_4BYTE_ADDR_LEN : SPI_NOR_3BYTE_ADDR_LEN;
+
+	return 0;
+}
+
+static struct spi_nor_info *fmc_spi_nor_unknown_info(struct fmc_spi *spi,
+						     u_char cs)
+{
+	unsigned long size;
+	unsigned int addrcycle;
+
+	fmc_spi_nor_generic_info.chipsize = _4M;
+	fmc_spi_nor_generic_info.addrcycle = SPI_NOR_3BYTE_ADDR_LEN;
+
+	if (!fmc_spi_nor_sfdp_size(spi, cs, &size, &addrcycle)) {
+		fmc_spi_nor_generic_info.chipsize = size;
+		fmc_spi_nor_generic_info.addrcycle = addrcycle;
+	}
+
+	return &fmc_spi_nor_generic_info;
+}
+
 static int match_chip_id(struct mtd_info_ex *mtd, struct fmc_spi *spi)
 {
 	unsigned char cs = 0;
@@ -2317,6 +2447,7 @@ static int match_chip_id(struct mtd_info_ex *mtd, struct fmc_spi *spi)
 	unsigned int total = 0;
 	char buffer[TMP_BUF_LEN];
 	unsigned char *fmc_cs = NULL;
+	bool compatible = false;
 	int ret = 0;
 
 	for (cs = 0; cs < CONFIG_SPI_NOR_MAX_CHIP_NUM; cs++) {
@@ -2338,7 +2469,8 @@ static int match_chip_id(struct mtd_info_ex *mtd, struct fmc_spi *spi)
 		if (ret < 0)
 			return ret;
 		len = ret;
-		spinor_info = fmc_spi_nor_serach_ids(ids, MAX_SPI_NOR_ID_LEN);
+		spinor_info = fmc_spi_nor_serach_ids(ids, MAX_SPI_NOR_ID_LEN,
+						     &compatible);
 		/* id 3-7th */
 		for (ix = 3; (spinor_info) && (ix < spinor_info->id_len); ix++) {
 			ret = sprintf_s(buffer + len, TMP_BUF_LEN, " %#x", ids[ix]);
@@ -2347,24 +2479,28 @@ static int match_chip_id(struct mtd_info_ex *mtd, struct fmc_spi *spi)
 			len += ret;
 		}
 
-		if (spinor_info) {
+		if (!spinor_info) {
+			spinor_info = fmc_spi_nor_unknown_info(spi, cs);
+			printf("%s: not in the ID table, using generic profile"
+			       " (%luM, 64K erase)\n", buffer,
+			       spinor_info->chipsize >> 20);
+		} else if (compatible) {
+			printf("%s: unknown manufacturer, using \"%s\""
+			       " profile\n", buffer, spinor_info->name);
+		} else {
 			fmc_pr(FMC_INFO, "%s\n", buffer);
-
 			fmc_pr(BT_DBG, "\t|||-CS-%d found SPI nor flash: %s\n",
 			       cs, spinor_info->name);
-
-			ret = chip_spi_init(mtd, spi, spinor_info, cs, ids);
-			if (ret)
-				return ret;
-
-			mtd->numchips++;
-			total += (unsigned int)spi->chipsize;
-			spi++;
-			(*fmc_cs)++;
-		} else {
-			printf("SPI Nor(cs %d) ID: %#x %#x %#x can't find"
-			 " in the ID table !!!\n", cs, ids[0], ids[1], ids[2]);
 		}
+
+		ret = chip_spi_init(mtd, spi, spinor_info, cs, ids);
+		if (ret)
+			return ret;
+
+		mtd->numchips++;
+		total += (unsigned int)spi->chipsize;
+		spi++;
+		(*fmc_cs)++;
 	}
 
 	return ret;

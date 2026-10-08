@@ -386,6 +386,45 @@ void fmc100_read_ids(const struct fmc_spi *spi, u_char cs, u_char* const id)
 	       cs, id[0], id[1], id[2], id[3], id[4], id[5]);
 }
 
+/* Read the Serial Flash Discoverable Parameter area: 5Ah, a 24-bit
+ * address and the standard 8 dummy cycles (one byte in this driver). */
+int fmc100_read_sfdp(const struct fmc_spi *spi, u_char cs, unsigned int addr,
+		     unsigned char *buf, unsigned int len)
+{
+	unsigned int reg;
+	struct fmc_host *host = NULL;
+
+	if (!spi || !spi->host || !buf || !len || len > 0x100)
+		return -1;
+	host = spi->host;
+	if (!host->iobase)
+		return -1;
+
+	reg = fmc_cmd_cmd1(SPI_CMD_RD_SFDP);
+	fmc_write(host, FMC_CMD, reg);
+
+	reg = op_cfg_fm_cs(cs) | OP_CFG_OEN_EN |
+	      op_cfg_addr_num(SPI_NOR_3BYTE_ADDR_LEN) | op_cfg_dummy_num(1);
+	fmc_write(host, FMC_OP_CFG, reg);
+
+	fmc_write(host, FMC_ADDRL, addr);
+
+	reg = fmc_data_num_cnt(len);
+	fmc_write(host, FMC_DATA_NUM, reg);
+
+	reg = fmc_op_dummy_en(ENABLE) | fmc_op_cmd1_en(ENABLE) |
+	      fmc_op_addr_en(ENABLE) | fmc_op_read_data_en(ENABLE) |
+	      FMC_OP_REG_OP_START;
+	fmc_write(host, FMC_OP, reg);
+
+	fmc_cmd_wait_cpu_finish(host);
+
+	if (memcpy_s(buf, len, host->iobase, len))
+		return -1;
+
+	return 0;
+}
+
 static int fmc100_reg_erase_one_block(struct spi_flash *spiflash, loff_t offs)
 {
 	unsigned int regval;
@@ -930,14 +969,18 @@ int fmc100_spi_nor_init(struct fmc_host *host)
 #ifdef CONFIG_SPI_BLOCK_PROTECT
 
 /*
- * Bits that protect the array: SR1 SRP0|BP4..BP0, SR2 CMP|SRP1 and
- * SR3.WPS, which hands protection to the per-block lock bits. Only
- * those are touched, leaving QE, the OTP/LB bits and the read-only
- * status bits alone. 0xff means the register does not exist.
+ * Register bits that lock the part down. Clearing covers the status
+ * register locks (SRP0/SRP1), the block protect fields and WPS; QE, the
+ * OTP/LB bits and the read-only status bits are left alone. The warning
+ * only looks at what actually protects the array: BP4..BP0 and CMP
+ * guard the blocks, WPS hands them to the per-block lock bits, while
+ * SRP0/SRP1 by themselves only lock the status register.
  */
-#define SPI_NOR_SR1_PROT_MASK	0xfc
-#define SPI_NOR_SR2_PROT_MASK	0x41
-#define SPI_NOR_SR3_WPS_MASK	0x04
+#define SPI_NOR_SR1_CLEAR_MASK	0xfc	/* SRP0 | BP4..BP0 */
+#define SPI_NOR_SR2_CLEAR_MASK	0x41	/* CMP | SRP1 */
+#define SPI_NOR_SR3_WPS_MASK	0x04	/* WPS */
+#define SPI_NOR_SR1_WARN_MASK	0x7c	/* BP4..BP0 */
+#define SPI_NOR_SR2_WARN_MASK	0x40	/* CMP */
 
 static void fmc100_send_cmd(struct fmc_host *host, struct fmc_spi *spi,
 			    unsigned char cmd)
@@ -983,17 +1026,20 @@ static void fmc100_write_status_reg(struct fmc_host *host, struct fmc_spi *spi,
 }
 
 /* Try to remove whatever write protection the part came with, whatever
- * the vendor: WPS/per-block locks, then the BP/CMP/SRP fields. */
+ * the vendor: WPS/per-block locks, the status register locks and the
+ * BP/CMP fields. */
 void fmc100_global_unlock(struct fmc_host *host)
 {
 	struct fmc_spi *spi = host->spi;
 	unsigned char sr1, sr2, sr3;
 
-	sr1 = spi_general_get_flash_register(spi, SPI_CMD_RDSR);
-	sr2 = spi_general_get_flash_register(spi, SPI_CMD_RDSR2);
-	sr3 = spi_general_get_flash_register(spi, SPI_CMD_RDSR3);
+	/* FMC_STATUS carries more than the flash status byte, so read the
+	 * registers through the plain command path. */
+	sr1 = spi_general_get_flash_register_raw(spi, SPI_CMD_RDSR);
+	sr2 = spi_general_get_flash_register_raw(spi, SPI_CMD_RDSR2);
+	sr3 = spi_general_get_flash_register_raw(spi, SPI_CMD_RDSR3);
 
-	printf("SR1[%#x] SR2[%#x] SR3[%#x]\n", sr1, sr2, sr3);
+	printf("SPI Nor: SR1=0x%02x SR2=0x%02x SR3=0x%02x\n", sr1, sr2, sr3);
 
 	/*
 	 * With WPS set the BP bits are out of circuit and the per-block
@@ -1006,24 +1052,24 @@ void fmc100_global_unlock(struct fmc_host *host)
 		spi->driver->write_enable(spi);
 		fmc100_send_cmd(host, spi, SPI_CMD_GBULK);
 		spi->driver->wait_ready(spi);
-		printf("Unlocking flash: SR3 [%#x]->[%#x] (WPS)\n", sr3,
+		printf("SPI Nor: unlocked SR3 0x%02x -> 0x%02x (WPS)\n", sr3,
 		       sr3 & ~SPI_NOR_SR3_WPS_MASK);
 		fmc100_write_status_reg(host, spi, SPI_CMD_WRSR3,
 					sr3 & ~SPI_NOR_SR3_WPS_MASK);
 	}
 
-	if (sr1 != 0xff && (sr1 & SPI_NOR_SR1_PROT_MASK)) {
-		printf("Unlocking flash: SR1 [%#x]->[%#x]\n", sr1,
-		       sr1 & ~SPI_NOR_SR1_PROT_MASK);
+	if (sr1 != 0xff && (sr1 & SPI_NOR_SR1_CLEAR_MASK)) {
+		printf("SPI Nor: unlocked SR1 0x%02x -> 0x%02x\n", sr1,
+		       sr1 & ~SPI_NOR_SR1_CLEAR_MASK);
 		fmc100_write_status_reg(host, spi, SPI_CMD_WRSR,
-					sr1 & ~SPI_NOR_SR1_PROT_MASK);
+					sr1 & ~SPI_NOR_SR1_CLEAR_MASK);
 	}
 
-	if (sr2 != 0xff && (sr2 & SPI_NOR_SR2_PROT_MASK)) {
-		printf("Unlocking flash: SR2 [%#x]->[%#x]\n", sr2,
-		       sr2 & ~SPI_NOR_SR2_PROT_MASK);
+	if (sr2 != 0xff && (sr2 & SPI_NOR_SR2_CLEAR_MASK)) {
+		printf("SPI Nor: unlocked SR2 0x%02x -> 0x%02x\n", sr2,
+		       sr2 & ~SPI_NOR_SR2_CLEAR_MASK);
 		fmc100_write_status_reg(host, spi, SPI_CMD_WRSR2,
-					sr2 & ~SPI_NOR_SR2_PROT_MASK);
+					sr2 & ~SPI_NOR_SR2_CLEAR_MASK);
 	}
 
 	/*
@@ -1031,14 +1077,14 @@ void fmc100_global_unlock(struct fmc_host *host)
 	 * stayed locked answers every erase and write with OK while
 	 * discarding it. Read the protection back and say so instead.
 	 */
-	sr1 = spi_general_get_flash_register(spi, SPI_CMD_RDSR);
-	sr2 = spi_general_get_flash_register(spi, SPI_CMD_RDSR2);
-	sr3 = spi_general_get_flash_register(spi, SPI_CMD_RDSR3);
-	if ((sr1 != 0xff && (sr1 & SPI_NOR_SR1_PROT_MASK)) ||
-	    (sr2 != 0xff && (sr2 & SPI_NOR_SR2_PROT_MASK)) ||
+	sr1 = spi_general_get_flash_register_raw(spi, SPI_CMD_RDSR);
+	sr2 = spi_general_get_flash_register_raw(spi, SPI_CMD_RDSR2);
+	sr3 = spi_general_get_flash_register_raw(spi, SPI_CMD_RDSR3);
+	if ((sr1 != 0xff && (sr1 & SPI_NOR_SR1_WARN_MASK)) ||
+	    (sr2 != 0xff && (sr2 & SPI_NOR_SR2_WARN_MASK)) ||
 	    (sr3 != 0xff && (sr3 & SPI_NOR_SR3_WPS_MASK)))
-		printf("SPI nor: STILL PROTECTED, SR1[%#x] SR2[%#x] SR3[%#x]"
-		       " - erase and write will be discarded\n",
+		printf("SPI Nor: still protected (SR1=0x%02x SR2=0x%02x"
+		       " SR3=0x%02x), erase and write will be discarded\n",
 		       sr1, sr2, sr3);
 }
 

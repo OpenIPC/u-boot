@@ -143,6 +143,8 @@ unsigned short fmc100_handle_bp_rdsr_info(struct fmc_host *host,
 #endif
 unsigned char spi_general_get_flash_register(struct fmc_spi *spi,
 				u_char cmd);
+unsigned char spi_general_get_flash_register_raw(struct fmc_spi *spi,
+				u_char cmd);
 
 #define spiflash_to_host(_spiflash) ((struct fmc_host *)(_spiflash))
 
@@ -156,6 +158,8 @@ unsigned int spi_mxic_check_spi_dtr_support(struct fmc_spi *spi);
 #endif
 
 void fmc100_read_ids(const struct fmc_spi *spi, u_char cs, u_char* const id);
+int fmc100_read_sfdp(const struct fmc_spi *spi, u_char cs, unsigned int addr,
+		     unsigned char *buf, unsigned int len);
 void fmc100_op_reg(struct fmc_spi *spi, unsigned char opcode,
 				unsigned int len, unsigned char optype);
 int fmc_spi_nor_probe(struct mtd_info_ex *mtd, struct fmc_spi *spi);
