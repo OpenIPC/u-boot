@@ -305,6 +305,7 @@ SPI_IF_WRITE_QUAD_ADDR, SPI_CMD_WRITE_QUAD_ADDR4B, _dummy_, _size_, _clk_ }
 
 #define SPI_CMD_WREN			0x06 /* Write Enable */
 #define SPI_CMD_WRDI			0x04 /* Write Disable */
+#define SPI_CMD_GBULK			0x98 /* Global Block/Sector Unlock */
 
 #define SPI_CMD_WRSR			0x01 /* Write Status Register */
 #define SPI_CMD_WRSR2			0x31 /* Write Status Register-2 */

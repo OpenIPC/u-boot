@@ -115,6 +115,58 @@ set_erase_sector_64k4b(0, _64K, 120);
 set_erase_sector_64k(0, _64K, 133);
 set_erase_sector_64k4b(0, _64K, 133);
 
+/* Additional operation variants used by the flash entries below */
+set_read_std(0, INFINITE, 40);
+set_read_std(0, INFINITE, 45);
+set_read_std(0, INFINITE, 54);
+set_read_std4b(0, INFINITE, 54);
+set_read_fast(1, INFINITE, 55);
+set_read_fast(1, INFINITE, 100);
+set_read_fast(1, INFINITE, 112);
+set_read_fast(1, INFINITE, 120);
+set_read_dual(1, INFINITE, 55);
+set_read_dual(1, INFINITE, 64);
+set_read_dual(1, INFINITE, 84);
+set_read_dual(1, INFINITE, 112);
+set_read_dual(1, INFINITE, 120);
+set_read_dual_addr(2, INFINITE, 84);
+set_read_dual_addr4b(2, INFINITE, 84);
+set_read_dual_addr(2, INFINITE, 108);
+set_read_dual_addr(1, INFINITE, 112);
+set_read_dual_addr(1, INFINITE, 120);
+set_read_dual_addr4b(2, INFINITE, 133);
+set_read_quad(1, INFINITE, 0);
+set_read_quad(1, INFINITE, 112);
+set_read_quad(1, INFINITE, 120);
+set_read_quad_addr(5, INFINITE, 84);
+set_read_quad_addr4b(5, INFINITE, 84);
+set_read_quad_addr(5, INFINITE, 108);
+set_read_quad_addr4b(5, INFINITE, 125);
+set_read_quad_addr(3, INFINITE, 112);
+set_read_quad_addr(3, INFINITE, 120);
+set_write_std(0, 256, 55);
+set_write_std(0, 256, 112);
+set_write_std(0, 256, 120);
+set_write_dual(0, 256, 75);
+set_write_dual4b(0, 256, 75);
+set_write_dual(0, 256, 108);
+set_write_dual4b(0, 256, 133);
+set_write_dual_addr(0, 256, 75);
+set_write_dual_addr4b(0, 256, 75);
+set_write_dual_addr(0, 256, 108);
+set_write_dual_addr4b(0, 256, 133);
+set_write_quad(0, 256, 55);
+set_write_quad(0, 256, 112);
+set_write_quad(0, 256, 120);
+set_write_quad4b(0, 256, 133);
+set_write_quad_addr(0, 256, 33);
+set_erase_sector_64k(0, _64K, 33);
+set_erase_sector_64k(0, _64K, 55);
+set_erase_sector_64k(0, _64K, 50);
+set_erase_sector_64k4b(0, _64K, 80);
+set_erase_sector_64k(0, _64K, 112);
+set_erase_sector_64k(0, _64K, 120);
+
 #include "fmc100_spi_general.c"
 static struct spi_drv spi_driver_general = {
 	.wait_ready = spi_general_wait_ready,
@@ -164,6 +216,53 @@ static struct spi_drv spi_driver_xtx = {
 	.write_enable = spi_general_write_enable,
 	.entry_4addr = spi_general_entry_4addr,
 	.qe_enable = spi_xtx_qe_enable,
+};
+
+#include "fmc100_spi_s25fl256s.c"
+static struct spi_drv spi_driver_s25fl256s = {
+	.wait_ready = spi_general_wait_ready,
+	.write_enable = spi_general_write_enable,
+	.entry_4addr = spi_s25fl256s_entry_4addr,
+	.qe_enable = spi_do_not_qe_enable,
+};
+
+static struct spi_drv spi_driver_w25q256jv = {
+	.wait_ready = spi_general_wait_ready,
+	.write_enable = spi_general_write_enable,
+	.entry_4addr = spi_w25q256jv_entry_4addr,
+	.qe_enable = spi_do_not_qe_enable,
+};
+
+#include "fmc100_spi_micron.c"
+static struct spi_drv spi_driver_micron = {
+	.wait_ready = spi_general_wait_ready,
+	.write_enable = spi_general_write_enable,
+	.entry_4addr = spi_micron_entry_4addr,
+	.qe_enable = spi_do_not_qe_enable,
+};
+
+#include "fmc100_spi_puya.c"
+static struct spi_drv spi_driver_puya = {
+	.wait_ready = spi_general_wait_ready,
+	.write_enable = spi_general_write_enable,
+	.entry_4addr = spi_puya_entry_4addr,
+	.qe_enable = spi_do_not_qe_enable,
+};
+
+#include "fmc100_spi_issi.c"
+static struct spi_drv spi_driver_issi = {
+	.wait_ready = spi_general_wait_ready,
+	.write_enable = spi_general_write_enable,
+	.entry_4addr = spi_s25fl256s_entry_4addr,
+	.qe_enable = spi_do_not_qe_enable,
+};
+
+#include "fmc100_spi_nm25q128.c"
+static struct spi_drv spi_driver_nm25q128 = {
+	.wait_ready = spi_general_wait_ready,
+	.write_enable = spi_general_write_enable,
+	.entry_4addr = spi_nm25q128_entry_4addr,
+	.qe_enable = spi_do_not_qe_enable,
 };
 
 #define SPI_NOR_ID_TBL_VER     "1.0"
@@ -1220,6 +1319,713 @@ static struct spi_nor_info fmc_spi_nor_info_table[] = {
 
 		{
 			&erase_sector_64k(0, _64K, 80), /* 80MHz */
+			0
+		},
+		&spi_driver_general,
+	},
+
+	/* MX25R6435F Wide Voltage Range 1.65~3.6V */
+	{
+		"MX25R6435F", {0xc2, 0x28, 0x17}, 3, _8M, _64K, 3,
+		{
+			&read_std(0, INFINITE, 33), /* 33MHz */
+			&read_fast(1, INFINITE, 80), /* 80MHz */
+			&read_dual(1, INFINITE, 80), /* 80MHz */
+			&read_dual_addr(1, INFINITE, 80), /* 80MHz */
+			&read_quad(1, INFINITE, 80), /* 80MHz */
+			&read_quad_addr(3, INFINITE, 80), /* 80MHz */
+			0
+		},
+
+		{
+			&write_std(0, 256, 33), /* 33MHz */
+			&write_quad_addr(0, 256, 33), /* 33MHz */
+			0
+		},
+
+		{
+			&erase_sector_64k(0, _64K, 33), /* 33MHz */
+			0
+		},
+		&spi_driver_mx25l25635e,
+	},
+
+	/* MX25U1633F, 1.65-2.0V */
+	{
+		"MX25U1633F", {0xc2, 0x25, 0x35}, 3, _2M, _64K, 3,
+		{
+			&read_std(0, INFINITE, 33), /* 33MHz */
+			&read_fast(1, INFINITE, 80), /* 80MHz */
+			&read_dual(1, INFINITE, 80), /* 80MHz */
+			&read_dual_addr(1, INFINITE, 80), /* 80MHz */
+			&read_quad(1, INFINITE, 80), /* 80MHz */
+			&read_quad_addr(3, INFINITE, 80), /* 80MHz */
+			0
+		},
+
+		{
+			&write_std(0, 256, 33), /* 33MHz */
+			&write_quad_addr(0, 256, 80), /* 80MHz */
+			0
+		},
+
+		{
+			&erase_sector_64k(0, _64K, 80), /* 80MHz */
+			0
+		},
+		&spi_driver_mx25l25635e,
+	},
+
+	/* MX66U1G45GM, 1.65-2.0V */
+	{
+		"MX66U1G45GM", {0xc2, 0x25, 0x3b}, 3, _128M, _64K, 4,
+		{
+			&read_std4b(0, INFINITE, 50),
+			&read_fast4b(1, INFINITE, 133),
+			&read_dual4b(1, INFINITE, 133),
+			&read_dual_addr4b(1, INFINITE, 133),
+			&read_quad4b(1, INFINITE, 133),
+			&read_quad_addr4b(3, INFINITE, 133),
+			0
+		},
+
+		{
+			&write_std4b(0, 256, 133),
+			&write_quad_addr4b(0, 256, 133),
+			0
+		},
+
+		{
+			&erase_sector_64k4b(0, _64K, 133),
+			0
+		},
+		&spi_driver_mx25l25635e,
+	},
+
+	/* Micron  N25Q064A 1.8V */
+	{
+		"N25Q064A",   {0x20, 0xbb, 0x17}, 3, (_64K * _128B), _64K, 3,
+		{
+			&read_std(0, INFINITE, 54),  /* 54MHz */
+			&read_fast(1, INFINITE, 108), /* 108MHz */
+			&read_dual(1, INFINITE, 108), /* 108MHz */
+			&read_dual_addr(2, INFINITE, 108),
+			&read_quad(1, INFINITE, 108), /* 108MHz */
+			0
+		},
+
+		{
+			&write_std(0, 256, 80), /* 80MHz */
+			&write_dual(0, 256, 108), /* 108MHz */
+			&write_dual_addr(0, 256, 108), /* 108MHz */
+			&write_quad(0, 256, 108), /* 108MHz */
+			0
+		},
+
+		{
+			&erase_sector_64k(0, _64K, 108), /* 108MHz */
+			0
+		},
+		&spi_driver_general,
+	},
+
+	/* Micron "N25Q128A11/MT25QU128AB" 1.8V */
+	{
+		"(MT)N25Q(U)128A",   {0x20, 0xbb, 0x18}, 3,
+		(_64K * _256B), _64K, 3,
+		{
+			&read_std(0, INFINITE, 54),   /* 54MHz */
+			&read_fast(1, INFINITE, 108), /* 108MHz */
+			&read_dual(1, INFINITE, 108), /* 108MHz */
+			&read_dual_addr(2, INFINITE, 108),  /* 108MHz */
+			&read_quad(1, INFINITE, 108), /* 108MHz */
+			&read_quad_addr(5, INFINITE, 108), /* 108MHz */
+			0
+		},
+
+		{
+			&write_std(0, 256, 80), /* 80MHz */
+			&write_dual(0, 256, 108), /* 108MHz */
+			&write_dual_addr(0, 256, 108), /* 108MHz */
+			&write_quad(0, 256, 108), /* 108MHz */
+			0
+		},
+
+		{
+			&erase_sector_64k(0, _64K, 108), /* 108MHz */
+			0
+		},
+		&spi_driver_micron,
+	},
+
+	/* Micron  N25QL064A 3.3V */
+	{
+		"N25QL064A",   {0x20, 0xba, 0x17}, 3, (_64K * _128B), _64K, 3,
+		{
+			&read_std(0, INFINITE, 54),     /* 54MHz */
+			&read_fast(1, INFINITE, 80), /* 80MHz */
+			&read_dual(1, INFINITE, 80), /* 80MHz */
+			&read_dual_addr(2, INFINITE, 84), /* 84MHz */
+			&read_quad(1, INFINITE, 80), /* 80MHz */
+			&read_quad_addr(5, INFINITE, 84), /* 84MHz */
+			0
+		},
+
+		{
+			&write_std(0, 256, 80), /* 80MHz */
+			&write_dual(0, 256, 75), /* 75MHz */
+			&write_dual_addr(0, 256, 75), /* 75MHz */
+			&write_quad(0, 256, 80),  /* 80MHz */
+			0
+		},
+
+		{
+			&erase_sector_64k(0, _64K, 50),   /* 50MHz */
+			0
+		},
+		&spi_driver_micron,
+	},
+
+	/* Micron  MT(N)25QL128A 3.3V */
+	{
+		"N25QL128A",   {0x20, 0xba, 0x18}, 3, (_64K * _256B), _64K, 3,
+		{
+			&read_std(0, INFINITE, 54),   /* 54MHz */
+			&read_fast(1, INFINITE, 108), /* 108MHz */
+			&read_dual(1, INFINITE, 84),   /* 84MHz */
+			&read_dual_addr(2, INFINITE, 84),  /* 84MHz */
+			&read_quad(1, INFINITE, 84), /* 84MHz */
+			&read_quad_addr(5, INFINITE, 84), /* 84MHz */
+			0
+		},
+
+		{
+			&write_std(0, 256, 108), /* 108MHz */
+			&write_dual(0, 256, 108), /* 108MHz */
+			&write_dual_addr(0, 256, 108), /* 108MHz */
+			&write_quad(0, 256, 108), /* 108MHz */
+			0
+		},
+
+		{
+			&erase_sector_64k(0, _64K, 108), /* 108MHz */
+			0
+		},
+		&spi_driver_micron,
+	},
+
+	/* Micron "MT25QU256A" 1.8V */
+	{
+		"MT25QU256A",   {0x20, 0xbb, 0x19}, 3, (_64K * _512B), _64K, 4,
+		{
+			&read_std4b(0, INFINITE, 54), /* 54MHz */
+			&read_fast4b(1, INFINITE, 80), /* 80MHz */
+			&read_dual4b(1, INFINITE, 80), /* 80MHz */
+			&read_dual_addr4b(2, INFINITE, 84), /* 84MHz */
+			&read_quad4b(1, INFINITE, 80), /* 80MHz */
+			&read_quad_addr4b(5, INFINITE, 84), /* 84MHz */
+			0
+		},
+
+		{
+			&write_std4b(0, 256, 80), /* 80MHz */
+			&write_dual4b(0, 256, 75), /* 75MHz */
+			&write_dual_addr4b(0, 256, 75), /* 75MHz */
+			&write_quad4b(0, 256, 80), /* 80MHz */
+			0
+		},
+
+		{
+			&erase_sector_64k4b(0, _64K, 80), /* 80MHz */
+			0
+		},
+		&spi_driver_micron,
+	},
+
+	/* Winbond -- w25x "blocks" are 64K, "sectors" are 4KiB */
+	/* winbond W25Q16JV-IQ/S25FL016K  3.3V */
+	{
+		"W25Q16/S25FL016",
+		{0xef, 0x40, 0x15}, 3, (_64K * _32B), _64K, 3,
+		{
+			&read_std(0, INFINITE, 50), /* 50MHz */
+			&read_fast(1, INFINITE, 80), /* 80MHz */
+			&read_dual(1, INFINITE, 80), /* 80MHz */
+			&read_quad(1, INFINITE, 80), /* 80MHz */
+			0
+		},
+
+		{
+			&write_std(0, 256, 80), /* 80MHz */
+			&write_quad(0, 256, 80), /* 80MHz */
+			0
+		},
+
+		{
+			&erase_sector_64k(0, _64K, 80), /* 80MHz */
+			0
+		},
+		&spi_driver_general,
+	},
+
+	/* NOR MEM NM25Q128EVB 3.3V */
+	{
+		"NM25Q128EVB", {0x52, 0x21, 0x18}, 3, _16M, _64K, 3,
+		{
+			&read_std(0, INFINITE, 50),  /* 50MHz */
+			&read_fast(1, INFINITE, 104), /* 104MHz */
+			&read_dual(1, INFINITE, 104), /* 104MHz */
+			&read_dual_addr(1, INFINITE, 80), /* 90MHz */
+			&read_quad(1, INFINITE, 0), /* 24MHz */
+			0
+		},
+
+		{
+			&write_std(0, 256, 80), /* 104MHz */
+			&write_quad(0, 256, 55), /* 104MHz */
+			0
+		},
+
+		{
+			&erase_sector_64k(0, _64K, 80), /* 104MHz */
+			0
+		},
+			&spi_driver_nm25q128,
+	},
+
+	/* NOR MEM NM25Q64EVB 3.3V */
+	{
+		"NM25Q64EVB", {0x52, 0x22, 0x17}, 3, _8M, _64K, 3,
+		{
+			&read_std(0, INFINITE, 50),  /* 50MHz */
+			&read_fast(1, INFINITE, 104), /* 104MHz */
+			&read_dual(1, INFINITE, 104), /* 104MHz */
+			&read_dual_addr(1, INFINITE, 80), /* 90MHz */
+			&read_quad(1, INFINITE, 80), /* 104MHz */
+			0
+		},
+
+		{
+			&write_std(0, 256, 80), /* 104MHz */
+			&write_quad(0, 256, 80), /* 104MHz */
+			0
+		},
+
+		{
+			&erase_sector_64k(0, _64K, 80), /* 104MHz */
+			0
+		},
+			&spi_driver_nm25q128,
+	},
+
+	/* ESMT/CFEON */
+	{
+		"EN25Q32B", {0x1c, 0x30, 0x16}, 3, (_64K * _64B),  _64K, 3,
+		{
+			&read_std(0, INFINITE, 50), /* 50MHz */
+			&read_fast(1, INFINITE, 80), /* 80MHz */
+			&read_dual(1, INFINITE, 80), /* 80MHz */
+			&read_dual_addr(1, INFINITE, 80), /* 80MHz */
+			/* &read_quad(3, INFINITE, 80), */
+			0
+		},
+
+		{
+			&write_std(0, 256, 80 /* 104 */), /* 80MHz */
+			0
+		},
+
+		{
+			&erase_sector_64k(0, _64K, 80 /* 104 */), /* 80MHz */
+			0
+		},
+		&spi_driver_general,
+	},
+
+	{
+		"EN25Q64", {0x1c, 0x30, 0x17}, 3, (_64K * _128B),  _64K, 3,
+		{
+			&read_std(0, INFINITE, 50), /* 50MHz */
+			&read_fast(1, INFINITE, 100), /* 100MHz */
+			&read_dual(1, INFINITE, 80), /* 80MHz */
+			&read_dual_addr(1, INFINITE, 80), /* 80MHz */
+			0
+		},
+
+		{
+			&write_std(0, 256, 80), /* 80MHz */
+			0
+		},
+
+		{
+			&erase_sector_64k(0, _64K, 104), /* 104MHz */
+			0
+		},
+		&spi_driver_no_qe,
+	},
+
+	{
+		"EN25XQ128A", {0x1c, 0x71, 0x18}, 3, _16M,  _64K, 3,
+		{
+			&read_std(0, INFINITE, 50), /* 50MHz */
+			&read_fast(1, INFINITE, 104), /* 104MHz */
+			&read_dual(1, INFINITE, 104), /* 104MHz */
+			&read_dual_addr(1, INFINITE, 104), /* 104MHz */
+#ifndef CONFIG_CLOSE_SPI_8PIN_4IO
+			&read_quad(1, INFINITE, 104), /* 104MHz */
+			&read_quad_addr(3, INFINITE, 104), /* 104MHz */
+#endif
+			0
+		},
+
+		{
+			&write_std(0, 256, 104), /* 104MHz */
+#ifndef CONFIG_CLOSE_SPI_8PIN_4IO
+			&write_quad(0, 256, 104), /* 104MHz */
+#endif
+			0
+		},
+
+		{
+			&erase_sector_64k(0, _64K, 104), /* 104MHz */
+			0
+		},
+		&spi_driver_general,
+	},
+
+	{
+		"EN25Q128", {0x1c, 0x30, 0x18}, 3, (_64K * _256B),  _64K, 3,
+		{
+			&read_std(0, INFINITE, 50), /* 50MHz */
+			&read_fast(1, INFINITE, 104), /* 104MHz */
+			&read_dual(1, INFINITE, 80), /* 80MHz */
+			&read_dual_addr(1, INFINITE, 80), /* 80MHz */
+			0
+		},
+
+		{
+			&write_std(0, 256, 104), /* 104MHz */
+			0
+		},
+
+		{
+			&erase_sector_64k(0, _64K, 104), /* 104MHz */
+			0
+		},
+		&spi_driver_no_qe,
+	},
+
+	/* Paragon 3.3V */
+	{
+		"PN25F16S", {0xe0, 0x40, 0x15}, 3, _2M,  _64K, 3,
+		{
+			&read_std(0, INFINITE, 55), /* 55MHz */
+			&read_fast(1, INFINITE, 108), /* 108MHz */
+			&read_dual(1, INFINITE, 108), /* 108MHz */
+			&read_dual_addr(1, INFINITE, 108), /* 108MHz */
+			0
+		},
+		{
+			&write_std(0, 256, 108),  /* 108MHz */
+			0
+		},
+		{
+			&erase_sector_64k(0, _64K, 108), /* 108MHz */
+			0
+		},
+		&spi_driver_general,
+	},
+
+	{
+		"PN25F32S", {0xe0, 0x40, 0x16}, 3, _4M,  _64K, 3,
+		{
+			&read_std(0, INFINITE, 55), /* 55MHz */
+			&read_fast(1, INFINITE, 108), /* 108MHz */
+			&read_dual(1, INFINITE, 108), /* 108MHz */
+			&read_dual_addr(1, INFINITE, 108), /* 108MHz */
+			&read_quad(1, INFINITE, 108), /* 108MHz */
+			&read_quad_addr(3, INFINITE, 108), /* 108MHz */
+			0
+		},
+		{
+			&write_std(0, 256, 108),  /* 108MHz */
+			0
+		},
+		{
+			&erase_sector_64k(0, _64K, 108), /* 108MHz */
+			0
+		},
+		&spi_driver_general,
+	},
+
+	/* Puya Semiconductor 3.3V */
+	{
+		"P25Q128H", {0x85, 0x60, 0x18}, 3, _16M,  _64K, 3,
+		{
+			&read_std(0, INFINITE, 80),
+			&read_fast(1, INFINITE, 104),
+			&read_dual(1, INFINITE, 104),
+			&read_dual_addr(1, INFINITE, 104),
+			&read_quad(1, INFINITE, 104),
+			&read_quad_addr(3, INFINITE, 104),
+			0
+		},
+		{
+			&write_std(0, 256, 104),
+			&write_quad(0, 256, 104),
+			0
+		},
+		{
+			&erase_sector_64k(0, _64K, 104),
+			0
+		},
+		&spi_driver_puya,
+	},
+
+	{
+		"P25Q64SH", {0x85, 0x60, 0x17}, 3, _8M,  _64K, 3,
+		{
+			&read_std(0, INFINITE, 80),
+			&read_fast(1, INFINITE, 80),
+			&read_dual(1, INFINITE, 80),
+			&read_dual_addr(1, INFINITE, 80),
+			&read_quad(1, INFINITE, 80),
+			&read_quad_addr(3, INFINITE, 80),
+			0
+		},
+		{
+			&write_std(0, 256, 80),
+			&write_quad(0, 256, 80),
+			0
+		},
+		{
+			&erase_sector_64k(0, _64K, 80),
+			0
+		},
+		&spi_driver_puya,
+	},
+
+	{
+		"H25S128", {0x68, 0x40, 0x18}, 3, _16M,  _64K, 3,
+		{
+			&read_std(0, INFINITE, 55),
+			&read_fast(1, INFINITE, 55),
+			&read_dual(1, INFINITE, 55),
+			&read_dual_addr(1, INFINITE, 108),
+			&read_quad(1, INFINITE, 108),
+			&read_quad_addr(3, INFINITE, 108),
+			0
+		},
+		{
+			&write_std(0, 256, 55),
+			&write_quad(0, 256, 55),
+			0
+		},
+		{
+			&erase_sector_64k(0, _64K, 55),
+			0
+		},
+		&spi_driver_w25q256fv,
+	},
+
+	/* ISSI IS25WP512M-RMLA3 1V8 */
+	{
+		"IS25WP512M", {0x9d, 0x70, 0x1a}, 3, _64M,  _64K, 4,
+		{
+			&read_std(0, INFINITE, 50),
+			&read_fast(1, INFINITE, 112),
+			&read_dual(1, INFINITE, 112),
+			&read_dual_addr(1, INFINITE, 112),
+			&read_quad(1, INFINITE, 112),
+			&read_quad_addr(3, INFINITE, 112),
+			0
+		},
+		{
+			&write_std(0, 256, 112),
+			&write_quad(0, 256, 112),
+			0
+		},
+		{
+			&erase_sector_64k(0, _64K, 112),
+			0
+		},
+		&spi_driver_issi,
+	},
+
+	/* ZB25VQ64A 3.3V */
+	{
+		"ZB25VQ64A", {0x5e, 0x40, 0x17}, 3, _8M,  _64K, 3,
+		{
+			&read_std(0, INFINITE, 45),
+			&read_fast(1, INFINITE, 104),
+			&read_dual(1, INFINITE, 104),
+			&read_dual_addr(1, INFINITE, 104),
+			&read_quad(1, INFINITE, 104),
+			&read_quad_addr(3, INFINITE, 104),
+			0
+		},
+		{
+			&write_std(0, 256, 104),
+			&write_quad(0, 256, 104),
+			0
+		},
+		{
+			&erase_sector_64k(0, _64K, 104),
+			0
+		},
+		&spi_driver_general,
+	},
+
+	/* PY25Q128HA 3.3V */
+	{
+		"PY25Q128HA", {0x85, 0x20, 0x18}, 3, _16M,  _64K, 3,
+		{
+			&read_std(0, INFINITE, 45),
+			&read_fast(1, INFINITE, 104),
+			&read_dual(1, INFINITE, 104),
+			&read_dual_addr(1, INFINITE, 104),
+			&read_quad(1, INFINITE, 104),
+			&read_quad_addr(3, INFINITE, 104),
+			0
+		},
+		{
+			&write_std(0, 256, 104),
+			&write_quad(0, 256, 104),
+			0
+		},
+		{
+			&erase_sector_64k(0, _64K, 104),
+			0
+		},
+		&spi_driver_puya,
+	},
+
+        /* ZB ZB25VQ128ASIG 3.3V */
+        {
+                "ZB25VQ128ASIG", {0x5e, 0x40, 0x18}, 3, _16M,  _64K, 3,
+                {
+                        &read_std(0, INFINITE, 45),
+                        &read_fast(1, INFINITE, 104),
+                        &read_dual(1, INFINITE, 104),
+                        &read_dual_addr(1, INFINITE, 104),
+                        &read_quad(1, INFINITE, 104),
+                        &read_quad_addr(3, INFINITE, 104),
+                        0
+                },
+                {
+                        &write_std(0, 256, 104),
+                        &write_quad(0, 256, 104),
+                        0
+                },
+                {
+                        &erase_sector_64k(0, _64K, 104),
+                        0
+                },
+                &spi_driver_general,
+        },
+
+	/* CFX GM25Q64ASIG 3.3V */
+	{
+		"GM25Q64ASIG", {0x1c, 0x40, 0x17}, 3, _8M,  _64K, 3,
+		{
+			&read_std(0, INFINITE, 45),
+			&read_fast(1, INFINITE, 104),
+			&read_dual(1, INFINITE, 104),
+			&read_dual_addr(1, INFINITE, 104),
+			&read_quad(1, INFINITE, 104),
+			&read_quad_addr(3, INFINITE, 80),
+			0
+		},
+		{
+			&write_std(0, 256, 104),
+			&write_quad(0, 256, 80),
+			0
+		},
+		{
+			&erase_sector_64k(0, _64K, 104),
+			0
+		},
+		&spi_driver_general,
+	},
+
+	/* CFX GM25Q128ASIG 3.3V */
+	{
+		"GM25Q128ASIG", {0x1c, 0x40, 0x18}, 3, _16M,  _64K, 3,
+		{
+			&read_std(0, INFINITE, 45),
+			&read_fast(1, INFINITE, 104),
+			&read_dual(1, INFINITE, 104),
+			&read_dual_addr(1, INFINITE, 104),
+			&read_quad(1, INFINITE, 104),
+			&read_quad_addr(3, INFINITE, 80),
+			0
+		},
+		{
+			&write_std(0, 256, 104),
+			&write_quad(0, 256, 80),
+			0
+		},
+		{
+			&erase_sector_64k(0, _64K, 104),
+			0
+		},
+		&spi_driver_general,
+	},
+
+	/* SK */
+	{
+		"SK25P64", {0x25, 0x60, 0x17}, 3, _8M,  _64K, 3,
+		{
+			&read_std(0, INFINITE, 80), /* 80MHz */
+			&read_fast(1, INFINITE, 104), /* 104MHz */
+			&read_dual(1, INFINITE, 104), /* 104MHz */
+			&read_dual_addr(1, INFINITE, 104), /* 104MHz */
+			0
+		},
+		{
+			&write_std(0, 256, 104), /* 104MHz */
+			0
+		},
+		{
+			&erase_sector_64k(0, _64K, 104), /* 104MHz */
+			0
+		},
+		&spi_driver_no_qe,
+	},
+
+	{
+		"SK25P128", {0x25, 0x60, 0x18}, 3, _16M,  _64K, 3,
+		{
+			&read_std(0, INFINITE, 50), /* 50MHz */
+			&read_fast(1, INFINITE, 104), /* 104MHz */
+			&read_dual(1, INFINITE, 104), /* 104MHz */
+			&read_dual_addr(1, INFINITE, 104), /* 104MHz */
+			0
+		},
+		{
+			&write_std(0, 256, 104), /* 104MHz */
+			0
+		},
+		{
+			&erase_sector_64k(0, _64K, 104), /* 104MHz */
+			0
+		},
+		&spi_driver_no_qe,
+	},
+
+	{
+		"ZD25Q128A", {0xba, 0x40, 0x18}, 3, _16M,  _64K, 3,
+		{
+			&read_std(0, INFINITE, 50),
+			&read_fast(1, INFINITE, 80),
+			0
+		},
+		{
+			&write_std(0, 256, 80),
+			0
+		},
+		{
+			&erase_sector_64k(0, _64K, 80),
 			0
 		},
 		&spi_driver_general,

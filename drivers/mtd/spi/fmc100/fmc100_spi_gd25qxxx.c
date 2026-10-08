@@ -35,6 +35,11 @@ static void set_cmd(struct fmc_spi* const spi, u8 cmd, u8 len)
 	spi->driver->wait_ready(spi);
 }
 
+static int spi_gd25q256_entry_4addr(struct fmc_spi *spi, int enable)
+{
+	return 0;
+}
+
 static int gd_16pin_qe_enable(struct fmc_spi * const spi, int op)
 {
 	struct fmc_host *host = (struct fmc_host *)spi->host;

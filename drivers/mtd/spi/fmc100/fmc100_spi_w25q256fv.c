@@ -30,6 +30,12 @@ static void spi_w25q256fv_set_cmd(const struct fmc_spi *spi, u8 cmd)
 	fmc_cmd_wait_cpu_finish(host);
 }
 
+static int spi_w25q256jv_entry_4addr(struct fmc_spi *spi, int enable)
+{
+
+	return 0;
+}
+
 static int spi_w25q256fv_entry_4addr(struct fmc_spi *spi, int enable)
 {
 	unsigned char status;

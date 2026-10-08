@@ -929,10 +929,65 @@ int fmc100_spi_nor_init(struct fmc_host *host)
 
 #ifdef CONFIG_SPI_BLOCK_PROTECT
 
+/*
+ * Bits that protect the array: SR1 SRP0|BP4..BP0, SR2 CMP|SRP1 and
+ * SR3.WPS, which hands protection to the per-block lock bits. Only
+ * those are touched, leaving QE, the OTP/LB bits and the read-only
+ * status bits alone. 0xff means the register does not exist.
+ */
+#define SPI_NOR_SR1_PROT_MASK	0xfc
+#define SPI_NOR_SR2_PROT_MASK	0x41
+#define SPI_NOR_SR3_WPS_MASK	0x04
+
+static void fmc100_send_cmd(struct fmc_host *host, struct fmc_spi *spi,
+			    unsigned char cmd)
+{
+	unsigned int reg;
+
+	reg = fmc_cmd_cmd1(cmd);
+	fmc_write(host, FMC_CMD, reg);
+
+	reg = op_cfg_fm_cs(spi->chipselect) | OP_CFG_OEN_EN;
+	fmc_write(host, FMC_OP_CFG, reg);
+
+	reg = fmc_op_cmd1_en(ENABLE) | FMC_OP_REG_OP_START;
+	fmc_write(host, FMC_OP, reg);
+
+	fmc_cmd_wait_cpu_finish(host);
+}
+
+static void fmc100_write_status_reg(struct fmc_host *host, struct fmc_spi *spi,
+				    unsigned char cmd, unsigned char val)
+{
+	unsigned int reg;
+
+	spi->driver->write_enable(spi);
+
+	writeb(val, host->iobase);
+
+	reg = fmc_cmd_cmd1(cmd);
+	fmc_write(host, FMC_CMD, reg);
+
+	reg = op_cfg_fm_cs(spi->chipselect) | OP_CFG_OEN_EN;
+	fmc_write(host, FMC_OP_CFG, reg);
+
+	reg = fmc_data_num_cnt(SPI_NOR_SR_LEN);
+	fmc_write(host, FMC_DATA_NUM, reg);
+
+	reg = fmc_op_cmd1_en(ENABLE) | fmc_op_write_data_en(ENABLE) |
+		FMC_OP_REG_OP_START;
+	fmc_write(host, FMC_OP, reg);
+
+	fmc_cmd_wait_cpu_finish(host);
+	spi->driver->wait_ready(spi);
+}
+
+/* Try to remove whatever write protection the part came with, whatever
+ * the vendor: WPS/per-block locks, then the BP/CMP/SRP fields. */
 void fmc100_global_unlock(struct fmc_host *host)
 {
 	struct fmc_spi *spi = host->spi;
-	unsigned int reg, sr1, sr2, sr3, mask;
+	unsigned char sr1, sr2, sr3;
 
 	sr1 = spi_general_get_flash_register(spi, SPI_CMD_RDSR);
 	sr2 = spi_general_get_flash_register(spi, SPI_CMD_RDSR2);
@@ -940,49 +995,51 @@ void fmc100_global_unlock(struct fmc_host *host)
 
 	printf("SR1[%#x] SR2[%#x] SR3[%#x]\n", sr1, sr2, sr3);
 
-	mask = ((1 << 2) | (1 << 3) | (1 << 4) | (1 << 5));
-	if (sr1 & mask) {
+	/*
+	 * With WPS set the BP bits are out of circuit and the per-block
+	 * lock bits protect the array; they power up locked, so only the
+	 * global block unlock clears them. It has to be issued while WPS
+	 * is still set, since that is the only mode in which the bits
+	 * exist.
+	 */
+	if (sr3 != 0xff && (sr3 & SPI_NOR_SR3_WPS_MASK)) {
 		spi->driver->write_enable(spi);
-		printf("Unlocking flash: SR1 [%#x]->[%#x]\n", sr1, sr1 & ~mask);
-		writeb(sr1 & ~mask, host->iobase);
-
-		reg = fmc_cmd_cmd1(SPI_CMD_WRSR);
-		fmc_write(host, FMC_CMD, reg);
-
-		reg = op_cfg_fm_cs(spi->chipselect) | OP_CFG_OEN_EN;
-		fmc_write(host, FMC_OP_CFG, reg);
-
-		reg = fmc_data_num_cnt(SPI_NOR_SR_LEN);
-		fmc_write(host, FMC_DATA_NUM, reg);
-
-		reg = fmc_op_cmd1_en(ENABLE) | fmc_op_write_data_en(ENABLE) |
-			FMC_OP_REG_OP_START;
-		fmc_write(host, FMC_OP, reg);
-
-		fmc_cmd_wait_cpu_finish(host);
+		fmc100_send_cmd(host, spi, SPI_CMD_GBULK);
+		spi->driver->wait_ready(spi);
+		printf("Unlocking flash: SR3 [%#x]->[%#x] (WPS)\n", sr3,
+		       sr3 & ~SPI_NOR_SR3_WPS_MASK);
+		fmc100_write_status_reg(host, spi, SPI_CMD_WRSR3,
+					sr3 & ~SPI_NOR_SR3_WPS_MASK);
 	}
 
-	mask = (1 << 3);
-	if (sr2 & mask) {
-		spi->driver->write_enable(spi);
-		printf("Disabling WPS: SR2 [%#x]->[%#x]\n", sr2, sr2 & ~mask);
-		writeb(sr2 & ~mask, host->iobase);
-
-		reg = fmc_cmd_cmd1(SPI_CMD_WRSR2);
-		fmc_write(host, FMC_CMD, reg);
-
-		reg = op_cfg_fm_cs(spi->chipselect) | OP_CFG_OEN_EN;
-		fmc_write(host, FMC_OP_CFG, reg);
-
-		reg = fmc_data_num_cnt(SPI_NOR_SR_LEN);
-		fmc_write(host, FMC_DATA_NUM, reg);
-
-		reg = fmc_op_cmd1_en(ENABLE) | fmc_op_write_data_en(ENABLE) |
-			FMC_OP_REG_OP_START;
-		fmc_write(host, FMC_OP, reg);
-
-		fmc_cmd_wait_cpu_finish(host);
+	if (sr1 != 0xff && (sr1 & SPI_NOR_SR1_PROT_MASK)) {
+		printf("Unlocking flash: SR1 [%#x]->[%#x]\n", sr1,
+		       sr1 & ~SPI_NOR_SR1_PROT_MASK);
+		fmc100_write_status_reg(host, spi, SPI_CMD_WRSR,
+					sr1 & ~SPI_NOR_SR1_PROT_MASK);
 	}
+
+	if (sr2 != 0xff && (sr2 & SPI_NOR_SR2_PROT_MASK)) {
+		printf("Unlocking flash: SR2 [%#x]->[%#x]\n", sr2,
+		       sr2 & ~SPI_NOR_SR2_PROT_MASK);
+		fmc100_write_status_reg(host, spi, SPI_CMD_WRSR2,
+					sr2 & ~SPI_NOR_SR2_PROT_MASK);
+	}
+
+	/*
+	 * None of the writes above can report a refusal, and a part that
+	 * stayed locked answers every erase and write with OK while
+	 * discarding it. Read the protection back and say so instead.
+	 */
+	sr1 = spi_general_get_flash_register(spi, SPI_CMD_RDSR);
+	sr2 = spi_general_get_flash_register(spi, SPI_CMD_RDSR2);
+	sr3 = spi_general_get_flash_register(spi, SPI_CMD_RDSR3);
+	if ((sr1 != 0xff && (sr1 & SPI_NOR_SR1_PROT_MASK)) ||
+	    (sr2 != 0xff && (sr2 & SPI_NOR_SR2_PROT_MASK)) ||
+	    (sr3 != 0xff && (sr3 & SPI_NOR_SR3_WPS_MASK)))
+		printf("SPI nor: STILL PROTECTED, SR1[%#x] SR2[%#x] SR3[%#x]"
+		       " - erase and write will be discarded\n",
+		       sr1, sr2, sr3);
 }
 
 void spi_lock_update_address(struct fmc_host *host)
@@ -1073,8 +1130,17 @@ void fmc100_get_bp_lock_level(struct fmc_host *host)
 
 	fmc100_global_unlock(host);
 
+	/* Assume no protection until the BP table says otherwise, so an
+	 * ID without an entry is not read through a stale mask. */
+	host->bp_num = BP_NUM_3;
+	host->level = 0;
+
 	/* match the manufacture ID to get the block protect info */
 	switch (mid) {
+	case MID_FM:
+	case MID_XTX:
+	case MID_SK:
+	case MID_PUYA:
 	case MID_GD:
 	case MID_ESMT:
 	case MID_CFEON:
@@ -1136,6 +1202,10 @@ unsigned short fmc100_set_spi_lock_info(struct fmc_host *host)
 			val = fmc100_handle_bp_rdcr_info(host,
 							   SPI_CMD_RDCR_MX);
 		break;
+	case MID_FM:
+	case MID_XTX:
+	case MID_SK:
+	case MID_PUYA:
 	case MID_GD:
 	case MID_ESMT:
 	case MID_CFEON:
