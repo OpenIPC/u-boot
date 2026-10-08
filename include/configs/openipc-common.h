@@ -196,16 +196,19 @@ void hi_gpio_status(void);
 
 #define CONFIG_BOOTARGS "mem=\\${osmem} console=ttyAMA0,115200 panic=20 init=/init root=ubi0:rootfs rootfstype=ubifs ubi.mtd=2,2048 mtdparts=\\${mtdparts} \\${extras}"
 
-/* Recovery: create the volumes manually; kernel first so the rootfs
- * volume can take all the remaining space. */
+/* Recovery: recreate the system volumes; the kernel is fixed and the
+ * rootfs volume is sized to the image, with rootfs_data taking the
+ * rest. Only a rootfs that grew beyond what the old volume could give
+ * costs the data volume, as U-Boot cannot resize UBI volumes; else
+ * rootfs_data is preserved. */
 #define OPENIPC_FWUPD "fwupd=run uk; run ur\0"
 
 #define OPENIPC_ENV_MEDIUM \
 	"ubfile=u-boot-" CONFIG_PRODUCT_SOC "-nand.bin\0" \
 	"urfile=rootfs.ubifs." CONFIG_PRODUCT_SOC "\0" \
 	"ubwrite=nand erase 0x0 0xc0000; nand write ${baseaddr} 0x0 ${filesize}\0" \
-	"ukwrite=ubi part ubi; ubi create kernel 0x400000 d; ubi write ${baseaddr} kernel ${filesize}\0" \
-	"urwrite=ubi part ubi; ubi create rootfs 0 d; ubi write ${baseaddr} rootfs ${filesize}\0" \
+	"ukwrite=ubi part ubi; ubi check kernel && ubi remove kernel; ubi create kernel 0x300000 d; ubi write ${baseaddr} kernel ${filesize}\0" \
+	"urwrite=ubi part ubi; ubi check rootfs && ubi remove rootfs; if ubi create rootfs ${filesize} d; then ubi check rootfs; else ubi remove rootfs_data; ubi create rootfs ${filesize} d; fi; ubi check rootfs_data || ubi create rootfs_data 0 d; ubi write ${baseaddr} rootfs ${filesize}\0" \
 	"loadkernel=ubi part ubi; ubi read ${baseaddr} kernel\0" \
 	"mtdids=nand0=" SFC "\0" \
 	"mtds=" OPENIPC_NAND_MTDPARTS "\0" \

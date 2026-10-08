@@ -213,6 +213,38 @@ static int recovery_ensure_volume(const char *name, const char *size) {
   return run_command(cmd, 0);
 }
 
+/* Recreate a system volume so it always has the expected size; the old
+ * one is removed first because UBI volumes cannot be resized. With
+ * `liberate' set, a create that runs out of space removes rootfs_data
+ * and retries: growing the rootfs is the only way to need its PEBs. */
+static int recovery_recreate_volume(const char *name, const char *size,
+                                    bool liberate) {
+  struct ubi_volume_desc *desc;
+  char cmd[64];
+  int ret;
+
+  desc = ubi_open_volume_nm(0, name, UBI_READONLY);
+  if (!IS_ERR(desc)) {
+    ubi_close_volume(desc);
+    printf("Recovery: recreating volume %s\n", name);
+    snprintf(cmd, sizeof(cmd), "ubi remove %s", name);
+    run_command(cmd, 0);
+  } else {
+    printf("Recovery: creating volume %s\n", name);
+  }
+
+  snprintf(cmd, sizeof(cmd), "ubi create %s %s d", name, size);
+  ret = run_command(cmd, 0);
+
+  if (ret && liberate) {
+    printf("Recovery: no room for %s, dropping rootfs_data\n", name);
+    run_command("ubi remove rootfs_data", 0);
+    ret = run_command(cmd, 0);
+  }
+
+  return ret;
+}
+
 static int recovery_write(const char *name, int type) {
   struct image_header hdr;
   loff_t actread;
@@ -263,9 +295,14 @@ static int recovery_write(const char *name, int type) {
   }
 
   if (type == RECOVERY_ROOTFS) {
-    ret = recovery_ensure_volume("rootfs", "0");
+    char size_str[24];
+
+    /* The volume is sized to the image; if it does not fit, the data
+     * volume is dropped (UBI volumes cannot be resized) */
+    snprintf(size_str, sizeof(size_str), "0x%lx", size);
+    ret = recovery_recreate_volume("rootfs", size_str, true);
     if (ret) {
-      printf("Recovery: cannot create rootfs volume (%d)\n", ret);
+      printf("Recovery: cannot recreate rootfs volume (%d)\n", ret);
       return -1;
     }
 
@@ -275,11 +312,14 @@ static int recovery_write(const char *name, int type) {
       return -1;
     }
 
+    /* The data volume takes the remaining space; keep it if present */
+    recovery_ensure_volume("rootfs_data", "0");
+
     printf("Recovery: wrote %s (%lu bytes) to rootfs volume\n", name, size);
   } else {
-    ret = recovery_ensure_volume("kernel", "0x400000");
+    ret = recovery_recreate_volume("kernel", "0x300000", false);
     if (ret) {
-      printf("Recovery: cannot create kernel volume (%d)\n", ret);
+      printf("Recovery: cannot recreate kernel volume (%d)\n", ret);
       return -1;
     }
 
