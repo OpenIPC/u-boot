@@ -2195,4 +2195,22 @@ const struct hi_muxctrl hi_muxctrl_table[] = {
 
 const int hi_muxctrl_count = ARRAY_SIZE(hi_muxctrl_table);
 
+#elif defined(CONFIG_TARGET_HI3520DV100_FAMILY)
+/*
+ * No pad-mux data for the Hi3520 family yet: its pads are muxed through
+ * per-peripheral IO-config registers rather than the one-nibble-per-pad
+ * scheme these tables describe, and neither ipctool nor the vendor trees
+ * carry a table for it. Keep an empty table so the GPIO command still
+ * builds and works; `gpio mux` reports that no row is known.
+ */
+const char hi_muxctrl_names[] =
+	"\0"
+;
+
+const struct hi_muxctrl hi_muxctrl_table[] = {
+	{0, {0}},
+};
+
+const int hi_muxctrl_count = ARRAY_SIZE(hi_muxctrl_table);
+
 #endif
