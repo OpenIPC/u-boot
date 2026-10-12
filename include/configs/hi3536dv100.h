@@ -12,8 +12,8 @@
 #define CONFIG_SYS_CACHELINE_SIZE   64
 
 /* Physical Memory Map */
-#define CONFIG_SYS_TEXT_BASE        0x88400000
-#define CONFIG_SYS_TEXT_BASE_ORI    0x88300000
+#define CONFIG_SYS_TEXT_BASE        0x80800000
+#define CONFIG_SYS_TEXT_BASE_ORI    0x80700000
 
 #define CONFIG_NR_DRAM_BANKS        1
 #define PHYS_SDRAM_1                0x80000000
