@@ -91,6 +91,9 @@ void hi_gpio_status(void);
 #define OPENIPC_BASEADDR CONFIG_SYS_LOAD_ADDR
 #endif
 
+#undef CONFIG_SYS_BOOTCOUNT_ADDR
+#define CONFIG_SYS_BOOTCOUNT_ADDR (CONFIG_SYS_SDRAM_BASE + 0x1f20000)
+
 /* Firmware image name for the whole-firmware update (CV610) */
 #ifdef CONFIG_ARCH_BSP
 #define OPENIPC_FW_FILE "rootfs.${soc}"
@@ -130,6 +133,8 @@ void hi_gpio_status(void);
 	"uk=if ${source} ${baseaddr} uImage.${soc}; then run ukwrite; elif ${source} ${baseaddr} fitImage.${soc}; then run ukwrite; fi\0" \
 	"ur=${source} ${baseaddr} ${urfile} && run urwrite\0" \
 	OPENIPC_FWUPD \
+	"bootlimit=2\0" \
+	"altbootcmd=echo \"*** Boot limit exceeded -- forcing firmware recovery ***\"; run fwupd\0" \
 	"fwrecovery=if env exists bootfail; then run fwupd; sleep 5; reset; fi\0" \
 	"bootflash=run fwrecovery; setenv setargs setenv bootargs ${bootargs}; run setargs; run loadkernel; bootm ${baseaddr}; reset\0"
 
