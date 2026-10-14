@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       release:
-        description: Publish to this repo's latest release and to OpenIPC/firmware
+        description: Publish to the Hisilicon release and to OpenIPC/firmware
         type: boolean
         default: false
 
@@ -15,10 +15,10 @@ on:
 # invoked with none; the matrix calls it with exactly one SoC per leg.
 
 jobs:
-  # Resolve the hisilicon revision this run builds from. The workflow
-  # itself lives on the openipc branch, so github.sha is the openipc
-  # commit, not the revision being built; release provenance must name
-  # the hisilicon commit that build.sh actually compiled.
+  # Resolve the openipc-hisilicon revision this run builds from. The
+  # workflow itself lives on the openipc branch, so github.sha is the
+  # openipc commit, not the revision being built; release provenance
+  # must name the commit that build.sh actually compiled.
   resolve:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -27,7 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: hisilicon
+          ref: openipc-hisilicon
           path: src
 
       - name: Resolve revision
@@ -84,7 +84,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: hisilicon
+          ref: openipc-hisilicon
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -287,10 +287,9 @@ jobs:
             exit 1
           fi
 
-  # Mirror every built image to this repository's own `latest` release,
-  # as before.
+  # Mirror every built image to this repository's own Hisilicon release.
   release:
-    needs: [build]
+    needs: [resolve, build]
     if: ${{ inputs.release }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -305,7 +304,9 @@ jobs:
       - name: Upload to releases
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest
+          tag_name: hisilicon
+          name: Hisilicon
+          target_commitish: ${{ needs.resolve.outputs.sha }}
           prerelease: true
           files: artifacts/**/*.bin
           fail_on_unmatched_files: true

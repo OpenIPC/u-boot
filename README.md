@@ -1,6 +1,6 @@
 # OpenIPC U-Boot
 
-[![hisilicon build](https://github.com/dimerr/u-boot/actions/workflows/build-hisilicon.yml/badge.svg)](https://github.com/dimerr/u-boot/actions/workflows/build-hisilicon.yml)
+[![hisilicon build](https://github.com/OpenIPC/u-boot/actions/workflows/build-hisilicon.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-hisilicon.yml)
 
 Unified repository for the U-Boot bootloaders maintained by
 [OpenIPC](https://openipc.org) for supported SoCs.
@@ -12,7 +12,7 @@ family — not bootloader sources.
 | Branch | Contents |
 | --- | --- |
 | `openipc` (this branch) | Unified documentation and CI workflows |
-| `hisilicon` | U-Boot for HiSilicon/Goke IP-camera SoCs |
+| `openipc-hisilicon` | U-Boot for HiSilicon/Goke IP-camera SoCs |
 | `main` | Fork of upstream mainline U-Boot, kept for rebasing |
 
 New families are added here as they are ported, each with its own
@@ -40,7 +40,7 @@ The current port: U-Boot for 36 HiSilicon and Goke camera SoCs.
 ### Build
 
 ```sh
-git clone --branch hisilicon https://github.com/dimerr/u-boot.git
+git clone --branch openipc-hisilicon https://github.com/OpenIPC/u-boot.git
 cd u-boot
 
 bash build.sh               # every supported SoC
@@ -65,7 +65,7 @@ started manually from the Actions tab:
 - uploads one artifact per SoC.
 
 With **`release: true`** the run additionally uploads every built image
-to this repository's [`latest` release](../../releases/tag/latest),
+to this repository's [`Hisilicon` release](../../releases/tag/hisilicon),
 pushes them to the `OpenIPC/firmware` `latest` release and reports the
 result to openipc.org. This requires a `FIRMWARE_RELEASE_TOKEN` secret
 with release write access to `OpenIPC/firmware`.
