@@ -117,7 +117,7 @@ static void hinfc301_dma_transfer(struct hinfc_host *host, int todev)
 
 static void hinfc301_cmd_ctrl(struct mtd_info *mtd, int dat, unsigned int ctrl)
 {
-	struct nand_chip *chip = mtd->priv;
+	struct nand_chip *chip = mtd_to_nand(mtd);
 	struct hinfc_host *host = chip->priv;
 
 	if (ctrl & NAND_ALE) {
@@ -295,7 +295,7 @@ static int hinfc301_dev_ready(struct mtd_info *mtd)
 
 static void hinfc301_select_chip(struct mtd_info *mtd, int chipselect)
 {
-	struct nand_chip *chip = mtd->priv;
+	struct nand_chip *chip = mtd_to_nand(mtd);
 	struct hinfc_host *host = chip->priv;
 
 	if (chipselect < 0)
@@ -310,7 +310,7 @@ static void hinfc301_select_chip(struct mtd_info *mtd, int chipselect)
 
 static uint8_t hinfc301_read_byte(struct mtd_info *mtd)
 {
-	struct nand_chip *chip = mtd->priv;
+	struct nand_chip *chip = mtd_to_nand(mtd);
 	struct hinfc_host *host = chip->priv;
 
 	if (host->command == NAND_CMD_STATUS)
@@ -327,7 +327,7 @@ static uint8_t hinfc301_read_byte(struct mtd_info *mtd)
 
 static u16 hinfc301_read_word(struct mtd_info *mtd)
 {
-	struct nand_chip *chip = mtd->priv;
+	struct nand_chip *chip = mtd_to_nand(mtd);
 	struct hinfc_host *host = chip->priv;
 
 	host->offset += 2;
@@ -338,7 +338,7 @@ static u16 hinfc301_read_word(struct mtd_info *mtd)
 static void hinfc301_write_buf(struct mtd_info *mtd,
 		const uint8_t *buf, int len)
 {
-	struct nand_chip *chip = mtd->priv;
+	struct nand_chip *chip = mtd_to_nand(mtd);
 	struct hinfc_host *host = chip->priv;
 
 	memcpy(host->buffer + host->column + host->offset, buf, len);
@@ -348,7 +348,7 @@ static void hinfc301_write_buf(struct mtd_info *mtd,
 
 static void hinfc301_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
 {
-	struct nand_chip *chip = mtd->priv;
+	struct nand_chip *chip = mtd_to_nand(mtd);
 	struct hinfc_host *host = chip->priv;
 
 	memcpy(buf, host->buffer + host->column + host->offset, len);
