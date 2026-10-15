@@ -15,14 +15,23 @@ on:
         required: true
   workflow_dispatch:
     inputs:
+      # Two switches: OpenIPC/firmware `latest` also carries -nor/-nand
+      # images that u-boot-xmedia and u-boot-hi3516cv6xx publish under the
+      # same names, so refreshing this repo's own release must not
+      # replace those by default.
       release:
-        description: Publish to the Hisilicon release and to OpenIPC/firmware
+        description: Publish to this repo's Hisilicon release
+        type: boolean
+        default: false
+      publish:
+        description: Publish to OpenIPC/firmware latest and report to openipc.org (replaces same-named images from other repos)
         type: boolean
         default: false
 
 # Mirrors the CI shape of OpenIPC/u-boot-xmedia:
 #   build (matrix, every SoC) -> qemu (prep) -> qemu_smoke (hard gate) ->
-#   release (own) + publish (OpenIPC/firmware latest + openipc.org report).
+#   release (own, `release` input) + publish (OpenIPC/firmware latest +
+#   openipc.org report, `publish` input).
 # build.sh takes SoCs as arguments and builds every supported SoC when
 # invoked with none; the matrix calls it with exactly one SoC per leg.
 
@@ -352,7 +361,7 @@ jobs:
   # from uploading between this run's upload and its report.
   publish:
     needs: [resolve, build, qemu_smoke]
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:

@@ -57,8 +57,11 @@ The toolchain is `arm-linux-gnueabi-` (Debian/Ubuntu package
 
 ## CI
 
-The [build-hisilicon](.github/workflows/build-hisilicon.yml) workflow is
-started manually from the Actions tab:
+The [build-hisilicon](.github/workflows/build-hisilicon.yml) workflow runs
+on pull requests to this branch, on pushes and pull requests to
+`openipc-hisilicon` (through that branch's `ci.yml`, which builds the
+pushed commit or the pull request merged into its base), and manually
+from the Actions tab. Each run:
 
 - builds every SoC in the list above, one matrix leg per SoC, and fails
   if an image overflows its boot partition;
@@ -68,16 +71,23 @@ started manually from the Actions tab:
   get no smoke leg;
 - uploads one artifact per SoC.
 
-With **`release: true`** the run additionally uploads every built image
-(except the held GK7206 ones)
-to this repository's [`Hisilicon` release](../../releases/tag/hisilicon),
-pushes them to the `OpenIPC/firmware` `latest` release and reports the
-result to openipc.org. This requires a `FIRMWARE_RELEASE_TOKEN` secret
-with release write access to `OpenIPC/firmware`.
+Two dispatch inputs control uploads; both skip the held GK7206 images.
+
+- **`release: true`** uploads every built image to this repository's
+  [`Hisilicon` release](../../releases/tag/hisilicon).
+- **`publish: true`** pushes them to the `OpenIPC/firmware` `latest`
+  release and reports the result to openipc.org. This requires a
+  `FIRMWARE_RELEASE_TOKEN` secret with release write access to
+  `OpenIPC/firmware`. `latest` already carries images under the same
+  names from OpenIPC/u-boot-xmedia (`u-boot-gk7205v500/v510/v530-*`,
+  `u-boot-hi3516ev200/ev300/dv200-*`, `u-boot-hi3518ev300-*`) and
+  u-boot-hi3516cv6xx (`boot-hi3516cv60x/cv610-*`); publishing replaces
+  them with this tree's builds.
 
 ```sh
-gh workflow run build-hisilicon.yml                    # build + smoke test
-gh workflow run build-hisilicon.yml -f release=true    # ... and publish
+gh workflow run build-hisilicon.yml                                   # build + smoke test
+gh workflow run build-hisilicon.yml -f release=true                   # ... and this repo's release
+gh workflow run build-hisilicon.yml -f release=true -f publish=true   # ... and OpenIPC/firmware + openipc.org
 ```
 
 ## Adding a SoC family
