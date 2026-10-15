@@ -1,0 +1,43 @@
+# Goke GK7206V1 (xmedia xmorca): appended to openipc_config.
+# CONFIG_TARGET_XM72050200 is not set
+CONFIG_TARGET_XMORCA=y
+CONFIG_SYS_SOC="xmorca"
+CONFIG_SYS_BOARD="xmorca"
+CONFIG_SYS_CONFIG_NAME="xmorca"
+CONFIG_IDENT_STRING="xmorca"
+CONFIG_SYS_LOAD_ADDR=0x42000000
+CONFIG_SYS_BOOTM_LEN=0x2000000
+CONFIG_SYS_MAXARGS=64
+
+# Hardware gunzip of U-Boot by the first stage, and for `hwzimage`/`ugzip`
+CONFIG_HWDEC=y
+CONFIG_HWDEC_V1=y
+
+# DDR is trained before U-Boot runs, by the SDK's auxcode
+# CONFIG_DDR_TRAINING_V2 is not set
+# CONFIG_CMD_DDR_TRAINING is not set
+
+# Ethernet: FTGMAC030 with the internal FEPHY or an external RTL PHY
+# CONFIG_NET_FEMAC is not set
+CONFIG_FTGMAC030=y
+CONFIG_PHY_REALTEK=y
+CONFIG_CMD_MDIO=y
+CONFIG_SYS_RX_ETH_BUFFER=16
+
+# USB: xmorca's DWC3 behind xhci, PHY in drivers/phy/xmedia
+# CONFIG_PHY_HISI_USB is not set
+CONFIG_PHY_VENDOR_USB=y
+
+# No pad-mux table for this die in drivers/gpio/hi_padmux_tables.c; the
+# SDK does not publish the function names
+# CONFIG_HI_GPIO is not set
+# CONFIG_CMD_GPIO is not set
+# CONFIG_CMD_GPIO_READ is not set
+# No I2C driver for this SoC here
+# CONFIG_LHS_I2C is not set
+# CONFIG_CMD_LHS_I2C is not set
+
+# Flash
+CONFIG_FMC=y
+CONFIG_FMC_SPI_NOR=y
+CONFIG_MTD_PARTITIONS=y

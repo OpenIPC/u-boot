@@ -497,4 +497,117 @@ unsigned char *get_cs_number(unsigned char cs);
 
 unsigned int get_fmc_boot_mode(void);
 
+#ifdef CONFIG_TARGET_XMORCA
+/*
+ * xmorca (GK7206V1): the same FMC with its register offsets and several
+ * field positions moved. Everything not listed here is as above.
+ */
+#undef FMC_CFG
+#define FMC_CFG	0x08
+#undef fmc_cfg_spi_nand_sel
+#define fmc_cfg_spi_nand_sel(_type)	(((_size) & 0x3) << 1)
+#undef fmc_cfg_page_size
+#define fmc_cfg_page_size(_size)	(((_size) & 0x3) << 11)
+#undef fmc_cfg_flash_sel
+#define fmc_cfg_flash_sel(_type)	(((_type) & 0x3) << 3)
+#undef PAGE_SIZE_SHIFT
+#define PAGE_SIZE_SHIFT	11
+#undef FLASH_SEL_SHIFT
+#define FLASH_SEL_SHIFT	3
+#undef FMC_GLOBAL_CFG
+#define FMC_GLOBAL_CFG	0x0c
+#undef FMC_GLOBAL_CFG_WP_ENABLE
+#define FMC_GLOBAL_CFG_WP_ENABLE	(1 << 11)
+#undef FMC_GLOBAL_CFG_RANDOMIZER_EN
+#define FMC_GLOBAL_CFG_RANDOMIZER_EN	(1 << 24)
+#undef FMC_SPI_TIMING_CFG
+#define FMC_SPI_TIMING_CFG	0x00
+#undef timing_cfg_tcss
+#define timing_cfg_tcss(_n)	(((_n) & 0xf) << 0)
+#undef timing_cfg_tshsl
+#define timing_cfg_tshsl(_n)	(((_n) & 0xf) << 4)
+#undef FMC_PND_PWIDTH_CFG
+#define FMC_PND_PWIDTH_CFG	0x04
+#undef FMC_INT
+#define FMC_INT	0x10
+#undef FMC_INT_EN
+#define FMC_INT_EN	0x14
+#undef FMC_INT_CLR
+#define FMC_INT_CLR	0x28
+#undef FMC_CMD
+#define FMC_CMD	0x2c
+#undef FMC_ADDRH
+#define FMC_ADDRH	0x20
+#undef FMC_ADDRL
+#define FMC_ADDRL	0x24
+#undef FMC_OP_CFG
+#define FMC_OP_CFG	0x38
+#undef op_cfg_fm_cs
+#define op_cfg_fm_cs(_cs)	((_cs) << 10)
+#undef op_cfg_force_cs_en
+#define op_cfg_force_cs_en(_en)	((_en) << 11)
+#undef op_cfg_mem_if_type
+#define op_cfg_mem_if_type(_type)	(((_type) & 0x7) << 4)
+#undef op_cfg_addr_num
+#define op_cfg_addr_num(_addr)	(((_addr) & 0x7) << 7)
+#undef IF_TYPE_SHIFT
+#define IF_TYPE_SHIFT	4
+#undef FMC_SPI_OP_ADDR
+#define FMC_SPI_OP_ADDR	0x3c
+#undef FMC_DATA_NUM
+#define FMC_DATA_NUM	0x30
+#undef FMC_OP
+#define FMC_OP	0x34
+#undef fmc_op_cmd1_en
+#define fmc_op_cmd1_en(_en)	((_en) << 2)
+#undef fmc_op_addr_en
+#define fmc_op_addr_en(_en)	((_en) << 1)
+#undef fmc_op_read_data_en
+#define fmc_op_read_data_en(_en)	((_en) << 7)
+#undef fmc_op_read_status_en
+#define fmc_op_read_status_en(_en)	((_en) << 6)
+#undef FMC_DMA_LEN
+#define FMC_DMA_LEN	0x48
+#undef FMC_DMA_AHB_CTRL
+#define FMC_DMA_AHB_CTRL	0x40
+#undef FMC_DMA_SADDR_D0
+#define FMC_DMA_SADDR_D0	0x44
+#undef FMC_DMA_SADDR_D1
+#define FMC_DMA_SADDR_D1	0x58
+#undef FMC_DMA_SADDR_D2
+#define FMC_DMA_SADDR_D2	0x5c
+#undef FMC_DMA_SADDR_D3
+#define FMC_DMA_SADDR_D3	0x50
+#undef FMC_DMA_SADDR_OOB
+#define FMC_DMA_SADDR_OOB	0x54
+#undef FMC_DMA_SADDRH_D0
+#define FMC_DMA_SADDRH_D0	0x208
+#undef FMC_DMA_SADDRH_OOB
+#define FMC_DMA_SADDRH_OOB	0x218
+#undef FMC_DMA_BLK_SADDR
+#define FMC_DMA_BLK_SADDR	0x68
+#undef FMC_DMA_BLK_LEN
+#define FMC_DMA_BLK_LEN	0x6c
+#undef FMC_OP_CTRL
+#define FMC_OP_CTRL	0x60
+#undef op_ctrl_rd_opcode
+#define op_ctrl_rd_opcode(_code)	(((_code) & 0xff) << 8)
+#undef op_ctrl_wr_opcode
+#define op_ctrl_wr_opcode(_code)	(((_code) & 0xff) << 16)
+#undef FMC_OP_PARA
+#define FMC_OP_PARA	0x78
+#undef FMC_BOOT_SET
+#define FMC_BOOT_SET	0x7c
+#undef FMC_BOOT_SET_DEVICE_ECC_EN
+#define FMC_BOOT_SET_DEVICE_ECC_EN	(1 << 4)
+#undef FMC_BOOT_SET_BOOT_QUAD_EN
+#define FMC_BOOT_SET_BOOT_QUAD_EN	(1 << 0)
+#undef FMC_STATUS
+#define FMC_STATUS	0xa4
+#undef FMC_VERSION
+#define FMC_VERSION	0xb4
+#undef FMC_VER_100
+#define FMC_VER_100	0x200
+#endif /* CONFIG_TARGET_XMORCA */
+
 #endif /* End of __FMC_COMMON_H__ */

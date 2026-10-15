@@ -46,6 +46,9 @@
 #if (defined CONFIG_TARGET_XM720XXX)
 #include "hw_decompress_xm720xxx.c"
 #endif
+#if (defined CONFIG_TARGET_XMORCA)
+#include "hw_decompress_xmorca.c"
+#endif
 
 #if (defined CONFIG_TARGET_HI3519DV500_FAMILY)
 #include "hw_decompress_hi3519dv500.c"

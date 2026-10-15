@@ -881,6 +881,8 @@ else ifeq ($(CONFIG_TARGET_HI3516CV300_FAMILY),y)
 libs-y += drivers/ddr/hisilicon/$(SOC)/
 else ifeq ($(CONFIG_ARCH_BSP),y)
 # vendor DDR training lives in drivers/ddr/vendor/boot_adaptation
+else ifeq ($(CONFIG_TARGET_XMORCA),y)
+# DDR is trained before U-Boot runs, by the auxcode in the boot image
 else
 libs-y += drivers/ddr/xmedia/default/
 endif

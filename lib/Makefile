@@ -133,6 +133,7 @@ obj-$(CONFIG_TARGET_XM72050200) += xmedia/
 obj-$(CONFIG_TARGET_XM72050300) += xmedia/
 obj-$(CONFIG_TARGET_XM72050500) += xmedia/
 obj-$(CONFIG_TARGET_XM720XXX) += xmedia/
+obj-$(CONFIG_TARGET_XMORCA) += xmedia/
 obj-$(CONFIG_TARGET_XM76050100) += xmedia/
 
 ifeq ($(CONFIG_$(SPL_TPL_)BUILD),y)

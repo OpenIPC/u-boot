@@ -5074,3 +5074,4 @@
 #define MACH_TYPE_XM76050100           8000
 #define MACH_TYPE_XM72050500           8000
 #define MACH_TYPE_XM720XXX             8000
+#define MACH_TYPE_XMORCA               8000
