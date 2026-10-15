@@ -8,7 +8,7 @@
 #include <common.h>
 #include <asm/io.h>
 
-#ifdef CONFIG_TARGET_XM720XXX
+#if defined(CONFIG_TARGET_XM720XXX) || defined(CONFIG_TARGET_XMORCA)
 static timestamp_type stopwatch_get_running_timer(void);
 #define timestamp_get_time()          stopwatch_get_running_timer()
 #define convert_to_final_stamp(value) (value)
@@ -30,7 +30,12 @@ typedef union {
 		u32 timer_trigger : 1;
 		/* [2] 1:timer clear enable, system will clear timer's value in reg */
 		u32 timer_clear : 1;
-#ifdef CONFIG_TARGET_XM720XXX
+#if defined(CONFIG_TARGET_XMORCA)
+		/* [2] running timer trigger; the timer select is a register of its own */
+		u32 running_timer_trigger : 1;
+		/* [3:31] reserved */
+		u32 reserved1 : 29;
+#elif defined(CONFIG_TARGET_XM720XXX)
 		/* [2-5]:timer select */
 		u32 timer_sel : 4;
 		/* [6:15] reserved */
@@ -80,7 +85,7 @@ void timestamp_mark(const char *func, u32 line, u32 type)
 
 	timestamp_item *item =
 		(timestamp_item *)(uintptr_t)TIMESTAMP_ITEM_START_ADDR;
-#ifdef CONFIG_TARGET_XM720XXX
+#if defined(CONFIG_TARGET_XM720XXX) || defined(CONFIG_TARGET_XMORCA)
 	item[cnt].stamp = stamp;
 #else
 	item[cnt].stamp = ~stamp;
@@ -147,20 +152,28 @@ static timestamp_type stopwatch_get(u32 point)
 
 	cfg.timer_clear = 0; /* false */
 	cfg.timer_trigger = 0; /* false */
+#ifdef CONFIG_TARGET_XMORCA
+	(void)cfg;
+	writel(point, STOPWATCH_SEL_REG);
+#else
 	cfg.timer_sel = point;
 	writel(cfg.value, (STOPWATCH_CTRL_REG));
+#endif
 	udelay(REG_OPERATION_DELAY_US);
 	timestamp_type value = readl(STOPWATCH_VALUE_REG);
-#ifdef CONFIG_TARGET_XM720XXX
+#if defined(CONFIG_TARGET_XM720XXX) || defined(CONFIG_TARGET_XMORCA)
 	value += (timestamp_type)readl(STOPWATCH_VALUE_REG_H) << 32;
 #endif
 	return value;
 }
 
-#ifdef CONFIG_TARGET_XM720XXX
+#if defined(CONFIG_TARGET_XM720XXX) || defined(CONFIG_TARGET_XMORCA)
 static timestamp_type stopwatch_get_running_timer(void)
 {
-	writel(1 << 16, STOPWATCH_CTRL_REG);
+	stopwatch_cfg cfg = {0};
+
+	cfg.running_timer_trigger = 1;
+	writel(cfg.value, STOPWATCH_CTRL_REG);
 	/* 4us at least to wait */
 	udelay(4);
 	timestamp_type value = readl(STOPWATCH_RUNNING_VALUE_REG);

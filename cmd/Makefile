@@ -268,6 +268,7 @@ obj-$(CONFIG_TARGET_XM72050200) += hwzimage.o
 obj-$(CONFIG_TARGET_XM72050300) += hwzimage.o
 obj-$(CONFIG_TARGET_XM72050500) += hwzimage.o
 obj-$(CONFIG_TARGET_XM720XXX) += hwzimage.o
+obj-$(CONFIG_TARGET_XMORCA) += hwzimage.o
 obj-$(CONFIG_TARGET_XM76050100) += hwzimage.o
 CFLAGS_hwzimage.o += -I$(srctree)/lib/hw_dec
 obj-y += xmedia/getinfo.o
@@ -280,5 +281,6 @@ obj-$(CONFIG_TARGET_XM72050200) += cmd_ugzip.o
 obj-$(CONFIG_TARGET_XM72050300) += cmd_ugzip.o
 obj-$(CONFIG_TARGET_XM72050500) += cmd_ugzip.o
 obj-$(CONFIG_TARGET_XM720XXX) += cmd_ugzip.o
+obj-$(CONFIG_TARGET_XMORCA) += cmd_ugzip.o
 obj-$(CONFIG_TARGET_XM76050100) += cmd_ugzip.o
 sinclude $(srctree)/cmd/Makefile-product

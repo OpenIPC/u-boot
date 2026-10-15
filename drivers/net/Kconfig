@@ -838,6 +838,15 @@ config NET_FEMAC
 	help
 	  XMEDIA FEMAC ethernet support.
 
+config FTGMAC030
+	bool "XMEDIA FTGMAC030 Ethernet Controller"
+	depends on TARGET_XMORCA
+	select PHYLIB
+	select MII
+	help
+	  The Faraday FTGMAC030-based MAC of the xmorca (GK7206V1) SoCs, with
+	  the driver for their internal FEPHY.
+
 config NET_HISFV300
 	bool "Hisilicon Fast Ethernet Controller v300"
 	help

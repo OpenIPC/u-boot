@@ -9,7 +9,7 @@
 #include <config.h>
 #include <linux/types.h>
 
-#ifdef CONFIG_TARGET_XM720XXX
+#if defined(CONFIG_TARGET_XM720XXX) || defined(CONFIG_TARGET_XMORCA)
 typedef	u64 timestamp_type;
 #else
 typedef	u32 timestamp_type;

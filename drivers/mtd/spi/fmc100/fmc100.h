@@ -99,7 +99,11 @@
 /* MXIC Config Register's dummy cycle bits */
 #define CR_DUMMY_CYCLE	  (0x03 << 6)
 #define SPI_CMD_RDCR_MX		 0x15 /* MXIC Read Config Register */
+#ifdef CONFIG_TARGET_XMORCA
+#define DTR_MODE_REQUEST_SHIFT		   2
+#else
 #define DTR_MODE_REQUEST_SHIFT		   11
+#endif
 #define SPI_NOR_SR_WIP_MASK 			(1 << 0)
 
 struct fmc_host {

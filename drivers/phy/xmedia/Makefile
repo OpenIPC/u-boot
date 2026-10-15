@@ -6,3 +6,4 @@ obj-$(CONFIG_TARGET_XM72050300) += phy-xm72050300-usb.o
 obj-$(CONFIG_TARGET_XM76050100) += phy-xm76050100-usb.o
 obj-$(CONFIG_TARGET_XM72050500) += phy-xm72050500-usb.o
 obj-$(CONFIG_TARGET_XM720XXX) += phy-xm720xxx-usb.o
+obj-$(CONFIG_TARGET_XMORCA) += phy-xmorca-usb.o

@@ -197,6 +197,30 @@ build_xmedia() {
     cp ${BOOT_BUILDDIR}/u-boot-xm*.bin ${BOOT_BUILDDIR}/../u-boot-${soc}-nand.bin || return 1
 }
 
+# Goke GK7206V1 (xmedia xmorca): NOR + NAND. The register table
+# is all that differs between the two dies; the other four (V10, V10B, V11,
+# V11AT) have none in the SDK.
+build_xmorca() {
+    soc=$1
+    mkflags
+
+    rm -rf ${BOOT_BUILDDIR}
+    mkdir -p ${BOOT_BUILDDIR}
+    cp openipc/${soc}_reginfo.bin ${BOOT_BUILDDIR}/.reg
+    for flash in nor nand; do
+        cat ${BOOT_SRCDIR}/openipc/openipc_config > ${BOOT_BUILDDIR}/.config && \
+        cat ${BOOT_SRCDIR}/openipc/gk7206v100_config >> ${BOOT_BUILDDIR}/.config && \
+        if [ ${flash} = nand ]; then \
+            cat ${BOOT_SRCDIR}/openipc/nand_config >> ${BOOT_BUILDDIR}/.config; \
+        fi && \
+        echo "CONFIG_PRODUCT_SOC=\"${soc}\"" >> ${BOOT_BUILDDIR}/.config && \
+        make ${MAKE_OPTS} olddefconfig </dev/null >/dev/null && \
+        make ${MAKE_OPTS} BOOT_SRCDIR=${BOOT_SRCDIR} </dev/null && \
+        make ${MAKE_OPTS} u-boot-z.bin </dev/null && \
+        cp ${BOOT_BUILDDIR}/u-boot-xmorca.bin ${BOOT_BUILDDIR}/../u-boot-${soc}-${flash}.bin || return 1
+    done
+}
+
 build_soc() {
     soc=$1
     case "${soc}" in
@@ -226,6 +250,8 @@ build_soc() {
             build_xmedia ${soc} ${soc}_config "-DPRODUCT_SOC=${soc} -DVENDOR_HISILICON" yes ;;
         gk7205v500|gk7205v510|gk7205v530)
             build_xmedia ${soc} xm720xxx_config "" no ;;
+        gk7206v11a|gk7206v12a)
+            build_xmorca ${soc} ;;
         *)
             echo "unsupported SoC: ${soc}" >&2
             return 1 ;;
@@ -243,7 +269,8 @@ ALL_SOCS="hi3516cv500 hi3516dv300 hi3516av300 \
           hi3518av100 hi3518cv100 hi3518ev100 hi3516cv100 \
           gk7201v200 gk7201v300 gk7205v200 gk7205v300 gk7202v300 gk7605v100 \
           hi3516dv200 hi3516ev200 hi3516ev300 hi3518ev300 \
-          gk7205v500 gk7205v510 gk7205v530"
+          gk7205v500 gk7205v510 gk7205v530 \
+          gk7206v11a gk7206v12a"
 
 SOCS="$@"
 [ -z "${SOCS}" ] && SOCS="${ALL_SOCS}"

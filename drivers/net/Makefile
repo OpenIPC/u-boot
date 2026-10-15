@@ -47,6 +47,7 @@ obj-$(CONFIG_GMAC_ROCKCHIP) += gmac_rockchip.o
 obj-$(CONFIG_HIGMACV300_ETH) += higmacv300.o
 obj-$(CONFIG_NET_HISFV300) += hisfv300/
 obj-$(CONFIG_NET_FEMAC) += femac/
+obj-$(CONFIG_FTGMAC030) += ftgmac030/
 obj-$(CONFIG_NET_HIGMACV300) += higmacv300/
 obj-$(CONFIG_KS8851_MLL) += ks8851_mll.o
 obj-$(CONFIG_KSZ9477) += ksz9477.o

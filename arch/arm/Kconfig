@@ -2175,6 +2175,15 @@ config TARGET_XM720XXX
 	help
 	  Support for xmedia XM72050500/XM72050510/XM72050530/XM72050230/XM72020330 platform.
 
+config TARGET_XMORCA
+	bool "Support XMORCA (Goke GK7206V1)"
+	select CPU_V7A
+	select DM
+	select CPU_V7A_HAS_NONSEC
+	help
+	  Support for xmedia xmorca platform: Goke GK7206V10/V10B/V11/V11A/
+	  V11AT/V12A.
+
 config TARGET_XM72010200
 	bool "Support XM72010200"
 	select CPU_V7A
@@ -2628,6 +2637,7 @@ source "board/xmedia/xm72020300/Kconfig"
 source "board/xmedia/xm76050100/Kconfig"
 source "board/xmedia/xm72050500/Kconfig"
 source "board/xmedia/xm720xxx/Kconfig"
+source "board/xmedia/xmorca/Kconfig"
 
 source "arch/arm/Kconfig.debug"
 

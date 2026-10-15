@@ -9,6 +9,35 @@
 /* The base address for emar */
 #define HW_DEC_REG_BASE_ADDR    (GZIP_REG_BASE)
 
+#ifdef CONFIG_TARGET_XMORCA
+/*
+ * xmorca (GK7206V1) has the same decompressor with its registers moved
+ * and the interrupt bits at [11:10] rather than [1:0].
+ */
+#define EAMR_RID_REG_OFST   0x0110UL
+#define EAMR_ROSD_REG_OFST  0x0114UL
+#define EAMR_WID_REG_OFST   0x0128UL
+#define EAMR_WOSD_REG_OFST  0x012CUL
+#define EAMR_WORK_EN_REG_OFST 0x0118UL
+#define DPRS_DATA_SRC_BADDR 0x2058UL
+#define DPRS_DATA_SRC_LEN   0x205CUL
+#define DPRS_DATA_RTN_BADDR 0x2038UL
+#define DPRS_DATA_RTN_LEN   0x203CUL
+#define DPRS_DATA_INFO_BADDR 0x2030UL
+#define DPRS_DATA_INFO_LEN  0x2034UL
+#define DPRS_DATA_CRC32     0x2040UL
+#define CRC_CHECK_EN        0x4018UL
+#define BUF_INFO            0x2098UL
+#define DPRS_RTN_INFO       0x209CUL
+#define DPRS_RTN_LEN        0x2090UL
+#define BUF_INFO_CLR        0x20A8UL
+#define RLT_INFO_CLR        0x20ACUL
+#define INT_EN_REG_ADDR     0x0130UL
+#define INT_STATUS_REG_ADDR 0x013CUL
+#define INT_CLEAR_REG_ADDR  0x0148UL
+#define TASK_MODE_REG       0x214CUL
+#define HW_DEC_INTR_PAD     10
+#else
 /* The global init registers for emar interface */
 #define EAMR_RID_REG_OFST   0x0108UL
 #define EAMR_ROSD_REG_OFST  0x010CUL
@@ -46,6 +75,8 @@
 #define INT_CLEAR_REG_ADDR  0x0130UL
 
 #define TASK_MODE_REG       0x2134UL
+#define HW_DEC_INTR_PAD     0
+#endif
 
 /* Define the union u_dprs_data_buf_info */
 typedef union {
@@ -87,9 +118,16 @@ typedef union {
 typedef union {
 	/* Define the struct bits */
 	struct {
+#if HW_DEC_INTR_PAD
+		unsigned int reserved_pad : HW_DEC_INTR_PAD;
+		unsigned int block_intrpt_en : 1; /* [10] */
+		unsigned int task_intrpt_en : 1; /* [11] */
+		unsigned int reserved_0 : 32 - HW_DEC_INTR_PAD - 2;
+#else
 		unsigned int task_intrpt_en : 1; /* [0] */
 		unsigned int block_intrpt_en : 1; /* [1] */
 		unsigned int reserved_0 : 30; /* [31..2] */
+#endif
 	} bits;
 
 	/* Define an unsigned member */
@@ -99,9 +137,16 @@ typedef union {
 typedef union {
 	/* Define the struct bits */
 	struct {
+#if HW_DEC_INTR_PAD
+		unsigned int reserved_pad : HW_DEC_INTR_PAD;
+		unsigned int block_intrpt : 1; /* [10] */
+		unsigned int task_intrpt : 1; /* [11] */
+		unsigned int reserved_0 : 32 - HW_DEC_INTR_PAD - 2;
+#else
 		unsigned int task_intrpt : 1; /* [0] */
 		unsigned int block_intrpt : 1; /* [1] */
 		unsigned int reserved_0 : 30; /* [31..2] */
+#endif
 	} bits;
 
 	/* Define an unsigned member */
@@ -111,9 +156,16 @@ typedef union {
 typedef union {
 	/* Define the struct bits */
 	struct {
+#if HW_DEC_INTR_PAD
+		unsigned int reserved_pad : HW_DEC_INTR_PAD;
+		unsigned int block_intrpt_clr : 1; /* [10] */
+		unsigned int task_intrpt_clr : 1; /* [11] */
+		unsigned int reserved_0 : 32 - HW_DEC_INTR_PAD - 2;
+#else
 		unsigned int task_intrpt_clr : 1; /* [0] */
 		unsigned int block_intrpt_clr : 1; /* [1] */
 		unsigned int reserved_0 : 30; /* [31..2] */
+#endif
 	} bits;
 
 	/* Define an unsigned member */
