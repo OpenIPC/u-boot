@@ -58,6 +58,11 @@ jobs:
           - { soc: gk7205v500, kinds: "nor nand", files: "output/u-boot-gk7205v500-*.bin" }
           - { soc: gk7205v510, kinds: "nor nand", files: "output/u-boot-gk7205v510-*.bin" }
           - { soc: gk7205v530, kinds: "nor nand", files: "output/u-boot-gk7205v530-*.bin" }
+          # Goke GK7206V1 (Lotus xmorca). Built on every run, but held back
+          # from release/publish (hold: true) until the images have booted on
+          # hardware: there is no qemu-hisilicon model to smoke-test them.
+          - { soc: gk7206v11a, kinds: "nor nand", files: "output/u-boot-gk7206v11a-*.bin", hold: true }
+          - { soc: gk7206v12a, kinds: "nor nand", files: "output/u-boot-gk7206v12a-*.bin", hold: true }
           # --- NOR only ---
           - { soc: hi3516cv610, kinds: "nor", files: "output/boot-hi3516cv610-*-nor.bin" }
           - { soc: hi3516cv608, kinds: "nor", files: "output/boot-hi3516cv608-nor.bin" }
@@ -149,10 +154,12 @@ jobs:
           esac
           exit $rc
 
+      # A held SoC's artifact is named hold-u-boot-<soc>, which the
+      # release and publish jobs' u-boot-* download pattern skips.
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: u-boot-${{ matrix.soc }}
+          name: ${{ matrix.hold && 'hold-' || '' }}u-boot-${{ matrix.soc }}
           path: ${{ matrix.files }}
           if-no-files-found: error
 
@@ -186,9 +193,9 @@ jobs:
 
   # QEMU smoke test — boots each freshly-built NOR u-boot in the matching
   # qemu-hisilicon machine model and asserts it prints a u-boot banner.
-  # Every SoC with a machine model is a hard gate on publish; the six
-  # without one (hi3518ev200, hi3516ev100, hi3515av100, hi3520av100,
-  # hi3520dv100, gk7201v300) have no smoke leg.
+  # Every SoC with a machine model is a hard gate on publish; the ones
+  # without (hi3518ev200, hi3516ev100, hi3515av100, hi3520av100,
+  # hi3520dv100, gk7201v300, gk7206v11a, gk7206v12a) have no smoke leg.
   qemu_smoke:
     needs: [build, qemu]
     runs-on: ubuntu-latest
@@ -300,6 +307,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+          pattern: u-boot-*
 
       - name: Upload to releases
         uses: softprops/action-gh-release@v2
@@ -333,6 +341,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+          pattern: u-boot-*
 
       - name: Upload to OpenIPC/firmware latest release
         env:
