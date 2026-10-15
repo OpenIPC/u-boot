@@ -66,8 +66,11 @@ end:
 
 struct mtd_info_ex *fmc100_get_spi_nor_info(struct spi_flash *spi_nor_flash)
 {
+	struct mtd_info_ex *info;
+
+	/* The probe writes its result through the pointer: never pass NULL */
 	if (fmc100_spi_nor_info.type == 0) {
-		if (fmc100_spi_nor_probe(NULL) == NULL)
+		if (fmc100_spi_nor_probe(&info) == NULL)
 			return NULL;
 	}
 
