@@ -1,6 +1,18 @@
 name: Build hisilicon
 
 on:
+  # Pull requests against this branch change the workflow itself; they
+  # build the current openipc-hisilicon.  Code changes reach it through
+  # workflow_call from the caller on openipc-hisilicon, which passes the
+  # revision to build.  Only workflow_dispatch can release or publish.
+  pull_request:
+    branches: [openipc]
+  workflow_call:
+    inputs:
+      ref:
+        description: openipc-hisilicon revision to build
+        type: string
+        required: true
   workflow_dispatch:
     inputs:
       release:
@@ -27,7 +39,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: openipc-hisilicon
+          ref: ${{ inputs.ref || 'openipc-hisilicon' }}
           path: src
 
       - name: Resolve revision
@@ -35,6 +47,7 @@ jobs:
         run: echo "sha=$(git -C src rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   build:
+    needs: resolve
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
@@ -89,7 +102,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: openipc-hisilicon
+          # The commit resolve recorded, not the ref again: every leg then
+          # builds the revision the release and openipc.org report name,
+          # even if the branch moves while the matrix runs.
+          ref: ${{ needs.resolve.outputs.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -297,7 +313,7 @@ jobs:
   # Mirror every built image to this repository's own Hisilicon release.
   release:
     needs: [resolve, build]
-    if: ${{ inputs.release }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -327,7 +343,7 @@ jobs:
   # from uploading between this run's upload and its report.
   publish:
     needs: [resolve, build, qemu_smoke]
-    if: ${{ inputs.release }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:
