@@ -20,14 +20,18 @@ New families are added here as they are ported, each with its own
 
 ## hisilicon
 
-The current port: U-Boot for 36 HiSilicon and Goke camera SoCs.
+The current port: U-Boot for 38 HiSilicon and Goke camera SoCs.
 
 **NOR + NAND:**
 
 `hi3516cv500`, `hi3516dv300`, `hi3516av300`, `hi3516dv200`,
 `hi3516ev200`, `hi3516ev300`, `hi3518ev300`, `gk7201v200`, `gk7201v300`,
 `gk7202v300`, `gk7205v200`, `gk7205v300`, `gk7205v500`, `gk7205v510`,
-`gk7205v530`, `gk7605v100`
+`gk7205v530`, `gk7605v100`, `gk7206v11a`\*, `gk7206v12a`\*
+
+\* Goke GK7206V1 (XMedia Lotus "xmorca"), from the vendor SDK's own
+first stage and DDR-init code. Not yet booted on hardware: CI builds the
+images but keeps them out of the release and publish steps.
 
 **NOR only:**
 
@@ -60,11 +64,12 @@ started manually from the Actions tab:
   if an image overflows its boot partition;
 - boots each NOR image in the matching machine model from
   [widgetii/qemu-hisilicon](https://github.com/widgetii/qemu-hisilicon);
-  the 30 SoCs with a machine model are a hard gate, the six without one
+  the 30 SoCs with a machine model are a hard gate, the eight without one
   get no smoke leg;
 - uploads one artifact per SoC.
 
 With **`release: true`** the run additionally uploads every built image
+(except the held GK7206 ones)
 to this repository's [`Hisilicon` release](../../releases/tag/hisilicon),
 pushes them to the `OpenIPC/firmware` `latest` release and reports the
 result to openipc.org. This requires a `FIRMWARE_RELEASE_TOKEN` secret
