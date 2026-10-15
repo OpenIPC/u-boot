@@ -294,16 +294,25 @@ jobs:
             -nographic -serial pipe:/tmp/uart \
             -monitor none > /tmp/qemu.log 2>&1 &
           QEMU_PID=$!
-          timeout 10 cat /tmp/uart.out > /tmp/uboot.txt || true
-          kill "$QEMU_PID" 2>/dev/null || true
+          # Wait for the autoboot prompt, not the banner: the banner prints
+          # before the board init that can hang. hi3516cv100/hi3518av100
+          # passed on "U-Boot " while stuck in the NAND probe right after it.
+          # Up to 30 s, done as soon as the prompt shows.
+          cat /tmp/uart.out > /tmp/uboot.txt &
+          CAT_PID=$!
+          for i in $(seq 1 60); do
+            grep -q 'Hit Ctrl-C' /tmp/uboot.txt 2>/dev/null && break
+            sleep 0.5
+          done
+          kill "$QEMU_PID" "$CAT_PID" 2>/dev/null || true
           wait 2>/dev/null || true
           echo "== captured u-boot output =="
           cat /tmp/uboot.txt
           echo
-          if grep -qE 'U-Boot |Hit Ctrl-C|CPU:|DRAM:|Board:' /tmp/uboot.txt; then
-            echo "PASS: u-boot booted past startup"
+          if grep -q 'Hit Ctrl-C' /tmp/uboot.txt; then
+            echo "PASS: u-boot reached the autoboot prompt"
           else
-            echo "FAIL: u-boot did not print a recognised banner"
+            echo "FAIL: u-boot did not reach the autoboot prompt"
             echo
             echo "== qemu stderr =="
             tail -40 /tmp/qemu.log || true
@@ -312,7 +321,7 @@ jobs:
 
   # Mirror every built image to this repository's own Hisilicon release.
   release:
-    needs: [resolve, build]
+    needs: [resolve, build, qemu_smoke]
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
