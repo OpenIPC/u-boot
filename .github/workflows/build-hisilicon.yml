@@ -47,6 +47,7 @@ jobs:
         run: echo "sha=$(git -C src rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   build:
+    needs: resolve
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
@@ -96,7 +97,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || 'openipc-hisilicon' }}
+          # The commit resolve recorded, not the ref again: every leg then
+          # builds the revision the release and openipc.org report name,
+          # even if the branch moves while the matrix runs.
+          ref: ${{ needs.resolve.outputs.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
