@@ -575,6 +575,17 @@ int firmware_scan(void) {
 
     char mtds[128], mtdparts[160];
     const char *mtdids = env_get("mtdids");
+    /*
+     * An environment saved by an earlier OpenIPC U-Boot has no mtdids: its
+     * bootargs carried "mtdparts=${mtdparts}" with the controller name
+     * spelled out. Without one the kernel gets "mtdparts=:...", matches no
+     * flash, and cannot mount /dev/mtdblock3. Name the controller this
+     * build drives, as its own default environment does.
+     */
+#ifdef SFC
+    if (!mtdids || !*mtdids)
+      mtdids = SFC;
+#endif
     sprintf(mtds, "%dk(u-boot),%dk(env),%lldk(kernel),%lldk(rootfs),%lldk@0x%lx(firmware),-(rootfs_data)",
             CONFIG_ENV_OFFSET / 1024, CONFIG_ENV_SIZE / 1024, kernel_size / 1024, rootfs_size / 1024,
             (kernel_size + rootfs_size) / 1024, kernel_off);
