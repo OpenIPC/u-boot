@@ -134,7 +134,14 @@ void hi_gpio_status(void);
 	"ur=${source} ${baseaddr} ${urfile} && run urwrite\0" \
 	OPENIPC_FWUPD \
 	"bootlimit=2\0" \
-	"altbootcmd=echo \"*** Boot limit exceeded -- forcing firmware recovery ***\"; run fwupd\0" \
+	/* Past bootlimit (a boot loop: the image is intact but userspace never \
+	 * comes up healthy, so nothing clears the DRAM counter), boot the same \
+	 * kernel with "failsafe": openipc-failsafe then brings up network and \
+	 * SSH only, so the camera stays reachable. Firmware without that package \
+	 * ignores the word and boots as usual. A reflash here would need a TFTP \
+	 * server or SD card the field does not have, and a failed one leaves the \
+	 * camera at this prompt. */ \
+	"altbootcmd=echo \"*** Boot limit exceeded -- entering FAILSAFE (network + SSH only) ***\"; setenv setargs setenv bootargs ${bootargs} failsafe; run setargs; run loadkernel; bootm ${baseaddr}; reset\0" \
 	"fwrecovery=if env exists bootfail; then run fwupd; sleep 5; reset; fi\0" \
 	"bootflash=run fwrecovery; setenv setargs setenv bootargs ${bootargs}; run setargs; run loadkernel; bootm ${baseaddr}; reset\0"
 
