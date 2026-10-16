@@ -188,9 +188,6 @@ void hi_gpio_status(void);
 #define SFC "nand"
 #endif
 
-/* NAND releases may ship a FIT kernel (fitImage.${soc}) */
-#define CONFIG_FIT 1
-
 /* Environment lives in the NAND 'env' partition */
 #undef CONFIG_ENV_OFFSET
 #undef CONFIG_ENV_SIZE
@@ -201,20 +198,32 @@ void hi_gpio_status(void);
 
 #define CONFIG_BOOTARGS "mem=\\${osmem} console=ttyAMA0,115200 panic=20 init=/init root=ubi0:rootfs rootfstype=ubifs ubi.mtd=2,2048 mtdparts=\\${mtdparts} \\${extras}"
 
-/* Recovery: recreate the system volumes; the kernel is fixed and the
- * rootfs volume is sized to the image, with rootfs_data taking the
- * rest. Only a rootfs that grew beyond what the old volume could give
- * costs the data volume, as U-Boot cannot resize UBI volumes; else
- * rootfs_data is preserved. */
-#define OPENIPC_FWUPD "fwupd=run uk; run ur\0"
+/*
+ * The NAND layout is one UBI device after boot and env, holding the UBIFS
+ * rootfs with the kernel inside it -- /boot/fitImage, or /boot/uImage on a
+ * build without a FIT -- and rootfs_data on the rest. No flash is set aside
+ * for a kernel: the rootfs volume is sized to its image. This is the layout
+ * the firmware's NAND packages (rootfs.ubi, rootfs.ubifs) and openipc.org's
+ * installs write.
+ *
+ * Recovery rewrites the rootfs volume only, sized to the image, with
+ * rootfs_data taking the rest. Only a rootfs that grew beyond what the old
+ * volume could give costs the data volume, as U-Boot cannot resize UBI
+ * volumes; else rootfs_data is preserved.
+ */
+#define OPENIPC_FWUPD "fwupd=run ur\0"
+/* bootm_size keeps the relocated FDT inside the kernel's lowmem
+ * (mem=${osmem}): bootm otherwise puts it at the top of RAM, which the
+ * kernel no longer maps once paging_init() honours mem=, and it dies
+ * silently in unflatten_device_tree(). */
 
 #define OPENIPC_ENV_MEDIUM \
 	"ubfile=u-boot-" CONFIG_PRODUCT_SOC "-nand.bin\0" \
 	"urfile=rootfs.ubifs." CONFIG_PRODUCT_SOC "\0" \
 	"ubwrite=nand erase 0x0 0xc0000; nand write ${baseaddr} 0x0 ${filesize}\0" \
-	"ukwrite=ubi part ubi; ubi check kernel && ubi remove kernel; ubi create kernel 0x300000 d; ubi write ${baseaddr} kernel ${filesize}\0" \
 	"urwrite=ubi part ubi; ubi check rootfs && ubi remove rootfs; if ubi create rootfs ${filesize} d; then ubi check rootfs; else ubi remove rootfs_data; ubi create rootfs ${filesize} d; fi; ubi check rootfs_data || ubi create rootfs_data 0 d; ubi write ${baseaddr} rootfs ${filesize}\0" \
-	"loadkernel=ubi part ubi; ubi read ${baseaddr} kernel\0" \
+	"loadkernel=ubi part ubi; ubifsmount ubi0:rootfs; ubifsload ${baseaddr} /boot/fitImage || ubifsload ${baseaddr} /boot/uImage\0" \
+	"bootm_size=0x2000000\0" \
 	"mtdids=nand0=" SFC "\0" \
 	"mtds=" OPENIPC_NAND_MTDPARTS "\0" \
 	"mtdparts=" SFC ":" OPENIPC_NAND_MTDPARTS "\0" \

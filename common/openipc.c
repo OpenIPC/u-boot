@@ -428,7 +428,8 @@ static int recovery_try(void) {
   if (recovery_run_script("script.txt"))
     return 1;
 
-  /* Kernel: uImage preferred, FIT fallback (creates the kernel volume) */
+#ifndef CONFIG_FMC_SPI_NAND
+  /* Kernel: uImage preferred, FIT fallback */
   sprintf(name, "uImage.%s.img", CONFIG_PRODUCT_SOC);
   ret = recovery_write(name, RECOVERY_KERNEL);
   if (ret > 0) {
@@ -439,8 +440,10 @@ static int recovery_try(void) {
     if (ret > 0)
       found = 1;
   }
+#endif
 
-  /* Rootfs (creates its volume with the remaining space) */
+  /* Rootfs. On NAND it carries the kernel (/boot), its volume is sized
+   * to the image and rootfs_data takes the rest. */
 #ifdef CONFIG_FMC_SPI_NAND
   sprintf(name, "rootfs.ubifs.%s.img", CONFIG_PRODUCT_SOC);
 #else
@@ -511,15 +514,10 @@ int firmware_scan(void) {
     return 0;
   }
 
-  ret = ubi_volume_read("kernel", (char *)buf, sizeof(buf));
-  if (ret || !check_kernel(buf)) {
-    printf("Firmware is absent/corrupt (kernel volume)\n");
-    env_set("bootfail", "1");
-    return 0;
-  }
-
+  /* The kernel is a file in the UBIFS rootfs (/boot/fitImage or
+   * /boot/uImage): there is no kernel volume to check. */
   ret = ubi_volume_read("rootfs", (char *)buf, sizeof(buf));
-  if (ret || !(check_ubifs(buf) || check_squashfs(buf))) {
+  if (ret || !check_ubifs(buf)) {
     printf("Firmware is absent/corrupt (rootfs volume)\n");
     env_set("bootfail", "1");
     return 0;
