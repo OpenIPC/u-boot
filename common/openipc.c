@@ -40,7 +40,7 @@
 #define SQSH_MAGIC_BE 0x73717368
 #define SQSH_MAGIC_LE 0x68737173
 
-static int check_squashfs(void *buf) {
+static int __maybe_unused check_squashfs(void *buf) {
   uint32_t magic = get_unaligned_be32(buf);
   if (magic == SQSH_MAGIC_BE || magic == SQSH_MAGIC_LE)
     return 1;
@@ -76,7 +76,7 @@ static int ubi_marker_present(void) {
 }
 #endif
 
-static int check_kernel(void *buf) {
+static int __maybe_unused check_kernel(void *buf) {
   struct image_header *hdr = (struct image_header *)buf;
   if (image_check_magic(hdr)) {
     return 1;
@@ -495,6 +495,43 @@ int firmware_recovery(void) {
 }
 #endif
 
+#if !defined(CONFIG_FMC_SPI_NAND) && defined(CONFIG_OPENIPC_NOR_FIT_SPLIT)
+/*
+ * The kernel learns the NOR layout from bootargs. A saved environment carries
+ * its own bootargs with "root=/dev/mtdblock3" spelled out, which is right for
+ * fixed slots but names the FIT under the split layout, where the partitions
+ * are u-boot, env, firmware, then the kernel's split of firmware into kernel
+ * (3), rootfs (4) and rootfs_data (5). Rewrite that one token for the layout
+ * found, in RAM only, and add openipc_nor_fit=1: the word sysupgrade reads from
+ * /proc/cmdline to know this bootloader boots the split layout.
+ */
+static void nor_bootargs_adjust(int fit)
+{
+  const char *cur = env_get("bootargs");
+  const char *want = fit ? "root=/dev/mtdblock4" : "root=/dev/mtdblock3";
+  const char *other = fit ? "root=/dev/mtdblock3" : "root=/dev/mtdblock4";
+  char buf[1024];
+  const char *p;
+
+  if (!cur || strlen(cur) + 32 >= sizeof(buf))
+    return;
+  p = strstr(cur, other);
+  if (p) {
+    size_t head = p - cur;
+
+    memcpy(buf, cur, head);
+    strcpy(buf + head, want);
+    strcat(buf, p + strlen(other));
+  } else {
+    strcpy(buf, cur);
+  }
+  if (!strstr(buf, "openipc_nor_fit=1"))
+    strcat(buf, " openipc_nor_fit=1");
+  if (strcmp(buf, cur))
+    env_set("bootargs", buf);
+}
+#endif
+
 int firmware_scan(void) {
 #ifdef CONFIG_FMC_SPI_NAND
   u8 buf[64];
@@ -568,7 +605,53 @@ int firmware_scan(void) {
     rootfs_size = 0xa00000;
 #endif
 
+  /*
+   * A FIT at the kernel offset is the split layout: FIT and squashfs back to
+   * back in one "firmware" partition that the kernel divides at boot
+   * (mtdsplit). Linux gets that one partition, the read is the FIT's own
+   * size, and nothing is clamped to a slot.
+   */
+#ifdef CONFIG_OPENIPC_NOR_FIT_SPLIT
+  if (kernel_off && rootfs_off) {
+    u8 hdr[64];
+
+    if (!spi_flash_read(flash, kernel_off, sizeof(hdr), hdr) &&
+        fdt_magic(hdr) == FDT_MAGIC && fdt_check_header(hdr) == 0) {
+      char str[32], mtds[128], mtdparts[160];
+      const char *mtdids = env_get("mtdids");
+      ulong fit_size = ALIGN(fdt_totalsize(hdr), 0x10000);
+
+      spi_flash_free(flash);
+      sprintf(str, "0x%08lx", kernel_off);
+      env_set("kernaddr", str);
+      sprintf(str, "0x%lx", fit_size);
+      env_set("kernsize", str);
+      sprintf(str, "0x%08lx", rootfs_off);
+      env_set("rootaddr", str);
+#ifdef SFC
+      if (!mtdids || !*mtdids)
+        mtdids = SFC;
+#endif
+      sprintf(mtds, "%dk(u-boot),%dk(env),-(firmware)",
+              CONFIG_ENV_OFFSET / 1024, CONFIG_ENV_SIZE / 1024);
+      env_set("mtds", mtds);
+      sprintf(mtdparts, "%s:%s", mtdids ? mtdids : "", mtds);
+      env_set("mtdparts", mtdparts);
+      /* The DTB stays in the kernel's lowmem (mem=${osmem}); a saved
+       * environment from a uImage-only bootloader has no bootm_size. */
+      if (!env_get("bootm_size"))
+        env_set("bootm_size", "0x2000000");
+      nor_bootargs_adjust(1);
+      env_set("bootfail", NULL);
+      return 0;
+    }
+  }
+#endif
+
   spi_flash_free(flash);
+#ifdef CONFIG_OPENIPC_NOR_FIT_SPLIT
+  nor_bootargs_adjust(0);
+#endif
 
   if (kernel_off) {
     char str[32];
