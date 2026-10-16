@@ -17,6 +17,13 @@ CONFIG_ENV_IS_IN_NAND=y
 # CONFIG_ENV_IS_IN_UBI is not set
 
 CONFIG_MTD_PARTITIONS=y
+# `nand erase.part ubi` / `nand write.trimffs ... ubi`: the UBI partition by
+# name, to the end of the chip whatever its size, from mtdids/mtdparts.
+CONFIG_CMD_MTDPARTS=y
+# The kernel is /boot/fitImage (zImage + DTB, crc32 and sha1 hashed) inside
+# the UBIFS rootfs, or /boot/uImage on a build without a FIT.
+CONFIG_FIT=y
+CONFIG_SHA1=y
 CONFIG_MTD_RAW_NAND=y
 CONFIG_SYS_NAND_USE_FLASH_BBT=y
 CONFIG_FMC_SPI_NAND=y
