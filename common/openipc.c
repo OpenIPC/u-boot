@@ -23,6 +23,7 @@
 #ifdef CONFIG_FMC_SPI_NAND
 #include <linux/err.h>
 #include <linux/mtd/ubi.h>
+#include <ubifs_uboot.h>
 #include <mtd.h>
 #include <mtd/ubi-user.h>
 #include <ubi_uboot.h>
@@ -519,6 +520,21 @@ int firmware_scan(void) {
   ret = ubi_volume_read("rootfs", (char *)buf, sizeof(buf));
   if (ret || !check_ubifs(buf)) {
     printf("Firmware is absent/corrupt (rootfs volume)\n");
+    env_set("bootfail", "1");
+    return 0;
+  }
+
+  /* A rootfs without a kernel in it boots nothing: hand it to recovery
+   * like a missing one. loadkernel mounts the volume again itself. */
+  if (cmd_ubifs_mount("ubi0:rootfs")) {
+    printf("Firmware is absent/corrupt (cannot mount rootfs)\n");
+    env_set("bootfail", "1");
+    return 0;
+  }
+  ret = ubifs_exists("/boot/fitImage") || ubifs_exists("/boot/uImage");
+  cmd_ubifs_umount();
+  if (!ret) {
+    printf("Firmware is absent/corrupt (no /boot/fitImage or /boot/uImage)\n");
     env_set("bootfail", "1");
     return 0;
   }
