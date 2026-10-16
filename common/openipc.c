@@ -641,6 +641,10 @@ int firmware_scan(void) {
        * environment from a uImage-only bootloader has no bootm_size. */
       if (!env_get("bootm_size"))
         env_set("bootm_size", "0x2000000");
+      /* The FIT carries crc32 and sha1 for the kernel and the DTB; a
+       * verify=n saved by an older bootloader must not skip them. RAM
+       * only, like the rest of the scan. */
+      env_set("verify", NULL);
       nor_bootargs_adjust(1);
       env_set("bootfail", NULL);
       return 0;
