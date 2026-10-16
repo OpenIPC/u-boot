@@ -683,12 +683,27 @@ static int env_crc_is_blank(void) {
   return crc == 0xffffffff;
 }
 
+/* An environment saved by an earlier build of this tree carries the retired
+ * boot-limit command, which reflashes instead of entering failsafe (see
+ * OPENIPC_ALTBOOTCMD). Replace exactly that one, once; a command anyone
+ * edited is left alone. */
+static void altbootcmd_migrate(void) {
+  const char *s = env_get("altbootcmd");
+
+  if (!s || strcmp(s, OPENIPC_ALTBOOTCMD_RETIRED))
+    return;
+  printf("altbootcmd: retired reflash command replaced with failsafe\n");
+  env_set("altbootcmd", OPENIPC_ALTBOOTCMD);
+  env_save();
+}
+
 int openipc_helper(void) {
   char msize[16];
   sprintf(msize, "%ldM", gd->ram_size / 1024 / 1024);
   env_set("totalmem", msize);
   firmware_recovery();
   firmware_scan();
+  altbootcmd_migrate();
 
   /* Persist the default environment on first start (or after a bad env);
    * only if the device env area is still blank so we never overwrite

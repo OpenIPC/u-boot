@@ -110,6 +110,24 @@ void hi_gpio_status(void);
 /* NAND partition list; composed the same way. */
 #define OPENIPC_NAND_MTDPARTS "768k(boot),256k(env),-(ubi)"
 
+/*
+ * Past bootlimit -- a boot loop: the image is intact, but userspace never
+ * comes up healthy, so nothing clears the DRAM counter -- boot the same
+ * kernel with "failsafe". openipc-failsafe then brings up network and SSH
+ * only, so the camera stays reachable. Firmware without that package ignores
+ * the word and boots as usual. Firmware the scan found broken (bootfail)
+ * goes to recovery first, as bootflash does. A kernel that does not load
+ * leaves the camera at this prompt rather than in a reset loop. The kernel
+ * is loaded inline (OPENIPC_LOADKERNEL), not through the loadkernel
+ * variable: an environment saved by an older OpenIPC U-Boot has no such
+ * variable, and the scan sets kernaddr/kernsize on every NOR boot anyway. A reflash
+ * here instead (OPENIPC_ALTBOOTCMD_RETIRED) needed a TFTP server or SD
+ * card the field does not have, and a failed one parked the camera at the
+ * prompt with no kernel; openipc_helper() replaces that saved command.
+ */
+#define OPENIPC_ALTBOOTCMD "run fwrecovery; echo \"*** Boot limit exceeded -- entering FAILSAFE (network + SSH only) ***\"; setenv setargs setenv bootargs ${bootargs} failsafe; run setargs; if " OPENIPC_LOADKERNEL "; then bootm ${baseaddr}; fi"
+#define OPENIPC_ALTBOOTCMD_RETIRED "echo \"*** Boot limit exceeded -- forcing firmware recovery ***\"; run fwupd"
+
 /* Environment shared by all boot media: identity, network boot, update
  * source selection and the medium-agnostic update commands. The selected
  * medium provides ubfile/ubwrite/ukwrite/urwrite/loadkernel/mtdids/
@@ -134,14 +152,7 @@ void hi_gpio_status(void);
 	"ur=${source} ${baseaddr} ${urfile} && run urwrite\0" \
 	OPENIPC_FWUPD \
 	"bootlimit=2\0" \
-	/* Past bootlimit (a boot loop: the image is intact but userspace never \
-	 * comes up healthy, so nothing clears the DRAM counter), boot the same \
-	 * kernel with "failsafe": openipc-failsafe then brings up network and \
-	 * SSH only, so the camera stays reachable. Firmware without that package \
-	 * ignores the word and boots as usual. A reflash here would need a TFTP \
-	 * server or SD card the field does not have, and a failed one leaves the \
-	 * camera at this prompt. */ \
-	"altbootcmd=echo \"*** Boot limit exceeded -- entering FAILSAFE (network + SSH only) ***\"; setenv setargs setenv bootargs ${bootargs} failsafe; run setargs; run loadkernel; bootm ${baseaddr}; reset\0" \
+	"altbootcmd=" OPENIPC_ALTBOOTCMD "\0" \
 	"fwrecovery=if env exists bootfail; then run fwupd; sleep 5; reset; fi\0" \
 	"bootflash=run fwrecovery; setenv setargs setenv bootargs ${bootargs}; run setargs; run loadkernel; bootm ${baseaddr}; reset\0"
 
@@ -166,6 +177,7 @@ void hi_gpio_status(void);
 #define OPENIPC_FWUPD "fwupd=run ur; run uk\0"
 #endif
 
+#define OPENIPC_LOADKERNEL "sf probe 0; sf read ${baseaddr} ${kernaddr} ${kernsize}"
 #define OPENIPC_ENV_MEDIUM \
 	"ubfile=u-boot-" CONFIG_PRODUCT_SOC "-nor.bin\0" \
 	"urfile=rootfs.squashfs." CONFIG_PRODUCT_SOC "\0" \
@@ -179,7 +191,7 @@ void hi_gpio_status(void);
 	"ukwrite=sf probe 0; sf erase ${kernaddr} ${kernsize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0" \
 	"urwrite=sf probe 0; if itest ${filesize} -gt 500000; then run mtdsultimate; fi; sf erase ${rootaddr} ${rootsize}; sf write ${baseaddr} ${rootaddr} ${filesize}\0" \
 	"fwwrite=sf probe 0; sf erase ${kernaddr} ${filesize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0" \
-	"loadkernel=sf probe 0; sf read ${baseaddr} ${kernaddr} ${kernsize}\0" \
+	"loadkernel=" OPENIPC_LOADKERNEL "\0" \
 	"mtdids=" SFC "\0" \
 	"mtds=" OPENIPC_MTDPARTS "\0" \
 	"mtdparts=" SFC ":" OPENIPC_MTDPARTS "\0" \
@@ -224,12 +236,13 @@ void hi_gpio_status(void);
  * kernel no longer maps once paging_init() honours mem=, and it dies
  * silently in unflatten_device_tree(). */
 
+#define OPENIPC_LOADKERNEL "ubi part ubi; ubifsmount ubi0:rootfs; ubifsload ${baseaddr} /boot/fitImage || ubifsload ${baseaddr} /boot/uImage"
 #define OPENIPC_ENV_MEDIUM \
 	"ubfile=u-boot-" CONFIG_PRODUCT_SOC "-nand.bin\0" \
 	"urfile=rootfs.ubifs." CONFIG_PRODUCT_SOC "\0" \
 	"ubwrite=nand erase 0x0 0xc0000; nand write ${baseaddr} 0x0 ${filesize}\0" \
 	"urwrite=ubi part ubi; ubi check rootfs && ubi remove rootfs; if ubi create rootfs ${filesize} d; then ubi check rootfs; else ubi remove rootfs_data; ubi create rootfs ${filesize} d; fi; ubi check rootfs_data || ubi create rootfs_data 0 d; ubi write ${baseaddr} rootfs ${filesize}\0" \
-	"loadkernel=ubi part ubi; ubifsmount ubi0:rootfs; ubifsload ${baseaddr} /boot/fitImage || ubifsload ${baseaddr} /boot/uImage\0" \
+	"loadkernel=" OPENIPC_LOADKERNEL "\0" \
 	"bootm_size=0x2000000\0" \
 	"mtdids=nand0=" SFC "\0" \
 	"mtds=" OPENIPC_NAND_MTDPARTS "\0" \
