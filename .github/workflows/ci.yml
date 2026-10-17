@@ -1,0 +1,25 @@
+name: CI
+
+# The build lives in build-xm.yml on the openipc branch (the default
+# branch, so it can be dispatched).  GitHub runs a pull request's
+# workflows from the PR's own tree, so this branch needs this caller for
+# its pushes and pull requests to be built and smoke-tested at all.
+# It never releases: that workflow only uploads on workflow_dispatch.
+on:
+  push:
+    branches: [openipc-xm]
+  pull_request:
+    branches: [openipc-xm]
+
+jobs:
+  build:
+    uses: OpenIPC/u-boot/.github/workflows/build-xm.yml@openipc
+    # github.sha: on pull_request the merge of the PR into the current
+    # base, so the PR is built as it would land; on push, that commit.
+    with:
+      ref: ${{ github.sha }}
+    # A called workflow is validated against what its caller grants,
+    # skipped jobs included; release/publish ask for these.
+    permissions:
+      contents: write
+      id-token: write
