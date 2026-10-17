@@ -279,11 +279,13 @@ void clear_update_flag(int update_flag)
 
 int misc_init_r(void)
 {
+	/* Before openipc_helper(): a FIT on the split NOR layout carries
+	 * hashes, and firmware_scan() drops this for it. */
+	env_set("verify", "n");
 	openipc_helper();
 #ifdef CONFIG_RANDOM_ETHADDR
 	random_init_r();
 #endif
-	env_set("verify", "n");
 
 #ifdef CFG_MMU_HANDLEOK
 	dcache_stop();

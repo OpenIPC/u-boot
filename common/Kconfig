@@ -1060,3 +1060,13 @@ config PRODUCT_SOCMODEL
 	  Optional board/binning model exposed as 'socmodel=' in the default
 	  environment (e.g. hi3516cv610 DDR binnings).
 
+config OPENIPC_NOR_FIT_SPLIT
+	bool "OpenIPC: boot the split NOR layout (FIT + squashfs in one partition)"
+	depends on FIT
+	help
+	  A FIT found at the NOR kernel offset is taken for the split layout:
+	  the FIT and the squashfs back to back in one "firmware" partition,
+	  which a kernel with mtdsplit divides at boot. Linux is passed that
+	  one partition. Only for boards whose kernel carries mtdsplit; a FIT
+	  kernel without it (hi3516cv610) keeps its fixed slots.
+
