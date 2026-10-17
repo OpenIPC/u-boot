@@ -1,0 +1,105 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this branch is
+
+`openipc` is the default branch of OpenIPC/u-boot, and it contains **no bootloader
+sources**. It holds only `README.md` (user-facing docs for every SoC family) and
+`.github/workflows/build-<family>.yml`. Each SoC family's U-Boot tree lives on its
+own branch:
+
+- `openipc-hisilicon`: U-Boot for HiSilicon/Goke camera SoCs. It has `build.sh`,
+  `openipc/`, `product/` and the vendor tree.
+- `main`: a fork of upstream mainline U-Boot, kept for rebasing.
+
+To change bootloader code, check out `openipc-hisilicon`, or read it with
+`git show origin/openipc-hisilicon:<path>`. Changes on this branch are almost
+always to CI or documentation.
+
+`openipc-hisilicon` has its own `CLAUDE.md`. It covers how that tree differs
+from mainline v2022.10 (the vendor code, the mainline files it patched, the
+files it reverted to vendor copies), plus the build, config assembly and the
+OpenIPC boot layer. Read it before any
+change that touches both branches: `git show origin/openipc-hisilicon:CLAUDE.md`.
+Adding, removing or holding a SoC needs edits on both branches. On
+`openipc-hisilicon`, change `build.sh` and `openipc/<soc>_*`. Here, change
+both workflow matrices and the README.
+
+## Cross-branch CI wiring
+
+The build logic lives here. Other branches call it:
+
+- `openipc-hisilicon/.github/workflows/ci.yml` is a thin caller:
+  `uses: OpenIPC/u-boot/.github/workflows/build-hisilicon.yml@openipc` with
+  `ref: ${{ github.sha }}`. A change to `build-hisilicon.yml` therefore affects
+  that branch's push/PR CI as soon as it lands on `openipc`.
+- A PR against `openipc` runs the workflow from the PR's tree against the
+  current `openipc-hisilicon` (no `ref` input, so it falls back to
+  `'openipc-hisilicon'`).
+- The `resolve` job pins the source revision once. Every build leg checks out
+  that SHA, and release provenance and the openipc.org report must name it.
+  `github.sha` names the `openipc` commit, so it is never the built revision.
+- Job graph: `resolve` → `build` (matrix, one SoC per leg) + `qemu` (builds
+  `qemu-system-arm` from widgetii/qemu-hisilicon once) → `qemu_smoke` (hard
+  gate) → `release` / `publish`. These last two run only on `workflow_dispatch`.
+
+## Invariants to keep when editing `build-hisilicon.yml`
+
+- **Three SoC lists must agree**: the `build` matrix, the `qemu_smoke` matrix,
+  and the README's SoC list. The comment above `qemu_smoke` names the SoCs that
+  have no qemu machine model and therefore no smoke leg. Keep that comment and
+  the README count ("30 SoCs with a machine model, eight without") in sync.
+- **Partition limits**: NOR images must be ≤ 256 KiB (env at 0x40000) and NAND
+  images ≤ 768 KiB (0xc0000). An oversized image bricks the device on upgrade.
+- **Smoke pass criterion** is the autoboot prompt `Hit Ctrl-C`, not the banner.
+  The banner prints before the board init that can hang (see #4).
+- **Held SoCs** (`hold: true`, currently gk7206v11a/v12a): their artifact is
+  named `hold-u-boot-<soc>`, so the `u-boot-*` download pattern in
+  release/publish skips them. Holding a SoC means setting `hold: true`. Do not
+  delete the SoC from the matrix.
+- **`release` vs `publish` are deliberately separate inputs.**
+  - `release` uploads to this repo's `hisilicon` pre-release.
+  - `publish` uploads to the OpenIPC/firmware `latest` release, clobbering
+    same-named images from u-boot-xmedia and u-boot-hi3516cv6xx, and then
+    reports to openipc.org.
+  - `publish` runs under the `publish-firmware-latest` concurrency group, so
+    the openipc.org report always describes exactly the bytes uploaded.
+  - It checks out `OpenIPC/firmware` at a pinned commit, because that job holds
+    an `id-token`.
+- Artifact names differ by SoC family: most SoCs produce
+  `u-boot-<soc>-{nor,nand}.bin`, while hi3516cv608/cv610 produce
+  `boot-<soc>*-nor.bin`. The `files:` globs and the smoke step's `ls` both
+  depend on these names.
+
+## Commands
+
+```sh
+yamllint .github/workflows/build-hisilicon.yml       # only local workflow lint available
+
+# Build locally (on the hisilicon branch, toolchain arm-linux-gnueabi-):
+git worktree add ../u-boot-hisi openipc-hisilicon
+cd ../u-boot-hisi && bash build.sh hi3516cv300       # one SoC; no args = all
+# -> output/u-boot-<soc>-nor.bin / -nand.bin
+
+# Reproduce one smoke leg locally (needs qemu-hisilicon's qemu-system-arm, which
+# has the -M <soc> machine models; the stock system qemu does not):
+dd if=/dev/zero of=flash.bin bs=1M count=8
+dd if=output/u-boot-<soc>-nor.bin of=flash.bin conv=notrunc
+qemu-system-arm -M <soc>,flash-file=flash.bin -nographic   # expect "Hit Ctrl-C"
+
+gh workflow run build-hisilicon.yml                                   # build + smoke
+gh workflow run build-hisilicon.yml -f release=true                   # + own release
+gh workflow run build-hisilicon.yml -f release=true -f publish=true   # + OpenIPC/firmware + openipc.org
+```
+
+CI's build legs symlink `/bin/sh` to bash, because the vendor recipes depend on
+bash-isms. They also need `pycryptodome`, `u-boot-tools`,
+`device-tree-compiler` and `lzop`.
+
+## Conventions
+
+- Commit subjects use a `ci:` prefix. Bodies explain the failure mode a change
+  prevents and how it was checked, often against qemu-hisilicon locally.
+- To add a SoC family: push the port on a new branch, add
+  `build-<family>.yml` here, and document the family in `README.md`.
