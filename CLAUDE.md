@@ -11,6 +11,9 @@ own branch:
 
 - `openipc-hisilicon`: U-Boot for HiSilicon/Goke camera SoCs. It has `build.sh`,
   `openipc/`, `product/` and the vendor tree.
+- `openipc-xm`: U-Boot for Xiongmai XM510/XM530/XM550, on the same mainline
+  release with the same OpenIPC layer. CI: `build-xm.yml`, called from that
+  branch's `ci.yml`. Its own `CLAUDE.md` covers the run-in-place boot.
 - `main`: a fork of upstream mainline U-Boot, kept for rebasing.
 
 To change bootloader code, check out `openipc-hisilicon`, or read it with
@@ -43,6 +46,27 @@ The build logic lives here. Other branches call it:
 - Job graph: `resolve` → `build` (matrix, one SoC per leg) + `qemu` (builds
   `qemu-system-arm` from widgetii/qemu-hisilicon once) → `qemu_smoke` (hard
   gate) → `release` / `publish`. These last two run only on `workflow_dispatch`.
+
+## `build-xm.yml`
+
+- It has the same job graph as `build-hisilicon.yml`, with the same
+  `resolve`/`ref` rules and the same partition limits.
+- `pull_request` runs only when the workflow file itself changes.
+- **No `hold`:** every SoC has a qemu-hisilicon machine, so every image is
+  smoke-tested and released.
+- **Smoke test:** two boots of an 8 MiB flash image under
+  `-global xm-sfc.wps=on`.
+  - It passes on `Hit Ctrl-C`.
+  - It fails if the second boot reports a bad environment CRC. That means the
+    driver did not clear the Xiongmai per-block protection, and the first
+    boot's `saveenv` was dropped.
+  - It needs a qemu-hisilicon with the `wps` property (PR #150 or later).
+- **Release and publish:**
+  - `release` uploads to the `xiongmai` tag.
+  - `publish` shares the `publish-firmware-latest` concurrency group with
+    hisilicon and reports `--source uboot` under a `uboot-xm-…` build id.
+  - openipc.org keeps the newest build per file name, so the two workflows'
+    pushes do not displace each other.
 
 ## Invariants to keep when editing `build-hisilicon.yml`
 

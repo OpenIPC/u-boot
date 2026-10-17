@@ -1,6 +1,7 @@
 # OpenIPC U-Boot
 
 [![hisilicon build](https://github.com/OpenIPC/u-boot/actions/workflows/build-hisilicon.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-hisilicon.yml)
+[![xiongmai build](https://github.com/OpenIPC/u-boot/actions/workflows/build-xm.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-xm.yml)
 
 Unified repository for the U-Boot bootloaders maintained by
 [OpenIPC](https://openipc.org) for supported SoCs.
@@ -13,6 +14,7 @@ family — not bootloader sources.
 | --- | --- |
 | `openipc` (this branch) | Unified documentation and CI workflows |
 | `openipc-hisilicon` | U-Boot for HiSilicon/Goke IP-camera SoCs |
+| `openipc-xm` | U-Boot for Xiongmai XM510/XM530/XM550 |
 | `main` | Fork of upstream mainline U-Boot, kept for rebasing |
 
 New families are added here as they are ported, each with its own
@@ -55,6 +57,29 @@ The toolchain is `arm-linux-gnueabi-` (Debian/Ubuntu package
 `gcc-arm-linux-gnueabi`). Images land in `output/` as
 `u-boot-<soc>-nor.bin` / `u-boot-<soc>-nand.bin`.
 
+## xiongmai
+
+U-Boot for Xiongmai's own camera SoCs, on the same mainline release
+(v2022.10) and with the same OpenIPC boot layer as `openipc-hisilicon`.
+
+**NOR:** `xm510`, `xm530`, `xm550`
+
+The boot ROM runs U-Boot in place from SPI NOR, and U-Boot brings up DDR
+itself, so the image is `u-boot.bin` as linked: `u-boot-<soc>-nor.bin`,
+written at flash offset 0. The flash driver clears the per-block write
+protection that Xiongmai bootloaders leave on (SR3.WPS), under which the
+vendor U-Boot's `sf erase`/`sf write` report success and change nothing.
+
+```sh
+git clone --branch openipc-xm https://github.com/OpenIPC/u-boot.git
+cd u-boot
+
+bash build.sh               # xm510 xm530 xm550
+bash build.sh xm530         # a single SoC
+```
+
+The toolchain is `arm-linux-gnueabi-`, as for hisilicon.
+
 ## CI
 
 The [build-hisilicon](.github/workflows/build-hisilicon.yml) workflow runs
@@ -88,6 +113,28 @@ Two dispatch inputs control uploads; both skip the held GK7206 images.
 gh workflow run build-hisilicon.yml                                   # build + smoke test
 gh workflow run build-hisilicon.yml -f release=true                   # ... and this repo's release
 gh workflow run build-hisilicon.yml -f release=true -f publish=true   # ... and OpenIPC/firmware + openipc.org
+```
+
+### xiongmai
+
+The [build-xm](.github/workflows/build-xm.yml) workflow has the same
+shape. It runs on pull requests to this branch that change it, on pushes
+and pull requests to `openipc-xm` (through that branch's `ci.yml`), and
+manually. Every SoC has a qemu-hisilicon machine model, so every image is
+smoke-tested:
+
+- booted in place from an 8 MiB flash image whose part powers up with the
+  Xiongmai per-block protection on;
+- booted a second time, which must load the environment the first boot
+  saved.
+
+Its `release` input fills this repository's
+[`Xiongmai` release](../../releases/tag/xiongmai); `publish` uploads to
+`OpenIPC/firmware` `latest`, where no other repository publishes
+`u-boot-xm*` names, and reports to openipc.org.
+
+```sh
+gh workflow run build-xm.yml -f release=true -f publish=true
 ```
 
 ## Adding a SoC family
