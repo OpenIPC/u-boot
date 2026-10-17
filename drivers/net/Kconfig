@@ -94,7 +94,7 @@ config DSA_SANDBOX
 menuconfig NETDEVICES
 	bool "Network device support"
 	depends on NET
-	select DM_ETH
+	default y if DM_ETH
 	help
 	  You must select Y to enable any network device support
 	  Generally if you have any networking support this is a given
