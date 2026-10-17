@@ -47,8 +47,13 @@
 #define CMD_SE_64K		0xD8
 
 #define SR1_WIP			BIT(0)
-#define SR1_BP			0x7C	/* BP0-2, TB, SEC */
+#define SR1_BP			0x7C	/* Winbond-style: BP0-2, TB, SEC */
+#define SR1_BP_MXIC		0x3C	/* Macronix and others: BP0-3, bit 6 is QE */
 #define SR3_WPS			BIT(2)
+
+#define MFR_WINBOND		0xef
+#define MFR_XMC			0x20
+#define MFR_GIGADEVICE		0xc8
 
 #define OP_DONE(op)		BIT((op) - 1)
 
@@ -124,7 +129,9 @@ static void xmsfc_write_reg(u8 cmd, u32 val, unsigned int nbytes)
 	writel(cmd, V2_CMD);
 	writel(nbytes - 1, V2_RW_NUM);
 	xmsfc_run(4);
-	xmsfc_bus_mode();
+	/* A status write is a program cycle: wait it out like one */
+	while (xmsfc_read_reg(CMD_RDSR, 1) & SR1_WIP)
+		;
 }
 
 static void xmsfc_cmd(u8 cmd)
@@ -209,6 +216,9 @@ static void xmsfc_write_reg(u8 cmd, u32 val, unsigned int nbytes)
 	writel(cmd, V1_CMD);
 	writel(nbytes - 1, V1_BSEL);
 	xmsfc_run(4);
+	/* A status write is a program cycle: wait it out like one */
+	while (xmsfc_read_reg(CMD_RDSR, 1) & SR1_WIP)
+		;
 }
 
 /* v1 has no command-only operation that the vendor code documents */
@@ -274,14 +284,22 @@ static int xmsfc_announced;
  * Xiongmai bootloaders set SR3.WPS: protection then comes from per-block
  * lock bits, all set at power-up, instead of the BP bits, and every erase
  * and program is silently dropped. Unlock the blocks, return the part to
- * BP protection, and clear the BP bits too. Winbond-style parts only; the
- * others have no SR3 and read it as all ones or zero.
+ * BP protection, and clear the BP bits too.
+ *
+ * Status layouts differ by maker. Winbond and XMC have SR3 and WPS; they
+ * and GigaDevice keep QE in SR2, written as the second byte of WRSR. On
+ * the others (Macronix, Eon, ...) bit 6 of SR1 is QE, 0x35 means
+ * something else (EQIO on Macronix), and a second WRSR byte reaches a
+ * configuration register: clear BP0-3 alone, with a one-byte WRSR.
  */
 static void xmsfc_unprotect(u32 jedec)
 {
+	const u8 mfr = jedec >> 16;
+	const bool sr2_qe = mfr == MFR_WINBOND || mfr == MFR_XMC ||
+			    mfr == MFR_GIGADEVICE;
 	u32 sr1, sr2, sr3;
 
-	if ((jedec >> 16) == 0xef || (jedec >> 16) == 0x20) {
+	if (mfr == MFR_WINBOND || mfr == MFR_XMC) {
 		sr3 = xmsfc_read_reg(CMD_RDSR3, 1) & 0xff;
 		if (sr3 != 0xff && (sr3 & SR3_WPS)) {
 			printf("SF: per-block protection (SR3 %02x), unlocking\n",
@@ -292,10 +310,15 @@ static void xmsfc_unprotect(u32 jedec)
 	}
 
 	sr1 = xmsfc_read_reg(CMD_RDSR, 1) & 0xff;
-	if (sr1 != 0xff && (sr1 & SR1_BP)) {
+	if (sr1 == 0xff)
+		return;
+	if (sr2_qe && (sr1 & SR1_BP)) {
 		sr2 = xmsfc_read_reg(CMD_RDSR2, 1) & 0xff;
 		printf("SF: block protection (SR1 %02x), clearing\n", sr1);
 		xmsfc_write_reg(CMD_WRSR, (sr1 & ~SR1_BP) << 8 | sr2, 2);
+	} else if (!sr2_qe && (sr1 & SR1_BP_MXIC)) {
+		printf("SF: block protection (SR1 %02x), clearing\n", sr1);
+		xmsfc_write_reg(CMD_WRSR, sr1 & ~SR1_BP_MXIC, 1);
 	}
 }
 
