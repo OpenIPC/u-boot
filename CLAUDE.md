@@ -42,6 +42,7 @@ git diff --diff-filter=M v2022.10 HEAD         # the mainline files we patched
 | SoC: PLL and DDR bring-up, timer, reset, DRAM size, SDHCI glue | `arch/arm/mach-xm/` (`ARCH_XM`; `TARGET_XM510`/`XM530`/`XM550`; register map in `include/mach/xm.h`) |
 | Boards: `board_init`, `misc_init_r` → `openipc_helper()`, `board_eth_init` with the PHY reset / MAC glue | `board/xiongmai/{xm510,xm530}/`. XM550 uses the xm530 board with `XM_DDR3` |
 | Memory map, console, timer | `include/configs/{xm510,xm530}.h`, each ending in `#include "openipc-common.h"` |
+| SPI NAND on the v2 controller (XM530/550): raw NAND, full-ID table, on-die ECC status through `ecc.read_page` | `drivers/mtd/nand/raw/xmsfc_nand.c` (`NAND_XMSFC`) |
 | SPI NOR controller, v1 (XM510) and v2 (XM530/550), non-DM | `drivers/mtd/spi/xmsfc.c`. It provides `spi_flash_probe()` and fills `mtd->_read/_write/_erase`, so mainline's non-DM `spi_flash_*()` wrappers, `sf` and env-in-SPI-flash work without the SPI and spi-nor layers |
 | OpenIPC boot layer | `common/openipc.c` and `include/openipc.h` (copied from `openipc-hisilicon`, NAND gate rekeyed to `CONFIG_ENV_IS_IN_NAND`), `include/configs/openipc-common.h` (XM-only rewrite, same env commands) |
 | Kconfig fragments and the build | `openipc/`, `build.sh` |
@@ -50,6 +51,7 @@ git diff --diff-filter=M v2022.10 HEAD         # the mainline files we patched
 
 - `arch/arm/{Kconfig,Makefile}`: the `ARCH_XM` hook.
 - `common/{Kconfig,Makefile}`: `OPENIPC`, `PRODUCT_SOC`, `PRODUCT_SOCMODEL`.
+- `drivers/mtd/nand/raw/{Kconfig,Makefile}`: the `NAND_XMSFC` hook.
 - `drivers/mtd/spi/{Kconfig,Makefile}`, `cmd/Kconfig` (`CMD_SF`) and
   `env/Kconfig` (`ENV_IS_IN_SPI_FLASH`): accept `XMSFC_SPI_NOR`.
 - `drivers/net/Kconfig`: `NETDEVICES` selects `DM_ETH` only when `DM` is on.
@@ -94,6 +96,34 @@ position-independent fixups. The only RAM before DDR is a 4 KiB SRAM at
   driver restores it (`xmsfc_bus_mode()`) after every v2 operation, and only
   ever runs after relocation, from DDR.
 
+## SPI NAND (XM530/XM550): built on a guess
+
+Xiongmai never shipped a NAND U-Boot from this SDK. There is a
+`CONFIG_SYS_USE_SPI_NAND` block in the vendor `xm530.h`, but no board target,
+and nothing documents how the boot ROM starts from SPI NAND.
+
+**What the NAND image assumes:**
+
+- the controller's window serves the NAND page data linearly, as in NOR
+  bus-read mode;
+- U-Boot is linked at 0x60001000 (the vendor's NAND `TEXT_BASE`), behind a
+  4 KiB header;
+- the header's first word is `ldr pc, [pc, #-4]` followed by that address, so
+  it reaches U-Boot whether the ROM starts at the window or the 0x08000000
+  alias (`build.sh`).
+
+**What it carries:**
+
+- layout `768k(boot),256k(env),-(ubi)`;
+- the environment at 0xc0000;
+- the kernel at `/boot/uImage` inside the UBIFS `rootfs` volume;
+- the same recovery as on `openipc-hisilicon` NAND.
+
+Only qemu-hisilicon's NAND model, which implements the same guess, has run
+it. The OpenIPC XM530 kernel has no SPI NAND driver either, so a NAND image
+loads and starts the kernel, which then cannot mount its root. Treat NAND as
+unverified on silicon, and say so wherever it is offered.
+
 ## Build
 
 ```sh
@@ -101,10 +131,11 @@ bash build.sh               # xm510 xm530 xm550; continues past failures, exits 
 bash build.sh xm530         # one or more SoCs (CROSS_COMPILE defaults to arm-linux-gnueabi-)
 ```
 
-- Output: `output/u-boot-<soc>-nor.bin`, built out of tree in
-  `output/build-<soc>/`.
-- `.config` is `openipc/openipc_config` followed by `openipc/<soc>_config`, then
-  `olddefconfig`. A later line wins.
+- Output: `output/u-boot-<soc>-nor.bin`, plus `-nand.bin` for xm530/xm550,
+  built out of tree in `output/build-<soc>-<nor|nand>/`.
+- `.config` is `openipc/openipc_config`, then `openipc/<soc>_config`, then
+  `openipc/nand_config` for NAND images, then `olddefconfig`. A later line
+  wins. The "override" warnings are that layering.
 - There are no `configs/*_defconfig` for these targets.
 - The host toolchain must match CI (Ubuntu `gcc-arm-linux-gnueabi`). A Docker
   image with it works:
@@ -130,6 +161,13 @@ with the reset vector at the window or alias, exactly as silicon does.
 - **SR3.WPS:** `-global xm-sfc.wps=on` powers the part up as Xiongmai
   bootloaders leave it, with per-block locks on. `xmsfc_unprotect()` must clear
   it before writes land.
+
+- **NAND:** `-global xm-sfc.nand-file=<raw image>`, with no `flash-file`.
+  - The raw image is pages of 2048 + 64 bytes, U-Boot at page 0, and
+    `ubinize`'s output at 1 MiB.
+  - It must reach the prompt, save the env, mount the rootfs and start the
+    kernel.
+  - From an erased NAND, TFTP recovery must create the UBI volumes and boot.
 
 **What qemu does not check:** DDR training values, the v2 bus-read restore and
 PHY/MDIO timing are acked instantly. A change to those needs a real board.

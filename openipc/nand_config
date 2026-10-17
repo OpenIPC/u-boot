@@ -1,0 +1,26 @@
+# SPI NAND (XM530/XM550): appended after the SoC fragment for NAND images.
+# The same controller drives NOR or NAND, so the NOR driver goes.
+# CONFIG_XMSFC_SPI_NOR is not set
+# CONFIG_CMD_SF is not set
+# CONFIG_ENV_IS_IN_SPI_FLASH is not set
+# Linked where the vendor links a NAND U-Boot: the v2 window, behind a
+# 4 KiB header (build.sh) whose first word jumps here.
+CONFIG_SYS_TEXT_BASE=0x60001000
+CONFIG_MTD=y
+CONFIG_MTD_RAW_NAND=y
+CONFIG_NAND_XMSFC=y
+CONFIG_CMD_NAND=y
+CONFIG_CMD_NAND_TRIMFFS=y
+CONFIG_ENV_IS_IN_NAND=y
+CONFIG_ENV_OFFSET=0xc0000
+CONFIG_ENV_SIZE=0x40000
+CONFIG_ENV_SECT_SIZE=0x20000
+# 768 KiB boot partition, less the 4 KiB header build.sh puts in front
+CONFIG_BOARD_SIZE_LIMIT=782336
+CONFIG_MTD_PARTITIONS=y
+CONFIG_CMD_MTDPARTS=y
+CONFIG_MTD_UBI=y
+CONFIG_CMD_UBI=y
+CONFIG_CMD_UBIFS=y
+CONFIG_RBTREE=y
+CONFIG_LZO=y
