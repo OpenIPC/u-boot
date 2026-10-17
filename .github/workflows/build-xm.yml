@@ -112,10 +112,13 @@ jobs:
             for f in $pattern; do
               [ -f "$f" ] || continue
               found=1
-              size_kb=$(( $(stat -c %s "$f") / 1024 ))
-              echo "- $f: [${size_kb}KB/${limit_kb}KB]"
-              if [ "$size_kb" -gt "$limit_kb" ]; then
-                echo "-- size exceeded by: $((size_kb - limit_kb))KB" >&2
+              # Compare bytes: rounding down to KiB would pass an image up
+              # to 1023 bytes into the environment.
+              size=$(stat -c %s "$f")
+              limit=$((limit_kb * 1024))
+              echo "- $f: [${size}/${limit} bytes]"
+              if [ "$size" -gt "$limit" ]; then
+                echo "-- size exceeded by: $((size - limit)) bytes" >&2
                 rc=1
               fi
             done
@@ -211,7 +214,7 @@ jobs:
           test -f "$UBOOT"
           echo "booting $UBOOT"
           # 8 MiB NOR, U-Boot at 0, the rest erased
-          tr '\0' '\377' < /dev/zero | head -c 8388608 > /tmp/flash.bin
+          dd if=/dev/zero bs=1M count=8 2>/dev/null | tr '\0' '\377' > /tmp/flash.bin
           dd if="$UBOOT" of=/tmp/flash.bin bs=1 conv=notrunc 2>/dev/null
           chmod +x ./qemu-arm
           # Two boots: the first finds an erased environment and saves the
