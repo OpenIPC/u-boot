@@ -61,8 +61,11 @@ jobs:
       matrix:
         include:
           - { soc: xm510, kinds: "nor", files: "output/u-boot-xm510-*.bin" }
-          - { soc: xm530, kinds: "nor", files: "output/u-boot-xm530-*.bin" }
-          - { soc: xm550, kinds: "nor", files: "output/u-boot-xm550-*.bin" }
+          # SPI NAND images follow a guess at how the XM530 boots from NAND
+          # (see openipc-xm's CLAUDE.md); smoke-tested on qemu-hisilicon's
+          # NAND model, which implements the same guess.
+          - { soc: xm530, kinds: "nor nand", files: "output/u-boot-xm530-*.bin" }
+          - { soc: xm550, kinds: "nor nand", files: "output/u-boot-xm550-*.bin" }
 
     steps:
       - name: Checkout
@@ -181,7 +184,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        soc: [xm510, xm530, xm550]
+        include:
+          - { soc: xm510, kind: nor }
+          - { soc: xm530, kind: nor }
+          - { soc: xm550, kind: nor }
+          - { soc: xm530, kind: nand }
+          - { soc: xm550, kind: nand }
     steps:
       - name: Download qemu-arm
         uses: actions/download-artifact@v4
@@ -210,20 +218,35 @@ jobs:
         timeout-minutes: 3
         run: |
           soc='${{ matrix.soc }}'
-          UBOOT="u-boot-${soc}-nor.bin"
+          kind='${{ matrix.kind }}'
+          UBOOT="u-boot-${soc}-${kind}.bin"
           test -f "$UBOOT"
           echo "booting $UBOOT"
-          # 8 MiB NOR, U-Boot at 0, the rest erased
-          dd if=/dev/zero bs=1M count=8 2>/dev/null | tr '\0' '\377' > /tmp/flash.bin
-          dd if="$UBOOT" of=/tmp/flash.bin bs=1 conv=notrunc 2>/dev/null
+          if [ "$kind" = nor ]; then
+            # 8 MiB NOR, U-Boot at 0, the rest erased
+            dd if=/dev/zero bs=1M count=8 2>/dev/null | tr '\0' '\377' > /tmp/flash.bin
+            dd if="$UBOOT" of=/tmp/flash.bin bs=1 conv=notrunc 2>/dev/null
+            FLASH="-M ${soc},flash-file=/tmp/flash.bin -global xm-sfc.wps=on"
+          else
+            # 128 MiB SPI NAND, raw 2048+64-byte pages, U-Boot from page 0
+            python3 - "$UBOOT" /tmp/nand.bin <<'PY'
+          import sys
+          D, S, PAGES = 2048, 64, 1024 * 64
+          raw = bytearray(b'\xff' * (PAGES * (D + S)))
+          img = open(sys.argv[1], 'rb').read()
+          for i in range(0, len(img), D):
+              o = (i // D) * (D + S)
+              raw[o:o + len(img[i:i + D])] = img[i:i + D]
+          open(sys.argv[2], 'wb').write(raw)
+          PY
+            FLASH="-M ${soc} -global xm-sfc.nand-file=/tmp/nand.bin"
+          fi
           chmod +x ./qemu-arm
           # Two boots: the first finds an erased environment and saves the
           # default one; the second must load it back.
           for boot in 1 2; do
             mkfifo /tmp/uart.in /tmp/uart.out
-            ./qemu-arm \
-              -M ${soc},flash-file=/tmp/flash.bin \
-              -global xm-sfc.wps=on \
+            ./qemu-arm $FLASH \
               -nographic -serial pipe:/tmp/uart \
               -monitor none > /tmp/qemu.log 2>&1 &
             QEMU_PID=$!
