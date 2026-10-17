@@ -52,9 +52,9 @@ git diff --diff-filter=M v2022.10 HEAD         # the mainline files we patched
 - `common/{Kconfig,Makefile}`: `OPENIPC`, `PRODUCT_SOC`, `PRODUCT_SOCMODEL`.
 - `drivers/mtd/spi/{Kconfig,Makefile}`, `cmd/Kconfig` (`CMD_SF`) and
   `env/Kconfig` (`ENV_IS_IN_SPI_FLASH`): accept `XMSFC_SPI_NOR`.
-- `drivers/net/Kconfig`: `NETDEVICES` has `default y if DM_ETH` instead of
-  `select DM_ETH`, the same change `openipc-hisilicon` carries. It keeps
-  DesignWare on the legacy `designware_initialize()` path with DM off.
+- `drivers/net/Kconfig`: `NETDEVICES` selects `DM_ETH` only when `DM` is on.
+  That keeps DesignWare on the legacy `designware_initialize()` path with DM
+  off, while driver-model boards keep `DM_ETH`.
 - `drivers/serial/serial_pl01x.c`: the non-DM driver's `base_regs` and
   `pl01x_type` were `.data` variables set at init. Before relocation those
   writes go nowhere (see below), so the console stayed silent. They are now
