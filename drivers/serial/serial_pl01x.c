@@ -30,8 +30,16 @@ DECLARE_GLOBAL_DATA_PTR;
 #ifndef CONFIG_DM_SERIAL
 
 static volatile unsigned char *const port[] = CONFIG_PL01x_PORTS;
-static enum pl01x_type pl01x_type __section(".data");
-static struct pl01x_regs *base_regs __section(".data");
+/*
+ * Constants, not variables set at init: a U-Boot that runs in place from
+ * flash before relocation cannot write .data, and both are fixed anyway.
+ */
+#define pl01x_base_regs ((struct pl01x_regs *)port[CONFIG_CONS_INDEX])
+#if defined(CONFIG_PL011_SERIAL)
+#define pl01x_port_type TYPE_PL011
+#else
+#define pl01x_port_type TYPE_PL010
+#endif
 #define NUM_PORTS (sizeof(port)/sizeof(port[0]))
 
 #endif
@@ -192,13 +200,12 @@ static void pl01x_serial_init_baud(int baudrate)
 	int clock = 0;
 
 #if defined(CONFIG_PL011_SERIAL)
-	pl01x_type = TYPE_PL011;
 	clock = CONFIG_PL011_CLOCK;
 #endif
-	base_regs = (struct pl01x_regs *)port[CONFIG_CONS_INDEX];
 
-	pl01x_generic_serial_init(base_regs, pl01x_type);
-	pl01x_generic_setbrg(base_regs, pl01x_type, clock, baudrate);
+	pl01x_generic_serial_init(pl01x_base_regs, pl01x_port_type);
+	pl01x_generic_setbrg(pl01x_base_regs, pl01x_port_type, clock,
+			     baudrate);
 }
 
 /*
@@ -216,15 +223,15 @@ int pl01x_serial_init(void)
 static void pl01x_serial_putc(const char c)
 {
 	if (c == '\n')
-		while (pl01x_putc(base_regs, '\r') == -EAGAIN);
+		while (pl01x_putc(pl01x_base_regs, '\r') == -EAGAIN);
 
-	while (pl01x_putc(base_regs, c) == -EAGAIN);
+	while (pl01x_putc(pl01x_base_regs, c) == -EAGAIN);
 }
 
 static int pl01x_serial_getc(void)
 {
 	while (1) {
-		int ch = pl01x_getc(base_regs);
+		int ch = pl01x_getc(pl01x_base_regs);
 
 		if (ch == -EAGAIN) {
 			WATCHDOG_RESET();
@@ -237,7 +244,7 @@ static int pl01x_serial_getc(void)
 
 static int pl01x_serial_tstc(void)
 {
-	return pl01x_tstc(base_regs);
+	return pl01x_tstc(pl01x_base_regs);
 }
 
 static void pl01x_serial_setbrg(void)
@@ -246,9 +253,9 @@ static void pl01x_serial_setbrg(void)
 	 * Flush FIFO and wait for non-busy before changing baudrate to avoid
 	 * crap in console
 	 */
-	while (!(readl(&base_regs->fr) & UART_PL01x_FR_TXFE))
+	while (!(readl(&pl01x_base_regs->fr) & UART_PL01x_FR_TXFE))
 		WATCHDOG_RESET();
-	while (readl(&base_regs->fr) & UART_PL01x_FR_BUSY)
+	while (readl(&pl01x_base_regs->fr) & UART_PL01x_FR_BUSY)
 		WATCHDOG_RESET();
 	pl01x_serial_init_baud(gd->baudrate);
 }
