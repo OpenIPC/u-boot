@@ -94,11 +94,22 @@ struct xmsfc_nand {
 
 static struct xmsfc_nand xmsfc_nand;
 
-static void xmsfc_run(u32 op)
+/*
+ * Run one controller operation; a controller that never finishes is
+ * reported, not waited on forever
+ */
+static int xmsfc_run(u32 op)
 {
+	ulong start = get_timer(0);
+
 	writel(op, V2_OP);
-	while (!(readl(V2_ST) & BIT(op - 1)))
-		;
+	while (!(readl(V2_ST) & BIT(op - 1))) {
+		if (get_timer(start) > 100) {
+			printf("xmsfc-nand: operation %u timed out\n", op);
+			return -ETIMEDOUT;
+		}
+	}
+	return 0;
 }
 
 static void xmsfc_bus_mode(void)
@@ -129,26 +140,34 @@ static void xmsfc_set_feature(u8 reg, u8 val)
 	xmsfc_run(4);
 }
 
-static void xmsfc_wait_ready(void)
+/*
+ * Wait for the part to finish (feature C0 OIP clear), at most 100 ms --
+ * a block erase takes a few
+ */
+static int xmsfc_wait_ready(void)
 {
-	int i;
+	ulong start = get_timer(0);
 
-	for (i = 0; i < 100000; i++) {
+	do {
 		if (!(xmsfc_get_feature(FEAT_STATUS) & STATUS_OIP))
-			return;
+			return 0;
 		udelay(1);
-	}
+	} while (get_timer(start) < 100);
+	printf("xmsfc-nand: still busy after 100 ms\n");
+	return -ETIMEDOUT;
 }
 
 /* An addressed command without data: page read, program execute, erase */
-static void xmsfc_row_cmd(u8 cmd, u32 row, u32 cfg1)
+static int xmsfc_row_cmd(u8 cmd, u32 row, u32 cfg1)
 {
+	int ret;
+
 	writel(cfg1, V2_CFG1);
 	writel(CFG2_POLL, V2_CFG2);
 	writel(cmd, V2_CMD);
 	writel(row, V2_ADDR);
-	xmsfc_run(1);
-	xmsfc_wait_ready();
+	ret = xmsfc_run(1);
+	return ret ? ret : xmsfc_wait_ready();
 }
 
 static void xmsfc_read_page(struct mtd_info *mtd, int page)
@@ -156,7 +175,13 @@ static void xmsfc_read_page(struct mtd_info *mtd, int page)
 	struct xmsfc_nand *host = &xmsfc_nand;
 	const unsigned int len = mtd->writesize + mtd->oobsize;
 
-	xmsfc_row_cmd(SPINAND_PAGE_READ, page, CFG1_ADDR);
+	if (xmsfc_row_cmd(SPINAND_PAGE_READ, page, CFG1_ADDR)) {
+		/* Report the page as uncorrectable rather than stale data */
+		memset(host->buf, 0xff, len);
+		host->status = STATUS_ECC_MASK;
+		xmsfc_bus_mode();
+		return;
+	}
 	host->status = xmsfc_get_feature(FEAT_STATUS);
 
 	writel(CFG1_ADDR | CFG1_DUMMY, V2_CFG1);
@@ -164,8 +189,12 @@ static void xmsfc_read_page(struct mtd_info *mtd, int page)
 	writel(SPINAND_READ_CACHE, V2_CMD);
 	writel(0, V2_ADDR);
 	writel(len - 1, V2_RW_NUM);
-	xmsfc_run(3);
-	memcpy_fromio(host->buf, (void *)XM_SFC_RAM, len);
+	if (xmsfc_run(3)) {
+		memset(host->buf, 0xff, len);
+		host->status = STATUS_ECC_MASK;
+	} else {
+		memcpy_fromio(host->buf, (void *)XM_SFC_RAM, len);
+	}
 	xmsfc_bus_mode();
 }
 
@@ -186,9 +215,11 @@ static int xmsfc_program_page(struct mtd_info *mtd, int page)
 	writel(SPINAND_PROG_LOAD, V2_CMD);
 	writel(0, V2_ADDR);
 	writel(len - 1, V2_RW_NUM);
-	xmsfc_run(4);
-
-	xmsfc_row_cmd(SPINAND_PROG_EXEC, page, CFG1_ADDR);
+	if (xmsfc_run(4) ||
+	    xmsfc_row_cmd(SPINAND_PROG_EXEC, page, CFG1_ADDR)) {
+		xmsfc_bus_mode();
+		return NAND_STATUS_FAIL;
+	}
 	status = xmsfc_get_feature(FEAT_STATUS);
 	xmsfc_bus_mode();
 	return status & STATUS_P_FAIL ? NAND_STATUS_FAIL : 0;
@@ -199,7 +230,10 @@ static int xmsfc_erase_block(int page)
 	u8 status;
 
 	xmsfc_set_feature(FEAT_PROT, 0);
-	xmsfc_row_cmd(SPINAND_BLOCK_ERASE, page, CFG1_WREN | CFG1_ADDR);
+	if (xmsfc_row_cmd(SPINAND_BLOCK_ERASE, page, CFG1_WREN | CFG1_ADDR)) {
+		xmsfc_bus_mode();
+		return NAND_STATUS_FAIL;
+	}
 	status = xmsfc_get_feature(FEAT_STATUS);
 	xmsfc_bus_mode();
 	return status & STATUS_E_FAIL ? NAND_STATUS_FAIL : 0;
@@ -216,9 +250,13 @@ static void xmsfc_read_id(void)
 	writel(SPINAND_READ_ID, V2_CMD);
 	writel(0, V2_ADDR);
 	writel(2, V2_RW_NUM);
-	xmsfc_run(3);
-	id = readl(V2_R_SR_ID);
 	memset(host->id, 0, sizeof(host->id));
+	if (xmsfc_run(3)) {
+		/* No ID: nand_scan_ident() then finds no chip */
+		xmsfc_bus_mode();
+		return;
+	}
+	id = readl(V2_R_SR_ID);
 	host->id[0] = id >> 16;
 	host->id[1] = id >> 8;
 	host->id[2] = id;
