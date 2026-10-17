@@ -1224,6 +1224,16 @@ config ARCH_U8500
 	imply SYS_THUMB_BUILD
 	imply SYSRESET_SYSCON
 
+config ARCH_XM
+	bool "Xiongmai XM510/XM530/XM550 IP camera SoCs"
+	select CPU_V7A
+	select CREATE_ARCH_SYMLINK
+	select SUPPORT_PASSING_ATAGS
+	help
+	  Xiongmai's own camera SoCs. U-Boot runs in place from SPI NOR
+	  through the flash controller's read window, brings up PLLs and
+	  DDR itself in lowlevel_init, then relocates to DRAM.
+
 config ARCH_VERSAL
 	bool "Support Xilinx Versal Platform"
 	select ARM64
@@ -2283,6 +2293,8 @@ source "arch/arm/mach-zynq/Kconfig"
 source "arch/arm/mach-zynqmp/Kconfig"
 
 source "arch/arm/mach-versal/Kconfig"
+
+source "arch/arm/mach-xm/Kconfig"
 
 source "arch/arm/mach-zynqmp-r5/Kconfig"
 

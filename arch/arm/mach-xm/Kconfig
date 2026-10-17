@@ -1,0 +1,58 @@
+if ARCH_XM
+
+choice
+	prompt "Xiongmai SoC"
+	default TARGET_XM510
+
+config TARGET_XM510
+	bool "XM510"
+	help
+	  XM510: one Cortex-A5 class core, 32 or 64 MiB DDR2, flash
+	  controller v1 with its read window at 0x0.
+
+config TARGET_XM530
+	bool "XM530"
+	select XM_SFC_V2
+	help
+	  XM530: 64 MiB DDR2, flash controller v2 with its read window at
+	  0x60000000, also mapped at 0x08000000 where U-Boot runs.
+
+config TARGET_XM550
+	bool "XM550"
+	select XM_SFC_V2
+	select XM_DDR3
+	help
+	  XM550: the XM530 die with 128 MiB of DDR3 and a 1600M DDR PLL.
+	  It uses the XM530 board and flash controller, so one U-Boot
+	  board serves both.
+
+endchoice
+
+config XM_SFC_V2
+	bool
+
+config XM_DDR3
+	bool
+
+config XM_DDR_64M
+	bool "64 MiB DDR2 (XM510)"
+	depends on TARGET_XM510
+	help
+	  The XM510's 64 MiB option: other PLL D settings and DDR training
+	  values than the 32 MiB part.
+
+config SYS_SOC
+	default "xm"
+
+config SYS_VENDOR
+	default "xiongmai"
+
+config SYS_BOARD
+	default "xm510" if TARGET_XM510
+	default "xm530"
+
+config SYS_CONFIG_NAME
+	default "xm510" if TARGET_XM510
+	default "xm530"
+
+endif

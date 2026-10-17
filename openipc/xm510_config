@@ -1,0 +1,6 @@
+CONFIG_TARGET_XM510=y
+CONFIG_SYS_TEXT_BASE=0x00000000
+CONFIG_PRODUCT_SOC="xm510"
+# 32 MiB: U-Boot relocates to 0x81fbc000 with its 4 MiB heap below, so the
+# boot counter sits under that, above the largest TFTP load (0x81a00000)
+CONFIG_SYS_BOOTCOUNT_ADDR=0x81b00000
