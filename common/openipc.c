@@ -620,14 +620,36 @@ int firmware_scan(void) {
       char str[32], mtds[128], mtdparts[160];
       const char *mtdids = env_get("mtdids");
       ulong fit_size = ALIGN(fdt_totalsize(hdr), 0x10000);
+      ulong kern_slot, root_slot;
 
+      /*
+       * kernsize is what loadkernel reads, and also what uk erases; rootaddr
+       * and rootsize are where ur writes. Those commands install a uImage
+       * and a squashfs, i.e. fixed slots, so they get the fixed slots: the
+       * kernel slot whole (the split squashfs starts inside it, and a head
+       * left there would be found by the next scan before the new rootfs),
+       * the rootfs slot after it. The FIT is read whole either way.
+       */
+      if (fit_size <= 0x200000) {
+        kern_slot = 0x200000;
+        root_slot = 0x500000;
+      } else if (fit_size <= 0x300000 && flash->size > 0x800000) {
+        kern_slot = 0x300000;
+        root_slot = 0xa00000;
+      } else {
+        /* No fixed-slot layout holds this kernel. */
+        kern_slot = fit_size;
+        root_slot = flash->size - kernel_off - fit_size;
+      }
       spi_flash_free(flash);
       sprintf(str, "0x%08lx", kernel_off);
       env_set("kernaddr", str);
-      sprintf(str, "0x%lx", fit_size);
+      sprintf(str, "0x%lx", kern_slot);
       env_set("kernsize", str);
-      sprintf(str, "0x%08lx", rootfs_off);
+      sprintf(str, "0x%08lx", kernel_off + kern_slot);
       env_set("rootaddr", str);
+      sprintf(str, "0x%lx", root_slot);
+      env_set("rootsize", str);
 #ifdef SFC
       if (!mtdids || !*mtdids)
         mtdids = SFC;
