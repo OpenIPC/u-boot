@@ -446,6 +446,15 @@ config NAND_MXIC
 	help
 	  This selects the Macronix raw NAND controller driver.
 
+config NAND_XMSFC
+	bool "Xiongmai xmsfc v2 SPI NAND"
+	depends on ARCH_XM && XM_SFC_V2
+	select SYS_NAND_SELF_INIT
+	help
+	  SPI NAND behind the XM530/XM550 flash controller, as a raw NAND
+	  device: the controller runs the SPI NAND commands, the part's
+	  on-die ECC corrects.
+
 config NAND_ZYNQ
 	bool "Support for Zynq Nand controller"
 	select SPL_SYS_NAND_SELF_INIT
