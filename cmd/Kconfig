@@ -1412,7 +1412,7 @@ config CMD_SDRAM
 
 config CMD_SF
 	bool "sf"
-	depends on DM_SPI_FLASH || SPI_FLASH
+	depends on DM_SPI_FLASH || SPI_FLASH || GK_SFLASH
 	default y if DM_SPI_FLASH
 	help
 	  SPI Flash support
