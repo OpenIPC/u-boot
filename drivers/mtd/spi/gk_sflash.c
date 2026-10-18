@@ -67,6 +67,9 @@
 #define SR1_BP			0x7C	/* GigaDevice/Winbond: BP0-4 */
 #define SR1_BP_OTHER		0x3C	/* BP0-3 */
 
+/* Longer than any erase or program of the parts on these boards */
+#define SF_TIMEOUT_MS		3000
+
 #define MFR_GIGADEVICE		0xc8
 #define MFR_WINBOND		0xef
 #define MFR_XMC			0x20
@@ -84,19 +87,27 @@ static void sf_cmd(u8 op)
 	readl(SF_DATA);
 }
 
-static void sf_wait_ready(void)
+static int sf_wait_ready(void)
 {
-	while (sf_reg_read(CMD_RDSR, 1) & SR1_WIP)
-		;
+	ulong start = get_timer(0);
+
+	while (sf_reg_read(CMD_RDSR, 1) & SR1_WIP) {
+		if (get_timer(start) > SF_TIMEOUT_MS) {
+			printf("SF: timed out waiting for the flash\n");
+			return -ETIMEDOUT;
+		}
+		WATCHDOG_RESET();
+	}
+	return 0;
 }
 
-static void sf_write_sr(u32 val, unsigned int nbytes)
+static int sf_write_sr(u32 val, unsigned int nbytes)
 {
 	sf_cmd(CMD_WREN);
 	writel(CMD_WRSR | SF_SEND_CMD | SF_RWN_WRITE | SF_BYTES(nbytes),
 	       SF_COMMAND);
 	writel(val, SF_DATA);
-	sf_wait_ready();
+	return sf_wait_ready();
 }
 
 /* Clear the block protection a vendor loader may have left set */
@@ -121,17 +132,17 @@ static void sf_unprotect(u32 jedec)
 	}
 }
 
-static void sf_erase_sector(u32 addr)
+static int sf_erase_sector(u32 addr)
 {
 	sf_cmd(CMD_WREN);
 	writel(CMD_SE_64K | SF_SEND_CMD | SF_ADDR3 | SF_RWN_NOTHING,
 	       SF_COMMAND);
 	writel(addr, SF_DATA);
-	sf_wait_ready();
+	return sf_wait_ready();
 }
 
 /* Whole words, within one page */
-static void sf_program(u32 addr, const u8 *buf, unsigned int words)
+static int sf_program(u32 addr, const u8 *buf, unsigned int words)
 {
 	sf_cmd(CMD_WREN);
 	writel(CMD_PP | SF_SEND_CMD | SF_ADDR3 | SF_RWN_WRITE | SF_BYTES_4,
@@ -141,7 +152,7 @@ static void sf_program(u32 addr, const u8 *buf, unsigned int words)
 		writel(get_unaligned_le32(buf), SF_DATA);
 		buf += 4;
 	}
-	sf_wait_ready();
+	return sf_wait_ready();
 }
 
 static int gk_sf_read(struct mtd_info *mtd, loff_t from, size_t len,
@@ -188,10 +199,11 @@ static int gk_sf_write(struct mtd_info *mtd, loff_t to, size_t len,
 	u8 page[SZ_PAGE];
 	u32 addr = to & ~3;
 	unsigned int head = to & 3;
+	int ret;
 
 	if (to + len > mtd->size)
 		return -EINVAL;
-	*retlen = len;
+	*retlen = 0;
 	while (len) {
 		unsigned int room = SZ_PAGE - (addr & (SZ_PAGE - 1));
 		unsigned int n = min_t(size_t, len, room - head);
@@ -199,12 +211,14 @@ static int gk_sf_write(struct mtd_info *mtd, loff_t to, size_t len,
 
 		memset(page, 0xff, span);
 		memcpy(page + head, buf, n);
-		sf_program(addr, page, span / 4);
+		ret = sf_program(addr, page, span / 4);
+		if (ret)
+			return ret;
 		addr += span;
 		buf += n;
 		len -= n;
+		*retlen += n;
 		head = 0;
-		WATCHDOG_RESET();
 	}
 	return 0;
 }
@@ -213,12 +227,16 @@ static int gk_sf_erase(struct mtd_info *mtd, struct erase_info *instr)
 {
 	u32 addr = instr->addr;
 	u32 end = instr->addr + instr->len;
+	int ret;
 
 	if (addr % SZ_SECTOR || instr->len % SZ_SECTOR || end > mtd->size)
 		return -EINVAL;
 	for (; addr < end; addr += SZ_SECTOR) {
-		sf_erase_sector(addr);
-		WATCHDOG_RESET();
+		ret = sf_erase_sector(addr);
+		if (ret) {
+			instr->fail_addr = addr;
+			return ret;
+		}
 	}
 	return 0;
 }
