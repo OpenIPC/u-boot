@@ -3,6 +3,7 @@
 [![hisilicon build](https://github.com/OpenIPC/u-boot/actions/workflows/build-hisilicon.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-hisilicon.yml)
 [![xiongmai build](https://github.com/OpenIPC/u-boot/actions/workflows/build-xm.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-xm.yml)
 [![gk710x build](https://github.com/OpenIPC/u-boot/actions/workflows/build-gk710x.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-gk710x.yml)
+[![anyka build](https://github.com/OpenIPC/u-boot/actions/workflows/build-anyka.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-anyka.yml)
 
 Unified repository for the U-Boot bootloaders maintained by
 [OpenIPC](https://openipc.org) for supported SoCs.
@@ -17,6 +18,7 @@ family — not bootloader sources.
 | `openipc-hisilicon` | U-Boot for HiSilicon/Goke IP-camera SoCs |
 | `openipc-xm` | U-Boot for Xiongmai XM510/XM530/XM550 |
 | `openipc-gk710x` | U-Boot for Goke GK7101/GK7102 |
+| `openipc-anyka` | U-Boot for Anyka AK3918EV200, AK391xEV300, AK391xEV330 |
 | `main` | Fork of upstream mainline U-Boot, kept for rebasing |
 
 New families are added here as they are ported, each with its own
@@ -127,6 +129,39 @@ bash build.sh gk7102        # a single SoC
 
 Images land in `output/` as `u-boot-<soc>-nor.bin`.
 
+## anyka
+
+U-Boot for Anyka's ARM926 camera SoCs, on the same mainline release
+(v2022.10) and with the same OpenIPC boot layer as `openipc-hisilicon`.
+
+**NOR:** `ak3918ev200`; `ak3916ev300`, `ak3918ev300`, `ak3919ev300`
+(the AK3916EV301 runs the `ak3916ev300` image); `ak3918ev330`,
+`ak3919ev330`. Within a generation the images differ only in the DDR size
+(the AK3919s have 128 MiB, the others 64 MiB) and in `soc`.
+
+The mask ROM runs the PLL and DDR script in the image's header and copies
+U-Boot into DDR, so `u-boot-<soc>-nor.bin` is written at flash offset 0
+as it is. On the EV330 the ROM loads a 4 KiB first stage into on-chip
+memory, which loads U-Boot from flash offset 0x1200; that first stage and
+its header are the vendor's, from a camera's flash, and lead the image.
+
+Vendor uImages are built with the entry point 0x40 past the load address,
+for the vendor U-Boot's way of running them where they were read to; this
+U-Boot boots OpenIPC images (entry = load) and does not do that.
+
+These images have so far run only on qemu-hisilicon's Anyka machines, not
+on a camera. SD card recovery is not enabled.
+
+```sh
+git clone --branch openipc-anyka https://github.com/OpenIPC/u-boot.git
+cd u-boot
+
+bash build.sh               # all six
+bash build.sh ak3918ev300   # a single SoC
+```
+
+Images land in `output/` as `u-boot-<soc>-nor.bin`.
+
 ## CI
 
 The [build-hisilicon](.github/workflows/build-hisilicon.yml) workflow runs
@@ -203,6 +238,24 @@ Its `release` input fills this repository's
 
 ```sh
 gh workflow run build-gk710x.yml -f release=true -f publish=true
+```
+
+### anyka
+
+The [build-anyka](.github/workflows/build-anyka.yml) workflow has the same
+shape. It runs on pull requests to this branch that change it, on pushes
+and pull requests to `openipc-anyka` (through that branch's `ci.yml`), and
+manually. Every SoC has a qemu-hisilicon machine model, so every image is
+smoke-tested: booted from an 8 MiB flash image, then a second time, which
+must load the environment the first boot saved.
+
+Its `release` input fills this repository's
+[`Anyka` release](../../releases/tag/anyka); `publish` uploads to
+`OpenIPC/firmware` `latest`, where no other repository publishes
+`u-boot-ak39*` names, and reports to openipc.org.
+
+```sh
+gh workflow run build-anyka.yml -f release=true -f publish=true
 ```
 
 ## Adding a SoC family
