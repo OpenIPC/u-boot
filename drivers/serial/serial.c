@@ -119,6 +119,7 @@ U_BOOT_ENV_CALLBACK(baudrate, on_baudrate);
 	void name(void)						\
 		__attribute__((weak, alias("serial_null")));
 
+serial_initfunc(ak39_serial_initialize);
 serial_initfunc(atmel_serial_initialize);
 serial_initfunc(mcf_serial_initialize);
 serial_initfunc(mpc85xx_serial_initialize);
@@ -174,6 +175,7 @@ void serial_register(struct serial_device *dev)
  */
 int serial_initialize(void)
 {
+	ak39_serial_initialize();
 	atmel_serial_initialize();
 	mcf_serial_initialize();
 	mpc85xx_serial_initialize();

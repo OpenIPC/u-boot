@@ -1,0 +1,67 @@
+if ARCH_ANYKA
+
+choice
+	prompt "Anyka SoC"
+	default TARGET_AK3918EV300
+
+config TARGET_AK3918EV200
+	bool "AK3918EV200"
+	select AK39_EV200
+	help
+	  Cloud39E: 64 MiB of DDR2 in the package, boot header AKSH_240.
+
+config TARGET_AK3916EV300
+	bool "AK3916EV300"
+	select AK39_EV300
+	help
+	  AnyCloud39EV300, 64 MiB. The AK3916EV301 runs the same image.
+
+config TARGET_AK3918EV300
+	bool "AK3918EV300"
+	select AK39_EV300
+	help
+	  AnyCloud39EV300, 64 MiB.
+
+config TARGET_AK3919EV300
+	bool "AK3919EV300"
+	select AK39_EV300
+	help
+	  AnyCloud39EV300, 128 MiB.
+
+config TARGET_AK3918EV330
+	bool "AK3918EV330"
+	select AK39_EV330
+	help
+	  AnyCloud V500, 64 MiB. The mask ROM loads a first stage into L2
+	  memory, which loads U-Boot.
+
+config TARGET_AK3919EV330
+	bool "AK3919EV330"
+	select AK39_EV330
+	help
+	  AnyCloud V500, 128 MiB.
+
+endchoice
+
+config AK39_EV200
+	bool
+
+config AK39_EV300
+	bool
+
+config AK39_EV330
+	bool
+
+config SYS_SOC
+	default "anyka"
+
+config SYS_VENDOR
+	default "anyka"
+
+config SYS_BOARD
+	default "ak39"
+
+config SYS_CONFIG_NAME
+	default "anyka"
+
+endif

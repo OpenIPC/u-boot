@@ -766,6 +766,13 @@ config PL011_SERIAL
 	help
 	  Select this to enable a UART for platforms using PL011.
 
+config AK39_SERIAL
+	bool "Anyka AK39 UART"
+	depends on ARCH_ANYKA && !DM_SERIAL
+	default y
+	help
+	  UART0 of the Anyka AK39 SoCs, whose data goes through L2 memory.
+
 config PL01X_SERIAL
 	bool "ARM PL010 and PL011 driver"
 	depends on DM_SERIAL
