@@ -247,16 +247,24 @@ static const struct gk_gpio_map *gk_map(void)
 	return &gk_maps[0];
 }
 
-/* As the vendor U-Boot does at start: every pin, then the internal PHY's */
+/*
+ * U-Boot itself needs one pin: the internal PHY's reference clock, out on
+ * GPIO 48 in both layouts. The vendor U-Boot applied the whole map here,
+ * but the map is a guess until gpiomap is set, and the v2 map moves UART0
+ * off GPIO 30/31 -- a v1 board would lose its console before anyone could
+ * set gpiomap=v1. The pins stay as the boot ROM left them; the kernel
+ * applies the full map it is handed.
+ */
+#define GK_EPHY_CLK_PIN		48
+
 void gk_gpio_map_apply(void)
 {
 	const struct gk_gpio_map *m = gk_map();
 	int i;
 
-	for (i = 0; i < m->npins; i++)
-		gk_gpio_config(m->pins[i].pin, m->pins[i].type);
 	for (i = 0; i < m->nintphy; i++)
-		gk_gpio_config(m->intphy[i].pin, m->intphy[i].type);
+		if (m->intphy[i].pin == GK_EPHY_CLK_PIN)
+			gk_gpio_config(m->intphy[i].pin, m->intphy[i].type);
 	gk_gpio_init();
 }
 

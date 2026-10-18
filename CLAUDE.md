@@ -144,10 +144,16 @@ The SDK's 20-odd board GPIO headers come down to two layouts
   gc1024, GK7101 rb-ov2710 v2.2;
 - `v1`: rb-ov9712, ar0130, jxh42 v1.0, GK7101 imx222.
 
-`gpiomap=v1` in the environment selects the second. U-Boot also applies the
-selected map at `misc_init_r()`, as the vendor U-Boot did, so its own
-Ethernet gets its PHY clock pin. Other vendor boards (EVBs, rb-ov2710 v1/v2.0/v2.1,
-ps1210, bg0703, ar0230) have other maps and are not covered.
+`gpiomap=v1` in the environment selects the second. Other vendor boards
+(EVBs, rb-ov2710 v1/v2.0/v2.1, ps1210, bg0703, ar0230) have other maps and
+are not covered.
+
+U-Boot itself sets only GPIO 48, the internal PHY's reference clock, the
+same in both layouts. It does not apply the whole map, as the vendor U-Boot
+did. The two layouts put UART0 on different pins, so with the wrong default
+a v1 board would lose its console before `gpiomap=v1` could be set. A v1
+board still needs `gpiomap=v1` for the kernel's pins, its console
+included.
 
 ## Peripherals
 
