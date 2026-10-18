@@ -547,6 +547,15 @@ static int nor_split_layout(struct spi_flash *flash, ulong kernel_off, ulong roo
 {
   image_header_t hdr;
 
+  /*
+   * A squashfs at a fixed rootfs slot is fixed slots, even when the uImage
+   * before it ends in the kernel slot's last block and so looks split: a
+   * kernel from before the split layout needs its mtdparts and root=. A
+   * split image of that size loses nothing, as the kernel finds the split
+   * itself and ignores both.
+   */
+  if (rootfs_off - kernel_off == 0x200000 || rootfs_off - kernel_off == 0x300000)
+    return 0;
   if (!kernel_off || !rootfs_off ||
       spi_flash_read(flash, kernel_off, sizeof(hdr), &hdr) ||
       !image_check_magic(&hdr))
