@@ -14,6 +14,10 @@ own branch:
 - `openipc-xm`: U-Boot for Xiongmai XM510/XM530/XM550, on the same mainline
   release with the same OpenIPC layer. CI: `build-xm.yml`, called from that
   branch's `ci.yml`. Its own `CLAUDE.md` covers the run-in-place boot.
+- `openipc-gk710x`: U-Boot for Goke GK7101/GK7102, on the same mainline
+  release with the same OpenIPC layer. CI: `build-gk710x.yml`, called from
+  that branch's `ci.yml`. Its own `CLAUDE.md` covers the boot header, the
+  flash byte order and the kernel hand-off.
 - `main`: a fork of upstream mainline U-Boot, kept for rebasing.
 
 To change bootloader code, check out `openipc-hisilicon`, or read it with
@@ -73,6 +77,28 @@ The build logic lives here. Other branches call it:
     hisilicon and reports `--source uboot` under a `uboot-xm-…` build id.
   - openipc.org keeps the newest build per file name, so the two workflows'
     pushes do not displace each other.
+
+## `build-gk710x.yml`
+
+- It is `build-xm.yml` for `openipc-gk710x`: the same job graph and
+  `resolve`/`ref` rules, NOR only (256 KiB boot partition, header
+  included).
+- **No `hold`:** both SoCs have qemu-hisilicon machines (`gk7101`,
+  `gk7102`; qemu-hisilicon #159 or later).
+- **Smoke test:** two boots of an 8 MiB flash image holding only U-Boot.
+  - The image is written **byte-swapped per 32-bit word**, as the chip
+    holds it. The flash controller packs bytes MSB first, and the ROM and
+    drivers move whole little-endian words; `openipc-gk710x`'s `CLAUDE.md`
+    explains it.
+  - It passes on `Hit Ctrl-C`, and fails if the second boot reports a bad
+    environment CRC.
+- **Release and publish:**
+  - `release` uploads to the `gk710x` tag.
+  - `publish` shares the `publish-firmware-latest` concurrency group and
+    reports a `uboot-gk710x-…` build id.
+  - openipc.org accepts the report only from workflows it allowlists
+    (OpenIPC/website `service/internal/builds/verify.go`). `build-gk710x.yml`
+    has to be added there before the first `publish`.
 
 ## Invariants to keep when editing `build-hisilicon.yml`
 

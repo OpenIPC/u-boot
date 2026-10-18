@@ -2,6 +2,7 @@
 
 [![hisilicon build](https://github.com/OpenIPC/u-boot/actions/workflows/build-hisilicon.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-hisilicon.yml)
 [![xiongmai build](https://github.com/OpenIPC/u-boot/actions/workflows/build-xm.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-xm.yml)
+[![gk710x build](https://github.com/OpenIPC/u-boot/actions/workflows/build-gk710x.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-gk710x.yml)
 
 Unified repository for the U-Boot bootloaders maintained by
 [OpenIPC](https://openipc.org) for supported SoCs.
@@ -15,6 +16,7 @@ family — not bootloader sources.
 | `openipc` (this branch) | Unified documentation and CI workflows |
 | `openipc-hisilicon` | U-Boot for HiSilicon/Goke IP-camera SoCs |
 | `openipc-xm` | U-Boot for Xiongmai XM510/XM530/XM550 |
+| `openipc-gk710x` | U-Boot for Goke GK7101/GK7102 |
 | `main` | Fork of upstream mainline U-Boot, kept for rebasing |
 
 New families are added here as they are ported, each with its own
@@ -90,6 +92,41 @@ Images land in `output/` as `u-boot-<soc>-nor.bin` and, for xm530/xm550,
 
 The toolchain is `arm-linux-gnueabi-`, as for hisilicon.
 
+## gk710x
+
+U-Boot for Goke's own ARM1176 camera SoCs, the GK7101 and GK7102 -- not
+the HiSilicon-derived GK7205/GK7605 above -- on the same mainline release
+(v2022.10) and with the same OpenIPC boot layer as `openipc-hisilicon`.
+
+**NOR:** `gk7101`, `gk7102`. GK7101S/GK7102S are a different die and are
+not covered.
+
+The boot ROM runs the DDR set-up listed in the image's header and copies
+U-Boot into DDR, so `u-boot-<soc>-nor.bin` is the header and `u-boot.bin`,
+written at flash offset 0. It is in CPU byte order, as `sf write` stores
+it; the flash chip holds every 32-bit word byte-swapped, so an image for
+an external programmer must be swapped.
+
+The vendor kernel needs what the vendor U-Boot leaves it besides ATAGs:
+its HAL blob, memory layout words and the board's GPIO map, from which it
+configures every pin. This U-Boot provides all three. The GPIO map is the
+vendor reference boards' default layout (rb-sc1035 v2.1, sc1045, imx225,
+ov9750, jxh42 v2.0, gc1024; GK7101 rb-ov2710 v2.2); `setenv gpiomap v1`
+selects the other one (rb-ov9712, ar0130, jxh42 v1.0, GK7101 imx222).
+
+These images have so far run only on qemu-hisilicon's `gk7101` and
+`gk7102` machines, not on a camera. SD card recovery is not enabled.
+
+```sh
+git clone --branch openipc-gk710x https://github.com/OpenIPC/u-boot.git
+cd u-boot
+
+bash build.sh               # gk7101 gk7102
+bash build.sh gk7102        # a single SoC
+```
+
+Images land in `output/` as `u-boot-<soc>-nor.bin`.
+
 ## CI
 
 The [build-hisilicon](.github/workflows/build-hisilicon.yml) workflow runs
@@ -147,6 +184,25 @@ Its `release` input fills this repository's
 
 ```sh
 gh workflow run build-xm.yml -f release=true -f publish=true
+```
+
+### gk710x
+
+The [build-gk710x](.github/workflows/build-gk710x.yml) workflow has the
+same shape. It runs on pull requests to this branch that change it, on
+pushes and pull requests to `openipc-gk710x` (through that branch's
+`ci.yml`), and manually. Every SoC has a qemu-hisilicon machine model, so
+every image is smoke-tested: booted from an 8 MiB flash image (built
+byte-swapped, as the chip holds it), then a second time, which must load
+the environment the first boot saved.
+
+Its `release` input fills this repository's
+[`GK710x` release](../../releases/tag/gk710x); `publish` uploads to
+`OpenIPC/firmware` `latest`, where no other repository publishes
+`u-boot-gk710*` names, and reports to openipc.org.
+
+```sh
+gh workflow run build-gk710x.yml -f release=true -f publish=true
 ```
 
 ## Adding a SoC family
