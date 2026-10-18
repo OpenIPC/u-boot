@@ -1224,6 +1224,16 @@ config ARCH_U8500
 	imply SYS_THUMB_BUILD
 	imply SYSRESET_SYSCON
 
+config ARCH_GK710X
+	bool "Goke GK7101/GK7102 IP camera SoCs"
+	select CPU_ARM1176
+	select CREATE_ARCH_SYMLINK
+	select SUPPORT_PASSING_ATAGS
+	help
+	  Goke's own ARM1176 camera SoCs (not the HiSilicon-derived
+	  GK7205/GK7605). The boot ROM runs the DDR set-up listed in the
+	  flash header, copies U-Boot into DDR and starts it there.
+
 config ARCH_VERSAL
 	bool "Support Xilinx Versal Platform"
 	select ARM64
@@ -2283,6 +2293,8 @@ source "arch/arm/mach-zynq/Kconfig"
 source "arch/arm/mach-zynqmp/Kconfig"
 
 source "arch/arm/mach-versal/Kconfig"
+
+source "arch/arm/mach-gk710x/Kconfig"
 
 source "arch/arm/mach-zynqmp-r5/Kconfig"
 
