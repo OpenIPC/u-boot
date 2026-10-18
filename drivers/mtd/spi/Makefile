@@ -21,3 +21,4 @@ obj-$(CONFIG_SPI_FLASH) += spi-nor.o
 obj-$(CONFIG_SPI_FLASH_DATAFLASH) += sf_dataflash.o
 obj-$(CONFIG_$(SPL_TPL_)SPI_FLASH_MTD) += sf_mtd.o
 obj-$(CONFIG_SPI_FLASH_SANDBOX) += sandbox.o
+obj-$(CONFIG_AK_SFLASH) += ak_sflash.o
