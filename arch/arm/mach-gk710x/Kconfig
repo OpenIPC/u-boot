@@ -1,0 +1,31 @@
+if ARCH_GK710X
+
+choice
+	prompt "Goke SoC"
+	default TARGET_GK7102
+
+config TARGET_GK7101
+	bool "GK7101"
+	help
+	  GK7101: ARM1176 with 128 MiB of external DDR2.
+
+config TARGET_GK7102
+	bool "GK7102"
+	help
+	  GK7102: the GK7101 die with 64 MiB of DDR2 in the package.
+
+endchoice
+
+config SYS_SOC
+	default "gk710x"
+
+config SYS_VENDOR
+	default "goke"
+
+config SYS_BOARD
+	default "gk710x"
+
+config SYS_CONFIG_NAME
+	default "gk710x"
+
+endif

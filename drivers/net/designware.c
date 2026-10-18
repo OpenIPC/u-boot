@@ -694,7 +694,12 @@ int designware_initialize(ulong base_addr, u32 interface)
 
 	priv->interface = interface;
 
-	dw_mdio_init(dev->name, priv->mac_regs_p);
+	/*
+	 * A board whose PHY is not on the MAC's MDIO lines registers its own
+	 * bus under the device's name first.
+	 */
+	if (!miiphy_get_dev_by_name(dev->name))
+		dw_mdio_init(dev->name, priv->mac_regs_p);
 	priv->bus = miiphy_get_dev_by_name(dev->name);
 
 	return dw_phy_init(priv, dev);
