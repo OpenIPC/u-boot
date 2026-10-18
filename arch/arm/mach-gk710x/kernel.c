@@ -23,12 +23,13 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-/* "36M" -> 36: the environment spells these sizes in MiB */
-static ulong env_mib(const char *name, const char *def)
+/* A size as the kernel's mem= reads it: bytes, 0x for hex, K/M/G suffix */
+static ulong env_size(const char *name, const char *def)
 {
 	const char *s = env_get(name);
+	char *end;
 
-	return simple_strtoul(s ? s : def, NULL, 10);
+	return ustrtoul(s ? s : def, &end, 0);
 }
 
 void board_prep_linux(bootm_headers_t *images)
@@ -41,8 +42,8 @@ void board_prep_linux(bootm_headers_t *images)
 	writel(GK_ARM_FREQ, GK_U2K_ARM_FREQ);
 	writel(GK_HAL_ADDR, GK_U2K_HAL_ADDR);
 	writel(0, GK_U2K_SOC);
-	writel(env_mib("osmem", OPENIPC_OSMEM) * SZ_1M, GK_U2K_MEM);
-	writel(env_mib("bsbsize", __stringify(GK_BSB_MIB)) * SZ_1M, GK_U2K_BSB);
+	writel(env_size("osmem", OPENIPC_OSMEM), GK_U2K_MEM);
+	writel(env_size("bsbsize", __stringify(GK_BSB_MIB) "M"), GK_U2K_BSB);
 	writel(GK_U2K_MAGIC, GK_U2K_ENABLE);
 	writel(0, GK_U2K_USR);
 	writel(gd->ram_size / SZ_1M, GK_U2K_TOTAL_MEM);
