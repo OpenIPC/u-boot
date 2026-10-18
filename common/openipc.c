@@ -495,40 +495,63 @@ int firmware_recovery(void) {
 }
 #endif
 
-#if !defined(CONFIG_FMC_SPI_NAND) && defined(CONFIG_OPENIPC_NOR_FIT_SPLIT)
+#if !defined(CONFIG_FMC_SPI_NAND) && defined(CONFIG_OPENIPC_NOR_SPLIT)
 /*
- * The kernel learns the NOR layout from bootargs. A saved environment carries
- * its own bootargs with "root=/dev/mtdblock3" spelled out, which is right for
- * fixed slots but names the FIT under the split layout, where the partitions
- * are u-boot, env, firmware, then the kernel's split of firmware into kernel
- * (3), rootfs (4) and rootfs_data (5). Rewrite that one token for the layout
- * found, in RAM only, and add openipc_nor_fit=1: the word sysupgrade reads from
- * /proc/cmdline to know this bootloader boots the split layout.
+ * The split layout needs nothing from bootargs: the kernel's device tree has
+ * the partitions and the kernel takes the root its firmware split finds. A
+ * saved environment still spells out the fixed slots (mtdparts=..., root=
+ * /dev/mtdblock3), and an older build of this bootloader added
+ * openipc_nor_fit=1; drop those, in RAM only, so the command line says only
+ * what is true.
  */
-static void nor_bootargs_adjust(int fit)
+static void nor_split_bootargs(void)
 {
+  static const char * const drop[] = { "mtdparts=", "root=", "openipc_nor_fit=" };
   const char *cur = env_get("bootargs");
-  const char *want = fit ? "root=/dev/mtdblock4" : "root=/dev/mtdblock3";
-  const char *other = fit ? "root=/dev/mtdblock3" : "root=/dev/mtdblock4";
-  char buf[1024];
+  char buf[1024], *out = buf;
   const char *p;
 
-  if (!cur || strlen(cur) + 32 >= sizeof(buf))
+  if (!cur || strlen(cur) >= sizeof(buf))
     return;
-  p = strstr(cur, other);
-  if (p) {
-    size_t head = p - cur;
+  for (p = cur; *p;) {
+    const char *end = strchr(p, ' ');
+    size_t len = end ? (size_t)(end - p) : strlen(p);
+    int keep = len > 0;
+    int i;
 
-    memcpy(buf, cur, head);
-    strcpy(buf + head, want);
-    strcat(buf, p + strlen(other));
-  } else {
-    strcpy(buf, cur);
+    for (i = 0; keep && i < ARRAY_SIZE(drop); i++)
+      if (!strncmp(p, drop[i], strlen(drop[i])))
+        keep = 0;
+    if (keep) {
+      if (out != buf)
+        *out++ = ' ';
+      memcpy(out, p, len);
+      out += len;
+    }
+    p += len;
+    while (*p == ' ')
+      p++;
   }
-  if (!strstr(buf, "openipc_nor_fit=1"))
-    strcat(buf, " openipc_nor_fit=1");
+  *out = '\0';
   if (strcmp(buf, cur))
     env_set("bootargs", buf);
+}
+
+/*
+ * The split layout: a uImage at the kernel offset and the root squashfs at the
+ * next 64 KiB block after it, in one "firmware" partition the kernel divides
+ * at boot. The fixed-slot layout also starts with a uImage, but its squashfs
+ * sits at the slot boundary.
+ */
+static int nor_split_layout(struct spi_flash *flash, ulong kernel_off, ulong rootfs_off)
+{
+  image_header_t hdr;
+
+  if (!kernel_off || !rootfs_off ||
+      spi_flash_read(flash, kernel_off, sizeof(hdr), &hdr) ||
+      !image_check_magic(&hdr))
+    return 0;
+  return rootfs_off == kernel_off + ALIGN(image_get_image_size(&hdr), 0x10000);
 }
 #endif
 
@@ -605,79 +628,60 @@ int firmware_scan(void) {
     rootfs_size = 0xa00000;
 #endif
 
-  /*
-   * A FIT at the kernel offset is the split layout: FIT and squashfs back to
-   * back in one "firmware" partition that the kernel divides at boot
-   * (mtdsplit). Linux gets that one partition, the read is the FIT's own
-   * size, and nothing is clamped to a slot.
-   */
-#ifdef CONFIG_OPENIPC_NOR_FIT_SPLIT
-  if (kernel_off && rootfs_off) {
-    u8 hdr[64];
+#ifdef CONFIG_OPENIPC_NOR_SPLIT
+  if (nor_split_layout(flash, kernel_off, rootfs_off)) {
+    char str[32], mtds[128], mtdparts[160];
+    const char *mtdids = env_get("mtdids");
+    ulong kern_slot, root_slot;
 
-    if (!spi_flash_read(flash, kernel_off, sizeof(hdr), hdr) &&
-        fdt_magic(hdr) == FDT_MAGIC && fdt_check_header(hdr) == 0) {
-      char str[32], mtds[128], mtdparts[160];
-      const char *mtdids = env_get("mtdids");
-      ulong fit_size = ALIGN(fdt_totalsize(hdr), 0x10000);
-      ulong kern_slot, root_slot;
-
-      /*
-       * kernsize is what loadkernel reads, and also what uk erases; rootaddr
-       * and rootsize are where ur writes. Those commands install a uImage
-       * and a squashfs, i.e. fixed slots, so they get the fixed slots: the
-       * kernel slot whole (the split squashfs starts inside it, and a head
-       * left there would be found by the next scan before the new rootfs),
-       * the rootfs slot after it. The FIT is read whole either way.
-       */
-      if (fit_size <= 0x200000) {
-        kern_slot = 0x200000;
-        root_slot = 0x500000;
-      } else if (fit_size <= 0x300000 && flash->size > 0x800000) {
-        kern_slot = 0x300000;
-        root_slot = 0xa00000;
-      } else {
-        /* No fixed-slot layout holds this kernel. */
-        kern_slot = fit_size;
-        root_slot = flash->size - kernel_off - fit_size;
-      }
-      spi_flash_free(flash);
-      sprintf(str, "0x%08lx", kernel_off);
-      env_set("kernaddr", str);
-      sprintf(str, "0x%lx", kern_slot);
-      env_set("kernsize", str);
-      sprintf(str, "0x%08lx", kernel_off + kern_slot);
-      env_set("rootaddr", str);
-      sprintf(str, "0x%lx", root_slot);
-      env_set("rootsize", str);
-#ifdef SFC
-      if (!mtdids || !*mtdids)
-        mtdids = SFC;
-#endif
-      sprintf(mtds, "%dk(u-boot),%dk(env),-(firmware)",
-              CONFIG_ENV_OFFSET / 1024, CONFIG_ENV_SIZE / 1024);
-      env_set("mtds", mtds);
-      sprintf(mtdparts, "%s:%s", mtdids ? mtdids : "", mtds);
-      env_set("mtdparts", mtdparts);
-      /* The DTB stays in the kernel's lowmem (mem=${osmem}); a saved
-       * environment from a uImage-only bootloader has no bootm_size. */
-      if (!env_get("bootm_size"))
-        env_set("bootm_size", "0x2000000");
-      /* The FIT carries crc32 and sha1 for the kernel and the DTB; a
-       * verify=n saved by an older bootloader must not skip them. RAM
-       * only, like the rest of the scan. */
-      env_set("verify", NULL);
-      nor_bootargs_adjust(1);
-      env_set("bootfail", NULL);
-      return 0;
+    /*
+     * kernsize is what loadkernel reads, and also what uk erases; rootaddr
+     * and rootsize are where ur writes. Those commands install a uImage and a
+     * squashfs, i.e. fixed slots, so they get the fixed slots: the kernel
+     * slot whole (the split squashfs starts inside it, and a head left there
+     * would be found by the next scan before the new rootfs), the rootfs slot
+     * after it. The kernel slot holds the whole uImage either way.
+     */
+    if (rootfs_off - kernel_off <= 0x200000) {
+      kern_slot = 0x200000;
+      root_slot = 0x500000;
+    } else if (rootfs_off - kernel_off <= 0x300000 && flash->size > 0x800000) {
+      kern_slot = 0x300000;
+      root_slot = 0xa00000;
+    } else {
+      /* No fixed-slot layout holds this kernel. */
+      kern_slot = rootfs_off - kernel_off;
+      root_slot = flash->size - rootfs_off;
     }
+    spi_flash_free(flash);
+    sprintf(str, "0x%08lx", kernel_off);
+    env_set("kernaddr", str);
+    sprintf(str, "0x%lx", kern_slot);
+    env_set("kernsize", str);
+    sprintf(str, "0x%08lx", kernel_off + kern_slot);
+    env_set("rootaddr", str);
+    sprintf(str, "0x%lx", root_slot);
+    env_set("rootsize", str);
+#ifdef SFC
+    if (!mtdids || !*mtdids)
+      mtdids = SFC;
+#endif
+    /* U-Boot's own idea of the flash; the kernel is not told. */
+    sprintf(mtds, "%dk(u-boot),%dk(env),-(firmware)",
+            CONFIG_ENV_OFFSET / 1024, CONFIG_ENV_SIZE / 1024);
+    env_set("mtds", mtds);
+    sprintf(mtdparts, "%s:%s", mtdids ? mtdids : "", mtds);
+    env_set("mtdparts", mtdparts);
+    /* bootm checks the uImage's data CRC; a verify=n saved by an older
+     * bootloader must not skip it. RAM only, like the rest of the scan. */
+    env_set("verify", NULL);
+    nor_split_bootargs();
+    env_set("bootfail", NULL);
+    return 0;
   }
 #endif
 
   spi_flash_free(flash);
-#ifdef CONFIG_OPENIPC_NOR_FIT_SPLIT
-  nor_bootargs_adjust(0);
-#endif
 
   if (kernel_off) {
     char str[32];
