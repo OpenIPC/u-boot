@@ -133,14 +133,30 @@ The memory map is the same in all three generations: system control at
   divider comes from the ASIC clock (`ak_asic_clk()`, from the PLL word
   at `0x08000008`). UART0's shared-pin bits are 1-2 on the EV200 and 2-3
   on the EV300 and EV330.
+- **Clocks:** on the EV200, `arch_cpu_init()` sets the ASIC PLL to CPU
+  400 / memory 200 / ASIC 100 MHz (`0x018213c8`), as the EV200 vendor
+  U-Boot and the EV200 U-Boot port both do; out of reset an AK3918EV200
+  runs its peripherals at 60 MHz. The EV300 and EV330 keep what the boot
+  header set.
 - **Timer:** timer 1, a 32-bit down counter off the 12 MHz crystal, read
-  through `READ_SEL`; `lib/time.c` does the rest. **Reset:** the watchdog.
+  through `READ_SEL`; `lib/time.c` does the rest.
+- **Reset:** the watchdog, armed as the vendor U-Boots arm it: an 8 s
+  count, enable, enable + feed, then the same with a count of 1. A single
+  "count 1, enable + feed" write hangs a real AK3918EV200.
 - **SPI NOR:** SPI0, a byte-wise PIO master: CON picks send-only (`ARRM`)
   or receive-only (`TGDM`), CNT starts a transfer, 8-byte FIFOs a word at
   a time. Opcode and address are plain TX bytes. 64 KiB erase, 3-byte
   addresses (up to 16 MiB), block protection left by a vendor loader is
   cleared. Chip select is CON bit 5 (EV330 kernels drive it on GPIO 25
   instead).
+  - It does what the vendor U-Boots do, traced under qemu from the gwell
+    camera's EV200 U-Boot: SPI0 soft reset (bit 5) and its pads (`0x74`
+    bit 25; `0xDC |= 0x3003` on the EV200, `0x3e03` on the EV300, the
+    ROM's on the EV330) at each probe, fast read (`0x0B` + a dummy byte),
+    at most 8 KiB per CNT transfer (`MAX_XFER_LEN`), about 17 MHz.
+  - Fixed after a real AK3918EV200 (XM25QH64A) read back a kernel written
+    with an earlier build with a bad data CRC. qemu never showed it: its
+    SPI master stalls on a full FIFO, the real one is not known to.
 - **Ethernet:** the Synopsys GMAC at `0x20300000`, a PHY on MDIO.
   `board/anyka/ak39/ak39.c` does what the vendor U-Boots do first: the MAC
   pins (GPIO 10-24, shared-pin register `0x7C`), the PHY clock out on GPIO
@@ -155,9 +171,19 @@ The memory map is the same in all three generations: system control at
     pinctrl table agrees; the 3.4 kernel keeps the old value commented
     out). The MAC pins in `0x7C` are the same in both tables.
   - MII vs RMII is the board's choice; these are the vendors' defaults.
-- **SD:** not enabled (`CONFIG_MMC` off). The EV200 U-Boot port has an MCI
-  driver (DM, v2026.07) to start from; qemu-hisilicon models the MCI with
-  a FIFO data path. SD recovery in `common/openipc.c` is compiled out.
+- **SD:** MCI0 (`drivers/mmc/ak_mmc.c`, `MMC_AK39`), 1-bit, PIO through
+  the FIFO, up to 20 MHz. After the EV200 U-Boot port's DM driver. Every
+  vendor source wires a 1-bit bus on pads 31-33: `0xDC |= 0x1c0` (on the
+  EV200 pad 33's field is two bits, so bit 9 is cleared too), which does
+  not touch SPI0's pads. Card detect is a board GPIO (5, 24, 41, 57 in the
+  vendor sources) and is not used: with no card the first command times
+  out (one "did not respond" line, no delay).
+  - `common/openipc.c` recovers from it at every boot: `script.txt`, then
+    `uImage.<soc>.img` and `rootfs.squashfs.<soc>.img`. Each may be a
+    wrapper (`mkimage -T firmware -a <flash offset>`), written there
+    without its header, or the image as built: a kernel uImage/FIT goes to
+    `kernaddr`, a squashfs to `rootaddr`. `fatload mmc 0` and
+    `srcmmc` work as on the other targets.
 
 ## Build
 
@@ -171,8 +197,9 @@ bash build.sh ak3918ev300   # one or more SoCs (CROSS_COMPILE defaults to arm-li
 - `.config` is `openipc/openipc_config`, then `openipc/<soc>_config`, then
   `olddefconfig`.
 - There are no `configs/*_defconfig` for these targets.
-- ARM926 has no Thumb-2: the images are ~216 KiB (EV330 ~220 KiB with its
-  first stage). `BOARD_SIZE_LIMIT` keeps header + image under the 256 KiB
+- ARM926 has no Thumb-2: the images are ~233 KiB (EV330 ~237 KiB with its
+  first stage). `fdt`, `bootelf`, `imxtract`, `random`, `loads` and `nfs`
+  are left out to make room for SD. `BOARD_SIZE_LIMIT` keeps header + image under the 256 KiB
   boot partition. Check the size after enabling anything.
 
 ## Verification
@@ -197,14 +224,21 @@ the flashed bytes.
   - The boot limit: two `reset`s, then `altbootcmd` boots with `failsafe`.
   - `ping` to the qemu host from U-Boot on `ak3918ev200` and
     `ak3918ev300`.
+  - SD (`-drive if=sd,format=raw,file=<FAT image>`): `mmc info`, `fatls`,
+    `script.txt` at boot on `ak3918ev200` and `ak3919ev330`; recovery of
+    kernel and rootfs, as wrappers or as built, from an empty flash to
+    login on `ak3918ev300`.
   - Vendor kernels (repacked with entry = load): the V380E2 camera's
     3.4.35 on `ak3918ev200` and the AK3919EV330 camera's 4.4.192 with its
     DTB (`fdt_high=0xffffffff`, as its vendor environment sets) reach
     their login prompts.
 - **What qemu does not check:** DDR timing (the scripts are the vendor's,
   so this is low risk), the PLL and so the UART and SPI dividers, pad
-  control, the Ethernet clock and PHY reset, the SPI controller's real
-  timing. None of this has run on silicon yet.
+  control, the Ethernet clock and PHY reset, the SPI and MCI controllers'
+  real timing.
+- **On silicon:** an AK3918EV200 camera (gwell, XM25QH64A, no Ethernet)
+  booted the first build to the prompt; its flash reads and its reset are
+  what the SPI and watchdog changes above address.
 - qemu's UART pushes input with no flow control: a pasted line longer than
   the 128-byte RX ring loses bytes. Type or send long lines in pieces.
 
