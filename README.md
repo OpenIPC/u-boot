@@ -185,8 +185,10 @@ from the Actions tab. Each run:
 
 Two dispatch inputs control uploads; both skip the held GK7206 images.
 
-- **`release: true`** uploads every built image to this repository's
-  [`Hisilicon` release](../../releases/tag/hisilicon).
+- **`release: true`** uploads the built images to this repository's
+  releases: the HiSilicon `hi*` images to the
+  [`Hisilicon` release](../../releases/tag/hisilicon), the Goke `gk*`
+  images to the [`Goke` release](../../releases/tag/goke).
 - **`publish: true`** pushes them to the `OpenIPC/firmware` `latest`
   release and reports the result to openipc.org. This requires a
   `FIRMWARE_RELEASE_TOKEN` secret with release write access to

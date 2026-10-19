@@ -20,7 +20,7 @@ on:
       # same names, so refreshing this repo's own release must not
       # replace those by default.
       release:
-        description: Publish to this repo's Hisilicon release
+        description: Publish to this repo's Hisilicon and Goke releases
         type: boolean
         default: false
       publish:
@@ -361,7 +361,8 @@ jobs:
           [ "$n" -gt 0 ] || { echo "no NOR image for ${soc}" >&2; exit 1; }
           exit $rc
 
-  # Mirror every built image to this repository's own Hisilicon release.
+  # Mirror every built image to this repository's own releases, one per
+  # vendor: the HiSilicon hi* images to Hisilicon, the Goke gk* ones to Goke.
   release:
     needs: [resolve, build, qemu_smoke]
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
@@ -376,14 +377,26 @@ jobs:
           path: artifacts
           pattern: u-boot-*
 
-      - name: Upload to releases
+      - name: Upload to the Hisilicon release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: hisilicon
           name: Hisilicon
           target_commitish: ${{ needs.resolve.outputs.sha }}
           prerelease: true
-          files: artifacts/**/*.bin
+          files: |
+            artifacts/**/u-boot-hi*.bin
+            artifacts/**/boot-hi*.bin
+          fail_on_unmatched_files: true
+
+      - name: Upload to the Goke release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: goke
+          name: Goke
+          target_commitish: ${{ needs.resolve.outputs.sha }}
+          prerelease: true
+          files: artifacts/**/u-boot-gk*.bin
           fail_on_unmatched_files: true
 
   # Publish every NOR/NAND image to the OpenIPC/firmware `latest` release
