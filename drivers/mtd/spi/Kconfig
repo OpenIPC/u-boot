@@ -36,9 +36,17 @@ config SPI_FLASH
 
 	  If unsure, say N
 
+config AK_SFLASH
+	bool "Anyka AK39 SPI NOR on SPI0"
+	depends on ARCH_ANYKA && !SPI_FLASH && !DM_SPI_FLASH
+	help
+	  The SPI NOR the Anyka AK39 SoCs boot from, on their SPI0 PIO
+	  master. The driver provides spi_flash_probe() directly, without
+	  the SPI and spi-nor layers.
+
 config SF_DEFAULT_BUS
 	int "SPI Flash default bus identifier"
-	depends on SPI_FLASH || DM_SPI_FLASH
+	depends on SPI_FLASH || DM_SPI_FLASH || AK_SFLASH
 	default 0
 	help
 	  The default bus may be provided by the platform
@@ -47,7 +55,7 @@ config SF_DEFAULT_BUS
 
 config SF_DEFAULT_CS
 	int "SPI Flash default Chip-select"
-	depends on SPI_FLASH || DM_SPI_FLASH
+	depends on SPI_FLASH || DM_SPI_FLASH || AK_SFLASH
 	default 0
 	help
 	  The default chip select may be provided by the platform
@@ -56,7 +64,7 @@ config SF_DEFAULT_CS
 
 config SF_DEFAULT_MODE
 	hex "SPI Flash default mode (see include/spi.h)"
-	depends on SPI_FLASH || DM_SPI_FLASH
+	depends on SPI_FLASH || DM_SPI_FLASH || AK_SFLASH
 	default 0x0
 	help
 	  The default mode may be provided by the platform
@@ -68,7 +76,7 @@ config SF_DEFAULT_MODE
 
 config SF_DEFAULT_SPEED
 	int "SPI Flash default speed in Hz"
-	depends on SPI_FLASH || DM_SPI_FLASH
+	depends on SPI_FLASH || DM_SPI_FLASH || AK_SFLASH
 	default 1000000
 	help
 	  The default speed may be provided by the platform

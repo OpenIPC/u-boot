@@ -597,6 +597,16 @@ choice
 	prompt "Target select"
 	default TARGET_HIKEY
 
+config ARCH_ANYKA
+	bool "Anyka AK39 IP camera SoCs"
+	select CPU_ARM926EJS
+	select CREATE_ARCH_SYMLINK
+	select SUPPORT_PASSING_ATAGS
+	help
+	  Anyka's ARM926EJ-S camera SoCs: AK3918EV200, AK391xEV300 and
+	  AK391xEV330. The mask ROM runs the PLL and DDR set-up listed in
+	  the flash header, copies U-Boot into DDR and starts it there.
+
 config ARCH_AT91
 	bool "Atmel AT91"
 	select GPIO_EXTRA_HEADER
@@ -2177,6 +2187,8 @@ config SYS_KWD_CONFIG
 	  when packaging the U-Boot image for use.
 
 source "arch/arm/mach-apple/Kconfig"
+
+source "arch/arm/mach-anyka/Kconfig"
 
 source "arch/arm/mach-aspeed/Kconfig"
 

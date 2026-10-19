@@ -1,0 +1,6 @@
+CONFIG_TARGET_AK3919EV330=y
+CONFIG_PRODUCT_SOC="ak3919ev330"
+# The first stage copies flash 0x1200.. to 0x80E01000, 0x40000 bytes; the
+# image must still end before the environment at 0x40000
+CONFIG_SYS_TEXT_BASE=0x80E01000
+CONFIG_BOARD_SIZE_LIMIT=257536
