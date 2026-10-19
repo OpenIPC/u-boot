@@ -30,7 +30,7 @@ The current port: U-Boot for 38 HiSilicon and Goke camera SoCs.
 
 **NOR + NAND:**
 
-`hi3516cv500`, `hi3516dv300`, `hi3516av300`, `hi3516dv200`,
+`hi3516cv500`, `hi3516dv300`, `hi3516av300`, `hi3516cv300`, `hi3516dv200`,
 `hi3516ev200`, `hi3516ev300`, `hi3518ev300`, `gk7201v200`, `gk7201v300`,
 `gk7202v300`, `gk7205v200`, `gk7205v300`, `gk7205v500`, `gk7205v510`,
 `gk7205v530`, `gk7605v100`, `gk7206v11a`\*, `gk7206v12a`\*
@@ -41,12 +41,11 @@ images but keeps them out of the release and publish steps.
 
 **NOR only:**
 
-`hi3516cv100`, `hi3516cv200`, `hi3516cv300`, `hi3516cv608`,
-`hi3516cv610`, `hi3516av100`, `hi3516av200`, `hi3516dv100`,
-`hi3516ev100`, `hi3518av100`, `hi3518cv100`, `hi3518ev100`,
-`hi3518ev200`, `hi3519v101`, `hi3515av100`, `hi3520av100`,
-`hi3520dv100`, `hi3520dv200`, `hi3536cv100`, `hi3536dv100`,
-`hi3519dv500`\*\*
+`hi3516cv100`, `hi3516cv200`, `hi3516cv608`, `hi3516cv610`,
+`hi3516av100`, `hi3516av200`, `hi3516dv100`, `hi3516ev100`,
+`hi3518av100`, `hi3518cv100`, `hi3518ev100`, `hi3518ev200`,
+`hi3519v101`, `hi3515av100`, `hi3520av100`, `hi3520dv100`,
+`hi3520dv200`, `hi3536cv100`, `hi3536dv100`, `hi3519dv500`\*\*
 
 \*\* arm64, built with `aarch64-linux-gnu-` (`CROSS_COMPILE64`). Its signed
 boot images, `boot-hi3519dv500-{dmeb,dmebpro}-nor.bin`, go in a 512 KiB
