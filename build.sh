@@ -148,10 +148,12 @@ build_bootimg() {
     done
 }
 
-# CV200 family (hi3516cv200 / hi3518ev200), ARM926EJS, NOR
+# ARM926EJS families (hi3516cv200 / hi3518ev200, hi3516cv300 / hi3516ev100):
+# NOR, plus NAND when the third argument is "nand"
 build_nor_ddr() {
     soc=$1
     out=$2
+    flash=$3
     mkflags
 
     rm -rf ${BOOT_BUILDDIR}
@@ -165,6 +167,16 @@ build_nor_ddr() {
     make ${MAKE_OPTS} KCFLAGS="-DVENDOR_HISILICON" BOOT_SRCDIR=${BOOT_SRCDIR} </dev/null && \
     make ${MAKE_OPTS} u-boot-z.bin </dev/null && \
     cp ${BOOT_BUILDDIR}/${out} ${BOOT_BUILDDIR}/../u-boot-${soc}-nor.bin || return 1
+    [ "${flash}" = nand ] || return 0
+    # NAND
+    cat ${BOOT_SRCDIR}/openipc/openipc_config > ${BOOT_BUILDDIR}/.config && \
+    cat ${BOOT_SRCDIR}/openipc/${soc}_config >> ${BOOT_BUILDDIR}/.config && \
+    cat ${BOOT_SRCDIR}/openipc/nand_config >> ${BOOT_BUILDDIR}/.config && \
+    echo "CONFIG_PRODUCT_SOC=\"${soc}\"" >> ${BOOT_BUILDDIR}/.config && \
+    make ${MAKE_OPTS} olddefconfig </dev/null >/dev/null && \
+    make ${MAKE_OPTS} KCFLAGS="-DVENDOR_HISILICON" BOOT_SRCDIR=${BOOT_SRCDIR} </dev/null && \
+    make ${MAKE_OPTS} u-boot-z.bin </dev/null && \
+    cp ${BOOT_BUILDDIR}/${out} ${BOOT_BUILDDIR}/../u-boot-${soc}-nand.bin || return 1
 }
 
 # hi3519v101/av200, hi3520, hi3536, hi3516a, hi3518ev100: NOR, reg_info splice
@@ -254,7 +266,9 @@ build_soc() {
             build_v500 ${soc} ;;
         hi3516cv200|hi3518ev200)
             build_nor_ddr ${soc} u-boot-hi3518ev200.bin ;;
-        hi3516cv300|hi3516ev100)
+        hi3516cv300)
+            build_nor_ddr ${soc} u-boot-hi3516cv300.bin nand ;;
+        hi3516ev100)
             build_nor_ddr ${soc} u-boot-hi3516cv300.bin ;;
         hi3516av200|hi3519v101)
             build_nor_splice ${soc} u-boot-${soc}.bin ;;
