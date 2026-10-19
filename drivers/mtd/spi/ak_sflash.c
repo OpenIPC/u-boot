@@ -63,6 +63,7 @@
 #define CMD_SE_64K		0xD8
 
 #define SR1_WIP			BIT(0)
+#define SR1_WEL			BIT(1)
 #define SR1_BP			0x7C	/* GigaDevice/Winbond and alikes: BP0-4 */
 #define SR1_BP_OTHER		0x3C	/* BP0-3 */
 
@@ -186,12 +187,29 @@ static int sf_wait_ready(void)
 	return 0;
 }
 
+/*
+ * A program or erase the flash did not accept leaves it idle, which the
+ * ready wait would take for success: make sure write enable latched.
+ */
+static int sf_write_enable(void)
+{
+	int ret = sf_cmd(CMD_WREN, -1, NULL, NULL, 0);
+
+	if (ret)
+		return ret;
+	if (!(sf_read_reg(CMD_RDSR) & SR1_WEL)) {
+		printf("SF: write enable did not latch\n");
+		return -EIO;
+	}
+	return 0;
+}
+
 static int sf_write_sr(const u8 *sr, unsigned int len)
 {
-	int ret;
+	int ret = sf_write_enable();
 
-	sf_cmd(CMD_WREN, -1, NULL, NULL, 0);
-	ret = sf_cmd(CMD_WRSR, -1, sr, NULL, len);
+	if (!ret)
+		ret = sf_cmd(CMD_WRSR, -1, sr, NULL, len);
 	return ret ? ret : sf_wait_ready();
 }
 
@@ -223,7 +241,7 @@ static int ak_sf_read(struct mtd_info *mtd, loff_t from, size_t len,
 {
 	int ret;
 
-	if (from + len > mtd->size)
+	if (from > mtd->size || len > mtd->size - from)
 		return -EINVAL;
 	ret = sf_cmd(CMD_READ, from, NULL, buf, len);
 	*retlen = ret ? 0 : len;
@@ -235,15 +253,16 @@ static int ak_sf_write(struct mtd_info *mtd, loff_t to, size_t len,
 {
 	int ret;
 
-	if (to + len > mtd->size)
+	if (to > mtd->size || len > mtd->size - to)
 		return -EINVAL;
 	*retlen = 0;
 	while (len) {
 		unsigned int n = min_t(size_t, len,
 				       SZ_PAGE - (to & (SZ_PAGE - 1)));
 
-		sf_cmd(CMD_WREN, -1, NULL, NULL, 0);
-		ret = sf_cmd(CMD_PP, to, buf, NULL, n);
+		ret = sf_write_enable();
+		if (!ret)
+			ret = sf_cmd(CMD_PP, to, buf, NULL, n);
 		if (!ret)
 			ret = sf_wait_ready();
 		if (ret)
@@ -258,15 +277,19 @@ static int ak_sf_write(struct mtd_info *mtd, loff_t to, size_t len,
 
 static int ak_sf_erase(struct mtd_info *mtd, struct erase_info *instr)
 {
-	u32 addr = instr->addr;
-	u32 end = instr->addr + instr->len;
+	u32 addr, end;
 	int ret;
 
-	if (addr % SZ_SECTOR || instr->len % SZ_SECTOR || end > mtd->size)
+	/* Checked in 64 bits, before anything can wrap */
+	if (instr->addr % SZ_SECTOR || instr->len % SZ_SECTOR ||
+	    instr->addr > mtd->size || instr->len > mtd->size - instr->addr)
 		return -EINVAL;
+	addr = instr->addr;
+	end = instr->addr + instr->len;
 	for (; addr < end; addr += SZ_SECTOR) {
-		sf_cmd(CMD_WREN, -1, NULL, NULL, 0);
-		ret = sf_cmd(CMD_SE_64K, addr, NULL, NULL, 0);
+		ret = sf_write_enable();
+		if (!ret)
+			ret = sf_cmd(CMD_SE_64K, addr, NULL, NULL, 0);
 		if (!ret)
 			ret = sf_wait_ready();
 		if (ret) {
