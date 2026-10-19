@@ -169,10 +169,13 @@ jobs:
             for f in $pattern; do
               [ -f "$f" ] || continue
               found=1
-              size_kb=$(( $(stat -c %s "$f") / 1024 ))
-              echo "- $f: [${size_kb}KB/${limit_kb}KB]"
-              if [ "$size_kb" -gt "$limit_kb" ]; then
-                echo "-- size exceeded by: $((size_kb - limit_kb))KB" >&2
+              # In bytes: a size rounded down to KiB let an image up to
+              # 1023 bytes over its partition through.
+              size=$(stat -c %s "$f")
+              limit=$((limit_kb * 1024))
+              echo "- $f: [$((size / 1024))KB/${limit_kb}KB] ($size/$limit bytes)"
+              if [ "$size" -gt "$limit" ]; then
+                echo "-- size exceeded by: $((size - limit)) bytes" >&2
                 rc=1
               fi
             done
@@ -300,48 +303,63 @@ jobs:
           done
 
       - name: Smoke-test in QEMU
-        timeout-minutes: 2
+        timeout-minutes: 6
         run: |
           soc='${{ matrix.soc }}'
-          UBOOT=$(ls u-boot-${soc}-nor.bin boot-${soc}*-nor.bin 2>/dev/null | head -1)
-          test -n "$UBOOT"
-          echo "booting $UBOOT"
-          dd if=/dev/zero of=/tmp/flash.bin bs=1M count=8 2>/dev/null
-          dd if="$UBOOT" of=/tmp/flash.bin bs=1 conv=notrunc 2>/dev/null
-          mkfifo /tmp/uart.in /tmp/uart.out
           # hi3519dv500 is the one arm64 machine model.
           QEMU=./qemu-arm
           [ "$soc" = hi3519dv500 ] && QEMU=./qemu-aarch64
           chmod +x ./qemu-arm ./qemu-aarch64
-          "$QEMU" \
-            -M ${soc},flash-file=/tmp/flash.bin \
-            -nographic -serial pipe:/tmp/uart \
-            -monitor none > /tmp/qemu.log 2>&1 &
-          QEMU_PID=$!
-          # Wait for the autoboot prompt, not the banner: the banner prints
-          # before the board init that can hang. hi3516cv100/hi3518av100
-          # passed on "U-Boot " while stuck in the NAND probe right after it.
-          # Up to 30 s, done as soon as the prompt shows.
-          cat /tmp/uart.out > /tmp/uboot.txt &
-          CAT_PID=$!
-          for i in $(seq 1 60); do
-            grep -q 'Hit Ctrl-C' /tmp/uboot.txt 2>/dev/null && break
-            sleep 0.5
-          done
-          kill "$QEMU_PID" "$CAT_PID" 2>/dev/null || true
-          wait 2>/dev/null || true
-          echo "== captured u-boot output =="
-          cat /tmp/uboot.txt
-          echo
-          if grep -q 'Hit Ctrl-C' /tmp/uboot.txt; then
-            echo "PASS: u-boot reached the autoboot prompt"
-          else
-            echo "FAIL: u-boot did not reach the autoboot prompt"
+
+          # Every image the leg built and would publish: the boot-image SoCs
+          # have one per board (hi3516cv610: five, hi3519dv500: two).
+          smoke() {
+            img=$1
+            echo "== booting $img =="
+            rm -f /tmp/flash.bin /tmp/uart.in /tmp/uart.out /tmp/uboot.txt
+            dd if=/dev/zero of=/tmp/flash.bin bs=1M count=8 2>/dev/null
+            dd if="$img" of=/tmp/flash.bin bs=1 conv=notrunc 2>/dev/null
+            mkfifo /tmp/uart.in /tmp/uart.out
+            "$QEMU" \
+              -M ${soc},flash-file=/tmp/flash.bin \
+              -nographic -serial pipe:/tmp/uart \
+              -monitor none > /tmp/qemu.log 2>&1 &
+            QEMU_PID=$!
+            # Wait for the autoboot prompt, not the banner: the banner prints
+            # before the board init that can hang. hi3516cv100/hi3518av100
+            # passed on "U-Boot " while stuck in the NAND probe right after it.
+            # Up to 30 s, done as soon as the prompt shows.
+            cat /tmp/uart.out > /tmp/uboot.txt &
+            CAT_PID=$!
+            for i in $(seq 1 60); do
+              grep -q 'Hit Ctrl-C' /tmp/uboot.txt 2>/dev/null && break
+              sleep 0.5
+            done
+            kill "$QEMU_PID" "$CAT_PID" 2>/dev/null || true
+            wait 2>/dev/null || true
+            echo "== captured u-boot output =="
+            cat /tmp/uboot.txt
             echo
-            echo "== qemu stderr =="
-            tail -40 /tmp/qemu.log || true
-            exit 1
-          fi
+            if grep -q 'Hit Ctrl-C' /tmp/uboot.txt; then
+              echo "PASS: $img reached the autoboot prompt"
+            else
+              echo "FAIL: $img did not reach the autoboot prompt"
+              echo
+              echo "== qemu stderr =="
+              tail -40 /tmp/qemu.log || true
+              return 1
+            fi
+          }
+
+          rc=0
+          n=0
+          for img in u-boot-${soc}-nor.bin boot-${soc}*-nor.bin; do
+            [ -f "$img" ] || continue
+            n=$((n + 1))
+            smoke "$img" || rc=1
+          done
+          [ "$n" -gt 0 ] || { echo "no NOR image for ${soc}" >&2; exit 1; }
+          exit $rc
 
   # Mirror every built image to this repository's own Hisilicon release.
   release:
