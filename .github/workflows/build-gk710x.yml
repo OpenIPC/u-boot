@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       release:
-        description: Publish to this repo's GK710x release
+        description: Publish to this repo's Goke release
         type: boolean
         default: false
       publish:
@@ -256,7 +256,8 @@ jobs:
           fi
           echo "PASS: u-boot reached the autoboot prompt, and its saved environment survived a reset"
 
-  # Mirror every built image to this repository's own GK710x release.
+  # Mirror every built image to this repository's own Goke release, shared
+  # with the Goke gk* images from build-hisilicon.yml.
   release:
     needs: [resolve, build, qemu_smoke]
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
@@ -271,11 +272,11 @@ jobs:
           path: artifacts
           pattern: u-boot-*
 
-      - name: Upload to releases
+      - name: Upload to the Goke release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: gk710x
-          name: GK710x
+          tag_name: goke
+          name: Goke
           target_commitish: ${{ needs.resolve.outputs.sha }}
           prerelease: true
           files: artifacts/**/*.bin
