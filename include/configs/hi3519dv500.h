@@ -25,6 +25,8 @@
 
 #define PHYS_SDRAM_1			0x40000000
 #define PHYS_SDRAM_1_SIZE		0x20000000
+/* RAM detection probe size (DDR up to 2GB) */
+#define OPENIPC_RAM_MAX_SIZE	0x80000000
 
 #define CONFIG_SYS_SDRAM_BASE		PHYS_SDRAM_1
 
@@ -164,7 +166,6 @@ e* ---------------------------------------------------------------------*/
  */
 
 /* Assume we boot with root on the seventh partition of eMMC */
-#define CONFIG_BOOTCOMMAND "bootm 0x42000000"
 #define CONFIG_SYS_USB_XHCI_MAX_ROOT_PORTS 2
 #define CONFIG_USB_MAX_CONTROLLER_COUNT 1
 #define BOOT_TARGET_DEVICES(func) \
@@ -200,8 +201,7 @@ func(DHCP, dhcp, na)
 #define CONFIG_DDR_TRAINING_V2
 /* Open it as you need #define CONFIG_I2C_BSP */
 
-/* Osd enable */
-#define CONFIG_OSD_ENABLE
+/* Osd: not in OpenIPC's U-Boot, as on hi3516cv610 */
 /* Open it as you need  #define CONFIG_CIPHER_ENABLE */
 /* Open it as you need  #define CONFIG_KLAD_ENABLE */
 /* Open it as you need  #define CONFIG_OTP_ENABLE */
@@ -361,5 +361,24 @@ func(DHCP, dhcp, na)
 #else
 #define TIME_RECORD_ADDR (FDR_ADDR_BASE + 0xC800)
 #endif
+
+/* The arm64 kernel Image decompresses to about 13 MiB */
+#define CONFIG_SYS_BOOTM_LEN	0x2000000
+
+/*
+ * The signed boot image (GSL + DDR table + U-Boot) is about 400 KiB, so the
+ * boot partition is 512 KiB and the environment 256 KiB after it: firmware
+ * starts at 0xc0000, not at 0x50000 as on the other NOR boards.
+ */
+#define OPENIPC_ENV_OFFSET	0x80000
+#define OPENIPC_ENV_SIZE	0x40000
+#define OPENIPC_KERNADDR	0xc0000
+#define OPENIPC_ROOTADDR_LITE	0x2c0000
+#define OPENIPC_ROOTADDR_ULTIMATE	0x3c0000
+#define OPENIPC_MTDPARTS "512k(boot),256k(env),2048k(kernel),5120k(rootfs),7168k@0xc0000(firmware),-(rootfs_data)"
+#define OPENIPC_BASEADDR	0x42000000
+#define OPENIPC_OSMEM		"128M"
+
+#include "openipc-common.h"
 
 #endif /* __HI3519DV500_H */

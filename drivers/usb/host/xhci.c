@@ -21,6 +21,7 @@
 
 #include <common.h>
 #include <linux/bug.h>
+#include <linux/delay.h>
 #include <cpu_func.h>
 #include <dm.h>
 #include <asm/byteorder.h>

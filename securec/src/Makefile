@@ -37,3 +37,5 @@ obj-y += strncat_s.o
 obj-y += strcpy_s.o
 #obj-y += swscanf_s.o
 obj-y += vsnprintf_s.o
+# arm64 builds with -mgeneral-regs-only: no floating point to format
+ccflags-$(CONFIG_ARM64) += -DSECUREC_ENABLE_SPRINTF_FLOAT=0
