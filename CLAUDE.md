@@ -141,13 +141,20 @@ The memory map is the same in all three generations: system control at
   addresses (up to 16 MiB), block protection left by a vendor loader is
   cleared. Chip select is CON bit 5 (EV330 kernels drive it on GPIO 25
   instead).
-- **Ethernet:** the Synopsys GMAC at `0x20300000`, RMII, a PHY on MDIO.
-  - On the EV300 and EV330, `board/anyka/ak39/ak39.c` does what the EV300
-    vendor U-Boot does: MAC pins, the 50 MHz PHY clock out on GPIO 47, a
-    PHY reset pulse on GPIO 0. The EV330 has the same shared-pin layout;
-    that it needs exactly this is unverified.
-  - On the EV200 the shared-pin layout is different and not known: the
-    MAC is registered without pin set-up.
+- **Ethernet:** the Synopsys GMAC at `0x20300000`, a PHY on MDIO.
+  `board/anyka/ak39/ak39.c` does what the vendor U-Boots do first: the MAC
+  pins (GPIO 10-24, shared-pin register `0x7C`), the PHY clock out on GPIO
+  47, the MAC clock (`0x14`), a MAC soft reset (bit 13).
+  - EV300, from the SDK: RMII, 50 MHz, and a PHY reset pulse on GPIO 0.
+    The EV330 has the same shared-pin layout (its 4.4 pinctrl table); that
+    it needs exactly this is unverified.
+  - EV200, from the V380E2 camera's vendor U-Boot, traced under qemu while
+    it pinged: MII (`0x575f5a5`, the SDK's MII value too), 25 MHz, no PHY
+    reset. Shared-pin register 0 is one bit narrower at the bottom than
+    the EV300's, so GPIO 47's field is bits 10:9, not 11:10 (the EV200 4.4
+    pinctrl table agrees; the 3.4 kernel keeps the old value commented
+    out). The MAC pins in `0x7C` are the same in both tables.
+  - MII vs RMII is the board's choice; these are the vendors' defaults.
 - **SD:** not enabled (`CONFIG_MMC` off). The EV200 U-Boot port has an MCI
   driver (DM, v2026.07) to start from; qemu-hisilicon models the MCI with
   a FIFO data path. SD recovery in `common/openipc.c` is compiled out.
@@ -188,6 +195,8 @@ the flashed bytes.
   - TFTP recovery from a flash holding only U-Boot
     (`-nic user,net=192.168.1.0/24,host=192.168.1.107,tftp=<dir>`).
   - The boot limit: two `reset`s, then `altbootcmd` boots with `failsafe`.
+  - `ping` to the qemu host from U-Boot on `ak3918ev200` and
+    `ak3918ev300`.
   - Vendor kernels (repacked with entry = load): the V380E2 camera's
     3.4.35 on `ak3918ev200` and the AK3919EV330 camera's 4.4.192 with its
     DTB (`fdt_high=0xffffffff`, as its vendor environment sets) reach
