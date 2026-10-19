@@ -46,7 +46,7 @@
 #define STA_TRANSF		BIT(8)
 
 #define SPI_HZ			20000000
-#define CON_DIV_MAX		0x7f
+#define CON_DIV_MAX		0x7fU
 /* One CNT transfer, at most: the vendor U-Boot's MAX_XFER_LEN */
 #define SPI_CHUNK		0x2000
 /* Polls of STA before a transfer is given up */
