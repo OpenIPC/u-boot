@@ -77,6 +77,12 @@ config MMC_SPI_CRC_ON
 
 	  If unsure, say N.
 
+config MMC_AK39
+	bool "Anyka AK39 SD card (MCI0)"
+	depends on ARCH_ANYKA && MMC && !DM_MMC
+	help
+	  MCI0 of the Anyka AK39 SoCs, 1-bit, PIO through its FIFO.
+
 config ARM_PL180_MMCI
 	bool "ARM AMBA Multimedia Card Interface and compatible support"
 	help

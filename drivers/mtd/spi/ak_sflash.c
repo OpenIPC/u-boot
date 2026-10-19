@@ -22,6 +22,7 @@
 #include <watchdog.h>
 #include <asm/io.h>
 #include <asm/arch/anyka.h>
+#include <linux/delay.h>
 #include <linux/mtd/mtd.h>
 #include <linux/sizes.h>
 
@@ -45,8 +46,9 @@
 #define STA_TRANSF		BIT(8)
 
 #define SPI_HZ			20000000
-/* CNT is 16 bits; the vendor driver keeps one transfer under 64 KiB */
-#define SPI_CHUNK		0x8000
+#define CON_DIV_MAX		0x7fU
+/* One CNT transfer, at most: the vendor U-Boot's MAX_XFER_LEN */
+#define SPI_CHUNK		0x2000
 /* Polls of STA before a transfer is given up */
 #define SPI_SPINS		10000000
 
@@ -55,7 +57,7 @@
 
 #define CMD_WRSR		0x01
 #define CMD_PP			0x02
-#define CMD_READ		0x03
+#define CMD_FAST_READ		0x0B
 #define CMD_RDSR		0x05
 #define CMD_WREN		0x06
 #define CMD_RDSR2		0x35
@@ -149,14 +151,17 @@ static int spi_recv(u8 *buf, unsigned int len)
 	return 0;
 }
 
-/* One flash command: opcode and address out, then data out or in */
+/*
+ * One flash command: opcode and address out (and for a fast read the dummy
+ * byte), then data out or in
+ */
 static int sf_cmd(u8 op, int addr, const u8 *out, u8 *in, unsigned int len)
 {
-	u8 cmd[4] = { op, addr >> 16, addr >> 8, addr };
+	u8 cmd[5] = { op, addr >> 16, addr >> 8, addr, 0 };
 	int ret;
 
 	spi_select(true);
-	ret = spi_send(cmd, addr < 0 ? 1 : 4);
+	ret = spi_send(cmd, addr < 0 ? 1 : op == CMD_FAST_READ ? 5 : 4);
 	if (!ret && out && len)
 		ret = spi_send(out, len);
 	if (!ret && in && len)
@@ -243,7 +248,7 @@ static int ak_sf_read(struct mtd_info *mtd, loff_t from, size_t len,
 
 	if (from > mtd->size || len > mtd->size - from)
 		return -EINVAL;
-	ret = sf_cmd(CMD_READ, from, NULL, buf, len);
+	ret = sf_cmd(CMD_FAST_READ, from, NULL, buf, len);
 	*retlen = ret ? 0 : len;
 	return ret;
 }
@@ -300,6 +305,30 @@ static int ak_sf_erase(struct mtd_info *mtd, struct erase_info *instr)
 	return 0;
 }
 
+/*
+ * SPI0's pads, as the vendor U-Boots set them before each use; the boot ROM
+ * leaves enough for reading the boot image. The EV330's are left as the
+ * ROM has them.
+ */
+#if defined(CONFIG_AK39_EV200)
+#define SPI0_SHAREPIN0		BIT(25)
+#define SPI0_SHAREPIN3		0x3003
+#elif defined(CONFIG_AK39_EV300)
+#define SPI0_SHAREPIN0		BIT(25)
+#define SPI0_SHAREPIN3		(0x3 | 0x1f << 9)
+#endif
+
+static void spi_hw_init(void)
+{
+	setbits_le32(AK_SYS_SOFT_RST, AK_RST_SPI0);
+	udelay(10);
+	clrbits_le32(AK_SYS_SOFT_RST, AK_RST_SPI0);
+#ifdef SPI0_SHAREPIN0
+	setbits_le32(AK_SYS_SHAREPIN0, SPI0_SHAREPIN0);
+	setbits_le32(AK_SYS_SHAREPIN3, SPI0_SHAREPIN3);
+#endif
+}
+
 static struct spi_flash ak_flash;
 static int ak_announced;
 
@@ -313,7 +342,8 @@ struct spi_flash *spi_flash_probe(unsigned int bus, unsigned int cs,
 	u8 id[3];
 	u32 jedec, size;
 
-	spi_con = CON_EN | CON_MASTER | CON_DIV(min(div, 255U));
+	spi_hw_init();
+	spi_con = CON_EN | CON_MASTER | CON_DIV(min(div, CON_DIV_MAX));
 	spi_select(false);
 	writel(0, SPI_INT);
 
@@ -338,7 +368,7 @@ struct spi_flash *spi_flash_probe(unsigned int bus, unsigned int cs,
 	flash->sector_size = SZ_SECTOR;
 	flash->erase_size = SZ_SECTOR;
 	flash->erase_opcode = CMD_SE_64K;
-	flash->read_opcode = CMD_READ;
+	flash->read_opcode = CMD_FAST_READ;
 	flash->program_opcode = CMD_PP;
 
 	mtd->name = "ak-sflash";
