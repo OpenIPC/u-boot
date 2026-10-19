@@ -352,6 +352,22 @@ static int recovery_write(const char *name, int type) {
 #else
 static struct spi_flash *recovery_flash;
 
+/* Whether the flash at addr already holds these bytes */
+static int recovery_same(ulong addr, const u8 *data, ulong size) {
+  const ulong chunk = 0x10000;
+  u8 *buf = malloc(chunk);
+  ulong off, n;
+  int same = buf != NULL;
+
+  for (off = 0; same && off < size; off += n) {
+    n = min(chunk, size - off);
+    same = !spi_flash_read(recovery_flash, addr + off, n, buf) &&
+           !memcmp(buf, data + off, n);
+  }
+  free(buf);
+  return same;
+}
+
 static ulong recovery_env(const char *name, ulong def) {
   const char *str = env_get(name);
 
@@ -359,19 +375,15 @@ static ulong recovery_env(const char *name, ulong def) {
 }
 
 /*
- * What a card may hold, for the kernel or the rootfs:
- * - a wrapper image (mkimage -T firmware -a <flash offset>, the ".img"
- *   files): its payload goes to the offset its header names;
- * - for the kernel, a uImage or FIT as built: it goes to kernaddr;
- * - for the rootfs, a squashfs as built: it goes to rootaddr.
- * The kernel must end before rootaddr, the rootfs within the flash.
+ * A uImage on the card is flashed where its header's load address says,
+ * without the header (mkimage -a <flash offset>); a FIT goes to kernaddr.
+ * A card left in reflashes nothing: an image the flash already holds is
+ * skipped.
  */
 static int recovery_write(const char *name, int type) {
   struct image_header hdr;
-  loff_t actread, fsize;
-  ulong kernaddr = recovery_env("kernaddr", OPENIPC_KERNADDR);
-  ulong rootaddr = recovery_env("rootaddr", OPENIPC_ROOTADDR);
-  ulong addr, offset = 0, size, limit, erase_len;
+  loff_t actread;
+  ulong addr, offset = 0, size, erase_len;
   int ret;
 
   if (recovery_select() || !fs_exists(name))
@@ -383,35 +395,16 @@ static int recovery_write(const char *name, int type) {
     return -1;
   }
 
-  if (image_check_magic(&hdr) && image_get_type(&hdr) == IH_TYPE_FIRMWARE) {
+  if (image_check_magic(&hdr)) {
     addr = image_get_load(&hdr);
     offset = sizeof(hdr);
     size = image_get_data_size(&hdr);
-  } else if (type == RECOVERY_KERNEL && image_check_magic(&hdr)) {
-    addr = kernaddr;
-    size = sizeof(hdr) + image_get_data_size(&hdr);
   } else if (type == RECOVERY_KERNEL && fdt_magic(&hdr) == FDT_MAGIC &&
              fdt_check_header(&hdr) == 0) {
-    addr = kernaddr;
+    addr = recovery_env("kernaddr", OPENIPC_KERNADDR);
     size = fdt_totalsize(&hdr);
-  } else if (type == RECOVERY_ROOTFS && check_squashfs(&hdr)) {
-    ret = recovery_select() ? -1 : fs_size(name, &fsize);
-    if (ret || !fsize) {
-      printf("Recovery: failed to stat %s\n", name);
-      return -1;
-    }
-    addr = rootaddr;
-    size = fsize;
   } else {
-    printf("Recovery: %s is not a wrapper image, %s\n", name,
-           type == RECOVERY_KERNEL ? "uImage or FIT" : "or squashfs");
-    return -1;
-  }
-
-  limit = type == RECOVERY_KERNEL ? rootaddr : recovery_flash->size;
-  if (addr % recovery_flash->sector_size || addr + size > limit) {
-    printf("Recovery: %s (0x%lx bytes at 0x%lx) does not fit\n", name, size,
-           addr);
+    printf("Recovery: no valid uImage/FIT header in %s\n", name);
     return -1;
   }
 
@@ -419,6 +412,11 @@ static int recovery_write(const char *name, int type) {
   if (ret || actread != size) {
     printf("Recovery: failed to read %s\n", name);
     return -1;
+  }
+
+  if (recovery_same(addr, (u8 *)CONFIG_SYS_LOAD_ADDR, size)) {
+    printf("Recovery: %s already in flash at 0x%lx\n", name, addr);
+    return 1;
   }
 
   erase_len = (size + recovery_flash->sector_size - 1) &

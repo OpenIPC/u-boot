@@ -179,11 +179,13 @@ The memory map is the same in all three generations: system control at
   vendor sources) and is not used: with no card the first command times
   out (one "did not respond" line, no delay).
   - `common/openipc.c` recovers from it at every boot: `script.txt`, then
-    `uImage.<soc>.img` and `rootfs.squashfs.<soc>.img`. Each may be a
-    wrapper (`mkimage -T firmware -a <flash offset>`), written there
-    without its header, or the image as built: a kernel uImage/FIT goes to
-    `kernaddr`, a squashfs to `rootaddr`. `fatload mmc 0` and
-    `srcmmc` work as on the other targets.
+    `uImage.<soc>.img` and `rootfs.squashfs.<soc>.img`. These are uImages
+    flashed where their load address says, without the header
+    (`mkimage -T firmware -a 0x50000 -d uImage.<soc> uImage.<soc>.img`,
+    `-a 0x250000` for the rootfs); nothing checks the offset, that is the
+    card maker's call. A FIT kernel goes to `kernaddr`. An image the flash
+    already holds is skipped, so a card left in reflashes nothing.
+    `fatload mmc 0` and `srcmmc` work as on the other targets.
 
 ## Build
 
@@ -226,8 +228,8 @@ the flashed bytes.
     `ak3918ev300`.
   - SD (`-drive if=sd,format=raw,file=<FAT image>`): `mmc info`, `fatls`,
     `script.txt` at boot on `ak3918ev200` and `ak3919ev330`; recovery of
-    kernel and rootfs, as wrappers or as built, from an empty flash to
-    login on `ak3918ev300`.
+    kernel and rootfs from an empty flash to login on `ak3918ev300`, and
+    nothing rewritten on the next boot with the card still in.
   - Vendor kernels (repacked with entry = load): the V380E2 camera's
     3.4.35 on `ak3918ev200` and the AK3919EV330 camera's 4.4.192 with its
     DTB (`fdt_high=0xffffffff`, as its vendor environment sets) reach
