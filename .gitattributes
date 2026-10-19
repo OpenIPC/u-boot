@@ -6,3 +6,4 @@
 *.gz binary
 *.bin binary
 *.img binary
+*.xlsm binary

@@ -118,3 +118,10 @@ __pycache__
 
 # gzip source: .tarball-version is required by the build (hidden file)
 !extras/gzip-1.11/.tarball-version
+
+# hi3519dv500 signed boot image: the GSL build and the packer's work files
+/gsl_hi3519dv500/pub/
+/image_tool_hi3519dv500/image/
+/image_tool_hi3519dv500/oem/tmp/
+# DDR training dependency files the vendor build writes into the tree
+/drivers/ddr/vendor/**/*.d

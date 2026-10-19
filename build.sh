@@ -81,49 +81,71 @@ build_v500() {
     cp ${BOOT_BUILDDIR}/u-boot-${soc}.bin ${BOOT_BUILDDIR}/../u-boot-${soc}-nand.bin || return 1
 }
 
-# CV6xx family: hi3516cv610 (5 DDR binnings) + hi3516cv608, combined boot images
-cv6xx_build() {
+# Signed boot images: the boot ROM of these SoCs starts a GSL first stage,
+# which trains DDR from a register table and loads U-Boot. image_tool packs
+# the three into boot-<soc>[-<model>]-nor.bin, one per DDR binning; U-Boot
+# itself is the same for all of a SoC's binnings and is built once.
+#
+#   soc  model  reginfo/<table>  arch  packer  gsl
+#
+# arch picks the cross compiler (arm: CROSS_COMPILE, arm64: CROSS_COMPILE64);
+# packer is the image_tool directory of the SoC's SDK generation; gsl is the
+# GSL source the packer's input/gsl.bin is built from, or "-" to use the
+# prebuilt one it ships. A model of "-" names the image after the SoC alone.
+BOOTIMG_TABLE="
+hi3516cv610 10b     Hi3516CV610-DMEB_4L_DDR2_1333M_64MB_16bit-A7_950M_QFN.bin        arm   image_tool             -
+hi3516cv610 20s     Hi3516CV610-DMEB_4L_DDR3_2133M_128MB_16bit-A7_950M_QFN.bin       arm   image_tool             -
+hi3516cv610 20g     Hi3516CV610-DMEB_4L_DDR3_2133M_128MB_16bit-A7_950M_QFN.bin       arm   image_tool             -
+hi3516cv610 00s     Hi3516CV610-DMEB_4L_DDR3_2133M_512MB_16bit-A7_950M_BGA.bin       arm   image_tool             -
+hi3516cv610 00g     Hi3516CV610-DMEB_4L_DDR3_2133M_512MB_16bit-A7_950M_BGA.bin       arm   image_tool             -
+hi3516cv608 -       Hi3516CV608-DMEB_4L_DDR2_1333M_64MB_16bit-A7_950M_QFN.bin        arm   image_tool             -
+hi3519dv500 dmeb    Hi3519DV500-DMEB_6L_T_DDR4_2666M-2GB_16bitx2-A55_1G.bin          arm64 image_tool_hi3519dv500 gsl_hi3519dv500
+hi3519dv500 dmebpro Hi3519DV500-DMEBPRO_4L_flyby_DDR4_2666M-2GB_16bitx2-A55_1G.bin   arm64 image_tool_hi3519dv500 gsl_hi3519dv500
+"
+
+bootimg_rows() {
+    echo "${BOOTIMG_TABLE}" | awk -v soc="$1" '$1 == soc'
+}
+
+build_bootimg() {
     soc=$1
-    model=$2
-    reginfo=$3
+    rows=$(bootimg_rows ${soc})
+    arch=$(echo "${rows}" | awk 'NR == 1 {print $4}')
+    cc=${CROSS_COMPILE}
+    [ "${arch}" = arm64 ] && cc=${CROSS_COMPILE64:-aarch64-linux-gnu-}
     mkflags
 
+    # The DDR training command binary builds in the source tree: the
+    # ddr_training_clean drops what the SoC before left there, which may be
+    # the other architecture's.
     rm -rf ${BOOT_BUILDDIR}
     mkdir -p ${BOOT_BUILDDIR}
     cat ${BOOT_SRCDIR}/openipc/openipc_config > ${BOOT_BUILDDIR}/.config && \
     cat ${BOOT_SRCDIR}/openipc/${soc}_config >> ${BOOT_BUILDDIR}/.config && \
     echo "CONFIG_PRODUCT_SOC=\"${soc}\"" >> ${BOOT_BUILDDIR}/.config && \
-    make ${MAKE_OPTS} olddefconfig </dev/null >/dev/null && \
-    make ${MAKE_OPTS} KCFLAGS="-DVENDOR_HISILICON" </dev/null && \
-    make ${MAKE_OPTS} u-boot-z.bin </dev/null && \
-    make ${MAKE_OPTS} u-boot-z.clean </dev/null && \
-    cp ${BOOT_BUILDDIR}/u-boot-${soc}.bin image_tool/input/u-boot-original.bin && \
-    cp ${BOOT_BUILDDIR}/u-boot-${soc}.bin output/smoke-${soc}.bin && \
-    cp reginfo/${reginfo} image_tool/input/reg_info.bin && \
-    (cd image_tool/oem && python3 oem_quick_build.py >/dev/null) && \
-    if [ -n "${model}" ]; then \
-        mv image_tool/image/oem/boot_image.bin output/boot-${soc}-${model}-nor.bin; \
-    else \
-        mv image_tool/image/oem/boot_image.bin output/boot-${soc}-nor.bin; \
-    fi || return 1
-}
+    make ${MAKE_OPTS} CROSS_COMPILE=${cc} olddefconfig </dev/null >/dev/null && \
+    make ${MAKE_OPTS} CROSS_COMPILE=${cc} ddr_training_clean </dev/null >/dev/null && \
+    make ${MAKE_OPTS} CROSS_COMPILE=${cc} KCFLAGS="-DVENDOR_HISILICON" </dev/null && \
+    make ${MAKE_OPTS} CROSS_COMPILE=${cc} u-boot-z.bin </dev/null && \
+    make ${MAKE_OPTS} CROSS_COMPILE=${cc} u-boot-z.clean </dev/null && \
+    cp ${BOOT_BUILDDIR}/u-boot-${soc}.bin output/smoke-${soc}.bin || return 1
 
-build_cv6xx() {
-    case "$1" in
-        hi3516cv610)
-            cv6xx_build hi3516cv610 10b "Hi3516CV610-DMEB_4L_DDR2_1333M_64MB_16bit-A7_950M_QFN.bin" || return 1
-            cv6xx_build hi3516cv610 20s "Hi3516CV610-DMEB_4L_DDR3_2133M_128MB_16bit-A7_950M_QFN.bin" || return 1
-            cv6xx_build hi3516cv610 20g "Hi3516CV610-DMEB_4L_DDR3_2133M_128MB_16bit-A7_950M_QFN.bin" || return 1
-            cv6xx_build hi3516cv610 00s "Hi3516CV610-DMEB_4L_DDR3_2133M_512MB_16bit-A7_950M_BGA.bin" || return 1
-            cv6xx_build hi3516cv610 00g "Hi3516CV610-DMEB_4L_DDR3_2133M_512MB_16bit-A7_950M_BGA.bin" || return 1
-            ;;
-        hi3516cv608)
-            cv6xx_build hi3516cv608 "" "Hi3516CV608-DMEB_4L_DDR2_1333M_64MB_16bit-A7_950M_QFN.bin" || return 1
-            ;;
-        *)
-            return 1
-            ;;
-    esac
+    echo "${rows}" | while read -r _ model reginfo _ packer gsl; do
+        if [ "${gsl}" != - ]; then
+            # Its Makefile takes include paths from $(PWD): build from inside.
+            (cd ${gsl} && make CROSS_COMPILE=${cc} CHIP=${soc} </dev/null >/dev/null) && \
+            cp ${gsl}/pub/gsl.bin ${packer}/input/gsl.bin || return 1
+        fi
+        out=boot-${soc}-${model}-nor.bin
+        [ "${model}" = - ] && out=boot-${soc}-nor.bin
+        # The packer reports failures but still exits 0: check its output.
+        rm -f ${packer}/image/oem/boot_image.bin
+        cp ${BOOT_BUILDDIR}/u-boot-${soc}.bin ${packer}/input/u-boot-original.bin && \
+        cp reginfo/${reginfo} ${packer}/input/reg_info.bin && \
+        (cd ${packer}/oem && python3 oem_quick_build.py >/dev/null) && \
+        test -f ${packer}/image/oem/boot_image.bin && \
+        mv ${packer}/image/oem/boot_image.bin output/${out} || return 1
+    done
 }
 
 # CV200 family (hi3516cv200 / hi3518ev200), ARM926EJS, NOR
@@ -223,11 +245,13 @@ build_xmorca() {
 
 build_soc() {
     soc=$1
+    if [ -n "$(bootimg_rows ${soc})" ]; then
+        build_bootimg ${soc}
+        return
+    fi
     case "${soc}" in
         hi3516cv500|hi3516dv300|hi3516av300)
             build_v500 ${soc} ;;
-        hi3516cv610|hi3516cv608)
-            build_cv6xx ${soc} ;;
         hi3516cv200|hi3518ev200)
             build_nor_ddr ${soc} u-boot-hi3518ev200.bin ;;
         hi3516cv300|hi3516ev100)
@@ -259,7 +283,7 @@ build_soc() {
 }
 
 ALL_SOCS="hi3516cv500 hi3516dv300 hi3516av300 \
-          hi3516cv610 hi3516cv608 \
+          hi3516cv610 hi3516cv608 hi3519dv500 \
           hi3516cv200 hi3518ev200 \
           hi3516cv300 hi3516ev100 \
           hi3516av200 hi3519v101 \

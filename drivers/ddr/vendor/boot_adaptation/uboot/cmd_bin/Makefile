@@ -134,6 +134,9 @@ endif
 .PHONY: clean
 clean:
 	@rm -vf *.o *.d *.elf *.map *.srec $(LINK_FILES) $(DDR_CMD).bin
+	@# The objects of every SoC's sources, not only this one's: they are built
+	@# in the source tree, and the next SoC may be another architecture.
+	@find $(DDR_TOP_DIR) -name '*.o' -delete
 
 %.o : %.S
 	$(CC) -D__ASSEMBLY__ $(CFLAGS) -o $@ -c $*.S

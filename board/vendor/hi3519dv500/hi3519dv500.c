@@ -20,6 +20,8 @@
 #include <serial.h>
 #include <linux/mtd/mtd.h>
 #include <linux/delay.h>
+#include <fdt_support.h>
+#include <openipc.h>
 #if CONFIG_IS_ENABLED(CMD_TIMESTAMP)
 #include "cmd_timestamp.h"
 #endif
@@ -120,6 +122,7 @@ int board_early_init_f(void)
 
 #define UBOOT_DATA_ADDR     0x41000000UL
 #define UBOOT_DATA_SIZE     0x80000UL
+#if (CONFIG_AUTO_UPDATE == 1)
 int data_to_spiflash(void)
 {
 	static struct spi_flash *flash = NULL;
@@ -253,6 +256,12 @@ int save_bootdata_to_flash(void)
 	return 0;
 }
 
+int is_bare_program(void)
+{
+	return 1;
+}
+#endif /* CONFIG_AUTO_UPDATE */
+
 int auto_update_flag = 0;
 int bare_chip_program = 0;
 
@@ -263,11 +272,6 @@ int bare_chip_program = 0;
 #define PROC_LOOP               5
 #define DOWNLOAD_FLAG           0x1f
 #define ACK     		0xAA
-
-int is_bare_program(void)
-{
-	return 1;
-}
 
 /* Connect to TOOLS */
 int uart_self_boot_check(void)
@@ -374,6 +378,7 @@ int is_auto_update(void)
 
 int misc_init_r(void)
 {
+	openipc_helper();
 #ifdef CONFIG_RANDOM_ETHADDR
 	random_init_r();
 #endif
@@ -454,6 +459,30 @@ int timer_init(void)
 
 	return 0;
 }
+
+#if defined(CONFIG_OF_BOARD_SETUP)
+int ft_board_setup(void *blob, struct bd_info *bd)
+{
+	int chosen;
+
+	/*
+	 * The device tree in the FIT kernels this board shipped with claims an
+	 * initrd at 0x60000040..0x61000000, a vendor leftover past the end of
+	 * 512 MiB of DRAM. No ramdisk is loaded, so the kernel unpacks garbage
+	 * from there and dies before its console comes up. Drop the claim;
+	 * fdt_initrd() puts the real one back when a ramdisk is loaded.
+	 */
+	chosen = fdt_path_offset(blob, "/chosen");
+	if (chosen >= 0) {
+		fdt_delprop(blob, chosen, "linux,initrd-start");
+		fdt_delprop(blob, chosen, "linux,initrd-end");
+	}
+
+	return 0;
+}
+#endif
+
+int gmac_initialize(struct bd_info const *bis);
 
 int board_eth_init(struct bd_info *bis)
 {

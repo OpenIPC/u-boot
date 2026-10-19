@@ -59,11 +59,11 @@ directories. Mainline U-Boot has no counterpart for them.
 | HW gunzip | `lib/hw_dec`, plus `cmd/hwzimage.c` and `cmd/cmd_ugzip.c` |
 | ATAGs and I2C helpers | `drivers/lhs` |
 | GPIO and pad-mux (`gpio status` shows the live pad function) | `drivers/gpio/hi_*` |
-| Newer-SDK (`ARCH_BSP`, cv610/cv608) extras: OSD, audio, OTP, verified boot, security subsystem | `product/`, pulled in by `Makefile-otproduct`; `securec/` (Huawei bounds-checked libc) |
-| CV6xx boot-image packer | `image_tool/` (`oem_quick_build.py`, prebuilt `input/gsl.bin`) |
-| Source of the GSL first stage. **build.sh does not build it**: CV6xx images use the prebuilt `image_tool/input/gsl.bin` | `gsl/` |
+| Newer-SDK (`ARCH_BSP`: cv610/cv608, hi3519dv500) extras: OSD, audio, OTP, verified boot, security subsystem | `product/`, pulled in by `Makefile-otproduct`; `securec/` (Huawei bounds-checked libc) |
+| Signed boot-image packers (GSL + DDR table + U-Boot), one per SDK generation | `image_tool/` (cv610/cv608, prebuilt `input/gsl.bin`), `image_tool_hi3519dv500/` |
+| GSL first-stage sources. `gsl/` (cv6xx) is **not built**: those images use the prebuilt `image_tool/input/gsl.bin`. `gsl_hi3519dv500/` is built into `image_tool_hi3519dv500/input/gsl.bin` | `gsl/`, `gsl_hi3519dv500/` |
 | Vendored host tools | `extras/gzip-1.11` (built by `build.sh`) |
-| OpenIPC's own per-SoC inputs | `openipc/`: config fragments and reginfo; `reginfo/` holds the CV6xx DDR tables |
+| OpenIPC's own per-SoC inputs | `openipc/`: config fragments and reginfo; `reginfo/` holds the cv6xx and hi3519dv500 DDR tables |
 
 ### Mainline files we patched
 
@@ -132,7 +132,9 @@ bash build.sh hi3516cv300   # one or more SoCs (CROSS_COMPILE defaults to arm-li
 Output:
 
 - Images land in `output/`: `u-boot-<soc>-{nor,nand}.bin`, or
-  `boot-<soc>[-<model>]-nor.bin` for cv608/cv610.
+  `boot-<soc>[-<model>]-nor.bin` for the SoCs in `BOOTIMG_TABLE`
+  (cv608, cv610, hi3519dv500). hi3519dv500 is arm64 and builds with
+  `CROSS_COMPILE64` (default `aarch64-linux-gnu-`).
 - Each SoC builds out-of-tree (`O=`) in `output/build-<soc>/`, and its
   `.config` stays there.
 
@@ -158,14 +160,18 @@ winning, and then runs `olddefconfig`:
 
 `openipc/<soc>_reginfo.bin` becomes `$O/.reg`, the DDR/pinmux table spliced
 into the first stage. `build.sh` has one function per family (`build_v500`,
-`build_cv6xx`, `build_nor_ddr`, `build_nor_splice`, `build_xmedia`,
-`build_xmorca`), because each SDK generation packages its image differently.
+`build_nor_ddr`, `build_nor_splice`, `build_xmedia`, `build_xmorca`), because
+each SDK generation packages its image differently. The SoCs whose boot ROM
+starts a signed GSL (cv610/cv608, hi3519dv500) are rows of `BOOTIMG_TABLE`
+instead -- SoC, DDR binning, DDR table, arch, packer, GSL source -- built by
+the one `build_bootimg`.
 Several SoCs share one board and binary and differ only in fragment and
 reginfo. For example, `hi3516cv100`/`hi3518*v100` all build
 `u-boot-hi3518ev100.bin`.
 
 **Hard size limits**: a NOR image may be at most 256 KiB, because env starts
-at 0x40000. A NAND image may be at most 768 KiB. CI rejects an oversized
+at 0x40000; hi3519dv500, whose boot partition is 512 KiB (env at 0x80000,
+firmware at 0xc0000, see `OPENIPC_KERNADDR`), at most 512 KiB. A NAND image may be at most 768 KiB. CI rejects an oversized
 image, because flashing one overwrites env and bricks the camera.
 
 **Verification** (there are no unit tests):
