@@ -30,6 +30,24 @@ unsigned long ak_asic_clk(void)
 	return clk * 1000000;
 }
 
+#ifdef CONFIG_AK39_EV200
+/*
+ * The ASIC PLL: CPU 400, memory 200, ASIC (peripheral) 100 MHz, as the EV200
+ * vendor U-Boot and the EV200 U-Boot port both set it before anything else.
+ * Out of reset it gives 60 MHz. Bit 28 of the CPU PLL register applies it.
+ */
+int arch_cpu_init(void)
+{
+	int spins = 1000000;
+
+	writel(AK_EV200_ASIC_PLL, AK_SYS_ASIC_PLL);
+	setbits_le32(AK_SYS_CPU_PLL, AK_PLL_APPLY);
+	while ((readl(AK_SYS_CPU_PLL) & AK_PLL_APPLY) && --spins)
+		;
+	return 0;
+}
+#endif
+
 /*
  * Timer 1, free running from 0xffffffff at the crystal rate. The count is
  * read back through CTRL1 while READ_SEL is set.
@@ -54,11 +72,23 @@ unsigned long notrace timer_read_counter(void)
 	return ~count;
 }
 
-/* The watchdog, at its shortest count */
+/*
+ * The watchdog, armed the way the vendor U-Boots do it: an 8 s count,
+ * enable, enable and feed; then again with a count of 1, which is what
+ * resets the part at once. A single write of count 1 with enable and feed
+ * hangs an AK3918EV200.
+ */
+static void ak_wdt_arm(u32 count)
+{
+	writel(AK_WDT_CFG1_KEY | count, AK_SYS_WDT_CFG1);
+	writel(AK_WDT_CFG2_KEY | AK_WDT_EN, AK_SYS_WDT_CFG2);
+	writel(AK_WDT_CFG2_KEY | AK_WDT_EN | AK_WDT_FEED, AK_SYS_WDT_CFG2);
+}
+
 void reset_cpu(void)
 {
-	writel(AK_WDT_CFG1_KEY | 1, AK_SYS_WDT_CFG1);
-	writel(AK_WDT_CFG2_KEY | AK_WDT_EN | AK_WDT_FEED, AK_SYS_WDT_CFG2);
+	ak_wdt_arm(AK_WDT_COUNT_8S);
+	ak_wdt_arm(1);
 	while (1)
 		;
 }

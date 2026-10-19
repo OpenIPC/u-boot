@@ -26,6 +26,7 @@
 
 /* System control */
 #define AK_SYS_CHIP_ID		(AK_SYSCTRL_BASE + 0x00)
+#define AK_SYS_CPU_PLL		(AK_SYSCTRL_BASE + 0x04)
 #define AK_SYS_ASIC_PLL		(AK_SYSCTRL_BASE + 0x08)
 #define AK_SYS_MAC_CLK		(AK_SYSCTRL_BASE + 0x14)
 #define AK_SYS_CLK_GATE		(AK_SYSCTRL_BASE + 0x1c)	/* 1 = gated */
@@ -38,6 +39,7 @@
 #define AK_SYS_WDT_CFG1		(AK_SYSCTRL_BASE + 0xe4)
 #define AK_SYS_WDT_CFG2		(AK_SYSCTRL_BASE + 0xe8)
 
+#define AK_CLK_MCI0		BIT(1)
 #define AK_CLK_UART0		BIT(7)
 #define AK_CLK_MAC		BIT(13)
 
@@ -47,6 +49,9 @@
  * (the vendor U-Boot's get_asic_freq()).
  */
 #define AK_XTAL_HZ		12000000
+#define AK_PLL_APPLY		BIT(28)
+/* EV200: CPU 400 / memory 200 / ASIC 100 MHz */
+#define AK_EV200_ASIC_PLL	0x018213c8
 
 /* Timer 1: a 32-bit down counter off the 12 MHz crystal */
 #define AK_TIMER_READ_SEL	BIT(26)
@@ -58,6 +63,7 @@
 #define AK_WDT_CFG2_KEY		0xaa000000
 #define AK_WDT_EN		BIT(0)
 #define AK_WDT_FEED		BIT(1)
+#define AK_WDT_COUNT_8S		0x05b8d8
 
 /* L2 buffer controller, UART buffers; UART0 TX/RX buffers in L2 memory */
 #define AK_L2_FRAC_ADDR		(AK_L2_BASE + 0x84)
@@ -79,6 +85,13 @@
 /* GPIO: direction (1 = out) and output banks, 32 pins a bank */
 #define AK_GPIO_DIR(n)		(AK_GPIO_BASE + 0x00 + 4 * ((n) / 32))
 #define AK_GPIO_OUT(n)		(AK_GPIO_BASE + 0x0c + 4 * ((n) / 32))
+
+/* Soft reset bits (AK_SYS_SOFT_RST) */
+#define AK_RST_MCI0		BIT(1)
+#define AK_RST_SPI0		BIT(5)
+
+#define AK_MCI0_BASE		0x20100000
+#define AK_SYS_SHAREPIN3	(AK_SYSCTRL_BASE + 0xdc)
 
 #ifndef __ASSEMBLY__
 unsigned long ak_asic_clk(void);
