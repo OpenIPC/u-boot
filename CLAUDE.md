@@ -128,9 +128,12 @@ The build logic lives here. Other branches call it:
 - **Three SoC lists must agree**: the `build` matrix, the `qemu_smoke` matrix,
   and the README's SoC list. The comment above `qemu_smoke` names the SoCs that
   have no qemu machine model and therefore no smoke leg. Keep that comment and
-  the README count ("30 SoCs with a machine model, eight without") in sync.
-- **Partition limits**: NOR images must be ≤ 256 KiB (env at 0x40000) and NAND
-  images ≤ 768 KiB (0xc0000). An oversized image bricks the device on upgrade.
+  the README count ("31 SoCs with a machine model, eight without") in sync.
+- **Partition limits**: NOR images must be ≤ 256 KiB (env at 0x40000), or a
+  leg's `nor_kb` (hi3519dv500: 512 KiB, env at 0x80000); NAND images ≤ 768 KiB
+  (0xc0000). An oversized image bricks the device on upgrade.
+- **hi3519dv500 is arm64**: its leg needs `gcc-aarch64-linux-gnu`, and its
+  smoke leg runs `qemu-aarch64`, built by the `qemu` job beside `qemu-arm`.
 - **Smoke pass criterion** is the autoboot prompt `Hit Ctrl-C`, not the banner.
   The banner prints before the board init that can hang (see #4).
 - **Held SoCs** (`hold: true`, currently gk7206v11a/v12a): their artifact is
@@ -147,8 +150,8 @@ The build logic lives here. Other branches call it:
   - It checks out `OpenIPC/firmware` at a pinned commit, because that job holds
     an `id-token`.
 - Artifact names differ by SoC family: most SoCs produce
-  `u-boot-<soc>-{nor,nand}.bin`, while hi3516cv608/cv610 produce
-  `boot-<soc>*-nor.bin`. The `files:` globs and the smoke step's `ls` both
+  `u-boot-<soc>-{nor,nand}.bin`, while hi3516cv608/cv610 and hi3519dv500
+  produce `boot-<soc>*-nor.bin`. The `files:` globs and the smoke step's `ls` both
   depend on these names.
 
 ## Commands

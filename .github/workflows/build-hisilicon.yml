@@ -88,6 +88,9 @@ jobs:
           # --- NOR only ---
           - { soc: hi3516cv610, kinds: "nor", files: "output/boot-hi3516cv610-*-nor.bin" }
           - { soc: hi3516cv608, kinds: "nor", files: "output/boot-hi3516cv608-nor.bin" }
+          # arm64 (CROSS_COMPILE64); a signed boot image (GSL + DDR table + U-Boot)
+          # in a 512 KiB boot partition (env at 0x80000, firmware at 0xc0000).
+          - { soc: hi3519dv500, kinds: "nor", files: "output/boot-hi3519dv500-*-nor.bin", nor_kb: 512 }
           - { soc: hi3516cv200, kinds: "nor", files: "output/u-boot-hi3516cv200-nor.bin" }
           - { soc: hi3518ev200, kinds: "nor", files: "output/u-boot-hi3518ev200-nor.bin" }
           - { soc: hi3516cv300, kinds: "nor", files: "output/u-boot-hi3516cv300-nor.bin" }
@@ -130,7 +133,8 @@ jobs:
           install() {
             sudo timeout 180 apt-get update && \
             sudo timeout 240 apt-get install -y --no-install-recommends \
-              build-essential gcc-arm-linux-gnueabi u-boot-tools device-tree-compiler \
+              build-essential gcc-arm-linux-gnueabi gcc-aarch64-linux-gnu \
+              u-boot-tools device-tree-compiler \
               bison flex bc lzop libssl-dev python3 python3-pip
           }
           for i in 1 2 3 4; do
@@ -150,7 +154,8 @@ jobs:
       - name: Check partition fit
         run: |
           # Boot partition sizes from this tree's mtdparts: NOR boot = 256 KiB
-          # (env at 0x40000), NAND/UBI boot = 768 KiB (0xc0000). An image
+          # (env at 0x40000) unless the leg says otherwise (nor_kb: hi3519dv500's
+          # is 512 KiB, env at 0x80000), NAND/UBI boot = 768 KiB (0xc0000). An image
           # larger than its boot partition overflows into env and bricks the
           # device on upgrade.
           soc='${{ matrix.soc }}'
@@ -164,16 +169,19 @@ jobs:
             for f in $pattern; do
               [ -f "$f" ] || continue
               found=1
-              size_kb=$(( $(stat -c %s "$f") / 1024 ))
-              echo "- $f: [${size_kb}KB/${limit_kb}KB]"
-              if [ "$size_kb" -gt "$limit_kb" ]; then
-                echo "-- size exceeded by: $((size_kb - limit_kb))KB" >&2
+              # In bytes: a size rounded down to KiB let an image up to
+              # 1023 bytes over its partition through.
+              size=$(stat -c %s "$f")
+              limit=$((limit_kb * 1024))
+              echo "- $f: [$((size / 1024))KB/${limit_kb}KB] ($size/$limit bytes)"
+              if [ "$size" -gt "$limit" ]; then
+                echo "-- size exceeded by: $((size - limit)) bytes" >&2
                 rc=1
               fi
             done
             [ "$found" = 1 ] || { echo "missing ${kind} image for ${soc} (${pattern})" >&2; rc=1; }
           }
-          check_kind nor 256 "output/*${soc}*-nor.bin"
+          check_kind nor ${{ matrix.nor_kb || 256 }} "output/*${soc}*-nor.bin"
           case "$kinds" in
             *nand*) check_kind nand 768 "output/*${soc}*-nand.bin" ;;
           esac
@@ -188,7 +196,8 @@ jobs:
           path: ${{ matrix.files }}
           if-no-files-found: error
 
-  # Build qemu-system-arm once and share it with every smoke leg (30 SoCs).
+  # Build qemu-system-arm and -aarch64 once and share them with every smoke
+  # leg (31 SoCs; hi3519dv500 is the aarch64 one).
   qemu:
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -201,20 +210,23 @@ jobs:
             libglib2.0-dev libpixman-1-dev libfdt-dev zlib1g-dev \
             libslirp-dev python3 python3-venv
 
-      - name: Build qemu-system-arm
+      - name: Build qemu-system-arm and qemu-system-aarch64
         run: |
           git clone --depth 1 --branch master \
             https://github.com/widgetii/qemu-hisilicon qemu-hisilicon
           cd qemu-hisilicon
           bash qemu/setup.sh
           cp qemu-src/build/qemu-system-arm "$GITHUB_WORKSPACE/qemu-arm"
-          chmod +x "$GITHUB_WORKSPACE/qemu-arm"
+          cp qemu-src/build/qemu-system-aarch64 "$GITHUB_WORKSPACE/qemu-aarch64"
+          chmod +x "$GITHUB_WORKSPACE/qemu-arm" "$GITHUB_WORKSPACE/qemu-aarch64"
 
       - name: Upload qemu-arm
         uses: actions/upload-artifact@v4
         with:
           name: qemu-arm
-          path: qemu-arm
+          path: |
+            qemu-arm
+            qemu-aarch64
 
   # QEMU smoke test — boots each freshly-built NOR u-boot in the matching
   # qemu-hisilicon machine model and asserts it prints a u-boot banner.
@@ -234,6 +246,7 @@ jobs:
           - hi3516av300
           - hi3516cv610
           - hi3516cv608
+          - hi3519dv500
           - hi3516cv200
           - hi3516cv300
           - hi3516av200
@@ -281,52 +294,72 @@ jobs:
             build-essential ninja-build meson pkg-config \
             libglib2.0-dev libpixman-1-dev libfdt-dev zlib1g-dev \
             libslirp-dev python3 python3-venv
-          if ldd ./qemu-arm | grep -qi 'not found'; then
-            echo "qemu-arm has unresolved libraries:" >&2
-            ldd ./qemu-arm >&2
-            exit 1
-          fi
+          for q in ./qemu-arm ./qemu-aarch64; do
+            if ldd "$q" | grep -qi 'not found'; then
+              echo "$q has unresolved libraries:" >&2
+              ldd "$q" >&2
+              exit 1
+            fi
+          done
 
       - name: Smoke-test in QEMU
-        timeout-minutes: 2
+        timeout-minutes: 6
         run: |
           soc='${{ matrix.soc }}'
-          UBOOT=$(ls u-boot-${soc}-nor.bin boot-${soc}*-nor.bin 2>/dev/null | head -1)
-          test -n "$UBOOT"
-          echo "booting $UBOOT"
-          dd if=/dev/zero of=/tmp/flash.bin bs=1M count=8 2>/dev/null
-          dd if="$UBOOT" of=/tmp/flash.bin bs=1 conv=notrunc 2>/dev/null
-          mkfifo /tmp/uart.in /tmp/uart.out
-          chmod +x ./qemu-arm
-          ./qemu-arm \
-            -M ${soc},flash-file=/tmp/flash.bin \
-            -nographic -serial pipe:/tmp/uart \
-            -monitor none > /tmp/qemu.log 2>&1 &
-          QEMU_PID=$!
-          # Wait for the autoboot prompt, not the banner: the banner prints
-          # before the board init that can hang. hi3516cv100/hi3518av100
-          # passed on "U-Boot " while stuck in the NAND probe right after it.
-          # Up to 30 s, done as soon as the prompt shows.
-          cat /tmp/uart.out > /tmp/uboot.txt &
-          CAT_PID=$!
-          for i in $(seq 1 60); do
-            grep -q 'Hit Ctrl-C' /tmp/uboot.txt 2>/dev/null && break
-            sleep 0.5
-          done
-          kill "$QEMU_PID" "$CAT_PID" 2>/dev/null || true
-          wait 2>/dev/null || true
-          echo "== captured u-boot output =="
-          cat /tmp/uboot.txt
-          echo
-          if grep -q 'Hit Ctrl-C' /tmp/uboot.txt; then
-            echo "PASS: u-boot reached the autoboot prompt"
-          else
-            echo "FAIL: u-boot did not reach the autoboot prompt"
+          # hi3519dv500 is the one arm64 machine model.
+          QEMU=./qemu-arm
+          [ "$soc" = hi3519dv500 ] && QEMU=./qemu-aarch64
+          chmod +x ./qemu-arm ./qemu-aarch64
+
+          # Every image the leg built and would publish: the boot-image SoCs
+          # have one per board (hi3516cv610: five, hi3519dv500: two).
+          smoke() {
+            img=$1
+            echo "== booting $img =="
+            rm -f /tmp/flash.bin /tmp/uart.in /tmp/uart.out /tmp/uboot.txt
+            dd if=/dev/zero of=/tmp/flash.bin bs=1M count=8 2>/dev/null
+            dd if="$img" of=/tmp/flash.bin bs=1 conv=notrunc 2>/dev/null
+            mkfifo /tmp/uart.in /tmp/uart.out
+            "$QEMU" \
+              -M ${soc},flash-file=/tmp/flash.bin \
+              -nographic -serial pipe:/tmp/uart \
+              -monitor none > /tmp/qemu.log 2>&1 &
+            QEMU_PID=$!
+            # Wait for the autoboot prompt, not the banner: the banner prints
+            # before the board init that can hang. hi3516cv100/hi3518av100
+            # passed on "U-Boot " while stuck in the NAND probe right after it.
+            # Up to 30 s, done as soon as the prompt shows.
+            cat /tmp/uart.out > /tmp/uboot.txt &
+            CAT_PID=$!
+            for i in $(seq 1 60); do
+              grep -q 'Hit Ctrl-C' /tmp/uboot.txt 2>/dev/null && break
+              sleep 0.5
+            done
+            kill "$QEMU_PID" "$CAT_PID" 2>/dev/null || true
+            wait 2>/dev/null || true
+            echo "== captured u-boot output =="
+            cat /tmp/uboot.txt
             echo
-            echo "== qemu stderr =="
-            tail -40 /tmp/qemu.log || true
-            exit 1
-          fi
+            if grep -q 'Hit Ctrl-C' /tmp/uboot.txt; then
+              echo "PASS: $img reached the autoboot prompt"
+            else
+              echo "FAIL: $img did not reach the autoboot prompt"
+              echo
+              echo "== qemu stderr =="
+              tail -40 /tmp/qemu.log || true
+              return 1
+            fi
+          }
+
+          rc=0
+          n=0
+          for img in u-boot-${soc}-nor.bin boot-${soc}*-nor.bin; do
+            [ -f "$img" ] || continue
+            n=$((n + 1))
+            smoke "$img" || rc=1
+          done
+          [ "$n" -gt 0 ] || { echo "no NOR image for ${soc}" >&2; exit 1; }
+          exit $rc
 
   # Mirror every built image to this repository's own Hisilicon release.
   release:

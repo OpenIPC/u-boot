@@ -45,7 +45,12 @@ images but keeps them out of the release and publish steps.
 `hi3516cv610`, `hi3516av100`, `hi3516av200`, `hi3516dv100`,
 `hi3516ev100`, `hi3518av100`, `hi3518cv100`, `hi3518ev100`,
 `hi3518ev200`, `hi3519v101`, `hi3515av100`, `hi3520av100`,
-`hi3520dv100`, `hi3520dv200`, `hi3536cv100`, `hi3536dv100`
+`hi3520dv100`, `hi3520dv200`, `hi3536cv100`, `hi3536dv100`,
+`hi3519dv500`\*\*
+
+\*\* arm64, built with `aarch64-linux-gnu-` (`CROSS_COMPILE64`). Its signed
+boot images, `boot-hi3519dv500-{dmeb,dmebpro}-nor.bin`, go in a 512 KiB
+boot partition: env at `0x80000`, firmware at `0xc0000`.
 
 ### Build
 
@@ -174,7 +179,7 @@ from the Actions tab. Each run:
   if an image overflows its boot partition;
 - boots each NOR image in the matching machine model from
   [widgetii/qemu-hisilicon](https://github.com/widgetii/qemu-hisilicon);
-  the 30 SoCs with a machine model are a hard gate, the eight without one
+  the 31 SoCs with a machine model are a hard gate, the eight without one
   get no smoke leg;
 - uploads one artifact per SoC.
 
@@ -188,8 +193,8 @@ Two dispatch inputs control uploads; both skip the held GK7206 images.
   `OpenIPC/firmware`. `latest` already carries images under the same
   names from OpenIPC/u-boot-xmedia (`u-boot-gk7205v500/v510/v530-*`,
   `u-boot-hi3516ev200/ev300/dv200-*`, `u-boot-hi3518ev300-*`) and
-  u-boot-hi3516cv6xx (`boot-hi3516cv60x/cv610-*`); publishing replaces
-  them with this tree's builds.
+  u-boot-hi3516cv6xx (`boot-hi3516cv60x/cv610-*`) and u-boot-hi3519dv500
+  (`boot-hi3519dv500-*`); publishing replaces them with this tree's builds.
 
 ```sh
 gh workflow run build-hisilicon.yml                                   # build + smoke test
