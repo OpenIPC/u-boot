@@ -658,13 +658,20 @@ int firmware_scan(void) {
    * rootfs packed right after the kernel (a FIT and its squashfs written as
    * one image) keeps the sizes found: a slot there would put the rootfs
    * partition past the squashfs.
+   *
+   * The 10 MiB rootfs slot is the 3 MiB kernel slot's (the ultimate pair,
+   * rootfs at 0x350000; ur moves a large rootfs there before it writes). A
+   * rootfs over 5 MiB behind the 2 MiB kernel slot is a packed image that
+   * outgrew the lite slot -- hi3516cv6xx ultimate on 16 MiB, 7104k at
+   * 0x250000 -- and keeps the size found: rounding it up to 10 MiB moved
+   * rootfs_data from 0x940000 to 0xc50000, away from the settings there.
    */
   if (!kernel_size || kernel_size == 0x200000 || kernel_size == 0x300000) {
     if (kernel_size <= 0x200000)
       kernel_size = 0x200000;
     if (rootfs_size < 0x500000)
       rootfs_size = 0x500000;
-    else if (rootfs_size > 0x500000 && flash->size > 0x800000)
+    else if (kernel_size == 0x300000 && rootfs_size < 0xa00000 && flash->size > 0x800000)
       rootfs_size = 0xa00000;
   }
 
