@@ -20,7 +20,7 @@ on:
       # same names, so refreshing this repo's own release must not
       # replace those by default.
       release:
-        description: Publish to this repo's Hisilicon release
+        description: Publish to this repo's Hisilicon and Goke releases
         type: boolean
         default: false
       publish:
