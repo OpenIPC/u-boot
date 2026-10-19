@@ -18,6 +18,11 @@ own branch:
   release with the same OpenIPC layer. CI: `build-gk710x.yml`, called from
   that branch's `ci.yml`. Its own `CLAUDE.md` covers the boot header, the
   flash byte order and the kernel hand-off.
+- `openipc-anyka`: U-Boot for Anyka AK3918EV200, AK391xEV300 and
+  AK391xEV330, on the same mainline release with the same OpenIPC layer.
+  CI: `build-anyka.yml`, called from that branch's `ci.yml`. Its own
+  `CLAUDE.md` covers the boot headers, the EV330 first stage and the
+  drivers.
 - `main`: a fork of upstream mainline U-Boot, kept for rebasing.
 
 To change bootloader code, check out `openipc-hisilicon`, or read it with
@@ -98,6 +103,24 @@ The build logic lives here. Other branches call it:
     reports a `uboot-gk710x-…` build id.
   - openipc.org accepts the report only from workflows it allowlists
     (OpenIPC/website `service/internal/builds/verify.go`). `build-gk710x.yml`
+    has to be added there before the first `publish`.
+
+## `build-anyka.yml`
+
+- It is `build-gk710x.yml` for `openipc-anyka`: the same job graph and
+  `resolve`/`ref` rules, NOR only (256 KiB boot partition, header
+  included; on the EV330 the 0x1200-byte header and first stage).
+- **No `hold`:** all six SoCs have qemu-hisilicon machines of the same
+  names (qemu-hisilicon #161 or later).
+- **Smoke test:** two boots of an 8 MiB flash image holding only U-Boot,
+  in CPU byte order (no swap, unlike GK710x). It passes on `Hit Ctrl-C`,
+  and fails if the second boot reports a bad environment CRC.
+- **Release and publish:**
+  - `release` uploads to the `anyka` tag.
+  - `publish` shares the `publish-firmware-latest` concurrency group and
+    reports a `uboot-anyka-…` build id.
+  - openipc.org accepts the report only from workflows it allowlists
+    (OpenIPC/website `service/internal/builds/verify.go`). `build-anyka.yml`
     has to be added there before the first `publish`.
 
 ## Invariants to keep when editing `build-hisilicon.yml`
