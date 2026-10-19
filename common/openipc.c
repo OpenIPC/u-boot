@@ -189,11 +189,25 @@ static int scan_spi_device(struct spi_flash *flash, ulong *kernel_off, ulong *ro
 #define RECOVERY_KERNEL 0
 #define RECOVERY_ROOTFS 1
 
+/* The medium recovery_mount() found. Every fs_*() call closes the
+ * filesystem when it returns, so each one has to select it again. */
+static const char *recovery_if, *recovery_part;
+
+static int recovery_select(void) {
+  return fs_set_blk_dev(recovery_if, recovery_part, FS_TYPE_FAT);
+}
+
 static int recovery_mount(const char *ifname) {
-  if (!fs_set_blk_dev(ifname, "0:1", FS_TYPE_FAT))
-    return 0;
-  if (!fs_set_blk_dev(ifname, "0", FS_TYPE_FAT))
-    return 0;
+  static const char *const parts[] = { "0:1", "0" };
+  int i;
+
+  for (i = 0; i < ARRAY_SIZE(parts); i++) {
+    if (!fs_set_blk_dev(ifname, parts[i], FS_TYPE_FAT)) {
+      recovery_if = ifname;
+      recovery_part = parts[i];
+      return 0;
+    }
+  }
   return -1;
 }
 
@@ -252,14 +266,14 @@ static int recovery_write(const char *name, int type) {
   ulong size;
   int ret;
 
-  if (!fs_exists(name))
+  if (recovery_select() || !fs_exists(name))
     return 0;
 
   if (type == RECOVERY_ROOTFS) {
     /* Raw ubifs image, written into the rootfs volume */
     loff_t fsize;
 
-    ret = fs_size(name, &fsize);
+    ret = recovery_select() ? -1 : fs_size(name, &fsize);
     if (ret || fsize == 0) {
       printf("Recovery: failed to stat %s\n", name);
       return -1;
@@ -267,7 +281,7 @@ static int recovery_write(const char *name, int type) {
     size = fsize;
   } else {
     /* Kernel: uImage or FIT, written to the kernel volume */
-    ret = fs_read(name, (ulong)&hdr, 0, sizeof(hdr), &actread);
+    ret = recovery_select() ? -1 : fs_read(name, (ulong)&hdr, 0, sizeof(hdr), &actread);
     if (ret || actread != sizeof(hdr)) {
       printf("Recovery: failed to read %s\n", name);
       return -1;
@@ -283,7 +297,7 @@ static int recovery_write(const char *name, int type) {
     }
   }
 
-  ret = fs_read(name, CONFIG_SYS_LOAD_ADDR, 0, size, &actread);
+  ret = recovery_select() ? -1 : fs_read(name, CONFIG_SYS_LOAD_ADDR, 0, size, &actread);
   if (ret || actread != size) {
     printf("Recovery: failed to read %s\n", name);
     return -1;
@@ -338,36 +352,70 @@ static int recovery_write(const char *name, int type) {
 #else
 static struct spi_flash *recovery_flash;
 
+static ulong recovery_env(const char *name, ulong def) {
+  const char *str = env_get(name);
+
+  return str ? hextoul(str, NULL) : def;
+}
+
+/*
+ * What a card may hold, for the kernel or the rootfs:
+ * - a wrapper image (mkimage -T firmware -a <flash offset>, the ".img"
+ *   files): its payload goes to the offset its header names;
+ * - for the kernel, a uImage or FIT as built: it goes to kernaddr;
+ * - for the rootfs, a squashfs as built: it goes to rootaddr.
+ * The kernel must end before rootaddr, the rootfs within the flash.
+ */
 static int recovery_write(const char *name, int type) {
   struct image_header hdr;
-  loff_t actread;
-  ulong addr, size, erase_len;
+  loff_t actread, fsize;
+  ulong kernaddr = recovery_env("kernaddr", OPENIPC_KERNADDR);
+  ulong rootaddr = recovery_env("rootaddr", OPENIPC_ROOTADDR);
+  ulong addr, offset = 0, size, limit, erase_len;
   int ret;
 
-  if (!fs_exists(name))
+  if (recovery_select() || !fs_exists(name))
     return 0;
 
-  ret = fs_read(name, (ulong)&hdr, 0, sizeof(hdr), &actread);
+  ret = recovery_select() ? -1 : fs_read(name, (ulong)&hdr, 0, sizeof(hdr), &actread);
   if (ret || actread != sizeof(hdr)) {
     printf("Recovery: failed to read %s\n", name);
     return -1;
   }
 
-  if (image_check_magic(&hdr)) {
+  if (image_check_magic(&hdr) && image_get_type(&hdr) == IH_TYPE_FIRMWARE) {
     addr = image_get_load(&hdr);
+    offset = sizeof(hdr);
+    size = image_get_data_size(&hdr);
+  } else if (type == RECOVERY_KERNEL && image_check_magic(&hdr)) {
+    addr = kernaddr;
     size = sizeof(hdr) + image_get_data_size(&hdr);
   } else if (type == RECOVERY_KERNEL && fdt_magic(&hdr) == FDT_MAGIC &&
              fdt_check_header(&hdr) == 0) {
-    const char *str = env_get("kernaddr");
-
-    addr = str ? hextoul(str, NULL) : OPENIPC_KERNADDR;
+    addr = kernaddr;
     size = fdt_totalsize(&hdr);
+  } else if (type == RECOVERY_ROOTFS && check_squashfs(&hdr)) {
+    ret = recovery_select() ? -1 : fs_size(name, &fsize);
+    if (ret || !fsize) {
+      printf("Recovery: failed to stat %s\n", name);
+      return -1;
+    }
+    addr = rootaddr;
+    size = fsize;
   } else {
-    printf("Recovery: no valid uImage/FIT header in %s\n", name);
+    printf("Recovery: %s is not a wrapper image, %s\n", name,
+           type == RECOVERY_KERNEL ? "uImage or FIT" : "or squashfs");
     return -1;
   }
 
-  ret = fs_read(name, CONFIG_SYS_LOAD_ADDR, 0, size, &actread);
+  limit = type == RECOVERY_KERNEL ? rootaddr : recovery_flash->size;
+  if (addr % recovery_flash->sector_size || addr + size > limit) {
+    printf("Recovery: %s (0x%lx bytes at 0x%lx) does not fit\n", name, size,
+           addr);
+    return -1;
+  }
+
+  ret = recovery_select() ? -1 : fs_read(name, CONFIG_SYS_LOAD_ADDR, offset, size, &actread);
   if (ret || actread != size) {
     printf("Recovery: failed to read %s\n", name);
     return -1;
@@ -375,8 +423,12 @@ static int recovery_write(const char *name, int type) {
 
   erase_len = (size + recovery_flash->sector_size - 1) &
               ~(recovery_flash->sector_size - 1);
-  spi_flash_erase(recovery_flash, addr, erase_len);
-  spi_flash_write(recovery_flash, addr, size, (void *)CONFIG_SYS_LOAD_ADDR);
+  if (spi_flash_erase(recovery_flash, addr, erase_len) ||
+      spi_flash_write(recovery_flash, addr, size,
+                      (void *)CONFIG_SYS_LOAD_ADDR)) {
+    printf("Recovery: failed to write %s to flash at 0x%lx\n", name, addr);
+    return -1;
+  }
 
   printf("Recovery: wrote %s (%lu bytes) to flash at 0x%lx\n", name, size,
          addr);
@@ -392,16 +444,16 @@ static int recovery_run_script(const char *name) {
   int ret;
   char cmd[32];
 
-  if (!fs_exists(name))
+  if (recovery_select() || !fs_exists(name))
     return 0;
 
-  ret = fs_size(name, &size);
+  ret = recovery_select() ? -1 : fs_size(name, &size);
   if (ret || size == 0) {
     printf("Recovery: failed to stat %s\n", name);
     return 1;
   }
 
-  ret = fs_read(name, CONFIG_SYS_LOAD_ADDR, 0, size, &actread);
+  ret = recovery_select() ? -1 : fs_read(name, CONFIG_SYS_LOAD_ADDR, 0, size, &actread);
   if (ret || actread != size) {
     printf("Recovery: failed to read %s\n", name);
     return 1;
