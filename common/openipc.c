@@ -29,8 +29,9 @@
 #include <ubi_uboot.h>
 #endif
 
-#define SCAN_FROM CONFIG_ENV_OFFSET + CONFIG_ENV_SIZE
+#define SCAN_FROM (CONFIG_ENV_OFFSET + CONFIG_ENV_SIZE)
 #define SCAN_STEP 0x10000
+/* How far to look for the kernel, and for the rootfs past the kernel's end */
 #define SCAN_LIMIT 0x400000
 
 #define UBI_MAGIC_ASCII "UBI#"
@@ -118,10 +119,19 @@ static int check_rootfs(void *buf, uint64_t *rootfs_size) {
   return 0;
 }
 
+/* The kernel image's size from its header, or 0 when it has none */
+static ulong kernel_image_size(void *buf) {
+  if (image_check_magic((struct image_header *)buf))
+    return image_get_image_size((struct image_header *)buf);
+  if (fdt_magic(buf) == FDT_MAGIC && fdt_check_header(buf) == 0)
+    return fdt_totalsize(buf);
+  return 0;
+}
+
 static int scan_spi_device(struct spi_flash *flash, ulong *kernel_off, ulong *rootfs_off, uint64_t *kernel_size,
                            uint64_t *rootfs_size) {
   u8 *buf;
-  ulong offset;
+  ulong offset, limit;
   ulong erase_size;
   int ret;
 
@@ -135,9 +145,10 @@ static int scan_spi_device(struct spi_flash *flash, ulong *kernel_off, ulong *ro
   erase_size = 0x10000;
 #endif
 
-  printf("Scanning 0x%x-0x%x ...\n", SCAN_FROM, SCAN_LIMIT);
+  limit = min_t(ulong, SCAN_FROM + SCAN_LIMIT, flash->size);
+  printf("Scanning 0x%x-0x%lx ...\n", SCAN_FROM, limit);
 
-  for (offset = SCAN_FROM; offset < SCAN_LIMIT && offset < flash->size; offset += SCAN_STEP) {
+  for (offset = SCAN_FROM; offset < limit; offset += SCAN_STEP) {
     ret = spi_flash_read(flash, offset, SCAN_STEP, buf);
     if (ret != 0)
       continue;
@@ -156,8 +167,20 @@ static int scan_spi_device(struct spi_flash *flash, ulong *kernel_off, ulong *ro
     }
 
     if (!*kernel_off && check_kernel(buf)) {
+      ulong end = offset + ALIGN(kernel_image_size(buf), SCAN_STEP);
+
       *kernel_off = offset;
       printf("Found Kernel at 0x%08lx\n", offset);
+      /*
+       * The rootfs is past the kernel: skip the image, whose contents could
+       * pass for one, and look as far past its end as before it. A large
+       * kernel (arm64) ends beyond the first window.
+       */
+      if (end > offset) {
+        limit = min_t(ulong, max_t(ulong, limit, end + SCAN_LIMIT), flash->size);
+        offset = end - SCAN_STEP;
+        continue;
+      }
     }
 
     if (!*rootfs_off && check_rootfs(buf, rootfs_size)) {
@@ -628,14 +651,22 @@ int firmware_scan(void) {
 
   scan_spi_device(flash, &kernel_off, &rootfs_off, &kernel_size, &rootfs_size);
 
-#ifndef CONFIG_TARGET_HI3516CV610_FAMILY
-  if (kernel_size <= 0x200000)
-    kernel_size = 0x200000;
-  if (rootfs_size < 0x500000)
-    rootfs_size = 0x500000;
-  else if (rootfs_size > 0x500000 && flash->size > 0x800000)
-    rootfs_size = 0xa00000;
-#endif
+  /*
+   * Fixed slots -- the rootfs at the 2 or 3 MiB slot boundary after the
+   * kernel, or nothing found to say otherwise -- get the slots' sizes, so the
+   * rootfs partition is its whole slot and rootfs_data starts after it. A
+   * rootfs packed right after the kernel (a FIT and its squashfs written as
+   * one image) keeps the sizes found: a slot there would put the rootfs
+   * partition past the squashfs.
+   */
+  if (!kernel_size || kernel_size == 0x200000 || kernel_size == 0x300000) {
+    if (kernel_size <= 0x200000)
+      kernel_size = 0x200000;
+    if (rootfs_size < 0x500000)
+      rootfs_size = 0x500000;
+    else if (rootfs_size > 0x500000 && flash->size > 0x800000)
+      rootfs_size = 0xa00000;
+  }
 
 #ifdef CONFIG_OPENIPC_NOR_SPLIT
   if (nor_split_layout(flash, kernel_off, rootfs_off)) {

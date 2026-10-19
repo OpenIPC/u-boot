@@ -390,6 +390,9 @@ func(DHCP, dhcp, na)
 #define TIME_RECORD_ADDR (FDR_ADDR_BASE + 0xC800)
 #endif
 
+/* One firmware image serves the family: firmware.bin.hi3516cv6xx */
+#define OPENIPC_FW_SOC "hi3516cv6xx"
+
 #include "openipc-common.h"
 
 #endif /* __HI3516CV610_H */

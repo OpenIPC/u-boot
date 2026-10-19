@@ -46,14 +46,33 @@ void hi_gpio_status(void);
 #define VENDOR "goke"
 #endif
 
-#define CONFIG_ENV_OFFSET 0x40000
-#define CONFIG_ENV_SIZE 0x10000
+/*
+ * The NOR layout: the boot partition, the environment after it at
+ * OPENIPC_ENV_OFFSET, and the firmware after that at OPENIPC_KERNADDR, with
+ * the rootfs slots of the fixed lite (2 MiB kernel) and ultimate (3 MiB
+ * kernel) layouts. A 256 KiB boot partition unless the SoC's header gives
+ * its own -- all of them, as literals: they are spelled into the default
+ * environment. The vendor headers' CONFIG_ENV_* are overridden.
+ */
+#ifndef OPENIPC_ENV_OFFSET
+#define OPENIPC_ENV_OFFSET 0x40000
+#define OPENIPC_ENV_SIZE 0x10000
+#endif
+#undef CONFIG_ENV_OFFSET
+#undef CONFIG_ENV_SIZE
+#undef CONFIG_ENV_SECT_SIZE
+#define CONFIG_ENV_OFFSET OPENIPC_ENV_OFFSET
+#define CONFIG_ENV_SIZE OPENIPC_ENV_SIZE
 #define CONFIG_ENV_SECT_SIZE 0x10000
 
-/* Kernel/rootfs offsets (shared by all NOR layouts) */
-#define CONFIG_ENV_KERNADDR 0x50000
+#ifndef OPENIPC_KERNADDR
+#define OPENIPC_KERNADDR 0x50000
+#define OPENIPC_ROOTADDR_LITE 0x250000
+#define OPENIPC_ROOTADDR_ULTIMATE 0x350000
+#endif
+#define CONFIG_ENV_KERNADDR OPENIPC_KERNADDR
 #define CONFIG_ENV_KERNSIZE 0x200000
-#define CONFIG_ENV_ROOTADDR 0x250000
+#define CONFIG_ENV_ROOTADDR OPENIPC_ROOTADDR_LITE
 #define CONFIG_ENV_ROOTSIZE 0x500000
 
 /* gzip image header */
@@ -80,7 +99,9 @@ void hi_gpio_status(void);
 #define OPENIPC_BASEADDR 0x82000000
 #define OPENIPC_OSMEM "128M"
 #elif defined(CONFIG_ARCH_BSP)
+#ifndef OPENIPC_OSMEM
 #define OPENIPC_OSMEM "32M"
+#endif
 #else /* XMedia / Goke */
 #undef CONFIG_SYS_LOAD_ADDR
 #define CONFIG_SYS_LOAD_ADDR 0x42000000
@@ -94,18 +115,24 @@ void hi_gpio_status(void);
 #undef CONFIG_SYS_BOOTCOUNT_ADDR
 #define CONFIG_SYS_BOOTCOUNT_ADDR (CONFIG_SYS_SDRAM_BASE + 0x1f20000)
 
-/* Firmware image name for the whole-firmware update (CV610) */
-#ifdef CONFIG_ARCH_BSP
-#define OPENIPC_FW_FILE "rootfs.${soc}"
-#else
-#define OPENIPC_FW_FILE "firmware.${soc}"
+/*
+ * The whole-firmware image of the split NOR layout, as the firmware build
+ * names it: firmware.bin.<its SoC model>. That is the SoC, unless the
+ * firmware builds one image for a family (hi3516cv6xx); the header of such
+ * a SoC names the family.
+ */
+#ifndef OPENIPC_FW_SOC
+#define OPENIPC_FW_SOC CONFIG_PRODUCT_SOC
 #endif
+#define OPENIPC_FW_FILE "firmware.bin." OPENIPC_FW_SOC
 
 #define OPENIPC_BOOTARGSNFS "mem=\\${osmem} console=ttyAMA0,115200 panic=20 root=/dev/nfs rootfstype=nfs ip=${ipaddr}:::255.255.255.0::eth0 nfsroot=${serverip}:${nfsroot},v3,nolock rw \\${extras}"
 
 /* NOR partition list; the reserved 'mtdparts' variable holds the full
  * "<mtd-id>:<list>" string, the bootargs compose it from mtdids/mtds. */
+#ifndef OPENIPC_MTDPARTS
 #define OPENIPC_MTDPARTS "256k(boot),64k(env),2048k(kernel),5120k(rootfs),7168k@0x50000(firmware),-(rootfs_data)"
+#endif
 
 /* NAND partition list; composed the same way. */
 #define OPENIPC_NAND_MTDPARTS "768k(boot),256k(env),-(ubi)"
@@ -168,11 +195,16 @@ void hi_gpio_status(void);
 
 #define CONFIG_BOOTARGS "mem=\\${osmem} console=ttyAMA0,115200 panic=20 root=/dev/mtdblock3 rootfstype=squashfs init=/init mtdparts=\\${mtdparts} \\${extras}"
 
-/* Recovery: CV610 writes a single firmware blob, the others split images;
- * the rootfs is fetched first so its size selects the NOR schema. */
-#ifdef CONFIG_TARGET_HI3516CV610_FAMILY
+/*
+ * Recovery. A board that boots the split layout takes the whole firmware
+ * image, written where the firmware starts; without one on the server, or
+ * on a fixed-slot board, the rootfs and the kernel, the rootfs first so its
+ * size selects the NOR schema.
+ */
+#ifdef CONFIG_OPENIPC_NOR_SPLIT
 #define OPENIPC_FWUPD \
-	"fwupd=${source} ${baseaddr} " OPENIPC_FW_FILE " && run fwwrite\0"
+	"fwfile=" OPENIPC_FW_FILE "\0" \
+	"fwupd=if ${source} ${baseaddr} ${fwfile}; then run fwwrite; else run ur; run uk; fi\0"
 #else
 #define OPENIPC_FWUPD "fwupd=run ur; run uk\0"
 #endif
@@ -185,12 +217,12 @@ void hi_gpio_status(void);
 	"kernsize=" __stringify(CONFIG_ENV_KERNSIZE) "\0" \
 	"rootaddr=" __stringify(CONFIG_ENV_ROOTADDR) "\0" \
 	"rootsize=" __stringify(CONFIG_ENV_ROOTSIZE) "\0" \
-	"mtdslite=setenv kernsize 0x200000; setenv rootaddr 0x250000; setenv rootsize 0x500000\0" \
-	"mtdsultimate=setenv kernsize 0x300000; setenv rootaddr 0x350000; setenv rootsize 0xa00000\0" \
+	"mtdslite=setenv kernsize 0x200000; setenv rootaddr " __stringify(OPENIPC_ROOTADDR_LITE) "; setenv rootsize 0x500000\0" \
+	"mtdsultimate=setenv kernsize 0x300000; setenv rootaddr " __stringify(OPENIPC_ROOTADDR_ULTIMATE) "; setenv rootsize 0xa00000\0" \
 	"ubwrite=sf probe 0; sf erase 0x0 ${kernaddr}; sf write ${baseaddr} 0x0 ${filesize}\0" \
 	"ukwrite=sf probe 0; sf erase ${kernaddr} ${kernsize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0" \
 	"urwrite=sf probe 0; if itest ${filesize} -gt 500000; then run mtdsultimate; fi; sf erase ${rootaddr} ${rootsize}; sf write ${baseaddr} ${rootaddr} ${filesize}\0" \
-	"fwwrite=sf probe 0; sf erase ${kernaddr} ${filesize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0" \
+	"fwwrite=sf probe 0; sf erase ${kernaddr} +${filesize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0" \
 	"loadkernel=" OPENIPC_LOADKERNEL "\0" \
 	"mtdids=" SFC "\0" \
 	"mtds=" OPENIPC_MTDPARTS "\0" \
