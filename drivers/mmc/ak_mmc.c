@@ -243,20 +243,28 @@ static int ak_mci_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 			return -EBUSY;
 	}
 
-	/* CMD25 wants the block count first */
-	if (data && cmd->cmdidx == MMC_CMD_WRITE_MULTIPLE_BLOCK) {
-		ret = ak_mci_cmd(MMC_CMD_APP_CMD, MMC_RSP_R1, mmc->rca << 16,
-				 false);
-		if (!ret)
-			ret = ak_mci_cmd(MMC_CMD_SET_BLOCK_COUNT, MMC_RSP_R1,
-					 data->blocks, false);
-		if (ret)
-			return ret;
-	}
+	/*
+	 * Before CMD25 an SD card is told how many blocks to pre-erase
+	 * (ACMD23), as the vendor drivers do. It is only a hint: a card that
+	 * refuses it is written anyway, and MMC cards do not get it.
+	 */
+	if (data && cmd->cmdidx == MMC_CMD_WRITE_MULTIPLE_BLOCK && IS_SD(mmc) &&
+	    !ak_mci_cmd(MMC_CMD_APP_CMD, MMC_RSP_R1, mmc->rca << 16, false))
+		ak_mci_cmd(MMC_CMD_SET_BLOCK_COUNT, MMC_RSP_R1, data->blocks, false);
+
+	/*
+	 * A read's data path is armed before the command, as the vendor kernels
+	 * do: the card may start sending a few clocks after its response.
+	 */
+	if (data && (data->flags & MMC_DATA_READ))
+		ak_mci_arm_data(data->blocksize, nbytes, true);
 
 	ret = ak_mci_cmd(cmd->cmdidx, cmd->resp_type, cmd->cmdarg, data != NULL);
-	if (ret)
+	if (ret) {
+		if (data)
+			writel(0, MCI_DATACTRL);
 		return ret;
+	}
 
 	if (cmd->resp_type & MMC_RSP_136) {
 		/* RESPONSE0 holds the most significant word */
@@ -268,10 +276,8 @@ static int ak_mci_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 
 	if (!data)
 		return 0;
-	if (data->flags & MMC_DATA_READ) {
-		ak_mci_arm_data(data->blocksize, nbytes, true);
+	if (data->flags & MMC_DATA_READ)
 		return ak_mci_read((u8 *)data->dest, nbytes);
-	}
 	ak_mci_arm_data(data->blocksize, nbytes, false);
 	return ak_mci_write((const u8 *)data->src, nbytes);
 }
