@@ -239,7 +239,7 @@ byte-swapped, as the chip holds it), then a second time, which must load
 the environment the first boot saved.
 
 Its `release` input fills this repository's
-[`GK710x` release](../../releases/tag/gk710x); `publish` uploads to
+[`Goke` release](../../releases/tag/goke); `publish` uploads to
 `OpenIPC/firmware` `latest`, where no other repository publishes
 `u-boot-gk710*` names, and reports to openipc.org.
 
