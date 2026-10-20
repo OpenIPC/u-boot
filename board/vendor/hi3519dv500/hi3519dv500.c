@@ -501,9 +501,7 @@ int board_mmc_init(struct bd_info *bis)
 
 #ifdef CONFIG_MMC_SDHCI
 
-#if!defined(CONFIG_FMC) || defined(CONFIG_AUTO_SD_UPDATE)
 	int dev_num = 0;
-#endif
 
 #ifndef CONFIG_FMC
 	ret = sdhci_add_port(0, EMMC_BASE_REG, MMC_TYPE_MMC);
@@ -515,8 +513,14 @@ int board_mmc_init(struct bd_info *bis)
 	dev_num++;
 #endif
 
-#ifdef CONFIG_AUTO_SD_UPDATE
-	if (is_auto_update()) {
+	/*
+	 * The SD slot. A NOR camera registers it at every boot: OpenIPC's
+	 * recovery (common/openipc.c firmware_recovery) reads the card before
+	 * the flash is scanned, button or not. Otherwise, as the vendor's SD
+	 * update has it, only with the update button held.
+	 */
+#if defined(CONFIG_FMC) || defined(CONFIG_AUTO_SD_UPDATE)
+	if (IS_ENABLED(CONFIG_FMC) || is_auto_update()) {
 		ret = sdhci_add_port(1, SDIO0_BASE_REG, MMC_TYPE_SD);
 		if (ret)
 			return ret;

@@ -187,7 +187,7 @@ static uint mmc_mode2freq(struct mmc *mmc, enum bus_mode mode)
 		return freqs[mode];
 }
 
-static int mmc_select_mode(struct mmc *mmc, enum bus_mode mode)
+int mmc_select_mode(struct mmc *mmc, enum bus_mode mode)
 {
 	mmc->selected_mode = mode;
 	mmc->tran_speed = mmc_mode2freq(mmc, mode);
@@ -963,7 +963,7 @@ static int mmc_set_card_speed(struct mmc *mmc, enum bus_mode mode,
 	return 0;
 }
 
-static int mmc_get_capabilities(struct mmc *mmc)
+int mmc_get_capabilities(struct mmc *mmc)
 {
 	u8 *ext_csd = mmc->ext_csd;
 	char cardtype;
@@ -2094,7 +2094,7 @@ static int mmc_select_hs400es(struct mmc *mmc)
 	    ecbv++) \
 		if ((ddr == ecbv->is_ddr) && (caps & ecbv->cap))
 
-static int mmc_select_mode_and_width(struct mmc *mmc, uint card_caps)
+int mmc_select_mode_and_width(struct mmc *mmc, uint card_caps)
 {
 	int err = 0;
 	const struct mode_width_tuning *mwt;
@@ -2237,7 +2237,7 @@ error:
 DEFINE_CACHE_ALIGN_BUFFER(u8, ext_csd_bkup, MMC_MAX_BLOCK_LEN);
 #endif
 
-static int mmc_startup_v4(struct mmc *mmc)
+int mmc_startup_v4(struct mmc *mmc)
 {
 	int err, i;
 	u64 capacity;

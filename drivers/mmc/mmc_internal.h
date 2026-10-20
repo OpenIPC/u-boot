@@ -94,6 +94,7 @@ void printf_mmc(int dev_num);
 
 int mmc_restore(struct mmc *mmc);
 int mmc_save_parameters(struct mmc *mmc);
+int mmc_set_boot_config(struct mmc *mmc);
 
 int mmc_select_mode(struct mmc *mmc, enum bus_mode mode);
 int mmc_startup_v4(struct mmc *mmc);
