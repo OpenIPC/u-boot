@@ -11,6 +11,8 @@
 #include <spi.h>
 #include <vsprintf.h>
 #include <spi_flash.h>
+#include <u-boot/crc.h>
+#include <linux/sizes.h>
 #ifdef CONFIG_USB
 #include <usb.h>
 #endif
@@ -252,6 +254,12 @@ static int rfs_read(const char *name, ulong addr, loff_t offset, loff_t len,
   return recovery_mount(recovery_if) ? -1 : fs_read(name, addr, offset, len, actread);
 }
 
+/* What a file read to CONFIG_SYS_LOAD_ADDR may take: the RAM below the
+ * stack and the relocated U-Boot, with room */
+static ulong recovery_ram_room(void) {
+  return gd->start_addr_sp - SZ_1M - CONFIG_SYS_LOAD_ADDR;
+}
+
 #ifdef CONFIG_FMC_SPI_NAND
 static int recovery_ensure_volume(const char *name, const char *size) {
   struct ubi_volume_desc *desc;
@@ -393,54 +401,6 @@ static int recovery_write(const char *name, int type) {
 #else
 static struct spi_flash *recovery_flash;
 
-static int recovery_write(const char *name, int type) {
-  struct image_header hdr;
-  loff_t actread;
-  ulong addr, size, erase_len;
-  int ret;
-
-  if (!rfs_exists(name))
-    return 0;
-
-  ret = rfs_read(name, (ulong)&hdr, 0, sizeof(hdr), &actread);
-  if (ret || actread != sizeof(hdr)) {
-    printf("Recovery: failed to read %s\n", name);
-    return -1;
-  }
-
-  if (image_check_magic(&hdr)) {
-    addr = image_get_load(&hdr);
-    size = sizeof(hdr) + image_get_data_size(&hdr);
-  } else if (type == RECOVERY_KERNEL && fdt_magic(&hdr) == FDT_MAGIC &&
-             fdt_check_header(&hdr) == 0) {
-    const char *str = env_get("kernaddr");
-
-    addr = str ? hextoul(str, NULL) : CONFIG_ENV_KERNADDR;
-    size = fdt_totalsize(&hdr);
-  } else {
-    printf("Recovery: no valid uImage/FIT header in %s\n", name);
-    return -1;
-  }
-
-  ret = rfs_read(name, CONFIG_SYS_LOAD_ADDR, 0, size, &actread);
-  if (ret || actread != size) {
-    printf("Recovery: failed to read %s\n", name);
-    return -1;
-  }
-
-  erase_len = (size + recovery_flash->sector_size - 1) &
-              ~(recovery_flash->sector_size - 1);
-  spi_flash_erase(recovery_flash, addr, erase_len);
-  spi_flash_write(recovery_flash, addr, size, (void *)CONFIG_SYS_LOAD_ADDR);
-
-  printf("Recovery: wrote %s (%lu bytes) to flash at 0x%lx\n", name, size,
-         addr);
-
-  return 1;
-}
-
-#ifdef CONFIG_OPENIPC_NOR_SPLIT
-/* Whether flash from addr holds data, compared 64 KiB at a time. */
 static int recovery_flash_holds(ulong addr, const void *data, ulong len) {
   const ulong chunk = 0x10000;
   u8 *buf = malloc(chunk);
@@ -459,101 +419,115 @@ static int recovery_flash_holds(ulong addr, const void *data, ulong len) {
 }
 
 /*
- * A split image refused before anything is erased: said so, then treated as
- * absent, so a kernel and rootfs pair on the same card is still tried.
+ * One recovery image: a uImage wrapper whose load address is where in the
+ * flash its payload goes. Whatever the payload is -- a kernel, a rootfs, a
+ * whole firmware, U-Boot itself -- it is written there; the wrapper header
+ * never is. Returns 1 when it wrote, 0 when it skipped, -1 on a failed write.
  */
-static int recovery_skip(const char *name)
-{
-  printf("Recovery: %s skipped, trying the other recovery files\n", name);
-  return 0;
-}
-
-/*
- * The split layout's one image (firmware.bin.<soc>, ${fwfile}, what fwupd
- * fetches): a uImage, then the squashfs. Written at kernaddr, where the
- * firmware partition starts on this board, with the rest of the chip erased:
- * the old image's overlay must not be found by the next boot's scan or taken
- * for settings. Nothing is erased until the whole file is in RAM and its
- * kernel checks out, and a card left in the slot does not reflash an
- * unchanged image at every boot. Returns 1 when written, 2 when already on
- * the flash, 0 when absent or refused before any erase, -1 when the erase
- * or the write failed.
- */
-static int recovery_write_firmware(const char *name) {
+static int recovery_write_img(const char *name, loff_t size) {
   struct image_header hdr;
-  loff_t size, actread;
-  ulong addr, len, env_end;
-  const char *str;
+  loff_t actread;
+  ulong addr, len, sect = recovery_flash->sector_size;
 
-  if (!name || !rfs_exists(name))
+  if (size <= (loff_t)sizeof(hdr) ||
+      rfs_read(name, (ulong)&hdr, 0, sizeof(hdr), &actread) ||
+      actread != sizeof(hdr) || !image_check_magic(&hdr) ||
+      !image_check_hcrc(&hdr)) {
+    printf("Recovery: %s is not a uImage, skipped\n", name);
     return 0;
-
-  if (rfs_size(name, &size) || size <= (loff_t)sizeof(hdr)) {
-    printf("Recovery: failed to stat %s\n", name);
-    return recovery_skip(name);
   }
-  if (rfs_read(name, (ulong)&hdr, 0, sizeof(hdr), &actread) ||
-      actread != sizeof(hdr)) {
-    printf("Recovery: failed to read %s\n", name);
-    return recovery_skip(name);
+  addr = image_get_load(&hdr);
+  len = image_get_data_size(&hdr);
+  /* a read of length 0 would be a read of the whole file */
+  if (!len) {
+    printf("Recovery: %s has no data, skipped\n", name);
+    return 0;
   }
-  /* the data size against what follows the header, in 64 bits: added to
-   * the header's in a 32-bit ulong, a size near 4 GiB wrapped past this */
-  if (!image_check_magic(&hdr) || !image_check_hcrc(&hdr) ||
-      (loff_t)image_get_data_size(&hdr) > size - (loff_t)sizeof(hdr)) {
-    printf("Recovery: %s does not start with a uImage\n", name);
-    return recovery_skip(name);
-  }
-
-  str = env_get("kernaddr");
-  addr = str ? hextoul(str, NULL) : CONFIG_ENV_KERNADDR;
-  len = size;
-  /* never into the boot image or the environment below the firmware */
-  env_end = CONFIG_ENV_OFFSET + CONFIG_ENV_SIZE;
-  if (addr < env_end) {
-    printf("Recovery: kernaddr 0x%lx is inside the boot area (firmware starts at 0x%lx)\n",
-           addr, env_end);
-    return recovery_skip(name);
+  /* in 64 bits: a size near 4 GiB would wrap a 32-bit sum */
+  if ((loff_t)len > size - (loff_t)sizeof(hdr)) {
+    printf("Recovery: %s is shorter than its header says, skipped\n", name);
+    return 0;
   }
   if (addr >= recovery_flash->size || len > recovery_flash->size - addr) {
-    printf("Recovery: %s (%lu bytes) does not fit the flash from 0x%lx\n",
-           name, len, addr);
-    return recovery_skip(name);
+    printf("Recovery: %s (0x%lx + %lu bytes) is outside the flash, skipped\n",
+           name, addr, len);
+    return 0;
   }
-  /* the file in RAM below the stack and the relocated U-Boot, with room */
-  if (len > gd->start_addr_sp - SZ_1M - CONFIG_SYS_LOAD_ADDR) {
-    printf("Recovery: %s (%lu bytes) does not fit the free RAM from 0x%lx\n",
-           name, len, (ulong)CONFIG_SYS_LOAD_ADDR);
-    return recovery_skip(name);
+  if (addr % sect) {
+    printf("Recovery: %s: 0x%lx is not on a %lu-byte erase boundary, skipped\n",
+           name, addr, sect);
+    return 0;
   }
-
-  if (rfs_read(name, CONFIG_SYS_LOAD_ADDR, 0, len, &actread) || actread != len) {
-    printf("Recovery: failed to read %s\n", name);
-    return recovery_skip(name);
+  if (len > recovery_ram_room()) {
+    printf("Recovery: %s (%lu bytes) does not fit the free RAM, skipped\n",
+           name, len);
+    return 0;
   }
-  if (!image_check_dcrc((struct image_header *)CONFIG_SYS_LOAD_ADDR)) {
-    printf("Recovery: %s: the kernel's CRC does not match\n", name);
-    return recovery_skip(name);
+  if (rfs_read(name, CONFIG_SYS_LOAD_ADDR, sizeof(hdr), len, &actread) ||
+      actread != len) {
+    printf("Recovery: failed to read %s, skipped\n", name);
+    return 0;
   }
-
-  /* handled, not absent: the legacy pair on the same card is not written */
+  if (crc32(0, (const u8 *)CONFIG_SYS_LOAD_ADDR, len) != image_get_dcrc(&hdr)) {
+    printf("Recovery: %s: the data CRC does not match, skipped\n", name);
+    return 0;
+  }
+  /* A card left in the slot: nothing to do, the system boots */
   if (recovery_flash_holds(addr, (void *)CONFIG_SYS_LOAD_ADDR, len)) {
     printf("Recovery: %s is already on the flash at 0x%lx\n", name, addr);
-    return 2;
+    return 0;
   }
 
-  printf("Recovery: writing %s (%lu bytes) at 0x%lx, erasing to the end of the flash\n",
-         name, len, addr);
-  if (spi_flash_erase(recovery_flash, addr, recovery_flash->size - addr) ||
+  printf("Recovery: writing %s (%lu bytes) at 0x%lx\n", name, len, addr);
+  if (spi_flash_erase(recovery_flash, addr, ALIGN(len, sect)) ||
       spi_flash_write(recovery_flash, addr, len, (void *)CONFIG_SYS_LOAD_ADDR)) {
     printf("Recovery: writing %s failed\n", name);
     return -1;
   }
   printf("Recovery: wrote %s\n", name);
-
   return 1;
 }
-#endif
+
+struct recovery_file {
+  char name[256];
+  loff_t size;
+};
+
+/* Every *.img in the root of the medium, in the order the directory lists
+ * them. The names are collected first: reading a file closes the
+ * filesystem under an open directory stream. */
+static int recovery_images(void) {
+  struct recovery_file *files = NULL, *more;
+  struct fs_dir_stream *dirs;
+  struct fs_dirent *d;
+  int n = 0, i, written = 0;
+  size_t l;
+
+  if (recovery_mount(recovery_if))
+    return 0;
+  dirs = fs_opendir("/");
+  if (!dirs)
+    return 0;
+  while ((d = fs_readdir(dirs))) {
+    l = strlen(d->name);
+    if (d->type != FS_DT_REG || l < 5 || l >= sizeof(files->name) ||
+        strcasecmp(d->name + l - 4, ".img"))
+      continue;
+    more = realloc(files, (n + 1) * sizeof(*files));
+    if (!more)
+      break;
+    files = more;
+    strcpy(files[n].name, d->name);
+    files[n++].size = d->size;
+  }
+  fs_closedir(dirs);
+
+  for (i = 0; i < n; i++)
+    if (recovery_write_img(files[i].name, files[i].size) > 0)
+      written++;
+  free(files);
+  return written;
+}
 #endif
 
 /* If a script.txt is present on the medium, execute it (uImage script or
@@ -569,6 +543,10 @@ static int recovery_run_script(const char *name) {
   ret = rfs_size(name, &size);
   if (ret || size == 0) {
     printf("Recovery: failed to stat %s\n", name);
+    return 1;
+  }
+  if ((u64)size > recovery_ram_room()) {
+    printf("Recovery: %s (%lld bytes) does not fit the free RAM\n", name, size);
     return 1;
   }
 
@@ -587,52 +565,31 @@ static int recovery_run_script(const char *name) {
     ret = run_command_list((char *)CONFIG_SYS_LOAD_ADDR, size, 0);
   }
 
-  printf("Recovery: executed %s (%lld bytes)\n", name, size);
+  /* The script took recovery over: its result is reported, not retried
+   * with the images */
+  printf("Recovery: executed %s (%lld bytes)%s\n", name, size,
+         ret ? ", it failed" : "");
 
   return 1;
 }
 
 static int recovery_try(void) {
+#ifdef CONFIG_FMC_SPI_NAND
   char name[64];
-  int ret, found = 0;
+#endif
 
-  /* script.txt takes precedence over the kernel/rootfs search */
+  /* script.txt takes precedence over the image search */
   if (recovery_run_script("script.txt"))
     return 1;
 
-#if defined(CONFIG_OPENIPC_NOR_SPLIT) && !defined(CONFIG_FMC_SPI_NAND)
-  /* The split image, where this board takes one; else the pair below */
-  ret = recovery_write_firmware(env_get("fwfile") ? env_get("fwfile") : OPENIPC_FW_FILE);
-  if (ret)
-    return ret > 0;
-#endif
-
-#ifndef CONFIG_FMC_SPI_NAND
-  /* Kernel: uImage preferred, FIT fallback */
-  sprintf(name, "uImage.%s.img", CONFIG_PRODUCT_SOC);
-  ret = recovery_write(name, RECOVERY_KERNEL);
-  if (ret > 0) {
-    found = 1;
-  } else if (ret == 0) {
-    sprintf(name, "fitImage.%s.img", CONFIG_PRODUCT_SOC);
-    ret = recovery_write(name, RECOVERY_KERNEL);
-    if (ret > 0)
-      found = 1;
-  }
-#endif
-
+#ifdef CONFIG_FMC_SPI_NAND
   /* Rootfs. On NAND it carries the kernel (/boot), its volume is sized
    * to the image and rootfs_data takes the rest. */
-#ifdef CONFIG_FMC_SPI_NAND
   sprintf(name, "rootfs.ubifs.%s.img", CONFIG_PRODUCT_SOC);
+  return recovery_write(name, RECOVERY_ROOTFS) > 0;
 #else
-  sprintf(name, "rootfs.squashfs.%s.img", CONFIG_PRODUCT_SOC);
+  return recovery_images() > 0;
 #endif
-  ret = recovery_write(name, RECOVERY_ROOTFS);
-  if (ret > 0)
-    found = 1;
-
-  return found;
 }
 
 int firmware_recovery(void) {
