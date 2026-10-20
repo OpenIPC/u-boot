@@ -1068,5 +1068,6 @@ config OPENIPC_NOR_SPLIT
 	  partition the kernel divides at boot, from its own device tree. The
 	  kernel is told nothing about it: the fixed-slot mtdparts and root=
 	  of a saved environment are dropped, and bootm checks the uImage CRC.
-	  Only for boards whose kernel knows the layout (gk7205v200 family).
+	  Only for boards whose kernel knows the layout (gk7205v200 family,
+	  hi3516cv6xx, hi3519dv500, hi3516cv300/hi3516ev100).
 
