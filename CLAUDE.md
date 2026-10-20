@@ -101,7 +101,9 @@ The kernel still needs the blob (see "Hand-off to the kernel").
   - the words around the table are as in every SDK prebuilt and camera
     flash seen;
   - the table is `openipc/<soc>.rvs`, taken from the SDK's prebuilt
-    U-Boots, which matches what is on cameras in the field;
+    U-Boots, with the eFuse lines as GK7102 cameras in the field have
+    them (no write to `0x6000B100`; wait for `0x6000B104 == 3` after
+    starting the load). A GK7102 with the SDK's lines did not start;
   - GK7101 and GK7102 differ only in the DDR controller word at
     `0x60004004` (128 vs 64 MiB). `dram_init()` reads the same word back.
 - **Byte order.** The flash controller packs bytes MSB first. U-Boot, the
@@ -117,6 +119,17 @@ The kernel still needs the blob (see "Hand-off to the kernel").
     in its `gk7101_sflash.c`), and so does `gk_sflash.c`. `run ub` from
     either bootloader therefore writes exactly the bytes a programmer
     would. A CPU-order image (the SDK's prebuilts) is written unchanged.
+  - `gk_sflash.c` swaps the boot image's span on read as well (the image
+    found at offset 0 at probe, or the one last written there). Every
+    caller (`sf read`, SD recovery's "already on the flash" check) sees
+    the boot image as the file. Everything past it is the controller's
+    plain round trip.
+  - A whole-chip dump in chip order (a programmer's) restores with one
+    `sf write` at 0: a write at 0 that starts with the swapped magic is
+    swapped over its whole length. `sf update` splits it into sectors and
+    only the boot image comes out right. `sf read` of the whole chip is
+    not a dump either: the boot image in chip order, the rest in CPU
+    order.
   - Exception: the first release (2026-10-18) wrote CPU-order images and
     its `gk_sflash.c` has no swap check. `run ub` on a camera running it
     would write a chip-order image swapped twice and brick it. Upgrade
@@ -181,9 +194,17 @@ included.
   - `gk_ephy_init()` does the vendor's PHY clock (audio PLL, out on a pin),
     analog trim and MAC/PHY mux.
   - External-PHY boards (`phytype=1/2`) are not handled.
-- **SD:** not enabled. The vendor U-Boot had none, the controller's base
-  clock is unknown, and the SD pins depend on the board map. SD recovery in
-  `common/openipc.c` is compiled out with `CONFIG_MMC`.
+- **SD:** for recovery, the only way back for a camera without Ethernet
+  (`common/openipc.c`: `script.txt`, or uImage-wrapped `*.img` written at
+  their load address). `arch/arm/mach-gk710x/sdhci.c`:
+  - GK7101/GK7102: a standard SDHCI at `0x60002000`;
+  - GK710xS: at `0x90000000` in the vendor's halfword layout, so every
+    access goes through a table of where each SDHCI register and bit
+    sits, taken from what the S HAL does;
+  - the base clock comes from the RCT SD PLL and scaler.
+
+  U-Boot sets the map's SD pins and SD power pin. MMC, FAT and LTO
+  together still fit the 256 KiB boot partition.
 - **SPI NAND:** not supported. OpenIPC's GK7102 firmware is NOR only.
 
 ## The GK710xS (GK7101S, GK7102S, GK7102C)
