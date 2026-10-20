@@ -76,7 +76,7 @@ static void gk_ephy_init(void)
 	int i;
 
 	/* Its reference clock: the audio PLL at 96 MHz / 4, out on a pin */
-	writel(0x02402001, GK_RCT_PLL_AUDIO_CTRL);
+	writel(GK_PLL_AUDIO_EPHY, GK_RCT_PLL_AUDIO_CTRL);
 	writel(0, GK_RCT_PLL_AUDIO_FRAC);
 	writel(4, GK_RCT_DIV_AUDIO_PST);
 	writel(1, GK_RCT_DIV_AUDIO_PRE);

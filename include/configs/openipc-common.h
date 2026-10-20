@@ -28,7 +28,7 @@
  * bitstream buffer (bsbsize) and gives the rest to the DSP, so both are
  * passed to it as well (mach-gk710x/kernel.c). The vendor U-Boot defaults.
  */
-#if defined(CONFIG_TARGET_GK7101)
+#if defined(CONFIG_TARGET_GK7101) || defined(CONFIG_TARGET_GK7101S)
 #define OPENIPC_OSMEM		"50M"
 #else
 #define OPENIPC_OSMEM		"36M"

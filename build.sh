@@ -43,7 +43,7 @@ build_gk710x() {
 build_soc() {
     soc=$1
     case "${soc}" in
-        gk7101|gk7102)
+        gk7101|gk7102|gk7101s|gk7102s)
             build_gk710x "${soc}" ;;
         *)
             echo "unsupported SoC: ${soc}" >&2
@@ -51,7 +51,7 @@ build_soc() {
     esac
 }
 
-ALL_SOCS="gk7101 gk7102"
+ALL_SOCS="gk7101 gk7102 gk7101s gk7102s"
 
 SOCS="$@"
 [ -z "${SOCS}" ] && SOCS="${ALL_SOCS}"

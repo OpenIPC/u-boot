@@ -1,0 +1,78 @@
+# GK7101S boot ROM set-up: the register writes the mask ROM makes before it
+# copies U-Boot into DDR -- clocks, DDR PHY and the DDR controller, at the
+# GK710xS addresses. Taken from the boot header of the SDK's GK7101S U-Boot
+# build uboot-gk7101s-rb-sc1035-v2.1.bin (GK710X_LinuxSDK_v2.0.0
+# boot/u-boot). build.sh writes it into the boot header.
+#
+#   version: <word>                  header word 1
+#   ddrtest: <address> = <pattern>   header words 5 and 6
+#   setup: <register> = <value>      write
+#   rdcom: <register> = <value>      wait until the register reads <value>
+#   delay: <count>                   wait
+#
+version: 0x30360801
+ddrtest: 0xC1000000 = 0x5A5A5A5A
+#
+setup: 0x90021A6C = 0x00008000
+setup: 0x90021A68 = 0x00000200
+setup: 0x90021A60 = 0x0000DF3B
+setup: 0x90021A64 = 0x00000033
+setup: 0x90021A48 = 0x00001000
+setup: 0x90021A48 = 0x00000000
+setup: 0x90021B00 = 0x00000031
+setup: 0x90021A00 = 0x00000012
+setup: 0x90021A08 = 0x0000F080
+setup: 0x90021A70 = 0x00000033
+setup: 0x90021A74 = 0x00000000
+setup: 0x90021A04 = 0x00000000
+setup: 0x90021A78 = 0x00000200
+setup: 0x90021A7C = 0x00000022
+setup: 0x90021A1C = 0x000000E7
+setup: 0x90021A1C = 0x000000A7
+setup: 0x90021A1C = 0x000000E7
+setup: 0x90021A1C = 0x000000A7
+setup: 0x90021ADC = 0x00004444
+setup: 0x90021AE4 = 0x00000006
+setup: 0x90021AD4 = 0x00000027
+setup: 0x90021AD0 = 0x00000027
+setup: 0x90021AA8 = 0x00000000
+setup: 0x90021A2C = 0x00000000
+setup: 0x90021A00 = 0x00000002
+setup: 0x90021A04 = 0x0000AAAA
+setup: 0x90021A10 = 0x0000007F
+setup: 0xA0170228 = 0x00000001
+setup: 0x90002004 = 0x00100354
+setup: 0x90002008 = 0x48F8368B
+setup: 0x9000200C = 0x0000236A
+setup: 0x90002010 = 0x0020903A
+setup: 0x90002020 = 0x000000A0
+setup: 0x90002000 = 0x00000004
+setup: 0x90002014 = 0x00000001
+rdcom: 0x90002014 = 0x00000000
+setup: 0x90002018 = 0x01020000
+rdcom: 0x90002018 = 0x01020000
+setup: 0x90002018 = 0x01030000
+rdcom: 0x90002018 = 0x01030000
+setup: 0x90002018 = 0x01010044
+rdcom: 0x90002018 = 0x01010044
+setup: 0x90002018 = 0x01000B63
+rdcom: 0x90002018 = 0x01000B63
+setup: 0x90002014 = 0x00000001
+rdcom: 0x90002014 = 0x00000000
+setup: 0x90002014 = 0x00000002
+rdcom: 0x90002014 = 0x00000000
+setup: 0x90002014 = 0x00000002
+rdcom: 0x90002014 = 0x00000000
+setup: 0x90002014 = 0x00000002
+rdcom: 0x90002014 = 0x00000000
+setup: 0x90002018 = 0x01000A63
+rdcom: 0x90002018 = 0x01000A63
+setup: 0x90002000 = 0x00000006
+setup: 0x90002018 = 0x01010380
+rdcom: 0x90002018 = 0x01010380
+setup: 0x90002018 = 0x01010002
+rdcom: 0x90002018 = 0x01010002
+setup: 0x9000201C = 0x00000030
+setup: 0x90002000 = 0x00000007
+setup: 0x90001104 = 0x00000001
+rdcom: 0x90001104 = 0x00000003
