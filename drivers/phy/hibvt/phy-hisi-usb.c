@@ -76,3 +76,10 @@ void phy_hiusb_init(int index)
 	phy_usb_init(index);
 }
 #endif
+#if defined(CONFIG_TARGET_HI3519DV500_FAMILY)
+#include "phy-usb-hi3519dv500.c"
+void phy_hiusb_init(int index)
+{
+	phy_usb_init(index);
+}
+#endif
