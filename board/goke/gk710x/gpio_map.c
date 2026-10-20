@@ -510,14 +510,34 @@ static const struct gk_gpio_map *gk_map(void)
 }
 
 /*
- * U-Boot itself needs one pin: the internal PHY's reference clock, out on
- * GPIO 48 in both layouts. The vendor U-Boot applied the whole map here,
- * but the map is a guess until gpiomap is set, and the v2 map moves UART0
- * off GPIO 30/31 -- a v1 board would lose its console before anyone could
- * set gpiomap=v1. The pins stay as the boot ROM left them; the kernel
- * applies the full map it is handed.
+ * U-Boot itself needs the internal PHY's reference clock, out on GPIO 48
+ * in the layouts that have it, and the SD pins. The vendor U-Boot applied
+ * the whole map here, but the map is a guess until gpiomap is set, and the
+ * v2 map moves UART0 off GPIO 30/31 -- a v1 board would lose its console
+ * before anyone could set gpiomap=v1. The other pins stay as the boot ROM
+ * left them; the kernel applies the full map it is handed.
  */
 #define GK_EPHY_CLK_PIN		48
+
+/*
+ * The SD pin functions: card detect, CMD, CLK, DATA0-3. Their pin types
+ * are the same on both dies. With the map's SD power pin they are what
+ * U-Boot needs for SD-card recovery; on boards without SD the map has
+ * none of them.
+ */
+static bool gk_gpio_is_sd(u32 type)
+{
+	static const u32 sd[] = {
+		0x50010f00, 0xd090181e, 0x9000001f,
+		0xd0881016, 0xd0891117, 0xd08a1218, 0xd08b1319,
+	};
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(sd); i++)
+		if (type == sd[i])
+			return true;
+	return false;
+}
 
 void gk_gpio_map_apply(void)
 {
@@ -527,6 +547,10 @@ void gk_gpio_map_apply(void)
 	for (i = 0; i < m->nintphy; i++)
 		if (m->intphy[i].pin == GK_EPHY_CLK_PIN)
 			gk_gpio_config(m->intphy[i].pin, m->intphy[i].type);
+	for (i = 0; i < m->npins; i++)
+		if (gk_gpio_is_sd(m->pins[i].type) ||
+		    m->pins[i].pin == m->sd_power)
+			gk_gpio_config(m->pins[i].pin, m->pins[i].type);
 	gk_gpio_init();
 }
 

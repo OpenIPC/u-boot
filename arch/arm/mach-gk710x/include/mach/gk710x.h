@@ -20,6 +20,7 @@
 #ifndef CONFIG_GK710X_S
 
 /* AHB */
+#define GK_SDIO0_BASE		0x60002000	/* SDHCI */
 #define GK_DDRC_BASE		0x60004000
 #define GK_GMAC_BASE		0x6000E000
 #define GK_SFLASH_BASE		0x60016000
@@ -52,6 +53,8 @@
 #define GK_RCT_DIV_AUDIO_PRE	(GK_RCT_BASE + 0x060)
 #define GK_RCT_SCALER_UART	(GK_RCT_BASE + 0x038)
 #define GK_RCT_PLL_CORE		(GK_RCT_BASE + 0x0E4)
+#define GK_RCT_PLL_SD		(GK_RCT_BASE + 0x000)	/* fields moved */
+#define GK_RCT_SCALER_SD	(GK_RCT_BASE + 0x00C)
 #define GK_RCT_IOCTRL_MISC2	(GK_RCT_BASE + 0x200)
 #define GK_IOCTRL_MISC2_VAL	0x11
 /* Pad drive and pull: one byte per pin, four pins per word */
@@ -70,6 +73,7 @@
  */
 
 /* AHB */
+#define GK_SDIO0_BASE		0x90000000	/* vendor layout, sdhci.c */
 #define GK_DDRC_BASE		0x90002000
 #define GK_GMAC_BASE		0x9000E000	/* DWMAC, registers reordered */
 #define GK_SFLASH_BASE		0x90016000
@@ -100,6 +104,8 @@
 #define GK_RCT_DIV_AUDIO_PST	(GK_RCT_BASE + 0x084)
 #define GK_RCT_DIV_AUDIO_PRE	(GK_RCT_BASE + 0x080)
 #define GK_RCT_SCALER_UART	(GK_RCT_BASE + 0x028)
+#define GK_RCT_PLL_SD		(GK_RCT_BASE + 0x014)
+#define GK_RCT_SCALER_SD	(GK_RCT_BASE + 0x018)
 #define GK_RCT_IOCTRL_MISC2	(GK_RCT_BASE + 0x198)
 #define GK_IOCTRL_MISC2_VAL	0x12	/* the flash HOLD pin pulled up */
 /* Pad control words count down from GPIO 55 (gk7101s_gpio.c) */

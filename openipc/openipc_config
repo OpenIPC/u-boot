@@ -78,6 +78,28 @@ CONFIG_CMD_MEMORY=y
 CONFIG_CMD_CRC32=y
 CONFIG_CMD_SLEEP=y
 
+# SD card: recovery images and scripts (common/openipc.c); the only way
+# back for a camera without Ethernet
+CONFIG_MMC=y
+CONFIG_MMC_SDHCI=y
+# CONFIG_MMC_HW_PARTITIONING is not set
+CONFIG_CMD_MMC=y
+CONFIG_DOS_PARTITION=y
+CONFIG_FS_FAT=y
+CONFIG_CMD_FAT=y
+
+# Room for it in the 256 KiB boot partition, with no Thumb-2 on ARM1176:
+# link-time optimisation, and no commands the OpenIPC flows have no use for
+# here (these kernels take no device tree)
+CONFIG_LTO=y
+# CONFIG_CMD_FDT is not set
+# CONFIG_CMD_ELF is not set
+# CONFIG_CMD_XIMG is not set
+# CONFIG_CMD_NFS is not set
+# CONFIG_CMD_IMPORTENV is not set
+# CONFIG_CMD_EXPORTENV is not set
+# CONFIG_CMD_CONSOLE is not set
+
 # Network: the GMAC is a DesignWare MAC, the PHY the SoC's own
 CONFIG_NET=y
 CONFIG_NETDEVICES=y
@@ -87,6 +109,5 @@ CONFIG_CMD_NET=y
 CONFIG_CMD_TFTPBOOT=y
 CONFIG_CMD_DHCP=y
 CONFIG_CMD_PING=y
-CONFIG_CMD_MII=y
 CONFIG_NET_RANDOM_ETHADDR=y
 CONFIG_LIB_RAND=y

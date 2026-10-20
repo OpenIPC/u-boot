@@ -188,9 +188,17 @@ included.
   - `gk_ephy_init()` does the vendor's PHY clock (audio PLL, out on a pin),
     analog trim and MAC/PHY mux.
   - External-PHY boards (`phytype=1/2`) are not handled.
-- **SD:** not enabled. The vendor U-Boot had none, the controller's base
-  clock is unknown, and the SD pins depend on the board map. SD recovery in
-  `common/openipc.c` is compiled out with `CONFIG_MMC`.
+- **SD:** for recovery, the only way back for a camera without Ethernet
+  (`common/openipc.c`: `script.txt`, or uImage-wrapped `*.img` written at
+  their load address). `arch/arm/mach-gk710x/sdhci.c`:
+  - GK7101/GK7102: a standard SDHCI at `0x60002000`;
+  - GK710xS: at `0x90000000` in the vendor's halfword layout, so every
+    access goes through a table of where each SDHCI register and bit
+    sits, taken from what the S HAL does;
+  - the base clock comes from the RCT SD PLL and scaler.
+
+  U-Boot sets the map's SD pins and SD power pin. MMC, FAT and LTO
+  together still fit the 256 KiB boot partition.
 - **SPI NAND:** not supported. OpenIPC's GK7102 firmware is NOR only.
 
 ## The GK710xS (GK7101S, GK7102S, GK7102C)
