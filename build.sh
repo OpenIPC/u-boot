@@ -31,39 +31,20 @@ build_xm() {
     builddir=${BOOT_SRCDIR}/output/build-${soc}-${kind}
     make_opts="-C ${BOOT_SRCDIR} O=${builddir} -j$(nproc)"
     fragments="openipc/openipc_config openipc/${soc}_config"
-    [ "${kind}" = nand ] && fragments="${fragments} openipc/nand_config"
 
     rm -rf "${builddir}"
     mkconfig "${builddir}" ${fragments} && \
     make ${make_opts} olddefconfig </dev/null >/dev/null && \
     make ${make_opts} </dev/null || return 1
 
-    if [ "${kind}" = nor ]; then
-        cp "${builddir}/u-boot.bin" "output/u-boot-${soc}-nor.bin" || return 1
-    else
-        # SPI NAND: a 4 KiB header, then U-Boot linked at the window + 4 KiB
-        # (CONFIG_SYS_TEXT_BASE in nand_config). Nothing documents what the
-        # boot ROM expects here; the header's first word jumps to U-Boot
-        # wherever the ROM starts it (ldr pc, [pc, #-4] and the address).
-        text=$(sed -n 's/^CONFIG_SYS_TEXT_BASE=//p' "${builddir}/.config")
-        python3 - "${builddir}/u-boot.bin" "output/u-boot-${soc}-nand.bin" \
-            "${text}" <<'PY' || return 1
-import struct, sys
-src, dst, text = sys.argv[1], sys.argv[2], int(sys.argv[3], 0)
-hdr = bytearray(b'\xff' * 0x1000)
-hdr[0:8] = struct.pack('<II', 0xe51ff004, text)
-open(dst, 'wb').write(bytes(hdr) + open(src, 'rb').read())
-PY
-    fi
+    cp "${builddir}/u-boot.bin" "output/u-boot-${soc}-nor.bin"
 }
 
 build_soc() {
     soc=$1
     case "${soc}" in
-        xm510)
+        xm510|xm530|xm550)
             build_xm "${soc}" nor ;;
-        xm530|xm550)
-            build_xm "${soc}" nor && build_xm "${soc}" nand ;;
         *)
             echo "unsupported SoC: ${soc}" >&2
             return 1 ;;
