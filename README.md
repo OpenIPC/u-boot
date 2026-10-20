@@ -109,9 +109,12 @@ not covered.
 
 The boot ROM runs the DDR set-up listed in the image's header and copies
 U-Boot into DDR, so `u-boot-<soc>-nor.bin` is the header and `u-boot.bin`,
-written at flash offset 0. It is in CPU byte order, as `sf write` stores
-it; the flash chip holds every 32-bit word byte-swapped, so an image for
-an external programmer must be swapped.
+written at flash offset 0. One file serves every way of installing it: it
+is in the flash chip's own byte order, so a programmer writes it as it is,
+and `sf write` -- the vendor bootloader's and this one's -- recognises that
+order at offset 0 and swaps it back as it programs. A camera already
+running the first release of this port (2026-10-18), whose `sf write` lacks
+that check, has to be upgraded with a programmer.
 
 The vendor kernel needs what the vendor U-Boot leaves it besides ATAGs:
 its HAL blob, memory layout words and the board's GPIO map, from which it
@@ -233,9 +236,9 @@ The [build-gk710x](.github/workflows/build-gk710x.yml) workflow has the
 same shape. It runs on pull requests to this branch that change it, on
 pushes and pull requests to `openipc-gk710x` (through that branch's
 `ci.yml`), and manually. Every SoC has a qemu-hisilicon machine model, so
-every image is smoke-tested: booted from an 8 MiB flash image (built
-byte-swapped, as the chip holds it), then a second time, which must load
-the environment the first boot saved.
+every image is smoke-tested: booted from an 8 MiB flash image holding it as
+a programmer would write it, then a second time, which must load the
+environment the first boot saved.
 
 Its `release` input fills this repository's
 [`Goke` release](../../releases/tag/goke); `publish` uploads to
