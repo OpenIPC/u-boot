@@ -176,6 +176,12 @@ static int sf_program(u32 addr, const u8 *buf, unsigned int words)
  * on the flash at probe, and a write at 0 moves it: one that starts with
  * the swapped magic opens it as long as that image, however the caller
  * splits the rest; any other write at 0 closes it.
+ *
+ * A write at 0 that starts with the swapped magic and runs past the boot
+ * image -- a programmer's whole-chip dump in one sf write, or recovery
+ * image -- is chip order throughout, and is swapped over its whole
+ * length. Split into sectors (sf update), only its first sector is seen
+ * at 0, so only the boot image is swapped back.
  */
 static u32 sf_swap_end;
 
@@ -263,11 +269,13 @@ static int gk_sf_write(struct mtd_info *mtd, loff_t to, size_t len,
 	u32 addr = to & ~3;
 	unsigned int head = to & 3;
 	unsigned int i;
+	u32 end;
 	int ret;
 
 	if (to + len > mtd->size)
 		return -EINVAL;
 	sf_swap_detect(to, len, buf);
+	end = !to && sf_swap_end ? max_t(u32, sf_swap_end, len) : sf_swap_end;
 	*retlen = 0;
 	while (len) {
 		unsigned int room = SZ_PAGE - (addr & (SZ_PAGE - 1));
@@ -276,7 +284,7 @@ static int gk_sf_write(struct mtd_info *mtd, loff_t to, size_t len,
 
 		memset(page, 0xff, span);
 		memcpy(page + head, buf, n);
-		for (i = 0; i < span && addr + i < sf_swap_end; i += 4)
+		for (i = 0; i < span && addr + i < end; i += 4)
 			put_unaligned_le32(swab32(get_unaligned_le32(page + i)),
 					   page + i);
 		ret = sf_program(addr, page, span / 4);
