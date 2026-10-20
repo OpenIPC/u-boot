@@ -101,7 +101,9 @@ The kernel still needs the blob (see "Hand-off to the kernel").
   - the words around the table are as in every SDK prebuilt and camera
     flash seen;
   - the table is `openipc/<soc>.rvs`, taken from the SDK's prebuilt
-    U-Boots, which matches what is on cameras in the field;
+    U-Boots, with the eFuse lines as GK7102 cameras in the field have
+    them (no write to `0x6000B100`; wait for `0x6000B104 == 3` after
+    starting the load). A GK7102 with the SDK's lines did not start;
   - GK7101 and GK7102 differ only in the DDR controller word at
     `0x60004004` (128 vs 64 MiB). `dram_init()` reads the same word back.
 - **Byte order.** The flash controller packs bytes MSB first. U-Boot, the

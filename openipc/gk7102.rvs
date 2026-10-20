@@ -1,8 +1,12 @@
 # GK7102 boot ROM set-up: the register writes the mask ROM makes before it
 # copies U-Boot into DDR -- eFuse, DDR PHY, the RCT and the DDR controller.
 # Taken from the header of the SDK's prebuilt uboot-gk7102-rb-jxh42_v2.0.bin
-# (GK710X_LinuxSDK_v2.0.0 boot/prebuild), the table on GK710x cameras in the
-# field. build.sh writes it into the boot header.
+# (GK710X_LinuxSDK_v2.0.0 boot/prebuild), with the eFuse lines as GK7102
+# cameras in the field have them: the SDK images also write 0xFF39C119 to
+# 0x6000B100 first and start the eFuse load at the end without waiting for
+# it; the vendor U-Boots of 2016-2017 found on cameras do neither, and a
+# GK7102 with the SDK's table did not start. build.sh writes it into the
+# boot header.
 #
 #   version: <word>                  header word 1
 #   ddrtest: <address> = <pattern>   header words 5 and 6
@@ -13,7 +17,6 @@
 version: 0x30310801
 ddrtest: 0xC4000000 = 0x5A5A5A5A
 #
-setup: 0x6000B100 = 0xFF39C119
 setup: 0x60021A68 = 0x00000300
 setup: 0x60021A60 = 0x00002B52
 setup: 0x60021A64 = 0x00000035
@@ -75,3 +78,4 @@ rdcom: 0x60004018 = 0x01010000
 setup: 0x6000401C = 0x00000210
 setup: 0x60004000 = 0x00000007
 setup: 0x6000B104 = 0x00000001
+rdcom: 0x6000B104 = 0x00000003
