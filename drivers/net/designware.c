@@ -362,7 +362,8 @@ static void _dw_eth_halt(struct dw_eth_dev *priv)
 	writel(readl(&mac_p->conf) & ~(RXENABLE | TXENABLE), &mac_p->conf);
 	writel(readl(&dma_p->opmode) & ~(RXSTART | TXSTART), &dma_p->opmode);
 
-	phy_shutdown(priv->phydev);
+	if (priv->phydev)
+		phy_shutdown(priv->phydev);
 }
 
 int designware_eth_init(struct dw_eth_dev *priv, u8 *enetaddr)
@@ -371,6 +372,10 @@ int designware_eth_init(struct dw_eth_dev *priv, u8 *enetaddr)
 	struct eth_dma_regs *dma_p = priv->dma_regs_p;
 	unsigned int start;
 	int ret;
+
+	/* No PHY was found at initialisation: no network, rather than a crash */
+	if (!priv->phydev)
+		return -ENODEV;
 
 	writel(readl(&dma_p->busmode) | DMAMAC_SRST, &dma_p->busmode);
 
