@@ -254,6 +254,12 @@ static int rfs_read(const char *name, ulong addr, loff_t offset, loff_t len,
   return recovery_mount(recovery_if) ? -1 : fs_read(name, addr, offset, len, actread);
 }
 
+/* What a file read to CONFIG_SYS_LOAD_ADDR may take: the RAM below the
+ * stack and the relocated U-Boot, with room */
+static ulong recovery_ram_room(void) {
+  return gd->start_addr_sp - SZ_1M - CONFIG_SYS_LOAD_ADDR;
+}
+
 #ifdef CONFIG_FMC_SPI_NAND
 static int recovery_ensure_volume(const char *name, const char *size) {
   struct ubi_volume_desc *desc;
@@ -418,12 +424,6 @@ static int recovery_flash_holds(ulong addr, const void *data, ulong len) {
  * whole firmware, U-Boot itself -- it is written there; the wrapper header
  * never is. Returns 1 when it wrote, 0 when it skipped, -1 on a failed write.
  */
-/* What a file read to CONFIG_SYS_LOAD_ADDR may take: the RAM below the
- * stack and the relocated U-Boot, with room */
-static ulong recovery_ram_room(void) {
-  return gd->start_addr_sp - SZ_1M - CONFIG_SYS_LOAD_ADDR;
-}
-
 static int recovery_write_img(const char *name, loff_t size) {
   struct image_header hdr;
   loff_t actread;
