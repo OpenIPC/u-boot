@@ -62,6 +62,8 @@ jobs:
         include:
           - { soc: gk7101, files: "output/u-boot-gk7101-*.bin" }
           - { soc: gk7102, files: "output/u-boot-gk7102-*.bin" }
+          - { soc: gk7101s, files: "output/u-boot-gk7101s-*.bin" }
+          - { soc: gk7102s, files: "output/u-boot-gk7102s-*.bin" }
 
     steps:
       - name: Checkout
@@ -180,7 +182,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        soc: [gk7101, gk7102]
+        # gk7101s/gk7102s: qemu-hisilicon's GK710xS machines
+        soc: [gk7101, gk7102, gk7101s, gk7102s]
     steps:
       - name: Download qemu-arm
         uses: actions/download-artifact@v4

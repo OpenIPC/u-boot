@@ -88,8 +88,9 @@ The build logic lives here. Other branches call it:
 - It is `build-xm.yml` for `openipc-gk710x`: the same job graph and
   `resolve`/`ref` rules, NOR only (256 KiB boot partition, header
   included).
-- **No `hold`:** both SoCs have qemu-hisilicon machines (`gk7101`,
-  `gk7102`; qemu-hisilicon #159 or later).
+- **No `hold`:** every SoC has a qemu-hisilicon machine (`gk7101`,
+  `gk7102`; and `gk7101s`, `gk7102s`, which need qemu-hisilicon's GK710xS
+  machines).
 - **Smoke test:** two boots of an 8 MiB flash image holding only U-Boot.
   - The release image is **in chip byte order** (the flash controller packs
     bytes MSB first, so the chip holds every word byte-swapped), and goes
