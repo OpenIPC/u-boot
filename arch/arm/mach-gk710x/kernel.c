@@ -19,7 +19,11 @@
 #include <linux/sizes.h>
 #include <linux/stringify.h>
 
+#ifdef CONFIG_GK710X_S
+#include "hal_data_s.h"
+#else
 #include "hal_data.h"
+#endif
 
 DECLARE_GLOBAL_DATA_PTR;
 

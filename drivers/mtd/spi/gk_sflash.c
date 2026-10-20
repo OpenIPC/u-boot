@@ -32,6 +32,7 @@
 #include <asm/arch/gk710x.h>
 #include <linux/mtd/mtd.h>
 #include <linux/sizes.h>
+#include <linux/byteorder/swab.h>
 
 #define SF_DATA			(GK_SFLASH_BASE + 0x00)
 #define SF_COMMAND		(GK_SFLASH_BASE + 0x04)
@@ -187,6 +188,30 @@ static int gk_sf_read(struct mtd_info *mtd, loff_t from, size_t len,
 		len -= n;
 	}
 	return 0;
+}
+
+/* The boot ROM header's first word, "GK71" */
+#define GK_BOOT_MAGIC		0x474b3731
+
+/*
+ * An image as a programmer writes it, every word as the chip holds it,
+ * starts with the boot header magic byte-swapped. Written at 0 as it is, it
+ * would land swapped twice. The vendor U-Boot's sf write swaps such an
+ * image back in RAM first, so one boot image serves a programmer and sf
+ * write alike; the sf command does the same through this, for the whole
+ * buffer at once -- sf update writes it one sector at a time.
+ */
+void gk_sflash_boot_order(unsigned int offset, unsigned long len, void *buf)
+{
+	u8 *p = buf;
+	size_t i;
+
+	if (offset || len < 4 || len % 4 ||
+	    get_unaligned_le32(p) != swab32(GK_BOOT_MAGIC))
+		return;
+	printf("SF: boot image in flash byte order, swapping it back\n");
+	for (i = 0; i < len; i += 4)
+		put_unaligned_le32(swab32(get_unaligned_le32(p + i)), p + i);
 }
 
 /*

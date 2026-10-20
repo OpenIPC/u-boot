@@ -57,8 +57,9 @@ CONFIG_ENV_IS_IN_SPI_FLASH=y
 CONFIG_ENV_OFFSET=0x40000
 CONFIG_ENV_SIZE=0x10000
 CONFIG_ENV_SECT_SIZE=0x10000
-# Boot header (576 bytes) + image must end before the environment: fail the
-# build, not the board
+# u-boot.bin must end before the environment, leaving room for the GK710x
+# boot header (576 bytes); gk710x-image.py checks header + image against
+# the environment offset, as the S headers are larger (848 bytes)
 CONFIG_HAS_BOARD_SIZE_LIMIT=y
 CONFIG_BOARD_SIZE_LIMIT=261568
 

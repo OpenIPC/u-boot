@@ -14,7 +14,28 @@ config TARGET_GK7102
 	help
 	  GK7102: the GK7101 die with 64 MiB of DDR2 in the package.
 
+config TARGET_GK7101S
+	bool "GK7101S"
+	select GK710X_S
+	help
+	  GK7101S: the later GK710xS die, 128 MiB of external DDR2.
+
+config TARGET_GK7102S
+	bool "GK7102S / GK7102C"
+	select GK710X_S
+	help
+	  GK7102S, and the GK7102C, a later part of the same family that
+	  runs the same HAL: the GK710xS die with 64 MiB of DDR2 in the
+	  package.
+
 endchoice
+
+config GK710X_S
+	bool
+	help
+	  The GK710xS die: its blocks sit at the addresses the vendor
+	  drivers use, in their register layout, instead of being moved and
+	  reordered behind the HAL as on the GK7101/GK7102.
 
 config SYS_SOC
 	default "gk710x"

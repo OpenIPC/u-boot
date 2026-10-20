@@ -30,7 +30,7 @@
 #define CONFIG_SYS_TIMER_COUNTS_DOWN
 
 /* Bitstream buffer above the kernel's mem=, as the vendor U-Boot sizes it */
-#ifdef CONFIG_TARGET_GK7101
+#if defined(CONFIG_TARGET_GK7101) || defined(CONFIG_TARGET_GK7101S)
 #define GK_BSB_MIB			4
 #else
 #define GK_BSB_MIB			2

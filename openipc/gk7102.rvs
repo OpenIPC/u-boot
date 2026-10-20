@@ -4,8 +4,14 @@
 # (GK710X_LinuxSDK_v2.0.0 boot/prebuild), the table on GK710x cameras in the
 # field. build.sh writes it into the boot header.
 #
+#   version: <word>                  header word 1
+#   ddrtest: <address> = <pattern>   header words 5 and 6
 #   setup: <register> = <value>      write
 #   rdcom: <register> = <value>      wait until the register reads <value>
+#   delay: <count>                   wait
+#
+version: 0x30310801
+ddrtest: 0xC4000000 = 0x5A5A5A5A
 #
 setup: 0x6000B100 = 0xFF39C119
 setup: 0x60021A68 = 0x00000300

@@ -36,14 +36,16 @@ build_gk710x() {
     make ${make_opts} </dev/null || return 1
 
     text=$(sed -n 's/^CONFIG_SYS_TEXT_BASE=//p' "${builddir}/.config")
+    env=$(sed -n 's/^CONFIG_ENV_OFFSET=//p' "${builddir}/.config")
     python3 openipc/gk710x-image.py openipc/${soc}.rvs \
-        "${builddir}/u-boot.bin" "${text}" "output/u-boot-${soc}-nor.bin"
+        "${builddir}/u-boot.bin" "${text}" "output/u-boot-${soc}-nor.bin" \
+        "${env}"
 }
 
 build_soc() {
     soc=$1
     case "${soc}" in
-        gk7101|gk7102)
+        gk7101|gk7102|gk7101s|gk7102s)
             build_gk710x "${soc}" ;;
         *)
             echo "unsupported SoC: ${soc}" >&2
@@ -51,7 +53,7 @@ build_soc() {
     esac
 }
 
-ALL_SOCS="gk7101 gk7102"
+ALL_SOCS="gk7101 gk7102 gk7101s gk7102s"
 
 SOCS="$@"
 [ -z "${SOCS}" ] && SOCS="${ALL_SOCS}"

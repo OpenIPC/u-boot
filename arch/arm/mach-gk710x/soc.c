@@ -19,21 +19,31 @@ int arch_cpu_init(void)
 	 * The CPU PLL and the UART divider as the vendor U-Boot sets them
 	 * (arm_freq 0x00112032 and REG_PLL_SCALER_UART 1), in silicon bit
 	 * order: the HAL permutes the PLL word on its way to the register.
+	 * On the GK710xS the boot header sets the PLLs, and the vendor U-Boot
+	 * leaves them alone.
 	 */
+#ifndef CONFIG_GK710X_S
 	writel(0x01203201, GK_RCT_PLL_CORE);
+#else
+	/*
+	 * The GK7102C boot header starts the watchdog (about 10 s); nothing
+	 * here feeds it. reset_cpu() programs it again when it is needed.
+	 */
+	writel(0, GK_WDT_CTRL);
+#endif
 	writel(1, GK_RCT_SCALER_UART);
 	return 0;
 }
 
 int timer_init(void)
 {
-	u32 ctrl = readl(GK_TIMER_CTRL) & ~0xf;
+	u32 ctrl = readl(GK_TIMER_CTRL) & ~GK_TIMER1_CTRL_MASK;
 
 	/* Timer 1, free running over the whole 32 bits for lib/time.c */
 	writel(ctrl, GK_TIMER_CTRL);
 	writel(0xffffffff, GK_TIMER1_STATUS);
 	writel(0xffffffff, GK_TIMER1_RELOAD);
-	writel(ctrl | GK_TIMER_CTRL_EN, GK_TIMER_CTRL);
+	writel(ctrl | GK_TIMER1_CTRL_EN, GK_TIMER_CTRL);
 	gd->arch.tbl = 0;
 	gd->arch.tbu = 0;
 	return 0;
@@ -43,7 +53,7 @@ void reset_cpu(void)
 {
 	writel(0xff, GK_WDT_RELOAD);
 	writel(GK_WDT_MAGIC, GK_WDT_RESTART);
-	writel(GK_WDT_CTRL_EN | GK_WDT_CTRL_RESET, GK_WDT_CTRL);
+	writel(GK_WDT_CTRL_RESET, GK_WDT_CTRL);
 	while (1)
 		;
 }

@@ -28,7 +28,7 @@
  * bitstream buffer (bsbsize) and gives the rest to the DSP, so both are
  * passed to it as well (mach-gk710x/kernel.c). The vendor U-Boot defaults.
  */
-#if defined(CONFIG_TARGET_GK7101)
+#if defined(CONFIG_TARGET_GK7101) || defined(CONFIG_TARGET_GK7101S)
 #define OPENIPC_OSMEM		"50M"
 #else
 #define OPENIPC_OSMEM		"36M"
@@ -99,8 +99,14 @@
 
 #define CONFIG_BOOTARGS "mem=\\${osmem} console=ttySGK0,115200 panic=20 root=/dev/mtdblock3 rootfstype=squashfs init=/init mtdparts=\\${mtdparts} \\${extras}"
 
-/* Recovery: the rootfs is fetched first so its size selects the NOR schema */
-#define OPENIPC_FWUPD "fwupd=run ur; run uk\0"
+/*
+ * Recovery: the rootfs is fetched first so its size selects the NOR schema.
+ * It starts from the lite layout, not from what the scan found: on a camera
+ * that still holds its vendor firmware the scan reports the vendor's
+ * offsets (rootfs at 0x1f0000 on a GK7102C), and writing OpenIPC there
+ * left the kernel write erasing the start of the new rootfs.
+ */
+#define OPENIPC_FWUPD "fwupd=run mtdslite; run ur; run uk\0"
 
 #define OPENIPC_LOADKERNEL "sf probe 0; sf read ${baseaddr} ${kernaddr} ${kernsize}"
 #define OPENIPC_ENV_MEDIUM \
@@ -110,7 +116,7 @@
 	"kernsize=" __stringify(OPENIPC_KERNSIZE) "\0" \
 	"rootaddr=" __stringify(OPENIPC_ROOTADDR) "\0" \
 	"rootsize=" __stringify(OPENIPC_ROOTSIZE) "\0" \
-	"mtdslite=setenv kernsize 0x200000; setenv rootaddr 0x250000; setenv rootsize 0x500000\0" \
+	"mtdslite=setenv kernaddr " __stringify(OPENIPC_KERNADDR) "; setenv kernsize 0x200000; setenv rootaddr 0x250000; setenv rootsize 0x500000\0" \
 	"mtdsultimate=setenv kernsize 0x300000; setenv rootaddr 0x350000; setenv rootsize 0xa00000\0" \
 	"ubwrite=sf probe 0; sf erase 0x0 ${kernaddr}; sf write ${baseaddr} 0x0 ${filesize}\0" \
 	"ukwrite=sf probe 0; sf erase ${kernaddr} ${kernsize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0" \
