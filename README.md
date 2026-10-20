@@ -104,8 +104,11 @@ U-Boot for Goke's own ARM1176 camera SoCs, the GK7101 and GK7102 -- not
 the HiSilicon-derived GK7205/GK7605 above -- on the same mainline release
 (v2022.10) and with the same OpenIPC boot layer as `openipc-hisilicon`.
 
-**NOR:** `gk7101`, `gk7102`. GK7101S/GK7102S are a different die and are
-not covered.
+**NOR:** `gk7101`, `gk7102`, and the later GK710xS die: `gk7101s`,
+`gk7102s`. The `gk7102s` image is also the one for GK7102C cameras, the
+same family: it boots the GK7102C's boot header and hands its kernel that
+board's GPIO map by default (`gpiomap=v2` or `v1` for SDK-style GK7102S
+boards).
 
 The boot ROM runs the DDR set-up listed in the image's header and copies
 U-Boot into DDR, so `u-boot-<soc>-nor.bin` is the header and `u-boot.bin`,
@@ -130,7 +133,7 @@ These images have so far run only on qemu-hisilicon's `gk7101` and
 git clone --branch openipc-gk710x https://github.com/OpenIPC/u-boot.git
 cd u-boot
 
-bash build.sh               # gk7101 gk7102
+bash build.sh               # gk7101 gk7102 gk7101s gk7102s
 bash build.sh gk7102        # a single SoC
 ```
 
