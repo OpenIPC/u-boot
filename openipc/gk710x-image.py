@@ -14,9 +14,13 @@ The mask ROM reads the header from flash offset 0, in CPU words:
            <register, value> to wait for; 0 ends it
 
 and U-Boot follows the 0. Words 0, 1 and 4-6 are as in every SDK prebuilt
-U-Boot and camera flash seen. The output is in CPU byte order, what `sf
-write` and the vendor kernel's driver store; the flash chip itself then
-holds every word byte-swapped (drivers/mtd/spi/gk_sflash.c).
+U-Boot and camera flash seen.
+
+The flash controller packs bytes MSB first, so the chip holds every 32-bit
+word byte-swapped (drivers/mtd/spi/gk_sflash.c). The output is in that
+chip order: a programmer writes it as it is, qemu takes it as flash, and
+sf write -- the vendor U-Boot's and this one's -- recognises the swapped
+magic at offset 0 and swaps it back.
 """
 import re
 import struct
@@ -50,8 +54,10 @@ def main():
     code += b'\0' * (-len(code) % 4)
     head = [MAGIC, VERSION, len(code) // 4, load, load // 4, *DDR_TEST]
     head += table(rvs)
+    image = struct.pack('<%dI' % len(head), *head) + code
     with open(dst, 'wb') as f:
-        f.write(struct.pack('<%dI' % len(head), *head) + code)
+        f.write(b''.join(image[i:i + 4][::-1]
+                         for i in range(0, len(image), 4)))
 
 
 if __name__ == '__main__':
