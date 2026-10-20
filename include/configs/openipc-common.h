@@ -205,8 +205,13 @@ void hi_gpio_status(void);
 #define OPENIPC_FWUPD \
 	"fwfile=" OPENIPC_FW_FILE "\0" \
 	"fwupd=if ${source} ${baseaddr} ${fwfile}; then run fwwrite; else run ur; run uk; fi\0"
+/* the whole firmware area: the scan sets fwsize to the end of the chip */
+#define OPENIPC_FWWRITE \
+	"fwwrite=sf probe 0; sf erase ${kernaddr} ${fwsize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0"
 #else
 #define OPENIPC_FWUPD "fwupd=run ur; run uk\0"
+#define OPENIPC_FWWRITE \
+	"fwwrite=sf probe 0; sf erase ${kernaddr} +${filesize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0"
 #endif
 
 #define OPENIPC_LOADKERNEL "sf probe 0; sf read ${baseaddr} ${kernaddr} ${kernsize}"
@@ -222,7 +227,7 @@ void hi_gpio_status(void);
 	"ubwrite=sf probe 0; sf erase 0x0 ${kernaddr}; sf write ${baseaddr} 0x0 ${filesize}\0" \
 	"ukwrite=sf probe 0; sf erase ${kernaddr} ${kernsize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0" \
 	"urwrite=sf probe 0; if itest ${filesize} -gt 500000; then run mtdsultimate; fi; sf erase ${rootaddr} ${rootsize}; sf write ${baseaddr} ${rootaddr} ${filesize}\0" \
-	"fwwrite=sf probe 0; sf erase ${kernaddr} +${filesize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0" \
+	OPENIPC_FWWRITE \
 	"loadkernel=" OPENIPC_LOADKERNEL "\0" \
 	"mtdids=" SFC "\0" \
 	"mtds=" OPENIPC_MTDPARTS "\0" \

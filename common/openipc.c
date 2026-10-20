@@ -459,13 +459,25 @@ static int recovery_flash_holds(ulong addr, const void *data, ulong len) {
 }
 
 /*
+ * A split image refused before anything is erased: said so, then treated as
+ * absent, so a kernel and rootfs pair on the same card is still tried.
+ */
+static int recovery_skip(const char *name)
+{
+  printf("Recovery: %s skipped, trying the other recovery files\n", name);
+  return 0;
+}
+
+/*
  * The split layout's one image (firmware.bin.<soc>, ${fwfile}, what fwupd
  * fetches): a uImage, then the squashfs. Written at kernaddr, where the
  * firmware partition starts on this board, with the rest of the chip erased:
  * the old image's overlay must not be found by the next boot's scan or taken
  * for settings. Nothing is erased until the whole file is in RAM and its
  * kernel checks out, and a card left in the slot does not reflash an
- * unchanged image at every boot.
+ * unchanged image at every boot. Returns 1 when written, 2 when already on
+ * the flash, 0 when absent or refused before any erase, -1 when the erase
+ * or the write failed.
  */
 static int recovery_write_firmware(const char *name) {
   struct image_header hdr;
@@ -478,19 +490,19 @@ static int recovery_write_firmware(const char *name) {
 
   if (rfs_size(name, &size) || size <= (loff_t)sizeof(hdr)) {
     printf("Recovery: failed to stat %s\n", name);
-    return -1;
+    return recovery_skip(name);
   }
   if (rfs_read(name, (ulong)&hdr, 0, sizeof(hdr), &actread) ||
       actread != sizeof(hdr)) {
     printf("Recovery: failed to read %s\n", name);
-    return -1;
+    return recovery_skip(name);
   }
   /* the data size against what follows the header, in 64 bits: added to
    * the header's in a 32-bit ulong, a size near 4 GiB wrapped past this */
   if (!image_check_magic(&hdr) || !image_check_hcrc(&hdr) ||
       (loff_t)image_get_data_size(&hdr) > size - (loff_t)sizeof(hdr)) {
     printf("Recovery: %s does not start with a uImage\n", name);
-    return -1;
+    return recovery_skip(name);
   }
 
   str = env_get("kernaddr");
@@ -501,27 +513,27 @@ static int recovery_write_firmware(const char *name) {
   if (addr < env_end) {
     printf("Recovery: kernaddr 0x%lx is inside the boot area (firmware starts at 0x%lx)\n",
            addr, env_end);
-    return -1;
+    return recovery_skip(name);
   }
   if (addr >= recovery_flash->size || len > recovery_flash->size - addr) {
     printf("Recovery: %s (%lu bytes) does not fit the flash from 0x%lx\n",
            name, len, addr);
-    return -1;
+    return recovery_skip(name);
   }
   /* the file in RAM below the stack and the relocated U-Boot, with room */
   if (len > gd->start_addr_sp - SZ_1M - CONFIG_SYS_LOAD_ADDR) {
     printf("Recovery: %s (%lu bytes) does not fit the free RAM from 0x%lx\n",
            name, len, (ulong)CONFIG_SYS_LOAD_ADDR);
-    return -1;
+    return recovery_skip(name);
   }
 
   if (rfs_read(name, CONFIG_SYS_LOAD_ADDR, 0, len, &actread) || actread != len) {
     printf("Recovery: failed to read %s\n", name);
-    return -1;
+    return recovery_skip(name);
   }
   if (!image_check_dcrc((struct image_header *)CONFIG_SYS_LOAD_ADDR)) {
     printf("Recovery: %s: the kernel's CRC does not match\n", name);
-    return -1;
+    return recovery_skip(name);
   }
 
   /* handled, not absent: the legacy pair on the same card is not written */
@@ -793,6 +805,26 @@ int firmware_scan(void) {
   }
 
   scan_spi_device(flash, &kernel_off, &rootfs_off, &kernel_size, &rootfs_size);
+
+#ifdef CONFIG_OPENIPC_NOR_SPLIT
+  {
+    /* fwwrite erases from the firmware start to the end of the chip, as
+     * recovery does, so no old overlay is left behind a shorter image */
+    char str[32];
+    const char *ka = env_get("kernaddr");
+    ulong start = kernel_off ? kernel_off :
+                  (ka ? hextoul(ka, NULL) : CONFIG_ENV_KERNADDR);
+
+    if (start < flash->size) {
+      sprintf(str, "0x%lx", (ulong)(flash->size - start));
+      env_set("fwsize", str);
+      /* RAM only, like the rest of the scan: a saved environment keeps an
+       * older fwwrite that erased only the file's length */
+      env_set("fwwrite", "sf probe 0; sf erase ${kernaddr} ${fwsize}; "
+                         "sf write ${baseaddr} ${kernaddr} ${filesize}");
+    }
+  }
+#endif
 
   /*
    * Fixed slots -- the rootfs at the 2 or 3 MiB slot boundary after the

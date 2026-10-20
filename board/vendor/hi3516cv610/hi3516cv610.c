@@ -342,11 +342,12 @@ static void set_bootloader_download_process_flag(void)
 
 int misc_init_r(void)
 {
+	/* before the scan: a split image clears it, so bootm checks its CRC */
+	env_set("verify", "n");
 	openipc_helper();
 #ifdef CONFIG_RANDOM_ETHADDR
 	random_init_r();
 #endif
-	env_set("verify", "n");
 
 #if (CONFIG_AUTO_UPDATE == 1)
 	/* auto update flag */
