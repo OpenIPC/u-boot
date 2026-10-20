@@ -17,7 +17,8 @@
  *    UART0 on GPIO 30/31, the external-PHY pins on 41-47.
  * gpiomap=v1 in the environment selects the second. The S boards of the
  * same names (arch-gk7101s/gpio_rb_*.h) split the same way, with the S
- * pin-function numbers.
+ * pin-function numbers. The GK7102S image adds a third, "c", for GK7102C
+ * boards, and makes it its default.
  *
  * Pin types are the vendor's GPIO_TYPE_* words (mach-gk710x/gpio.c), named
  * in the comments; the tables were generated from the SDK headers.
@@ -366,6 +367,49 @@ static const struct gk_gpio_pin v1_extphy[] = {
 	{ 52, 0x60011d00 },	/* input_enet_phy_rxd_0 */
 };
 
+/*
+ * c: the GK7102C board in the camera dump this port was checked against
+ * ("devkit-v1.1", vendor U-Boot of 2020). Its U-Boot hands the kernel
+ * pins 0-32 as function IDs of the GK7102C SDK; here they are the S
+ * pin types of the same functions. No PHY pins: the package has no
+ * GPIO 48.
+ */
+static const struct gk_gpio_pin c_xref[] = {
+	{  0, 0xa0000024 },	/* output_sf_cs0 */
+	{  1, 0xa0000001 },	/* output_1 (sensor reset) */
+	{  2, 0xd0030300 },	/* inout_i2c_data */
+	{  3, 0xd0040400 },	/* inout_i2c_clk */
+	{  4, 0xa0000001 },	/* output_1 */
+	{  5, 0xa0000000 },	/* output_0 */
+	{  6, 0xd090181e },	/* inout_sd_cmd */
+	{  7, 0xd0891117 },	/* inout_sd_data_1 */
+	{  8, 0xd0881016 },	/* inout_sd_data_0 */
+	{  9, 0x9000001f },	/* output_sdio_clk */
+	{ 10, 0x50010f00 },	/* input_sd_cd_n */
+	{ 11, 0xa0000000 },	/* output_0 */
+	{ 12, 0x60010000 },	/* input_0 */
+	{ 13, 0xa0000000 },	/* output_0 */
+	{ 14, 0xa0000000 },	/* output_0 */
+	{ 15, 0xa0000000 },	/* output_0 */
+	{ 16, 0x60010000 },	/* input_0 */
+	{ 17, 0xa0000000 },	/* output_0 */
+	{ 18, 0x60010000 },	/* input_0 */
+	{ 19, 0xd08b1319 },	/* inout_sd_data_3 */
+	{ 20, 0xd08a1218 },	/* inout_sd_data_2 */
+	{ 21, 0xa0000000 },	/* output_0 */
+	{ 22, 0xa0000000 },	/* output_0 */
+	{ 23, 0xa0000000 },	/* output_0 */
+	{ 24, 0xa0000000 },	/* output_0 */
+	{ 25, 0x50010900 },	/* input_uart0_rx */
+	{ 26, 0x90000009 },	/* output_uart0_tx */
+	{ 27, 0xa0000000 },	/* output_0 */
+	{ 28, 0xa0000000 },	/* output_0 */
+	{ 29, 0x60010000 },	/* input_0 */
+	{ 30, 0x60010000 },	/* input_0 */
+	{ 31, 0x60010000 },	/* input_0 */
+	{ 32, 0x60010000 },	/* input_0 */
+};
+
 #endif
 
 struct gk_gpio_map {
@@ -406,7 +450,26 @@ static const struct gk_gpio_map gk_maps[] = {
 		.pmu_ctl = 55,
 #endif
 	},
+#ifdef CONFIG_GK710X_S
+	{
+		/* 63: none, as the vendor U-Boot hands them over */
+		.name = "c",
+		.pins = c_xref, .npins = ARRAY_SIZE(c_xref),
+		.ir_led_ctl = 63, .ir_cut1 = 63, .ir_cut2 = 63,
+		.sensor_reset = 1, .phy_reset = 63, .phy_speed_led = 63,
+		.spi0_en0 = 63, .spi1_en0 = 63, .pwm = { 63, 63, 63, 63 },
+		.usb_host = 63, .sd_detect = 10, .sd_power = 63,
+		.sd1_detect = 63, .sd1_power = 63,
+	},
+#endif
 };
+
+/* The GK7102S image boots the GK7102C's boot header: its map comes first */
+#ifdef CONFIG_TARGET_GK7102S
+#define GK_GPIO_MAP_DEFAULT	"c"
+#else
+#define GK_GPIO_MAP_DEFAULT	"v2"
+#endif
 
 /*
  * The vendor's gpio_cfg_t (drivers/gpio/goke_gpio.c, gk7101s_gpio.c), as the
@@ -438,7 +501,9 @@ static const struct gk_gpio_map *gk_map(void)
 	const char *name = env_get("gpiomap");
 	int i;
 
-	for (i = 0; name && i < ARRAY_SIZE(gk_maps); i++)
+	if (!name)
+		name = GK_GPIO_MAP_DEFAULT;
+	for (i = 0; i < ARRAY_SIZE(gk_maps); i++)
 		if (!strcmp(name, gk_maps[i].name))
 			return &gk_maps[i];
 	return &gk_maps[0];
