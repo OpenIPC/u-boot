@@ -167,9 +167,12 @@ jobs:
   # SoC is a hard gate on release.
   #
   # The flash controller packs bytes MSB first, so the chip holds every
-  # 32-bit word of the image byte-swapped: the flash file is built that
-  # way. The second boot must then load the environment the first saved,
-  # which proves the driver's writes land where its reads find them.
+  # 32-bit word byte-swapped. openipc-gk710x builds its images in that chip
+  # order (the header reads "GK71"), as a programmer writes them, and they
+  # go into the flash file as they are; an image of an earlier build, in
+  # CPU order ("17KG"), is swapped into chip order first. The second boot
+  # must then load the environment the first saved, which proves the
+  # driver's writes land where its reads find them.
   qemu_smoke:
     needs: [build, qemu]
     runs-on: ubuntu-latest
@@ -209,14 +212,18 @@ jobs:
           UBOOT="u-boot-${soc}-nor.bin"
           test -f "$UBOOT"
           echo "booting $UBOOT"
-          # 8 MiB NOR, U-Boot at 0, the rest erased, every word byte-swapped
+          # 8 MiB NOR, U-Boot at 0 as the chip holds it, the rest erased
           python3 - "$UBOOT" /tmp/flash.bin <<'PY'
           import sys
-          img = bytearray(b'\xff' * (8 << 20))
           u = open(sys.argv[1], 'rb').read()
+          if u[:4] == b'17KG':
+              print('CPU-order image: swapping it into chip order')
+              u = b''.join(u[i:i + 4][::-1] for i in range(0, len(u), 4))
+          elif u[:4] != b'GK71':
+              sys.exit('%s: no GK710x boot header' % sys.argv[1])
+          img = bytearray(b'\xff' * (8 << 20))
           img[:len(u)] = u
-          open(sys.argv[2], 'wb').write(
-              b''.join(bytes(img[i:i + 4])[::-1] for i in range(0, len(img), 4)))
+          open(sys.argv[2], 'wb').write(bytes(img))
           PY
           FLASH="-M ${soc},flash-file=/tmp/flash.bin"
           chmod +x ./qemu-arm

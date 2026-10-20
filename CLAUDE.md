@@ -91,10 +91,12 @@ The build logic lives here. Other branches call it:
 - **No `hold`:** both SoCs have qemu-hisilicon machines (`gk7101`,
   `gk7102`; qemu-hisilicon #159 or later).
 - **Smoke test:** two boots of an 8 MiB flash image holding only U-Boot.
-  - The image is written **byte-swapped per 32-bit word**, as the chip
-    holds it. The flash controller packs bytes MSB first, and the ROM and
-    drivers move whole little-endian words; `openipc-gk710x`'s `CLAUDE.md`
-    explains it.
+  - The release image is **in chip byte order** (the flash controller packs
+    bytes MSB first, so the chip holds every word byte-swapped), and goes
+    into the flash file as it is. An image of an earlier build, in CPU
+    order ("17KG"), is swapped into chip order first; anything else is
+    refused. `openipc-gk710x`'s `CLAUDE.md` explains how `sf write` takes the
+    same file.
   - It passes on `Hit Ctrl-C`, and fails if the second boot reports a bad
     environment CRC.
 - **Release and publish:**
@@ -113,7 +115,7 @@ The build logic lives here. Other branches call it:
 - **No `hold`:** all six SoCs have qemu-hisilicon machines of the same
   names (qemu-hisilicon #161 or later).
 - **Smoke test:** two boots of an 8 MiB flash image holding only U-Boot,
-  in CPU byte order (no swap, unlike GK710x). It passes on `Hit Ctrl-C`,
+  in CPU byte order. It passes on `Hit Ctrl-C`,
   and fails if the second boot reports a bad environment CRC.
 - **Release and publish:**
   - `release` uploads to the `anyka` tag.
