@@ -16,6 +16,9 @@
 #include <spi.h>
 #include <spi_flash.h>
 #include <asm/cache.h>
+#ifdef CONFIG_GK_SFLASH
+#include <asm/arch/gk710x.h>
+#endif
 #include <jffs2/jffs2.h>
 #include <linux/mtd/mtd.h>
 
@@ -305,6 +308,12 @@ static int do_spi_flash_read_write(int argc, char *const argv[])
 		puts("Failed to map physical memory\n");
 		return 1;
 	}
+
+#ifdef CONFIG_GK_SFLASH
+	/* A Goke boot image in the flash's byte order goes in swapped back */
+	if (strcmp(argv[0], "update") == 0 || strncmp(argv[0], "write", 5) == 0)
+		gk_sflash_boot_order(offset, len, buf);
+#endif
 
 	if (strcmp(argv[0], "update") == 0) {
 		ret = spi_flash_update(flash, offset, len, buf);

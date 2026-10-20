@@ -149,6 +149,8 @@
 #ifndef __ASSEMBLY__
 void gk_gpio_config(unsigned int pin, unsigned int type);
 void gk_gpio_init(void);
+/* drivers/mtd/spi/gk_sflash.c, for cmd/sf.c */
+void gk_sflash_boot_order(unsigned int offset, unsigned long len, void *buf);
 /* board/goke/gk710x/gpio_map.c */
 void gk_gpio_map_apply(void);
 void gk_gpio_map_save(void *dst);

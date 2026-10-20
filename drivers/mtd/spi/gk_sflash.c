@@ -195,15 +195,23 @@ static int gk_sf_read(struct mtd_info *mtd, loff_t from, size_t len,
 
 /*
  * An image as a programmer writes it, every word as the chip holds it,
- * starts with the boot header magic byte-swapped. Written here at 0 as it
- * is, it would land swapped twice. The vendor U-Boot's sf write swaps such
- * an image back first, so one boot image serves a programmer and sf write
- * alike; so does this.
+ * starts with the boot header magic byte-swapped. Written at 0 as it is, it
+ * would land swapped twice. The vendor U-Boot's sf write swaps such an
+ * image back in RAM first, so one boot image serves a programmer and sf
+ * write alike; the sf command does the same through this, for the whole
+ * buffer at once -- sf update writes it one sector at a time.
  */
-static bool sf_chip_order(loff_t to, size_t len, const u_char *buf)
+void gk_sflash_boot_order(unsigned int offset, unsigned long len, void *buf)
 {
-	return !to && len >= 4 && !(len % 4) &&
-	       get_unaligned_le32(buf) == swab32(GK_BOOT_MAGIC);
+	u8 *p = buf;
+	size_t i;
+
+	if (offset || len < 4 || len % 4 ||
+	    get_unaligned_le32(p) != swab32(GK_BOOT_MAGIC))
+		return;
+	printf("SF: boot image in flash byte order, swapping it back\n");
+	for (i = 0; i < len; i += 4)
+		put_unaligned_le32(swab32(get_unaligned_le32(p + i)), p + i);
 }
 
 /*
@@ -216,14 +224,10 @@ static int gk_sf_write(struct mtd_info *mtd, loff_t to, size_t len,
 	u8 page[SZ_PAGE];
 	u32 addr = to & ~3;
 	unsigned int head = to & 3;
-	const bool swap = sf_chip_order(to, len, buf);
-	unsigned int i;
 	int ret;
 
 	if (to + len > mtd->size)
 		return -EINVAL;
-	if (swap)
-		printf("SF: boot image in flash byte order, swapping it back\n");
 	*retlen = 0;
 	while (len) {
 		unsigned int room = SZ_PAGE - (addr & (SZ_PAGE - 1));
@@ -232,9 +236,6 @@ static int gk_sf_write(struct mtd_info *mtd, loff_t to, size_t len,
 
 		memset(page, 0xff, span);
 		memcpy(page + head, buf, n);
-		for (i = 0; swap && i < span; i += 4)
-			put_unaligned_le32(swab32(get_unaligned_le32(page + i)),
-					   page + i);
 		ret = sf_program(addr, page, span / 4);
 		if (ret)
 			return ret;
