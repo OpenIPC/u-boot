@@ -63,12 +63,8 @@ The build logic lives here. Other branches call it:
 - `pull_request` runs only when the workflow file itself changes.
 - **No `hold`:** every SoC has a qemu-hisilicon machine, so every image is
   smoke-tested and released.
-- **NAND legs:** xm530/xm550 build `kinds: "nor nand"`, and `qemu_smoke`
-  has a NAND leg for each.
-  - A NAND leg boots a raw 128 MiB image (2048+64-byte pages) through
-    `-global xm-sfc.nand-file=`, which needs qemu-hisilicon's NAND model.
-  - The NAND images rest on an unverified guess at the XM530 NAND boot
-    path; `openipc-xm`'s `CLAUDE.md` explains it.
+- **NOR only:** every leg builds, uploads and smoke-tests
+  `u-boot-<soc>-nor.bin` alone. openipc-xm has no SPI NAND images.
 - **Smoke test:** two boots of an 8 MiB flash image under
   `-global xm-sfc.wps=on`.
   - It passes on `Hit Ctrl-C`.

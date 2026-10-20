@@ -72,13 +72,6 @@ U-Boot for Xiongmai's own camera SoCs, on the same mainline release
 
 **NOR:** `xm510`, `xm530`, `xm550`
 
-**SPI NAND:** `xm530`, `xm550`. These images are **unverified on
-silicon**: nothing documents how the XM530 boots from SPI NAND, and they
-follow the vendor SDK's unused NAND configuration (U-Boot behind a 4 KiB
-header in the controller window). They have only run on qemu-hisilicon's
-NAND model, which implements the same assumption. The OpenIPC XM530
-kernel has no SPI NAND driver yet.
-
 The boot ROM runs U-Boot in place from SPI NOR, and U-Boot brings up DDR
 itself, so the image is `u-boot.bin` as linked: `u-boot-<soc>-nor.bin`,
 written at flash offset 0. The flash driver clears the per-block write
@@ -93,8 +86,7 @@ bash build.sh               # xm510 xm530 xm550
 bash build.sh xm530         # a single SoC
 ```
 
-Images land in `output/` as `u-boot-<soc>-nor.bin` and, for xm530/xm550,
-`u-boot-<soc>-nand.bin`.
+Images land in `output/` as `u-boot-<soc>-nor.bin`.
 
 The toolchain is `arm-linux-gnueabi-`, as for hisilicon.
 
@@ -221,8 +213,6 @@ smoke-tested:
   Xiongmai per-block protection on;
 - booted a second time, which must load the environment the first boot
   saved.
-
-The NAND images get the same two boots on qemu-hisilicon's SPI NAND model.
 
 Its `release` input fills this repository's
 [`Xiongmai` release](../../releases/tag/xiongmai); `publish` uploads to
