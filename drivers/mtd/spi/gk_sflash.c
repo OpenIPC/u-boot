@@ -156,6 +156,64 @@ static int sf_program(u32 addr, const u8 *buf, unsigned int words)
 	return sf_wait_ready();
 }
 
+/* The boot ROM header's first word, "GK71" */
+#define GK_BOOT_MAGIC		0x474b3731
+
+/*
+ * The boot ROM reads the boot image as raw chip bytes, while everything
+ * read or written through the controller is packed MSB first: a 32-bit
+ * word goes to the chip byte-swapped and comes back swapped again. For the
+ * kernel, the rootfs and the environment that round trip is invisible.
+ * For the boot image it is not: a programmer writes it in the chip's
+ * order, and the vendor U-Boot's flash write recognises such an image by
+ * its byte-swapped magic and swaps it back (check_magic_number() in its
+ * gk7101_sflash.c).
+ *
+ * This driver does the same, both ways, for every caller: from offset 0
+ * to sf_swap_end -- header table plus the U-Boot length the header gives
+ * -- data is swapped on write and on read, so the boot image reads back
+ * as the file a programmer writes, byte for byte. The window is the image
+ * on the flash at probe, and a write at 0 moves it: one that starts with
+ * the swapped magic opens it as long as that image, however the caller
+ * splits the rest; any other write at 0 closes it.
+ */
+static u32 sf_swap_end;
+
+/* The length of a chip-order boot image starting at buf, or 0 */
+static u32 sf_boot_len(const u_char *buf, size_t len)
+{
+	u32 nwords, i;
+
+	if (len < 32 || get_unaligned_le32(buf) != swab32(GK_BOOT_MAGIC))
+		return 0;
+	/*
+	 * Header: 7 words, then the table -- <register, value> writes,
+	 * 0xFFFFFFFE <register, value> polls, 0xFFFFFFFF <count> delays --
+	 * ended by a 0 word; then nwords of U-Boot. A value can be 0, so the
+	 * table is walked entry by entry.
+	 */
+	nwords = swab32(get_unaligned_le32(buf + 8));
+	for (i = 7 * 4; i + 4 <= len; ) {
+		u32 w = swab32(get_unaligned_le32(buf + i));
+
+		if (!w)
+			break;
+		i += 4 * (w == 0xfffffffe ? 3 : 2);
+	}
+	if (i + 4 > len)
+		return 0;
+	return i + 4 + 4 * nwords;
+}
+
+static void sf_swap_detect(loff_t to, size_t len, const u_char *buf)
+{
+	if (to)
+		return;
+	sf_swap_end = sf_boot_len(buf, len);
+	if (sf_swap_end)
+		printf("SF: boot image in the chip's byte order, swapping it back\n");
+}
+
 static int gk_sf_read(struct mtd_info *mtd, loff_t from, size_t len,
 		      size_t *retlen, u_char *buf)
 {
@@ -175,6 +233,10 @@ static int gk_sf_read(struct mtd_info *mtd, loff_t from, size_t len,
 		u32 w = readl(SF_DATA);
 		unsigned int n = min_t(size_t, len, 4 - skip);
 
+		if (addr < sf_swap_end)
+			w = swab32(w);
+		addr += 4;
+
 		if (!skip && n == 4) {
 			put_unaligned_le32(w, buf);
 		} else {
@@ -190,30 +252,6 @@ static int gk_sf_read(struct mtd_info *mtd, loff_t from, size_t len,
 	return 0;
 }
 
-/* The boot ROM header's first word, "GK71" */
-#define GK_BOOT_MAGIC		0x474b3731
-
-/*
- * An image as a programmer writes it, every word as the chip holds it,
- * starts with the boot header magic byte-swapped. Written at 0 as it is, it
- * would land swapped twice. The vendor U-Boot's sf write swaps such an
- * image back in RAM first, so one boot image serves a programmer and sf
- * write alike; the sf command does the same through this, for the whole
- * buffer at once -- sf update writes it one sector at a time.
- */
-void gk_sflash_boot_order(unsigned int offset, unsigned long len, void *buf)
-{
-	u8 *p = buf;
-	size_t i;
-
-	if (offset || len < 4 || len % 4 ||
-	    get_unaligned_le32(p) != swab32(GK_BOOT_MAGIC))
-		return;
-	printf("SF: boot image in flash byte order, swapping it back\n");
-	for (i = 0; i < len; i += 4)
-		put_unaligned_le32(swab32(get_unaligned_le32(p + i)), p + i);
-}
-
 /*
  * The controller programs whole words, so a write that starts or ends
  * inside one pads it with 0xff, which leaves those flash bytes as they are.
@@ -224,10 +262,12 @@ static int gk_sf_write(struct mtd_info *mtd, loff_t to, size_t len,
 	u8 page[SZ_PAGE];
 	u32 addr = to & ~3;
 	unsigned int head = to & 3;
+	unsigned int i;
 	int ret;
 
 	if (to + len > mtd->size)
 		return -EINVAL;
+	sf_swap_detect(to, len, buf);
 	*retlen = 0;
 	while (len) {
 		unsigned int room = SZ_PAGE - (addr & (SZ_PAGE - 1));
@@ -236,6 +276,9 @@ static int gk_sf_write(struct mtd_info *mtd, loff_t to, size_t len,
 
 		memset(page, 0xff, span);
 		memcpy(page + head, buf, n);
+		for (i = 0; i < span && addr + i < sf_swap_end; i += 4)
+			put_unaligned_le32(swab32(get_unaligned_le32(page + i)),
+					   page + i);
 		ret = sf_program(addr, page, span / 4);
 		if (ret)
 			return ret;
@@ -268,6 +311,21 @@ static int gk_sf_erase(struct mtd_info *mtd, struct erase_info *instr)
 
 static struct spi_flash gk_flash;
 static int gk_announced;
+
+/* The swap window over the boot image already on the flash */
+static void sf_swap_probe(u32 size)
+{
+	u8 hdr[SZ_2K];
+	size_t n;
+	unsigned int i;
+
+	sf_swap_end = 0;
+	gk_sf_read(&gk_flash.mtd, 0, sizeof(hdr), &n, hdr);
+	for (i = 0; i < sizeof(hdr); i += 4)
+		put_unaligned_le32(swab32(get_unaligned_le32(hdr + i)),
+				   hdr + i);
+	sf_swap_end = min(sf_boot_len(hdr, sizeof(hdr)), size);
+}
 
 struct spi_flash *spi_flash_probe(unsigned int bus, unsigned int cs,
 				  unsigned int max_hz, unsigned int spi_mode)
@@ -310,6 +368,9 @@ struct spi_flash *spi_flash_probe(unsigned int bus, unsigned int cs,
 	mtd->_write = gk_sf_write;
 	mtd->_erase = gk_sf_erase;
 	mtd->priv = flash;
+	/* Once: later writes at 0 keep the window up to date */
+	if (!gk_announced)
+		sf_swap_probe(size);
 
 	/* Once: the environment and common/openipc.c probe again and again */
 	if (!gk_announced++)

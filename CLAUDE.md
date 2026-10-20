@@ -117,6 +117,11 @@ The kernel still needs the blob (see "Hand-off to the kernel").
     in its `gk7101_sflash.c`), and so does `gk_sflash.c`. `run ub` from
     either bootloader therefore writes exactly the bytes a programmer
     would. A CPU-order image (the SDK's prebuilts) is written unchanged.
+  - `gk_sflash.c` swaps the boot image's span on read as well (the image
+    found at offset 0 at probe, or the one last written there). Every
+    caller (`sf read`, SD recovery's "already on the flash" check) sees
+    the boot image as the file. Everything past it is the controller's
+    plain round trip.
   - Exception: the first release (2026-10-18) wrote CPU-order images and
     its `gk_sflash.c` has no swap check. `run ub` on a camera running it
     would write a chip-order image swapped twice and brick it. Upgrade
