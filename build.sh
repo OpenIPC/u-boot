@@ -36,8 +36,10 @@ build_gk710x() {
     make ${make_opts} </dev/null || return 1
 
     text=$(sed -n 's/^CONFIG_SYS_TEXT_BASE=//p' "${builddir}/.config")
+    env=$(sed -n 's/^CONFIG_ENV_OFFSET=//p' "${builddir}/.config")
     python3 openipc/gk710x-image.py openipc/${soc}.rvs \
-        "${builddir}/u-boot.bin" "${text}" "output/u-boot-${soc}-nor.bin"
+        "${builddir}/u-boot.bin" "${text}" "output/u-boot-${soc}-nor.bin" \
+        "${env}"
 }
 
 build_soc() {

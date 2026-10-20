@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Wrap u-boot.bin in the GK710x boot ROM header.
 
-    gk710x-image.py <soc>.rvs u-boot.bin <load address> <out>
+    gk710x-image.py <soc>.rvs u-boot.bin <load address> <out> [<limit>]
+
+With a limit (the environment's offset), an image that would reach it is
+refused: header and U-Boot have to end before the environment sector.
 
 The mask ROM reads the header from flash offset 0, in CPU words:
 
@@ -64,12 +67,16 @@ def rvs(path):
 def main():
     path, src, load, dst = sys.argv[1], sys.argv[2], int(sys.argv[3], 0), \
         sys.argv[4]
+    limit = int(sys.argv[5], 0) if len(sys.argv) > 5 else None
     version, test_addr, test_val, table = rvs(path)
     code = open(src, 'rb').read()
     code += b'\0' * (-len(code) % 4)
     head = [MAGIC, version, len(code) // 4, load, load // 4, test_addr,
             test_val] + table
     image = struct.pack('<%dI' % len(head), *head) + code
+    if limit is not None and len(image) > limit:
+        sys.exit('%s: %d bytes, %d over the %d bytes before the environment'
+                 % (dst, len(image), len(image) - limit, limit))
     with open(dst, 'wb') as f:
         f.write(b''.join(image[i:i + 4][::-1]
                          for i in range(0, len(image), 4)))
