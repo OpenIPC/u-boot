@@ -31,9 +31,10 @@ Adding or dropping a SoC needs both branches:
   `openipc/<soc>.rvs`;
 - there: `build-gk710x.yml`'s matrices and the README.
 
-GK7101S/GK7102S (`gk7102s` in OpenIPC/firmware) are a different die with a
-different HAL and register map. They are not supported here, and
-qemu-hisilicon does not model them.
+The later GK710xS die is supported too: targets `gk7101s` and `gk7102s`
+(OpenIPC/firmware's `gk7102s`). The GK7102C is the same family -- its vendor
+U-Boot carries the S HAL word for word -- and runs the `gk7102s` image. See
+"The GK710xS" below.
 
 ## Relationship to mainline
 
@@ -185,10 +186,55 @@ included.
   `common/openipc.c` is compiled out with `CONFIG_MMC`.
 - **SPI NAND:** not supported. OpenIPC's GK7102 firmware is NOR only.
 
+## The GK710xS (GK7101S, GK7102S, GK7102C)
+
+`CONFIG_GK710X_S` (selected by `TARGET_GK7101S`/`GK7102S`) switches to the S
+die. Run under Unicorn, its HAL passes nearly every access through. The S
+blocks sit at the vendor drivers' addresses (AHB `0x90000000`, APB
+`0xA0000000`), in their register and bit layout. The UARTs and VICs are the
+exceptions: the HAL reorders them as on the GK7101/GK7102, which leaves the
+console the same 16550.
+
+- **Map** (`include/mach/gk710x.h`):
+  - timer 1: count at +0, reload at +0x30, control at +0xC with enable at
+    bit 10;
+  - watchdog: control/reload/restart at +0/+0x10/+0x14, 5 to reset;
+  - DDR size word at `0x90002004`;
+  - pad control: words counting down from GPIO 55, in the byte order of
+    `gk7101s_gpio.c`;
+  - `IOCTRL_MISC2` = 0x12.
+- **GMAC:** the same DesignWare core with its registers in another order.
+  `drivers/net/designware.h` has the S layout under `CONFIG_GK710X_S`.
+- **Clocks:** the S U-Boot leaves the CPU PLL to the boot header.
+- **Watchdog:** the GK7102C header starts it (about 10 s), and
+  `arch_cpu_init()` stops it.
+- **Boot headers:**
+  - `gk7102s.rvs` is the GK7102C camera's (version word `0x304308EF`;
+    clocks, UART and watchdog set-up, then the SDK's S DDR sequence with
+    three values changed);
+  - `gk7101s.rvs` is the SDK's GK7101S build's.
+
+  The script takes the version and DDR test words, and `delay:` entries,
+  from the `.rvs`.
+- **Kernel:** the S HAL (`hal_data_s.h`, 20160804), the same U2K words, and
+  the S `gpio_cfg_t`, which has two SD1 pins before `soc_type`.
+- **GPIO maps:**
+  - The S SDK boards split into the same `v2`/`v1` layouts, with S
+    pin-function numbers.
+  - `c` is the GK7102C board's map, the `gk7102s` default. Its vendor
+    U-Boot hands pins 0-32 to the kernel as function IDs of its own SDK.
+    Those were read at its prompt in qemu (top 64 KiB of DDR), named
+    through the `char[20]` table in its kernel, and converted to the S
+    types of the same functions.
+  - The GK7102C has no GPIO 48, so the `c` map sets no PHY clock pin.
+- **qemu-hisilicon:** machines `gk7101s` and `gk7102s`. The GK7102C dump
+  boots its own U-Boot and kernel there, and so does this U-Boot, to the
+  OpenIPC `gk7102s` login.
+
 ## Build
 
 ```sh
-bash build.sh               # gk7101 gk7102; continues past failures, exits non-zero if any failed
+bash build.sh               # gk7101 gk7102 gk7101s gk7102s; continues past failures, exits non-zero if any failed
 bash build.sh gk7102        # one or more SoCs (CROSS_COMPILE defaults to arm-linux-gnueabi-)
 ```
 
