@@ -418,6 +418,12 @@ static int recovery_flash_holds(ulong addr, const void *data, ulong len) {
  * whole firmware, U-Boot itself -- it is written there; the wrapper header
  * never is. Returns 1 when it wrote, 0 when it skipped, -1 on a failed write.
  */
+/* What a file read to CONFIG_SYS_LOAD_ADDR may take: the RAM below the
+ * stack and the relocated U-Boot, with room */
+static ulong recovery_ram_room(void) {
+  return gd->start_addr_sp - SZ_1M - CONFIG_SYS_LOAD_ADDR;
+}
+
 static int recovery_write_img(const char *name, loff_t size) {
   struct image_header hdr;
   loff_t actread;
@@ -432,6 +438,11 @@ static int recovery_write_img(const char *name, loff_t size) {
   }
   addr = image_get_load(&hdr);
   len = image_get_data_size(&hdr);
+  /* a read of length 0 would be a read of the whole file */
+  if (!len) {
+    printf("Recovery: %s has no data, skipped\n", name);
+    return 0;
+  }
   /* in 64 bits: a size near 4 GiB would wrap a 32-bit sum */
   if ((loff_t)len > size - (loff_t)sizeof(hdr)) {
     printf("Recovery: %s is shorter than its header says, skipped\n", name);
@@ -447,8 +458,7 @@ static int recovery_write_img(const char *name, loff_t size) {
            name, addr, sect);
     return 0;
   }
-  /* in RAM below the stack and the relocated U-Boot, with room */
-  if (len > gd->start_addr_sp - SZ_1M - CONFIG_SYS_LOAD_ADDR) {
+  if (len > recovery_ram_room()) {
     printf("Recovery: %s (%lu bytes) does not fit the free RAM, skipped\n",
            name, len);
     return 0;
@@ -535,6 +545,10 @@ static int recovery_run_script(const char *name) {
     printf("Recovery: failed to stat %s\n", name);
     return 1;
   }
+  if ((u64)size > recovery_ram_room()) {
+    printf("Recovery: %s (%lld bytes) does not fit the free RAM\n", name, size);
+    return 1;
+  }
 
   ret = rfs_read(name, CONFIG_SYS_LOAD_ADDR, 0, size, &actread);
   if (ret || actread != size) {
@@ -551,7 +565,10 @@ static int recovery_run_script(const char *name) {
     ret = run_command_list((char *)CONFIG_SYS_LOAD_ADDR, size, 0);
   }
 
-  printf("Recovery: executed %s (%lld bytes)\n", name, size);
+  /* The script took recovery over: its result is reported, not retried
+   * with the images */
+  printf("Recovery: executed %s (%lld bytes)%s\n", name, size,
+         ret ? ", it failed" : "");
 
   return 1;
 }
