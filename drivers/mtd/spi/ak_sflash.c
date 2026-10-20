@@ -42,6 +42,7 @@
 #define CON_DIV(d)		((d) << 8)
 /* STA */
 #define STA_TXHEMP		BIT(2)
+#define STA_RXFULL		BIT(5)
 #define STA_RXHFULL		BIT(6)
 #define STA_TRANSF		BIT(8)
 
@@ -121,6 +122,24 @@ static int spi_send(const u8 *buf, unsigned int len)
 	return 0;
 }
 
+/* Pop a word from IN into buf at *got, keeping at most n bytes */
+static void spi_rx_word(u8 *buf, unsigned int *got, unsigned int n)
+{
+	u32 w = cpu_to_le32(readl(SPI_IN));
+	unsigned int k = min(n - *got, 4U);
+
+	memcpy(buf + *got, &w, k);
+	*got += k;
+}
+
+/*
+ * As the vendor U-Boot and kernel PIO reads do: words are taken while IN
+ * holds one, and a transfer ends only on TRANSF, which is then drained (two
+ * words when IN is full, one when half full, then the tail). Ending a
+ * chunk once the count is reached, without seeing TRANSF, left it set: on
+ * an AK3918EV300 the next chunk then took a word from the empty FIFO, and
+ * long reads came back with a word repeated at the 8 KiB boundaries.
+ */
 static int spi_recv(u8 *buf, unsigned int len)
 {
 	writel(spi_con | CON_CS | CON_TGDM, SPI_CON);
@@ -130,21 +149,29 @@ static int spi_recv(u8 *buf, unsigned int len)
 		unsigned int spins = SPI_SPINS;
 
 		writel(n, SPI_CNT);
-		while (got < n) {
+		for (;;) {
 			u32 st = readl(SPI_STA);
 
-			/* At the end, the last bytes may be less than a word */
-			if (st & (STA_RXHFULL | STA_TRANSF)) {
-				u32 w = cpu_to_le32(readl(SPI_IN));
-				unsigned int k = min(n - got, 4U);
-
-				memcpy(buf + got, &w, k);
-				got += k;
+			if (st & STA_TRANSF) {
+				if (st & STA_RXFULL) {
+					spi_rx_word(buf, &got, n);
+					spi_rx_word(buf, &got, n);
+				} else if (st & STA_RXHFULL) {
+					spi_rx_word(buf, &got, n);
+				}
+				if (got < n)
+					spi_rx_word(buf, &got, n);
+				break;
+			}
+			if (st & STA_RXHFULL) {
+				spi_rx_word(buf, &got, n);
 				spins = SPI_SPINS;
 			} else if (!--spins) {
 				return -ETIMEDOUT;
 			}
 		}
+		if (got != n)
+			return -EIO;
 		buf += n;
 		len -= n;
 	}
