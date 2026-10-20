@@ -1,6 +1,6 @@
 # OpenIPC base configuration for the Xiongmai targets. build.sh appends the
-# per-SoC fragment (and nand_config for NAND images) and runs olddefconfig,
-# so a later line overrides an earlier one.
+# per-SoC fragment and runs olddefconfig, so a later line overrides an
+# earlier one.
 CONFIG_ARM=y
 CONFIG_ARCH_XM=y
 CONFIG_SYS_THUMB_BUILD=y

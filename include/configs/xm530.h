@@ -26,9 +26,6 @@
 #define CONFIG_SYS_TIMER_COUNTER	XM_TIMER_VALUE
 #define CONFIG_SYS_TIMER_COUNTS_DOWN
 
-/* SPI NAND images (openipc/nand_config) */
-#define CONFIG_SYS_MAX_NAND_DEVICE	1
-
 #include "openipc-common.h"
 
 #endif
