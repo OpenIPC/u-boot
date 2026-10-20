@@ -473,7 +473,11 @@ int board_mmc_init(struct bd_info *bis)
 	 * update has it, only with the update button held.
 	 */
 #if defined(CONFIG_FMC) || defined(CONFIG_AUTO_SD_UPDATE)
-	if (IS_ENABLED(CONFIG_FMC) || is_auto_update()) {
+#ifdef CONFIG_FMC
+	if (1) {
+#else
+	if (is_auto_update()) {
+#endif
 #if defined(CONFIG_AUTO_SD_UPDATE_IS_IN_SDIO0) || !defined(CONFIG_AUTO_SD_UPDATE)
 		ret = sdhci_add_port(0, SDIO0_BASE_REG, MMC_TYPE_SD); // 0 for port0
 #else

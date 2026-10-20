@@ -440,6 +440,24 @@ static int recovery_write(const char *name, int type) {
 }
 
 #ifdef CONFIG_OPENIPC_NOR_SPLIT
+/* Whether flash from addr holds data, compared 64 KiB at a time. */
+static int recovery_flash_holds(ulong addr, const void *data, ulong len) {
+  const ulong chunk = 0x10000;
+  u8 *buf = malloc(chunk);
+  ulong off, n;
+  int same = 1;
+
+  if (!buf)
+    return 0;
+  for (off = 0; same && off < len; off += n) {
+    n = min(len - off, chunk);
+    same = !spi_flash_read(recovery_flash, addr + off, n, buf) &&
+           !memcmp(buf, (const u8 *)data + off, n);
+  }
+  free(buf);
+  return same;
+}
+
 /*
  * The split layout's one image (firmware.bin.<soc>, ${fwfile}, what fwupd
  * fetches): a uImage, then the squashfs. Written at kernaddr, where the
@@ -452,7 +470,7 @@ static int recovery_write(const char *name, int type) {
 static int recovery_write_firmware(const char *name) {
   struct image_header hdr;
   loff_t size, actread;
-  ulong addr, len, have;
+  ulong addr, len, env_end;
   const char *str;
 
   if (!name || !rfs_exists(name))
@@ -467,8 +485,10 @@ static int recovery_write_firmware(const char *name) {
     printf("Recovery: failed to read %s\n", name);
     return -1;
   }
+  /* the data size against what follows the header, in 64 bits: added to
+   * the header's in a 32-bit ulong, a size near 4 GiB wrapped past this */
   if (!image_check_magic(&hdr) || !image_check_hcrc(&hdr) ||
-      sizeof(hdr) + image_get_data_size(&hdr) > size) {
+      (loff_t)image_get_data_size(&hdr) > size - (loff_t)sizeof(hdr)) {
     printf("Recovery: %s does not start with a uImage\n", name);
     return -1;
   }
@@ -476,9 +496,22 @@ static int recovery_write_firmware(const char *name) {
   str = env_get("kernaddr");
   addr = str ? hextoul(str, NULL) : CONFIG_ENV_KERNADDR;
   len = size;
+  /* never into the boot image or the environment below the firmware */
+  env_end = CONFIG_ENV_OFFSET + CONFIG_ENV_SIZE;
+  if (addr < env_end) {
+    printf("Recovery: kernaddr 0x%lx is inside the boot area (firmware starts at 0x%lx)\n",
+           addr, env_end);
+    return -1;
+  }
   if (addr >= recovery_flash->size || len > recovery_flash->size - addr) {
     printf("Recovery: %s (%lu bytes) does not fit the flash from 0x%lx\n",
            name, len, addr);
+    return -1;
+  }
+  /* the file in RAM below the stack and the relocated U-Boot, with room */
+  if (len > gd->start_addr_sp - SZ_1M - CONFIG_SYS_LOAD_ADDR) {
+    printf("Recovery: %s (%lu bytes) does not fit the free RAM from 0x%lx\n",
+           name, len, (ulong)CONFIG_SYS_LOAD_ADDR);
     return -1;
   }
 
@@ -491,11 +524,10 @@ static int recovery_write_firmware(const char *name) {
     return -1;
   }
 
-  have = ALIGN(CONFIG_SYS_LOAD_ADDR + len, 0x10000);
-  if (!spi_flash_read(recovery_flash, addr, len, (void *)have) &&
-      !memcmp((void *)CONFIG_SYS_LOAD_ADDR, (void *)have, len)) {
+  /* handled, not absent: the legacy pair on the same card is not written */
+  if (recovery_flash_holds(addr, (void *)CONFIG_SYS_LOAD_ADDR, len)) {
     printf("Recovery: %s is already on the flash at 0x%lx\n", name, addr);
-    return 0;
+    return 2;
   }
 
   printf("Recovery: writing %s (%lu bytes) at 0x%lx, erasing to the end of the flash\n",
