@@ -511,7 +511,7 @@ static const struct gk_gpio_map *gk_map(void)
 
 /*
  * U-Boot itself needs the internal PHY's reference clock, out on GPIO 48
- * in the layouts that have it, and the SD pins. The vendor U-Boot applied
+ * in the layouts that have it, and the SD pins where the map is certain. The vendor U-Boot applied
  * the whole map here, but the map is a guess until gpiomap is set, and the
  * v2 map moves UART0 off GPIO 30/31 -- a v1 board would lose its console
  * before anyone could set gpiomap=v1. The other pins stay as the boot ROM
@@ -547,7 +547,15 @@ void gk_gpio_map_apply(void)
 	for (i = 0; i < m->nintphy; i++)
 		if (m->intphy[i].pin == GK_EPHY_CLK_PIN)
 			gk_gpio_config(m->intphy[i].pin, m->intphy[i].type);
-	for (i = 0; i < m->npins; i++)
+	/*
+	 * The SD pins only from a map known to be the board's: the GK710xS
+	 * has one, the GK7101/GK7102 default is a guess until gpiomap is set,
+	 * and the v2 SD pins are a v1 board's PHY reset, audio clock and PHY
+	 * data lines (v1 boards have no SD).
+	 */
+	if (!IS_ENABLED(CONFIG_GK710X_S) && !env_get("gpiomap"))
+		m = NULL;
+	for (i = 0; m && i < m->npins; i++)
 		if (gk_gpio_is_sd(m->pins[i].type) ||
 		    m->pins[i].pin == m->sd_power)
 			gk_gpio_config(m->pins[i].pin, m->pins[i].type);

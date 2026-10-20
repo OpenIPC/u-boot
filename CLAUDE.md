@@ -124,6 +124,12 @@ The kernel still needs the blob (see "Hand-off to the kernel").
     caller (`sf read`, SD recovery's "already on the flash" check) sees
     the boot image as the file. Everything past it is the controller's
     plain round trip.
+  - A whole-chip dump in chip order (a programmer's) restores with one
+    `sf write` at 0: a write at 0 that starts with the swapped magic is
+    swapped over its whole length. `sf update` splits it into sectors and
+    only the boot image comes out right. `sf read` of the whole chip is
+    not a dump either: the boot image in chip order, the rest in CPU
+    order.
   - Exception: the first release (2026-10-18) wrote CPU-order images and
     its `gk_sflash.c` has no swap check. `run ub` on a camera running it
     would write a chip-order image swapped twice and brick it. Upgrade
