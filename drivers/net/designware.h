@@ -23,6 +23,7 @@
 #define CONFIG_MACRESET_TIMEOUT	(3 * CONFIG_SYS_HZ)
 #define CONFIG_MDIO_TIMEOUT	(3 * CONFIG_SYS_HZ)
 
+#ifndef CONFIG_GK710X_S
 struct eth_mac_regs {
 	u32 conf;		/* 0x00 */
 	u32 framefilt;		/* 0x04 */
@@ -39,6 +40,29 @@ struct eth_mac_regs {
 	u32 macaddr0hi;		/* 0x40 */
 	u32 macaddr0lo;		/* 0x44 */
 };
+#else
+/*
+ * The Goke GK710xS GMAC: the same core with its registers in another
+ * order (the vendor kernel's mach-gk710xs/include/mach/eth.h).
+ */
+struct eth_mac_regs {
+	u32 conf;		/* 0x00 */
+	u32 miiaddr;		/* 0x04 */
+	u32 miidata;		/* 0x08 */
+	u32 framefilt;		/* 0x0c */
+	u32 hashtablehigh;	/* 0x10 */
+	u32 hashtablelow;	/* 0x14 */
+	u32 flowcontrol;	/* 0x18 */
+	u32 vlantag;		/* 0x1c */
+	u8 reserved_1[24];
+	u32 intreg;		/* 0x38 */
+	u32 intmask;		/* 0x3c */
+	u32 macaddr0hi;		/* 0x40 */
+	u32 macaddr0lo;		/* 0x44 */
+	u8 reserved_2[16];
+	u32 version;		/* 0x58 */
+};
+#endif
 
 /* MAC configuration register definitions */
 #define FRAMEBURSTENABLE	(1 << 21)
@@ -65,6 +89,7 @@ struct eth_mac_regs {
 #define MII_ADDRMSK		(0x1F << 11)
 
 
+#ifndef CONFIG_GK710X_S
 struct eth_dma_regs {
 	u32 busmode;		/* 0x00 */
 	u32 txpolldemand;	/* 0x04 */
@@ -82,6 +107,26 @@ struct eth_dma_regs {
 	u32 currhosttxbuffaddr;	/* 0x50 */
 	u32 currhostrxbuffaddr;	/* 0x54 */
 };
+#else
+struct eth_dma_regs {
+	u32 txpolldemand;	/* 0x00 */
+	u32 rxpolldemand;	/* 0x04 */
+	u32 busmode;		/* 0x08 */
+	u32 rxdesclistaddr;	/* 0x0c */
+	u32 txdesclistaddr;	/* 0x10 */
+	u32 status;		/* 0x14 */
+	u32 missedframes;	/* 0x18 */
+	u32 intenable;		/* 0x1c */
+	u32 opmode;		/* 0x20 */
+	u32 reserved1[1];
+	u32 axibus;		/* 0x28, not on this core */
+	u32 reserved2[5];
+	u32 currhosttxbuffaddr;	/* 0x40 */
+	u32 currhostrxbuffaddr;	/* 0x44 */
+	u32 currhosttxdesc;	/* 0x48 */
+	u32 currhostrxdesc;	/* 0x4c */
+};
+#endif
 
 #define DW_DMA_BASE_OFFSET	(0x1000)
 
