@@ -60,9 +60,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { soc: xm510, kinds: "nor", files: "output/u-boot-xm510-*.bin" }
-          - { soc: xm530, kinds: "nor", files: "output/u-boot-xm530-*.bin" }
-          - { soc: xm550, kinds: "nor", files: "output/u-boot-xm550-*.bin" }
+          - { soc: xm510, kinds: "nor", files: "output/u-boot-xm510-nor.bin" }
+          - { soc: xm530, kinds: "nor", files: "output/u-boot-xm530-nor.bin" }
+          - { soc: xm550, kinds: "nor", files: "output/u-boot-xm550-nor.bin" }
 
     steps:
       - name: Checkout
