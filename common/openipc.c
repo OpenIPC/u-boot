@@ -908,6 +908,25 @@ int firmware_scan(void) {
     env_set("mtds", mtds);
     sprintf(mtdparts, "%s:%s", mtdids ? mtdids : "", mtds);
     env_set("mtdparts", mtdparts);
+#ifdef CONFIG_OPENIPC_NOR_SPLIT
+    /*
+     * Fixed slots need root= and mtdparts= on the command line. A build of
+     * this bootloader that saved its environment after the scan could
+     * have stored a split boot's bootargs without them; put them back, in
+     * RAM, when both are missing. A command line that names either is the
+     * owner's and is left alone.
+     */
+    {
+      const char *ba = env_get("bootargs");
+      char buf[1024];
+
+      if (ba && !strstr(ba, "root=") && !strstr(ba, "mtdparts=") &&
+          strlen(ba) + 64 < sizeof(buf)) {
+        snprintf(buf, sizeof(buf), "%s root=/dev/mtdblock3 mtdparts=${mtdparts}", ba);
+        env_set("bootargs", buf);
+      }
+    }
+#endif
   }
 
   if (kernel_off && rootfs_off) {
