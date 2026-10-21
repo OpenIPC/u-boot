@@ -333,15 +333,21 @@ static int ak_sf_erase(struct mtd_info *mtd, struct erase_info *instr)
 }
 
 /*
- * SPI0's pads, as the vendor U-Boots set them before each use; the boot ROM
- * leaves enough for reading the boot image. The EV330's are left as the
- * ROM has them.
+ * SPI0's pads; the boot ROM leaves enough for reading the boot image, the
+ * EV330's are left as it has them.
+ * - EV200: pads 25/26 function 1, 35/36 function 2 (field 13:12 = 10), as
+ *   the EV200 device tree's spiflash_pins and Linux set them. The gwell
+ *   vendor U-Boot's 0x3003 (11 there) keeps that camera's SD card from
+ *   answering, with GPIO 34 low or not.
+ * - EV300: the SDK U-Boot's value.
  */
 #if defined(CONFIG_AK39_EV200)
 #define SPI0_SHAREPIN0		BIT(25)
-#define SPI0_SHAREPIN3		0x3003
+#define SPI0_SHAREPIN3_CLR	0x3003
+#define SPI0_SHAREPIN3		0x2003
 #elif defined(CONFIG_AK39_EV300)
 #define SPI0_SHAREPIN0		BIT(25)
+#define SPI0_SHAREPIN3_CLR	0
 #define SPI0_SHAREPIN3		(0x3 | 0x1f << 9)
 #endif
 
@@ -352,7 +358,7 @@ static void spi_hw_init(void)
 	clrbits_le32(AK_SYS_SOFT_RST, AK_RST_SPI0);
 #ifdef SPI0_SHAREPIN0
 	setbits_le32(AK_SYS_SHAREPIN0, SPI0_SHAREPIN0);
-	setbits_le32(AK_SYS_SHAREPIN3, SPI0_SHAREPIN3);
+	clrsetbits_le32(AK_SYS_SHAREPIN3, SPI0_SHAREPIN3_CLR, SPI0_SHAREPIN3);
 #endif
 }
 

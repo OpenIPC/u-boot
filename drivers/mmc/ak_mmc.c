@@ -74,11 +74,23 @@
 
 /* Pads 31-33 as MCI0 */
 #ifdef CONFIG_AK39_EV200
-#define MCI0_SHAREPIN3_CLR	0x3c0	/* pad 33 has a 2-bit field */
+/* Pad 33 has a 2-bit field; pad 34's (11:10) goes to GPIO for wifi_en below */
+#define MCI0_SHAREPIN3_CLR	0xfc0
 #else
 #define MCI0_SHAREPIN3_CLR	0x1c0
 #endif
 #define MCI0_SHAREPIN3_SET	0x1c0
+
+#ifdef CONFIG_AK39_EV200
+/*
+ * GPIO 34: wifi_en in the EV200 reference board's device tree, on the pad
+ * that is otherwise SD DAT1. Linux muxes the pad to GPIO and drives it low;
+ * a gwell AK3918EV200 camera comes out of its boot ROM with the pad's field
+ * at 11, and until the pad is a GPIO driven low its card does not answer at
+ * all (all-zero responses).
+ */
+#define MCI0_WIFI_EN_GPIO	34
+#endif
 
 static uint mci_clock = MCI_F_MIN;
 
@@ -103,6 +115,10 @@ static void ak_mci_host_init(void)
 {
 	clrsetbits_le32(AK_SYS_SHAREPIN3, MCI0_SHAREPIN3_CLR,
 			MCI0_SHAREPIN3_SET);
+#ifdef MCI0_WIFI_EN_GPIO
+	clrbits_le32(AK_GPIO_OUT(MCI0_WIFI_EN_GPIO), BIT(MCI0_WIFI_EN_GPIO % 32));
+	setbits_le32(AK_GPIO_DIR(MCI0_WIFI_EN_GPIO), BIT(MCI0_WIFI_EN_GPIO % 32));
+#endif
 	clrbits_le32(AK_SYS_CLK_GATE, AK_CLK_MCI0);
 	setbits_le32(AK_SYS_SOFT_RST, AK_RST_MCI0);
 	clrbits_le32(AK_SYS_SOFT_RST, AK_RST_MCI0);
