@@ -777,8 +777,18 @@ int firmware_scan(void) {
       env_set("fwsize", str);
       /* RAM only, like the rest of the scan: a saved environment keeps an
        * older fwwrite that erased only the file's length */
-      env_set("fwwrite", "sf probe 0; sf erase ${kernaddr} ${fwsize}; "
-                         "sf write ${baseaddr} ${kernaddr} ${filesize}");
+      env_set("fwwrite", OPENIPC_FWWRITE_SPLIT_CMD);
+    }
+    /* A saved fwupd from before the split layout fetches only the pair;
+     * exactly that one takes the firmware file first. An edited one is
+     * left alone. */
+    {
+      const char *fu = env_get("fwupd");
+
+      if (fu && !strcmp(fu, OPENIPC_FWUPD_LEGACY_CMD))
+        env_set("fwupd", OPENIPC_FWUPD_SPLIT_CMD);
+      if (!env_get("fwfile"))
+        env_set("fwfile", OPENIPC_FW_FILE);
     }
   }
 #endif
@@ -898,6 +908,25 @@ int firmware_scan(void) {
     env_set("mtds", mtds);
     sprintf(mtdparts, "%s:%s", mtdids ? mtdids : "", mtds);
     env_set("mtdparts", mtdparts);
+#ifdef CONFIG_OPENIPC_NOR_SPLIT
+    /*
+     * Fixed slots need root= and mtdparts= on the command line. A build of
+     * this bootloader that saved its environment after the scan could
+     * have stored a split boot's bootargs without them; put them back, in
+     * RAM, when both are missing. A command line that names either is the
+     * owner's and is left alone.
+     */
+    {
+      const char *ba = env_get("bootargs");
+      char buf[1024];
+
+      if (ba && !strstr(ba, "root=") && !strstr(ba, "mtdparts=") &&
+          strlen(ba) + 64 < sizeof(buf)) {
+        snprintf(buf, sizeof(buf), "%s root=/dev/mtdblock3 mtdparts=${mtdparts}", ba);
+        env_set("bootargs", buf);
+      }
+    }
+#endif
   }
 
   if (kernel_off && rootfs_off) {
@@ -994,14 +1023,18 @@ int openipc_helper(void) {
   sprintf(msize, "%ldM", gd->ram_size / 1024 / 1024);
   env_set("totalmem", msize);
   firmware_recovery();
-  firmware_scan();
   altbootcmd_migrate();
 
   /* Persist the default environment on first start (or after a bad env);
    * only if the device env area is still blank so we never overwrite
-   * foreign data (e.g. a RAM-booted U-Boot on another device). */
+   * foreign data (e.g. a RAM-booted U-Boot on another device). Both saves
+   * come before the scan: what it sets (the layout's addresses and
+   * mtdparts, a split boot's bootargs without root= and mtdparts=) is for
+   * this boot only, and a later fixed-slot image needs the defaults. */
   if ((gd->flags & GD_FLG_ENV_DEFAULT) && env_crc_is_blank())
     env_save();
+
+  firmware_scan();
 
   return 0;
 }

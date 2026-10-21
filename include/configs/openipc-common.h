@@ -202,12 +202,26 @@ void hi_gpio_status(void);
  * size selects the NOR schema.
  */
 #ifdef CONFIG_OPENIPC_NOR_SPLIT
+/* the firmware file when the server has one, else the fixed-slot pair */
+#define OPENIPC_FWUPD_SPLIT_CMD \
+	"if ${source} ${baseaddr} ${fwfile}; then run fwwrite; else run ur; run uk; fi"
+/* fwupd as a saved environment from before the split layout spells it */
+#define OPENIPC_FWUPD_LEGACY_CMD "run ur; run uk"
+/*
+ * The whole firmware area (the scan sets fwsize to the end of the chip), and
+ * only for a file that fits it: an oversized download must not erase the
+ * firmware it cannot replace.
+ */
+#define OPENIPC_FWWRITE_SPLIT_CMD \
+	"sf probe 0; if itest ${filesize} -gt 0; then if itest ${filesize} -le ${fwsize}; then " \
+	"sf erase ${kernaddr} ${fwsize}; sf write ${baseaddr} ${kernaddr} ${filesize}; " \
+	"else echo fwwrite: ${filesize} bytes do not fit ${fwsize} from ${kernaddr}, nothing written; fi; " \
+	"else echo fwwrite: empty file, nothing written; fi"
 #define OPENIPC_FWUPD \
 	"fwfile=" OPENIPC_FW_FILE "\0" \
-	"fwupd=if ${source} ${baseaddr} ${fwfile}; then run fwwrite; else run ur; run uk; fi\0"
-/* the whole firmware area: the scan sets fwsize to the end of the chip */
+	"fwupd=" OPENIPC_FWUPD_SPLIT_CMD "\0"
 #define OPENIPC_FWWRITE \
-	"fwwrite=sf probe 0; sf erase ${kernaddr} ${fwsize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0"
+	"fwwrite=" OPENIPC_FWWRITE_SPLIT_CMD "\0"
 #else
 #define OPENIPC_FWUPD "fwupd=run ur; run uk\0"
 #define OPENIPC_FWWRITE \
