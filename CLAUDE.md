@@ -151,8 +151,8 @@ The memory map is the same in all three generations: system control at
   instead).
   - It does what the vendor U-Boots do, traced under qemu from the gwell
     camera's EV200 U-Boot: SPI0 soft reset (bit 5) and its pads (`0x74`
-    bit 25; `0xDC |= 0x3003` on the EV200, `0x3e03` on the EV300, the
-    ROM's on the EV330) at each probe, fast read (`0x0B` + a dummy byte),
+    bit 25; `0xDC` 13:0 = `0x2003` on the EV200 (the DT's), `|= 0x3e03`
+    on the EV300, the ROM's on the EV330) at each probe, fast read (`0x0B` + a dummy byte),
     at most 8 KiB per CNT transfer (`MAX_XFER_LEN`), about 17 MHz.
   - Fixed after a real AK3918EV200 (XM25QH64A) read back a kernel written
     with an earlier build with a bad data CRC. qemu never showed it: its
@@ -178,6 +178,13 @@ The memory map is the same in all three generations: system control at
   not touch SPI0's pads. Card detect is a board GPIO (5, 24, 41, 57 in the
   vendor sources) and is not used: with no card the first command times
   out (one "did not respond" line, no delay).
+  - EV200: the SD driver also muxes pad 34 to GPIO and drives GPIO 34 low
+    (`wifi_en` in the EV200 reference board's DT, on the pad that is
+    otherwise DAT1), and SPI0's pads 35/36 are function 2 (`0xDC` bits
+    13:12 = `10`, as the DT and Linux set them). On a gwell AK3918EV200 the
+    card answers only with both: the ROM leaves pad 34's field at `11`, and
+    the gwell vendor U-Boot's SPI value `0x3003` puts `11` on pads 35/36.
+    Found by setting the registers Linux leaves (`devmem`) one by one.
   - `common/openipc.c` recovers from it at every boot: `script.txt`, then
     `uImage.<soc>.img` and `rootfs.squashfs.<soc>.img`. These are uImages
     flashed where their load address says, without the header
