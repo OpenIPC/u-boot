@@ -200,9 +200,12 @@ gh workflow run build-hisilicon.yml -f release=true                   # + own re
 gh workflow run build-hisilicon.yml -f release=true -f publish=true   # + OpenIPC/firmware + openipc.org
 ```
 
-CI's build legs symlink `/bin/sh` to bash, because the vendor recipes depend on
-bash-isms. They also need `pycryptodome`, `u-boot-tools`,
-`device-tree-compiler` and `lzop`.
+`build-hisilicon.yml`'s build legs symlink `/bin/sh` to bash, because the
+`openipc-hisilicon` vendor recipes depend on bash-isms. They also need
+`pycryptodome`, `u-boot-tools`, `device-tree-compiler` and `lzop`. The other
+families' builds use none of those recipes: their workflows install what their
+`build.sh` runs (for `openipc-novatek`, also `gcc-arm-none-eabi`; its loader's
+make system builds under dash).
 
 ## Conventions
 
