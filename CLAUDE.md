@@ -108,35 +108,27 @@ The kernel still needs the blob (see "Hand-off to the kernel").
     `0x60004004` (128 vs 64 MiB). `dram_init()` reads the same word back.
 - **Byte order.** The flash controller packs bytes MSB first. U-Boot, the
   ROM and the vendor kernel all move whole little-endian words through it, so
-  the chip holds every 32-bit word byte-swapped, and a camera dump reads as
-  big-endian ("GK7101" in a hex editor).
-  - `output/u-boot-<soc>-nor.bin` is **in chip order**: one file for every
-    way it gets onto a camera.
-  - A programmer writes it as it is; qemu takes it as `flash-file=` as it
-    is.
-  - `sf write` at offset 0 of a buffer starting with the byte-swapped magic
-    swaps it back first. The vendor U-Boot does this (`check_magic_number()`
-    in its `gk7101_sflash.c`), and so does `gk_sflash.c`. `run ub` from
-    either bootloader therefore writes exactly the bytes a programmer
-    would. A CPU-order image (the SDK's prebuilts) is written unchanged.
-  - `gk_sflash.c` swaps the boot image's span on read as well (the image
-    found at offset 0 at probe, or the one last written there). Every
-    caller (`sf read`, SD recovery's "already on the flash" check) sees
-    the boot image as the file. Everything past it is the controller's
-    plain round trip.
-  - A whole-chip dump in chip order (a programmer's) restores with one
-    `sf write` at 0: a write at 0 that starts with the swapped magic is
-    swapped over its whole length. `sf update` splits it into sectors and
-    only the boot image comes out right. `sf read` of the whole chip is
-    not a dump either: the boot image in chip order, the rest in CPU
-    order.
-  - Exception: the first release (2026-10-18) wrote CPU-order images and
-    its `gk_sflash.c` has no swap check. `run ub` on a camera running it
-    would write a chip-order image swapped twice and brick it. Upgrade
-    those cameras with a programmer.
-  - Anything else written to flash (kernel, rootfs, environment) is in CPU
-    order through the drivers; only a raw dump or programmer image of the
-    whole chip is swapped.
+  the chip holds every 32-bit word byte-swapped, everywhere: boot image,
+  env, kernel, rootfs. A programmer's dump reads as big-endian ("GK7101" in
+  a hex editor, "sqsh" for a squashfs).
+  - **Every published file is in CPU order**: `u-boot-<soc>-nor.bin`, as
+    `gk710x-image.py` writes it, like OpenIPC/firmware's uImage and rootfs.
+    They load by tftp, mmc or usb and go to flash with `sf write` or SD
+    recovery as they are. Through the drivers the flash reads and writes in
+    CPU order; `gk_sflash.c` never swaps a read.
+  - **Programmer and qemu `flash-file=` images are in chip order**, the
+    whole image: lay the CPU-order files out at their offsets, then swap
+    every word, `objcopy -I binary -O binary --reverse-bytes=4 full.bin
+    programmer.bin` (the openipc branch's README has the full recipe). The
+    same command turns a programmer's dump back into CPU order. Writing
+    the files with a programmer as they are puts them on the chip
+    unswapped: the ROM finds no boot header, U-Boot no kernel.
+  - A programmer image written through the driver anyway (`sf write`, SD
+    recovery) is recognised by the swapped magic at 0 and swapped back: the
+    boot image however the caller splits it, the whole write when one write
+    covers more. `sf update` of a whole chip-order image therefore only gets
+    the boot image right. The vendor U-Boot's flash write does the same
+    (`check_magic_number()` in its `gk7101_sflash.c`).
   - `gk_sflash.c` keeps the word mapping for unaligned offsets as well:
     whole words only, writes padded with `0xff`.
 
@@ -272,9 +264,8 @@ bash build.sh gk7102        # one or more SoCs (CROSS_COMPILE defaults to arm-li
 
 The emulator is widgetii/qemu-hisilicon, machines `gk7101` and `gk7102`
 (`docs/goke-gk710x.md` there). `-M gk7102,flash-file=<image>` does the boot
-ROM's job from the header, so it boots exactly the flashed bytes. The
-release image goes in as it is; firmware parts written behind it (uImage,
-rootfs) must be word-swapped, since the chip holds them that way.
+ROM's job from the header, so it boots exactly the flashed bytes: a
+programmer image (the whole file word-swapped, see "Byte order").
 
 - Guest `reset` re-enters the U-Boot qemu loaded at start-up, not what is in
   flash now. To check a newly written bootloader, start qemu again on the
