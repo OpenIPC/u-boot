@@ -1,0 +1,2 @@
+# The vendor libraries the loader links against
+!*.a
