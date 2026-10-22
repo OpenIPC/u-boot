@@ -23,6 +23,11 @@ own branch:
   CI: `build-anyka.yml`, called from that branch's `ci.yml`. Its own
   `CLAUDE.md` covers the boot headers, the EV330 first stage and the
   drivers.
+- `openipc-novatek`: U-Boot for Novatek NT98562/NT98566 (NA51089), on
+  the same mainline release with the same OpenIPC layer, plus the SDK's
+  loader, built from source in the tree. CI: `build-novatek.yml`, called
+  from that branch's `ci.yml`. Its own `CLAUDE.md` covers the loader, the
+  image layout and the kernel hand-off.
 - `main`: a fork of upstream mainline U-Boot, kept for rebasing.
 
 To change bootloader code, check out `openipc-hisilicon`, or read it with
@@ -121,6 +126,27 @@ The build logic lives here. Other branches call it:
   - openipc.org accepts the report only from workflows it allowlists
     (OpenIPC/website `service/internal/builds/verify.go`). `build-anyka.yml`
     has to be added there before the first `publish`.
+
+## `build-novatek.yml`
+
+- It is `build-anyka.yml` for `openipc-novatek`: the same job graph and
+  `resolve`/`ref` rules, NOR only (256 KiB boot partition: the loader,
+  the device tree at 0x10000 and U-Boot at 0x20000).
+- The build legs also install `gcc-arm-none-eabi`, for the loader.
+- **No `hold`:** both SoCs have qemu-hisilicon machines (`nt98562`,
+  `nt98566`). Their stand-in for the loader must unpack an LZMA BCL1
+  container (algorithm 11), which qemu-hisilicon needs for this smoke
+  test.
+- **Smoke test:** two boots of an 8 MiB flash image holding only the
+  image. It passes on `Hit Ctrl-C`, and fails if the second boot reports
+  a bad environment CRC.
+- **Release and publish:**
+  - `release` uploads to the `novatek` tag.
+  - `publish` shares the `publish-firmware-latest` concurrency group and
+    reports a `uboot-novatek-…` build id.
+  - openipc.org accepts the report only from workflows it allowlists
+    (OpenIPC/website `service/internal/builds/verify.go`).
+    `build-novatek.yml` has to be added there before the first `publish`.
 
 ## Invariants to keep when editing `build-hisilicon.yml`
 
