@@ -24,6 +24,7 @@ set_read_dual(1, INFINITE, 120);
 set_read_dual(1, INFINITE, 133);
 
 set_read_dual_addr(1, INFINITE, 80);
+set_read_dual_addr(2, INFINITE, 80);
 set_read_dual_addr(2, INFINITE, 104);
 set_read_dual_addr(1, INFINITE, 104);
 set_read_dual_addr(1, INFINITE, 120);
@@ -34,6 +35,7 @@ set_read_quad(1, INFINITE, 120);
 set_read_quad(1, INFINITE, 133);
 
 set_read_quad_addr(1, INFINITE, 80);
+set_read_quad_addr(4, INFINITE, 80);
 set_read_quad_addr(4, INFINITE, 104);
 set_read_quad_addr(1, INFINITE, 104);
 set_read_quad_addr(2, INFINITE, 104);
@@ -60,6 +62,34 @@ set_erase_sector_256k(0, _256K, 24);
 set_erase_sector_256k(0, _256K, 75);
 set_erase_sector_256k(0, _256K, 104);
 set_erase_sector_256k(0, _256K, 133);
+set_erase_sector_128k(0, _128K, 120);
+set_erase_sector_256k(0, _256K, 100);
+set_erase_sector_256k(0, _256K, 80);
+set_read_dual(1, INFINITE, 100);
+set_read_dual(1, INFINITE, 108);
+set_read_dual(1, INFINITE, 60);
+set_read_dual_addr(1, INFINITE, 100);
+set_read_dual_addr(1, INFINITE, 108);
+set_read_dual_addr(1, INFINITE, 133);
+set_read_dual_addr(1, INFINITE, 40);
+set_read_dual_addr(1, INFINITE, 60);
+set_read_fast(1, INFINITE, 100);
+set_read_fast(1, INFINITE, 108);
+set_read_fast(1, INFINITE, 60);
+set_read_quad(1, INFINITE, 100);
+set_read_quad(1, INFINITE, 108);
+set_read_quad(1, INFINITE, 60);
+set_read_quad_addr(1, INFINITE, 100);
+set_read_quad_addr(1, INFINITE, 108);
+set_read_quad_addr(1, INFINITE, 60);
+set_read_quad_addr(2, INFINITE, 108);
+set_read_quad_addr(2, INFINITE, 133);
+set_read_quad_addr(2, INFINITE, 40);
+set_read_quad_addr(2, INFINITE, 80);
+set_read_std(1, INFINITE, 20);
+set_write_quad(0, 256, 100);
+set_write_quad(0, 256, 108);
+set_write_std(0, 256, 100);
 
 #include "fmc100_spi_general.c"
 static struct spi_drv spi_driver_general = {
@@ -1059,6 +1089,1113 @@ struct spi_nand_info fmc_spi_nand_flash_table[] = {
 			0
 		},
 		.driver    = &spi_driver_general,
+	},
+
+	/* From OpenIPC/u-boot-xmedia, which published these chips until it
+	 * stopped publishing (#14); appended last so they never shadow an
+	 * entry above (the first prefix match wins). */
+	/* Micron MT29F1G01ABA 1GBit */
+	{
+		.name      = "MT29F1G01ABA",
+		.id        = {0x2C, 0x14},
+		.id_len    = _2B,
+		.chipsize  = _128M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _128B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			/* dummy clock:1 byte, read size:INFINITE bytes,
+			 * clock frq:24MHz */
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 80), /* 80MHz */
+			&read_dual(1, INFINITE, 80), /* 80MHz */
+			&read_dual_addr(1, INFINITE, 80), /* 80MHz */
+			&read_quad(1, INFINITE, 80), /* 80MHz */
+			&read_quad_addr(2, INFINITE, 80), /* 80MHz */
+			0
+		},
+		.write     = {
+			/* dummy clock:0byte, erase size:64K,
+			 * clock frq:80MHz */
+			&write_std(0, 256, 80), /* 80MHz */
+			&write_quad(0, 256, 80), /* 80MHz */
+			0
+		},
+		.erase     = {
+			/* dummy clock:0byte, erase size:128K,
+			clock frq:80MHz */
+			&erase_sector_128k(0, _128K, 80), /* 80MHz */
+			0
+		},
+		.driver    = &spi_driver_no_qe,
+	},
+
+	/* Micron MT29F1G01ABB 1GBit 1.8V */
+	{
+		.name      = "MT29F1G01ABB",
+		.id        = {0x2C, 0x15},
+		.id_len    = _2B,
+		.chipsize  = _128M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _128B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 80), /* 80MHz */
+			&read_dual(1, INFINITE, 80), /* 80MHz */
+			&read_dual_addr(1, INFINITE, 80), /* 80MHz */
+			&read_quad(1, INFINITE, 80), /* 80MHz */
+			&read_quad_addr(2, INFINITE, 80), /* 80MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 80), /* 80MHz */
+			&write_quad(0, 256, 80), /* 80MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 80), /* 80MHz */
+			0
+		},
+		.driver    = &spi_driver_no_qe,
+	},
+
+	/* Micron MT29F2G01ABA 2GBit */
+	{
+		.name      = "MT29F2G01ABA",
+		.id        = {0x2C, 0x24},
+		.id_len    = _2B,
+		.chipsize  = _256M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _128B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 108),  /* 108MHz */
+			&read_dual(1, INFINITE, 108),  /* 108MHz */
+			&read_dual_addr(1, INFINITE, 108),  /* 108MHz */
+			&read_quad(1, INFINITE, 108),  /* 108MHz */
+			&read_quad_addr(2, INFINITE, 104), /* 104MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 80), /* 80MHz */
+			&write_quad(0, 256, 108), /* 108MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 80), /* 80MHz */
+			0
+		},
+		.driver    = &spi_driver_no_qe,
+	},
+
+	/* Micron MT29F2G01ABB 2GBit 1.8V */
+	{
+		.name      = "MT29F2G01ABB",
+		.id        = {0x2C, 0x25},
+		.id_len    = _2B,
+		.chipsize  = _256M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _128B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 80), /* 80MHz */
+			&read_dual(1, INFINITE, 80), /* 80MHz */
+			&read_dual_addr(1, INFINITE, 80), /* 80MHz */
+			&read_quad(1, INFINITE, 80), /* 80MHz */
+			&read_quad_addr(2, INFINITE, 80), /* 80MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 80), /* 80MHz */
+			&write_quad(0, 256, 80), /* 80MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 80), /* 80MHz */
+			0
+		},
+		.driver    = &spi_driver_no_qe,
+	},
+
+	/* Micron MT29F4G01ADAG 4GBit 3.3V */
+	{
+		.name      = "MT29F4G01ADAG",
+		.id        = {0x2C, 0x36},
+		.id_len    = _2B,
+		.chipsize  = _512M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _128B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 80), /* 80MHz */
+			&read_dual(1, INFINITE, 80), /* 80MHz */
+			&read_dual_addr(1, INFINITE, 80), /* 80MHz */
+			&read_quad(1, INFINITE, 80), /* 80MHz */
+			&read_quad_addr(2, INFINITE, 80), /* 80MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 80), /* 80MHz */
+			&write_quad(0, 256, 80), /* 80MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 80), /* 80MHz */
+			0
+		},
+		.driver    = &spi_driver_no_qe,
+	},
+
+	/* Micron MT29F4G01ABBFDWB 4GBit 1.8V */
+	{
+		.name      = "MT29F4G01ABBFDWB",
+		.id        = {0x2C, 0x35},
+		.id_len    = _2B,
+		.chipsize  = _512M,
+		.erasesize = _256K,
+		.pagesize  = _4K,
+		.oobsize   = _256B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 80),  /* 80MHz */
+			&read_dual(1, INFINITE, 80),  /* 80MHz */
+			&read_quad(1, INFINITE, 80),  /* 80MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 80), /* 80MHz */
+			&write_quad(0, 256, 80), /* 80MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_256k(0, _256K, 80), /* 80MHz */
+			0
+		},
+		.driver    = &spi_driver_no_qe,
+	},
+
+	/* ESMT F50L512M41A 512Mbit */
+	{
+		.name      = "F50L512M41A",
+		.id        = {0xC8, 0x20},
+		.id_len    = _2B,
+		.chipsize  = _64M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _64B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 104), /* 104MHz */
+			&read_dual(1, INFINITE, 104), /* 104MHz */
+			&read_quad(1, INFINITE, 104), /* 104MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 24),  /* 24MHz */
+			&write_quad(0, 256, 104),  /* 104MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 24),  /* 24MHz */
+			0
+		},
+		.driver    = &spi_driver_no_qe,
+	},
+
+	/* ESMT F50L1G41A 1Gbit */
+	{
+		.name      = "F50L1G41A",
+		.id        = {0xC8, 0x21},
+		.id_len    = _2B,
+		.chipsize  = _128M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _64B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 104), /* 104MHz */
+			&read_dual(1, INFINITE, 104), /* 104MHz */
+			&read_quad(1, INFINITE, 104), /* 104MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 24),  /* 24MHz */
+			&write_quad(0, 256, 104),  /* 104MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 24),  /* 24MHz */
+			0
+		},
+		.driver    = &spi_driver_no_qe,
+	},
+
+	/* GD 1.8v GD5F1GM7UEYIG 1Gbit (on-die ECC 24bit/1K) */
+	{
+		.name      = "GD5F1GM7UEYIG",
+		.id        = {0xc8, 0x91},
+		.id_len    = _2B,
+		.chipsize  = _128M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _128B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 133),  /* 133MHz */
+			&read_dual(1, INFINITE, 133),  /* 133MHz */
+			&read_quad(1, INFINITE, 133),  /* 133MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 133),  /* 133MHz */
+			&write_quad(0, 256, 133),  /* 133MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 133),  /* 133MHz */
+			0
+		},
+		.driver    = &spi_driver_general,
+	},
+
+	/* ESMT F50L1G41LB-104YG2ME 1Gbit */
+	{
+		.name      = "F50L1G41LB-104YG2ME",
+		.id        = {0xC8, 0x01, 0x7F},
+		.id_len    = _3B,
+		.chipsize  = _128M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _64B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 104), /* 104MHz */
+			&read_dual(1, INFINITE, 104), /* 104MHz */
+			&read_quad(1, INFINITE, 104), /* 104MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 104),  /* 104MHz */
+			&write_quad(0, 256, 104),  /* 104MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 104),  /* 104MHz */
+			0
+		},
+		.driver    = &spi_driver_no_qe,
+	},
+
+	/* GD 3.3v GD5F1GQ4UAYIG 1Gbit */
+	{
+		.name      = "GD5F1GQ4UAYIG",
+		.id        = {0xc8, 0xf1},
+		.id_len    = _2B,
+		.chipsize  = _128M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _64B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 120),  /* 120MHz */
+			&read_dual(1, INFINITE, 120),  /* 120MHz */
+			&read_dual_addr(1, INFINITE, 120),  /* 120MHz */
+			&read_quad(1, INFINITE, 120),  /* 120MHz */
+			&read_quad_addr(1, INFINITE, 120),  /* 120MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 24),  /* 24MHz */
+			&write_quad(0, 256, 120),  /* 120MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 24),  /* 24MHz */
+			0
+		},
+		.driver    = &spi_driver_general,
+	},
+
+	/* GD 3.3v GD5F2GQ4UAYIG 2Gbit */
+	{
+		.name      = "GD5F2GQ4UAYIG",
+		.id        = {0xc8, 0xf2},
+		.id_len    = _2B,
+		.chipsize  = _256M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _64B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 120),  /* 120MHz */
+			&read_dual(1, INFINITE, 120),  /* 120MHz */
+			&read_dual_addr(1, INFINITE, 120),  /* 120MHz */
+			&read_quad(1, INFINITE, 120),  /* 120MHz */
+			&read_quad_addr(1, INFINITE, 120),  /* 120MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 24),  /* 24MHz */
+			&write_quad(0, 256, 120),  /* 120MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 24),  /* 24MHz */
+			0
+		},
+		.driver    = &spi_driver_general,
+	},
+
+	/* GD 3.3v GD5F4GQ4UAYIG 4Gbit */
+	{
+		.name      = "GD5F4GQ4UAYIG",
+		.id        = {0xc8, 0xf4},
+		.id_len    = _2B,
+		.chipsize  = _512M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _64B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 120),  /* 120MHz */
+			&read_dual(1, INFINITE, 120),  /* 120MHz */
+			&read_dual_addr(1, INFINITE, 120),  /* 120MHz */
+			&read_quad(1, INFINITE, 120),  /* 120MHz */
+			&read_quad_addr(1, INFINITE, 120),  /* 120MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 24),  /* 24MHz */
+			&write_quad(0, 256, 120),  /* 120MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 24),  /* 24MHz */
+			0
+		},
+		.driver    = &spi_driver_general,
+	},
+
+	/* GD 1.8V GD5F4GQ4RAYIG 4Gbit */
+	{
+		.name      = "GD5F4GQ4RAYIG",
+		.id        = {0xc8, 0xe4},
+		.id_len    = _2B,
+		.chipsize  = _512M,
+		.erasesize = _256K,
+		.pagesize  = _4K,
+		.oobsize   = _256B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 104), /* 104MHz */
+			&read_dual(1, INFINITE, 104), /* 104MHz */
+			&read_dual_addr(1, INFINITE, 104),
+			&read_quad(1, INFINITE, 104), /* 104MHz */
+			&read_quad_addr(1, INFINITE, 104),
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 24),  /* 24MHz */
+			&write_quad(0, 256, 104),  /* 104MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_256k(0, _256K, 24),  /* 24MHz */
+			0
+		},
+		.driver    = &spi_driver_general,
+	},
+
+	/* GD 1.8V GD5F4GQ4RBYIG 4Gbit */
+	{
+		.name      = "GD5F4GQ4RBYIG",
+		.id        = {0xc8, 0xc4},
+		.id_len    = _2B,
+		.chipsize  = _512M,
+		.erasesize = _256K,
+		.pagesize  = _4K,
+		.oobsize   = _256B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 120),  /* 120MHz */
+			&read_dual(1, INFINITE, 120),  /* 120MHz */
+			&read_dual_addr(1, INFINITE, 120),  /* 120MHz */
+			&read_quad(1, INFINITE, 120),  /* 120MHz */
+			&read_quad_addr(1, INFINITE, 120),  /* 120MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 24),  /* 24MHz */
+			&write_quad(0, 256, 120),  /* 120MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_256k(0, _256K, 24),  /* 24MHz */
+			0
+		},
+		.driver    = &spi_driver_general,
+	},
+
+	/* GD 1.8V 5F4GQ6RE9IG 4Gbit */
+	{
+		.name      = "GD5F4GQ6RE9IG",
+		.id        = {0xc8, 0x45},
+		.id_len    = 2,
+		.chipsize  = _512M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _128B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24),
+			&read_fast(1, INFINITE, 80),
+			&read_dual(1, INFINITE, 80),
+			&read_dual_addr(2, INFINITE, 80),
+			&read_quad(1, INFINITE, 80),
+			&read_quad_addr(4, INFINITE, 80),
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 80),
+			&write_quad(0, 256, 80),
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 80),
+			0
+		},
+		.driver    = &spi_driver_general,
+	},
+
+	/* Winbond 1.8V W25N02JWZEIF 2Gbit */
+	{
+		.name      = "W25N02JWZEIF",
+		.id        = {0xef, 0xbf, 0x22},
+		.id_len    = _3B,
+		.chipsize  = _256M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _64B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 120),  /* 120MHz */
+			&read_dual(1, INFINITE, 120),  /* 120MHz */
+			&read_dual_addr(1, INFINITE, 120),  /* 120MHz */
+			&read_quad(1, INFINITE, 120),  /* 120MHz */
+			&read_quad_addr(2, INFINITE, 104), /* 104MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 104), /* 104MHz */
+			&write_quad(0, 256, 104),  /* 104MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 104), /* 104MHz */
+			0
+		},
+		.driver  = &spi_driver_general,
+	},
+
+	/* Winbond 3.3V W25N02KVZEIR 2Gbit */
+	{
+		.name      = "W25N02KVZEIR",
+		.id        = {0xef, 0xAA, 0x22},
+		.id_len    = _3B,
+		.chipsize  = _256M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _128B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 104),  /* 104MHz */
+			&read_dual(1, INFINITE, 104),  /* 104MHz */
+			&read_dual_addr(1, INFINITE, 104),  /* 104MHz */
+			&read_quad(1, INFINITE, 104),  /* 104MHz */
+			&read_quad_addr(2, INFINITE, 104), /* 104MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 104), /* 104MHz */
+			&write_quad(0, 256, 104),  /* 104MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 104), /* 104MHz */
+			0
+		},
+		.driver  = &spi_driver_general,
+	},
+
+	/* ATO ATO25D1GA 1Gbit */
+	{
+		.name      = "ATO25D1GA",
+		.id        = {0x9b, 0x12},
+		.id_len    = _2B,
+		.chipsize  = _128M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _64B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 104), /* 104MHz */
+			&read_quad(1, INFINITE, 104), /* 104MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 24),  /* 24MHz */
+			&write_quad(0, 256, 104),  /* 104MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 24),  /* 24MHz */
+			0
+		},
+		.driver    = &spi_driver_general,
+	},
+
+	/* MXIC MX35LF2GE4AB 2Gbit SOP-16Pin */
+	{
+		.name      = "MX35LF2GE4AB",
+		.id        = {0xc2, 0x22},
+		.id_len    = _2B,
+		.chipsize  = _256M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _64B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 104), /* 104MHz */
+			&read_quad(1, INFINITE, 104), /* 104MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 24),  /* 24MHz */
+			&write_quad(0, 256, 104),  /* 104MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 24),  /* 24MHz */
+			0
+		},
+		.driver    = &spi_driver_general,
+	},
+
+	/* MXIC MX35LF2G24AD 2Gbit 3.3V */
+	{
+		.name      = "MX35LF2G24AD",
+		.id        = {0xc2, 0x24, 0x03},
+		.id_len    = _3B,
+		.chipsize  = _256M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _128B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 20), /* 20MHz */
+			&read_fast(1, INFINITE, 120),  /* 120MHz */
+			&read_dual(1, INFINITE, 120),  /* 120MHz */
+			&read_dual_addr(1, INFINITE, 108),  /* 108MHz */
+			&read_quad(1, INFINITE, 120),  /* 120MHz */
+			&read_quad_addr(2, INFINITE, 108),  /* 108MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 24),  /* 24MHz */
+			&write_quad(0, 256, 120), /* 120MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 120),  /* 120MHz */
+			0
+		},
+		.driver    = &spi_driver_general,
+	},
+
+	/* MXIC MX35UF4GE4AD 4Gbit 1.8V */
+	{
+		.name      = "MX35UF4GE4AD",
+		.id        = {0xc2, 0xb7, 0x03},
+		.id_len    = _3B,
+		.chipsize  = _512M,
+		.erasesize = _256K,
+		.pagesize  = _4K,
+		.oobsize   = _256B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 133), /* 133MHz */
+			&read_dual(1, INFINITE, 133), /* 133MHz */
+			&read_dual_addr(1, INFINITE, 133),
+			&read_quad(1, INFINITE, 133), /* 133MHz */
+			&read_quad_addr(2, INFINITE, 133), /* 133MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 24),  /* 24MHz */
+			&write_quad(0, 256, 133),  /* 133MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_256k(0, _256K, 133), /* 133MHz */
+			0
+		},
+		.driver    = &spi_driver_general,
+	},
+
+	/* Paragon PN26G01A 1Gbit */
+	{
+		.name      = "PN26G01A",
+		.id        = {0xa1, 0xe1},
+		.id_len    = _2B,
+		.chipsize  = _128M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _128B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 108),  /* 108MHz */
+			&read_dual(1, INFINITE, 108),  /* 108MHz */
+			&read_dual_addr(1, INFINITE, 108),  /* 108MHz */
+			&read_quad(1, INFINITE, 108),  /* 108MHz */
+			&read_quad_addr(1, INFINITE, 108),  /* 108MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 24),  /* 24MHz */
+			&write_quad(0, 256, 108), /* 108MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 24),  /* 24MHz */
+			0
+		},
+		.driver    = &spi_driver_general,
+	},
+
+	/* Paragon PN26G02A 2Gbit */
+	{
+		.name      = "PN26G02A",
+		.id        = {0xa1, 0xe2},
+		.id_len    = _2B,
+		.chipsize  = _256M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _128B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 108),  /* 108MHz */
+			&read_dual(1, INFINITE, 108),  /* 108MHz */
+			&read_dual_addr(1, INFINITE, 108),  /* 108MHz */
+			&read_quad(1, INFINITE, 108),  /* 108MHz */
+			&read_quad_addr(1, INFINITE, 108),  /* 108MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 24),  /* 24MHz */
+			&write_quad(0, 256, 108), /* 108MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 24),  /* 24MHz */
+			0
+		},
+		.driver    = &spi_driver_general,
+	},
+
+	/* All-flash AFS1GQ4UAC 1Gbit */
+	{
+		.name      = "AFS1GQ4UAC",
+		.id        = {0xc1, 0x51},
+		.id_len    = _2B,
+		.chipsize  = _128M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _128B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 80),  /* 80MHz */
+			&read_dual(1, INFINITE, 80),  /* 80MHz */
+			&read_dual_addr(1, INFINITE, 80),  /* 80MHz */
+			&read_quad(1, INFINITE, 80),  /* 80MHz */
+			&read_quad_addr(1, INFINITE, 80),  /* 80MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 24),  /* 24MHz */
+			&write_quad(0, 256, 80), /* 80MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 24),  /* 24MHz */
+			0
+		},
+		.driver    = &spi_driver_general,
+	},
+
+	/* All-flash AFS2GQ4UAD 2Gbit */
+	{
+		.name      = "AFS2GQ4UAD",
+		.id        = {0xc1, 0x52},
+		.id_len    = _2B,
+		.chipsize  = _256M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _128B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 80),  /* 80MHz */
+			&read_dual(1, INFINITE, 80),  /* 80MHz */
+			&read_dual_addr(1, INFINITE, 80),  /* 80MHz */
+			&read_quad(1, INFINITE, 80),  /* 80MHz */
+			&read_quad_addr(1, INFINITE, 80),  /* 80MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 24),  /* 24MHz */
+			&write_quad(0, 256, 80), /* 80MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 24),  /* 24MHz */
+			0
+		},
+		.driver    = &spi_driver_general,
+	},
+
+	/* KIOXIA TH58CYG3S0H 1.8V 8Gbit */
+	{
+		.name      = "TH58CYG3S0H",
+		.id        = {0x98, 0xd4, 0x51},
+		.id_len    = _3B,
+		.chipsize  = _1G,
+		.erasesize = _256K,
+		.pagesize  = _4K,
+		.oobsize   = _256B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 133), /* 133MHz */
+			&read_dual(1, INFINITE, 133), /* 133MHz */
+			&read_quad(1, INFINITE, 133), /* 133MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 133), /* 133MHz */
+			&write_quad(0, 256, 133), /* 133MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_256k(0, _256K, 133), /* 133MHz */
+			0
+		},
+		.driver    = &spi_driver_no_qe,
+	},
+
+	/* HeYangTek HYF1GQ4UAACAE 1Gbit */
+	{
+		.name      = "HYF1GQ4UAACAE",
+		.id        = {0xc9, 0x51},
+		.id_len    = _2B,
+		.chipsize  = _128M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _128B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 60), /* 60MHz */
+			&read_dual(1, INFINITE, 60), /* 60MHz */
+			&read_dual_addr(1, INFINITE, 60), /* 60MHz */
+			&read_quad(1, INFINITE, 60), /* 60MHz */
+			&read_quad_addr(1, INFINITE, 60), /* 60MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 80), /* 80MHz */
+			&write_quad(0, 256, 80), /* 80MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 80), /* 80MHz */
+			0
+		},
+		.driver    = &spi_driver_general,
+	},
+
+	/* HeYangTek HYF2GQ4UAACAE 2Gbit */
+	{
+		.name      = "HYF2GQ4UAACAE",
+		.id        = {0xc9, 0x52},
+		.id_len    = _2B,
+		.chipsize  = _256M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _128B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 60), /* 60MHz */
+			&read_dual(1, INFINITE, 60), /* 60MHz */
+			&read_dual_addr(1, INFINITE, 60), /* 60MHz */
+			&read_quad(1, INFINITE, 60), /* 60MHz */
+			&read_quad_addr(1, INFINITE, 60), /* 60MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 80), /* 80MHz */
+			&write_quad(0, 256, 80), /* 80MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 80), /* 80MHz */
+			0
+		},
+		.driver    = &spi_driver_general,
+	},
+
+	/* HeYangTek HYF4GQ4UAACBE 4Gbit */
+	{
+		.name      = "HYF4GQ4UAACBE",
+		.id        = {0xc9, 0xd4},
+		.id_len    = _2B,
+		.chipsize  = _512M,
+		.erasesize = _256K,
+		.pagesize  = _4K,
+		.oobsize   = _256B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 60), /* 60MHz */
+			&read_dual(1, INFINITE, 60), /* 60MHz */
+			&read_dual_addr(1, INFINITE, 60), /* 60MHz */
+			&read_quad(1, INFINITE, 60), /* 60MHz */
+			&read_quad_addr(1, INFINITE, 60), /* 60MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 80), /* 80MHz */
+			&write_quad(0, 256, 80), /* 80MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_256k(0, _256K, 80), /* 80MHz */
+			0
+		},
+		.driver    = &spi_driver_general,
+	},
+
+	/* Etron 1.8V EM78F044VCA-H 8Gbit */
+	{
+		.name      = "EM78F044VCA-H",
+		.id        = {0xD5, 0x8D},
+		.id_len    = _2B,
+		.chipsize  = _1G,
+		.erasesize = _256K,
+		.pagesize  = _4K,
+		.oobsize   = _256B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 100), /* 100MHz */
+			&read_dual(1, INFINITE, 100), /* 100MHz */
+			&read_dual_addr(1, INFINITE, 100),  /* 100MHz */
+			&read_quad(1, INFINITE, 100),  /* 100MHz */
+			&read_quad_addr(1, INFINITE, 100),  /* 100MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 100),  /* 100MHz */
+			&write_quad(0, 256, 100),  /* 100MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_256k(0, _256K, 100),  /* 100MHz */
+			0
+		},
+		.driver    = &spi_driver_general,
+	},
+
+	/* Etron 1.8V EM78E044VCA-H 4Gbit */
+	{
+		.name      = "EM78E044VCA-H",
+		.id        = {0xD5, 0x8C},
+		.id_len    = _2B,
+		.chipsize  = _512M,
+		.erasesize = _256K,
+		.pagesize  = _4K,
+		.oobsize   = _256B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 100), /* 100MHz */
+			&read_dual(1, INFINITE, 100), /* 100MHz */
+			&read_dual_addr(1, INFINITE, 100),  /* 100MHz */
+			&read_quad(1, INFINITE, 100),  /* 100MHz */
+			&read_quad_addr(1, INFINITE, 100),  /* 100MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 100),  /* 100MHz */
+			&write_quad(0, 256, 100),  /* 100MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_256k(0, _256K, 100),  /* 100MHz */
+			0
+		},
+		.driver    = &spi_driver_general,
+	},
+
+	/* Etron 1.8V EM78D044VCF-H 2Gbit */
+	{
+		.name      = "EM78D044VCF-H",
+		.id        = {0xd5, 0x81},
+		.id_len    = _2B,
+		.chipsize  = _256M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _64B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 104), /* 104MHz */
+			&read_dual(1, INFINITE, 104), /* 104MHz */
+			&read_dual_addr(1, INFINITE, 104),
+			&read_quad(1, INFINITE, 104), /* 104MHz */
+			&read_quad_addr(1, INFINITE, 104),
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 80), /* 80MHz */
+			&write_quad(0, 256, 104),  /* 104MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 104), /* 104MHz */
+			0
+		},
+		.driver    = &spi_driver_general,
+	},
+
+	/* Etron 3.3V EM73C044VCC-H 1Gbit */
+	{
+		.name      = "EM73C044VCC-H",
+		.id        = {0xd5, 0x22},
+		.id_len    = _2B,
+		.chipsize  = _128M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _64B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24),
+			&read_fast(1, INFINITE, 120),
+			&read_dual(1, INFINITE, 120),
+			&read_dual_addr(1, INFINITE, 120),
+			&read_quad(1, INFINITE, 120),
+			&read_quad_addr(1, INFINITE, 120),
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 104),
+			&write_quad(0, 256, 120),
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 104),
+			0
+		},
+		.driver    = &spi_driver_general,
+	},
+
+	/* FM 3.3V FM25S01-DND-A-G 1Gb */
+	{
+		.name      = "FM25S01-DND-A-G",
+		.id        = {0xa1, 0xa1},
+		.id_len    = _2B,
+		.chipsize  = _128M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _128B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 104), /* 104MHz */
+			&read_dual(1, INFINITE, 104), /* 104MHz */
+			&read_dual_addr(1, INFINITE, 40), /* 40MHz */
+			&read_quad(1, INFINITE, 104), /* 104MHz */
+			&read_quad_addr(2, INFINITE, 40), /* 40MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 104), /* 104MHz */
+			&write_quad(0, 256, 104),  /* 104MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 104), /* 104MHz */
+			0
+		},
+		.driver    = &spi_driver_no_qe,
+	},
+
+	/* FM 3.3V FM25S01A 1Gb */
+	{
+		.name      = "FM25S01A",
+		.id        = {0xa1, 0xe4},
+		.id_len    = _2B,
+		.chipsize  = _128M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _64B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 104), /* 104MHz */
+			&read_dual(1, INFINITE, 104), /* 104MHz */
+			&read_dual_addr(1, INFINITE, 40), /* 40MHz */
+			&read_quad(1, INFINITE, 104), /* 104MHz */
+			&read_quad_addr(2, INFINITE, 40), /* 40MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 104), /* 104MHz */
+			&write_quad(0, 256, 104),  /* 104MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 104), /* 104MHz */
+			0
+		},
+		.driver    = &spi_driver_no_qe,
 	},
 
 	{   .id_len    = 0, },
