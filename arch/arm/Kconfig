@@ -823,6 +823,15 @@ config ARCH_K3
 	select SUPPORT_SPL
 	select FIT
 
+config ARCH_NOVATEK
+	bool "Novatek NA51089 IP camera SoCs"
+	select CPU_V7A
+	select CREATE_ARCH_SYMLINK
+	help
+	  Novatek's NT98562 and NT98566: one Cortex-A9 with DDR in the
+	  package. The mask ROM starts the vendor loader, which trains the
+	  DDR, loads U-Boot as its device tree describes and starts it.
+
 config ARCH_OMAP2PLUS
 	bool "TI OMAP2+"
 	select CPU_V7A
@@ -2293,6 +2302,8 @@ source "arch/arm/cpu/armv8/Kconfig"
 source "arch/arm/mach-imx/Kconfig"
 
 source "arch/arm/mach-nexell/Kconfig"
+
+source "arch/arm/mach-novatek/Kconfig"
 
 source "arch/arm/mach-npcm/Kconfig"
 
