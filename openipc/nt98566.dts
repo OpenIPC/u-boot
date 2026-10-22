@@ -1,0 +1,40 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * NT98566: 128 MiB of DDR3, as its Xiongmai cameras' loaders carry it
+ * (IPC_NT98566_80N50_S38); the rest is the NT98562 tree.
+ */
+/dts-v1/;
+
+/include/ "na51089.dtsi"
+
+/ {
+	mmc@f0420000 {
+		card_power_gpio = <0xe9 0x00>;
+	};
+
+	nvt_memory_cfg {
+		dram {
+			reg = <0x00 0x8000000>;
+		};
+	};
+
+	memory {
+		reg = <0x00 0x3200000>;
+	};
+
+	hdal-memory {
+		media {
+			reg = <0x3200000 0x4e00000>;
+		};
+	};
+
+	hdal-maxpath-cfg {
+		vdocap_active_list = <0x01 0x01 0x00 0x00 0x00 0x00 0x00 0x00>;
+		vdoenc_maxpath = <0x06>;
+	};
+
+	nvt_info {
+		BIN_NAME = "FW98566A";
+		BIN_NAME_T = "FW98566T";
+	};
+};
