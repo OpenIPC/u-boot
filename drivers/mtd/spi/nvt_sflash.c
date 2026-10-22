@@ -319,27 +319,44 @@ static int sf_write_sr(const u8 *sr, unsigned int len)
 	return ret ? ret : sf_wait_ready();
 }
 
-/* Clear the block protection a vendor loader may have left set */
-static void sf_unprotect(u8 mfr)
+/* Set when the block protection could not be cleared: writes are refused */
+static bool nvt_protected;
+
+/*
+ * Clear the block protection a vendor loader may have left set, and check
+ * that it went: a program or erase of a protected block is accepted and
+ * dropped, which would pass for success.
+ */
+static int sf_unprotect(u8 mfr)
 {
 	u8 sr[2] = { sf_read_reg(CMD_RDSR) };
+	u8 bp = SR1_BP_OTHER;
+	int ret;
 
 	if (sr[0] == 0xff)
-		return;
+		return 0;
 	if (mfr == MFR_GIGADEVICE || mfr == MFR_WINBOND || mfr == MFR_XMC ||
-	    mfr == MFR_ZBIT || mfr == MFR_BOYA) {
+	    mfr == MFR_ZBIT || mfr == MFR_BOYA)
+		bp = SR1_BP;
+	if (!(sr[0] & bp))
+		return 0;
+
+	printf("SF: block protection (SR1 %02x), clearing\n", sr[0]);
+	sr[0] &= ~bp;
+	if (bp == SR1_BP) {
 		/* QE lives in SR2, written as WRSR's second byte: keep it */
-		if (sr[0] & SR1_BP) {
-			printf("SF: block protection (SR1 %02x), clearing\n", sr[0]);
-			sr[0] &= ~SR1_BP;
-			sr[1] = sf_read_reg(CMD_RDSR2);
-			sf_write_sr(sr, 2);
-		}
-	} else if (sr[0] & SR1_BP_OTHER) {
-		printf("SF: block protection (SR1 %02x), clearing\n", sr[0]);
-		sr[0] &= ~SR1_BP_OTHER;
-		sf_write_sr(sr, 1);
+		sr[1] = sf_read_reg(CMD_RDSR2);
+		ret = sf_write_sr(sr, 2);
+	} else {
+		ret = sf_write_sr(sr, 1);
 	}
+	sr[0] = sf_read_reg(CMD_RDSR);
+	if (ret || sr[0] & bp) {
+		printf("SF: block protection stays (SR1 %02x): writes refused\n",
+		       sr[0]);
+		return -EROFS;
+	}
+	return 0;
 }
 
 /*
@@ -356,6 +373,8 @@ static int sf_read_chunk(u32 addr, u8 *buf, unsigned int len, bool dma)
 	if (!ret) {
 		clrbits_le32(FL_SPI_CFG, CFG_BUS_WIDTH_MASK);
 		if (dma) {
+			/* No dirty line may land on the data afterwards */
+			invalidate_dcache_range((ulong)buf, (ulong)buf + len);
 			writel((ulong)buf, FL_DMASTART);
 			fl_setup(OP_READ_N, 0, len, FIFO_DMA);
 			fl_start(CMD_READ, false);
@@ -428,6 +447,8 @@ static int nvt_sf_write(struct mtd_info *mtd, loff_t to, size_t len,
 	if (to > mtd->size || len > mtd->size - to)
 		return -EINVAL;
 	*retlen = 0;
+	if (nvt_protected)
+		return -EROFS;
 	while (len) {
 		unsigned int n = min_t(size_t, len,
 				       SZ_PAGE - (to & (SZ_PAGE - 1)));
@@ -466,15 +487,22 @@ static int nvt_sf_erase(struct mtd_info *mtd, struct erase_info *instr)
 	if (instr->addr % SZ_SECTOR || instr->len % SZ_SECTOR ||
 	    instr->addr > mtd->size || instr->len > mtd->size - instr->addr)
 		return -EINVAL;
+	if (nvt_protected) {
+		instr->state = MTD_ERASE_FAILED;
+		return -EROFS;
+	}
+	instr->state = MTD_ERASING;
 	addr = instr->addr;
 	end = instr->addr + instr->len;
 	for (; addr < end; addr += SZ_SECTOR) {
 		ret = sf_erase_sector(addr);
 		if (ret) {
 			instr->fail_addr = addr;
+			instr->state = MTD_ERASE_FAILED;
 			return ret;
 		}
 	}
+	instr->state = MTD_ERASE_DONE;
 	return 0;
 }
 
@@ -528,10 +556,24 @@ struct spi_flash *spi_flash_probe(unsigned int bus, unsigned int cs,
 		printf("SF: no flash (JEDEC id %06x)\n", jedec);
 		return NULL;
 	}
-	/* The last ID byte is log2 of the size on the parts these boards carry */
-	size = id[2] >= 0x14 && id[2] <= 0x18 ? 1 << id[2] : SZ_8M;
+	/*
+	 * The last ID byte is log2 of the size on the parts these boards
+	 * carry. Addresses are 3 bytes: past 16 MiB, only the first 16 MiB.
+	 */
+	if (id[2] > 0x18) {
+		size = SZ_16M;
+		if (!nvt_announced)
+			printf("SF: JEDEC %06x is over 16 MiB, using its first 16 MiB\n",
+			       jedec);
+	} else if (id[2] >= 0x10) {
+		size = 1 << id[2];
+	} else {
+		size = SZ_8M;
+		if (!nvt_announced)
+			printf("SF: JEDEC %06x: size unknown, taking 8 MiB\n", jedec);
+	}
 
-	sf_unprotect(id[0]);
+	nvt_protected = sf_unprotect(id[0]) < 0;
 
 	memset(flash, 0, sizeof(*flash));
 	flash->name = "nvt-sflash";
