@@ -1070,5 +1070,5 @@ config OPENIPC_NOR_SPLIT
 	  of a saved environment are dropped, and bootm checks the uImage CRC.
 	  Only for boards whose kernel knows the layout (gk7205v200 family,
 	  hi3516cv6xx, hi3519dv500, hi3516cv300/hi3516ev100, the hi3516ev200
-	  family).
+	  family, the gk7205v500 family).
 

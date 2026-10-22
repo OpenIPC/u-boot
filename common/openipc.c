@@ -1022,7 +1022,20 @@ int openipc_helper(void) {
   char msize[16];
   sprintf(msize, "%ldM", gd->ram_size / 1024 / 1024);
   env_set("totalmem", msize);
-  firmware_recovery();
+
+  /* Recovery checks what it runs: a board may already have set verify=n
+   * (so that the split scan below can clear it), and source would then run
+   * a wrapped script.txt without its data CRC. Drop it for recovery only
+   * and put it back for the boot. */
+  {
+    const char *v = env_get("verify");
+    char *saved = v ? strdup(v) : NULL;
+
+    env_set("verify", NULL);
+    firmware_recovery();
+    env_set("verify", saved);
+    free(saved);
+  }
   altbootcmd_migrate();
 
   /* Persist the default environment on first start (or after a bad env);
