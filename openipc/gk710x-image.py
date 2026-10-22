@@ -21,11 +21,11 @@ and U-Boot follows the 0. The .rvs file gives the version and the DDR test
 words ("version:", "ddrtest:") and the table ("setup:", "rdcom:",
 "delay:"), as the header of the vendor image it came from has them.
 
-The flash controller packs bytes MSB first, so the chip holds every 32-bit
-word byte-swapped (drivers/mtd/spi/gk_sflash.c). The output is in that
-chip order: a programmer writes it as it is, qemu takes it as flash, and
-sf write -- the vendor U-Boot's and this one's -- recognises the swapped
-magic at offset 0 and swaps it back.
+The output is in CPU order, like every other published file: tftp, mmc or
+usb load it and sf write puts it at 0. The chip holds every 32-bit word
+byte-swapped (drivers/mtd/spi/gk_sflash.c), so a programmer, or qemu's
+flash-file, needs every word swapped (the openipc branch's README shows
+how).
 """
 import re
 import struct
@@ -78,8 +78,7 @@ def main():
         sys.exit('%s: %d bytes, %d over the %d bytes before the environment'
                  % (dst, len(image), len(image) - limit, limit))
     with open(dst, 'wb') as f:
-        f.write(b''.join(image[i:i + 4][::-1]
-                         for i in range(0, len(image), 4)))
+        f.write(image)
 
 
 if __name__ == '__main__':
