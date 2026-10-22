@@ -26,7 +26,7 @@ BL_RUN_FWNAME = FW98$(CHIP_SHORT)T.BIN
 #563
 #566
 #565
-CHIP = 561
+CHIP = 562
 
 # [CHIP_VER] : chip version
 # A
@@ -40,7 +40,7 @@ CHIP = 561
 # 666
 # 760
 # 933
-DRAM1_CLK = 933
+DRAM1_CLK = 666
 
 # [SDRAM_SIZE] : DRAM Size (unit: Giga bit)
 # 512(Mb)
@@ -124,7 +124,7 @@ DRAM_ODT = Normal
 # SpiFlash
 # EMMC
 # EMMC_NAND_COMBO >>>[eMMC & NandSpi 2 in 1 & STORAGEEXT must choose NONE]<<<
-STORAGEINT = NandSpi
+STORAGEINT = SpiFlash
 
 # [SPI_SETTING] :  SPI pinmux setting (Valid when STORAGEINT is NandSpi or SpiFlash)
 # SPI_NORMAL

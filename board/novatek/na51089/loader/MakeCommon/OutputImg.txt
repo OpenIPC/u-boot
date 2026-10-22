@@ -310,7 +310,7 @@ $(LD_LIB_D): $(MODELEXT_D)
 $(IMAGE_D): $(SRC) $(ASM) $(CPP_SRC) $(ALL_OBJ_D) $(LIB_D) $(LD_LIB_D) $(MODELEXT_D)
 	$(shell mv *.o $(IMG_BASE_DIR)/Debug/ObjectCode 2>>/dev/null)
 	@echo '-o $@ $(ALL_OBJ_D)'> ld_d.tmp
-	@echo '--start-group $(LD_LIB_D) $(filter-out $(LD_LIB_BAN_D),$(LIB_D)) --end-group -Bstatic -EL --no-wchar-size-warning --gc-sections -T $(LD_PATH_LDS_D) -L "$(libgcc_dir_el)" -L"$(libstdc_dir_el)" -L"$(libm_dir)" -lstdc++ -lgcc "$(libm_path)" $(LDMAP_D)' >> ld_d.tmp
+	@echo '--start-group $(LD_LIB_D) $(filter-out $(LD_LIB_BAN_D),$(LIB_D)) --end-group -Bstatic -EL --no-wchar-size-warning --gc-sections -T $(LD_PATH_LDS_D) -L "$(libgcc_dir_el)" -L"$(libstdc_dir_el)" -L"$(libm_dir)" -lgcc "$(libm_path)" $(LDMAP_D)' >> ld_d.tmp
 ifeq "$(SCATTER)" "EmuKit_cpu2.lds"
 	@echo "Linking CA53_core2...$(LD_PATH_LDS_D)" \
 	&& echo Creating image $@ ... \
@@ -419,7 +419,7 @@ $(LD_LIB_R): $(MODELEXT_R)
 $(IMAGE_R): $(SRC) $(ASM) $(CPP_SRC) $(ALL_OBJ_R) $(LIB_R) $(LD_LIB_R) $(MODELEXT_R)
 	$(shell mv *.o $(IMG_BASE_DIR)/Release/ObjectCode 2>>/dev/null)
 	@echo '-o $@ $(ALL_OBJ_R) '> ld_r.tmp
-	@echo '--start-group $(LD_LIB_R) $(filter-out $(LD_LIB_BAN_R),$(LIB_R)) --end-group -Bstatic -EL --no-wchar-size-warning --gc-sections -T $(LD_PATH_LDS_R) -L"$(libgcc_dir_el)" -L"$(libstdc_dir_el)" -lstdc++ -lgcc "$(libm_path)" $(LDMAP_R)' >> ld_r.tmp
+	@echo '--start-group $(LD_LIB_R) $(filter-out $(LD_LIB_BAN_R),$(LIB_R)) --end-group -Bstatic -EL --no-wchar-size-warning --gc-sections -T $(LD_PATH_LDS_R) -L"$(libgcc_dir_el)" -L"$(libstdc_dir_el)" -lgcc "$(libm_path)" $(LDMAP_R)' >> ld_r.tmp
 
 ifeq "$(SCATTER)" "EmuKit_cpu2.lds"
 	@echo "Linking CA53_core2...$(LD_PATH_LDS_R)" \

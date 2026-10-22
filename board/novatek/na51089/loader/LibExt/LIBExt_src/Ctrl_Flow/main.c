@@ -19,7 +19,7 @@ extern char _loader_exec_compress_load_cpu_addr[];
 extern char _load_LOADER_CONFIGRAM_FREQ_PARAM_start_base[];
 extern char _load_BOOT_EXEC_start_base[];
 extern char _loader_data_start_base[];
-#define _THUMB2 __attribute__((target("thumb2")))
+#define _THUMB2 __attribute__((target("thumb")))
 //---------------------------------------------------------------------------
 // Static function
 //---------------------------------------------------------------------------
@@ -165,4 +165,14 @@ _THUMB2 UINT32 main(void)
     //BL_PostHandle();
 
     return uiReturn;
+}
+
+/*
+ * OpenIPC: libgcc's division by zero handler calls raise() when the
+ * loader is built with a Linux toolchain
+ */
+int raise(int sig);
+int raise(int sig)
+{
+	return 0;
 }

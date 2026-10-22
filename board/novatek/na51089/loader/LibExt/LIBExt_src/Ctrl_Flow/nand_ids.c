@@ -11,7 +11,7 @@
 #include "compiler.h"
 #include "fuart.h"
 
-#define _THUMB2 __attribute__((target("thumb2")))
+#define _THUMB2 __attribute__((target("thumb")))
 
 
 NAND_FLASH_DEV nvt_nand_ids[] = {

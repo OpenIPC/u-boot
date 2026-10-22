@@ -127,7 +127,7 @@ endif
 # -fno-optimize-sibling-calls   : Don't optimize sibling and tail recursive calls
 # -fno-omit-frame-pointer       : Keep the frame pointer in a register for functions that don't need one
 #----------------------------------------------------------------------
-PLATFORM_CFLAGS += -fno-builtin -ffreestanding -fno-common -fshort-wchar -fno-strict-aliasing -fno-optimize-sibling-calls -fno-omit-frame-pointer
+PLATFORM_CFLAGS += -fno-builtin -ffreestanding -fno-common -fshort-enums -fshort-wchar -fno-strict-aliasing -fno-optimize-sibling-calls -fno-omit-frame-pointer
 
 # C Language Options for eCos system
 ifeq "$(USE_ECOS_KERNEL)" "ON"

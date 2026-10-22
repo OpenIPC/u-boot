@@ -7,7 +7,7 @@
 #include "global.h"
 
 
-#define _THUMB2 __attribute__((target("thumb2")))
+#define _THUMB2 __attribute__((target("thumb")))
 
 UART_Verify_CB guiUARTCheck_cb;
 UART_Vendor_CB guiUARTVendor_cb;
