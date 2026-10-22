@@ -80,7 +80,11 @@ build_nvt() {
 build_soc() {
     soc=$1
     case "${soc}" in
-        # The DDR clocks of Xiongmai's loaders for these parts
+        # The DDR clocks of Xiongmai's loaders for these parts. The DDR is
+        # in the package: Configram560 writes its parameters from its own
+        # tables for -package=562/566, and the ConfigRam/<chip>/*.ini path
+        # the make system names, which does not exist, is not read (a 560
+        # profile of any clock and size gives the same loader).
         nt98562)
             build_nvt "${soc}" 562 666 ;;
         nt98566)
