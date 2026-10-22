@@ -152,8 +152,9 @@ offset 0:
   time (`drivers/mtd/spi/nvt_sflash.c` describes them). READ 0x03 at
   48 MHz, single lane; whole cache lines by DMA, the rest through the FIFO;
   256-byte pages by DMA, shorter ones by PIO; 64 KiB erases polled by the
-  controller; 3-byte addresses (up to 16 MiB); block protection left by a
-  vendor loader is cleared.
+  controller; 3-byte addresses: a larger part is used for its first
+  16 MiB; block protection left by a vendor loader is cleared, and if it
+  stays, writes and erases fail (-EROFS) rather than being dropped.
 - **Ethernet:** the Synopsys Ethernet QoS MAC at `0xF02B0000` and the
   embedded PHY (`0xF02B3800`). `board_eth_init()` reads the wiring from the
   loader's device tree (`/top@f0010000/eth` pinmux; Xiongmai's 0x22 is the
