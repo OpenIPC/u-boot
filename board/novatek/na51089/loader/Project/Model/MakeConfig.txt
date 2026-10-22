@@ -846,7 +846,7 @@ SECURE_DECRYPT_UBOOT_PARAM = \
 #-------------------------------------------------------------------------------
 ifeq "$(SECUREBOOT_DECRYPT_OPTEE)" "Normal"
   OPTEE_DECRYPT_TYPE = _SECURE_DECRYPT_OPTEE_DISABLE_
-else ifeq "$(SECUREBOOT_DECRYPT_UBOOT)" "Secure"
+else ifeq "$(SECUREBOOT_DECRYPT_OPTEE)" "Secure"
   OPTEE_DECRYPT_TYPE = _SECURE_DECRYPT_OPTEE_ENABLE_
 else
   OPTEE_DECRYPT_TYPE = _SECURE_DECRYPT_OPTEE_DISABLE_
