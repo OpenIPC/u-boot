@@ -169,10 +169,10 @@ jobs:
   # SoC is a hard gate on release.
   #
   # The flash controller packs bytes MSB first, so the chip holds every
-  # 32-bit word byte-swapped. openipc-gk710x builds its images in that chip
-  # order (the header reads "GK71"), as a programmer writes them, and they
-  # go into the flash file as they are; an image of an earlier build, in
-  # CPU order ("17KG"), is swapped into chip order first. The second boot
+  # 32-bit word byte-swapped. openipc-gk710x publishes its images in CPU
+  # order (the header reads "17KG"), and they are swapped into chip order,
+  # as a programmer image, for the flash file; an image of an earlier
+  # build, already in chip order ("GK71"), goes in as it is. The second boot
   # must then load the environment the first saved, which proves the
   # driver's writes land where its reads find them.
   qemu_smoke:
@@ -220,7 +220,7 @@ jobs:
           import sys
           u = open(sys.argv[1], 'rb').read()
           if u[:4] == b'17KG':
-              print('CPU-order image: swapping it into chip order')
+              print('CPU-order image: swapped into chip order for the flash')
               u = b''.join(u[i:i + 4][::-1] for i in range(0, len(u), 4))
           elif u[:4] != b'GK71':
               sys.exit('%s: no GK710x boot header' % sys.argv[1])

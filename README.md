@@ -104,12 +104,38 @@ boards).
 
 The boot ROM runs the DDR set-up listed in the image's header and copies
 U-Boot into DDR, so `u-boot-<soc>-nor.bin` is the header and `u-boot.bin`,
-written at flash offset 0. One file serves every way of installing it: it
-is in the flash chip's own byte order, so a programmer writes it as it is,
-and `sf write` -- the vendor bootloader's and this one's -- recognises that
-order at offset 0 and swaps it back as it programs. A camera already
-running the first release of this port (2026-10-18), whose `sf write` lacks
-that check, has to be upgraded with a programmer.
+written at flash offset 0. Like OpenIPC's `uImage` and `rootfs` for these
+SoCs it is in the normal (CPU) byte order: load it by tftp, from an SD
+card or a USB stick, and write it with `sf write` (or `run ub`).
+
+**Programmer images.** The flash controller swaps the bytes of every
+32-bit word on the way to the chip and back, so the chip itself holds
+every word reversed: U-Boot, environment, kernel and rootfs alike. A
+programmer writes the chip directly, so it needs the whole flash image in
+that order. Do not write the files with a programmer as they are, and do
+not just concatenate them: lay them out at their offsets, then reverse
+every 32-bit word of the whole image.
+
+```sh
+# U-Boot alone
+objcopy -I binary -O binary --reverse-bytes=4 \
+    u-boot-gk7102-nor.bin u-boot-gk7102-programmer.bin
+
+# a full 8 MiB flash: U-Boot at 0, kernel at 0x50000, rootfs at 0x250000
+tr '\0' '\377' < /dev/zero | head -c 8M > full.bin
+dd if=u-boot-gk7102-nor.bin  of=full.bin conv=notrunc
+dd if=uImage.gk7102          of=full.bin conv=notrunc bs=64k seek=5
+dd if=rootfs.squashfs.gk7102 of=full.bin conv=notrunc bs=64k seek=37
+objcopy -I binary -O binary --reverse-bytes=4 full.bin full-programmer.bin
+
+# a programmer's dump back into the normal order (what sf read shows)
+objcopy -I binary -O binary --reverse-bytes=4 dump.bin dump-normal.bin
+```
+
+Without binutils, `perl -0777 -pe 's/(.)(.)(.)(.)/$4$3$2$1/gs' in > out`
+does the same. qemu-hisilicon's `flash-file=` takes the programmer image.
+A programmer image written through U-Boot anyway (`sf write` at 0, SD
+recovery) is recognised and swapped back.
 
 The vendor kernel needs what the vendor U-Boot leaves it besides ATAGs:
 its HAL blob, memory layout words and the board's GPIO map, from which it
@@ -118,8 +144,10 @@ vendor reference boards' default layout (rb-sc1035 v2.1, sc1045, imx225,
 ov9750, jxh42 v2.0, gc1024; GK7101 rb-ov2710 v2.2); `setenv gpiomap v1`
 selects the other one (rb-ov9712, ar0130, jxh42 v1.0, GK7101 imx222).
 
-These images have so far run only on qemu-hisilicon's `gk7101` and
-`gk7102` machines, not on a camera. SD card recovery is not enabled.
+U-Boot has started on GK7102C cameras; the rest has run only on
+qemu-hisilicon's machines. Without Ethernet (GK7102C cameras), recovery is
+from an SD card: `*.img` files, each a uImage wrapper whose load address is
+the flash offset its payload goes to.
 
 ```sh
 git clone --branch openipc-gk710x https://github.com/OpenIPC/u-boot.git
@@ -230,7 +258,7 @@ same shape. It runs on pull requests to this branch that change it, on
 pushes and pull requests to `openipc-gk710x` (through that branch's
 `ci.yml`), and manually. Every SoC has a qemu-hisilicon machine model, so
 every image is smoke-tested: booted from an 8 MiB flash image holding it as
-a programmer would write it, then a second time, which must load the
+a programmer would write it (word-swapped), then a second time, which must load the
 environment the first boot saved.
 
 Its `release` input fills this repository's
