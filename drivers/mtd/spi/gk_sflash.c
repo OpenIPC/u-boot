@@ -173,11 +173,15 @@ static int sf_program(u32 addr, const u8 *buf, unsigned int words)
  * taken for one and swapped back: over sf_swap_end -- header table plus
  * the U-Boot length the header gives -- however the caller splits the
  * rest, and over its whole length when that one write is longer (a
- * whole-chip image). Any other write at 0 closes the window. The vendor
- * U-Boot's flash write does the same (check_magic_number() in its
- * gk7101_sflash.c). Reads are never swapped.
+ * whole-chip image). Any other write at 0 closes the window, and so does
+ * a write elsewhere that does not start where the last one ended: the
+ * window carries over only the pieces of one image written in a row, so a
+ * later sf update whose unchanged first sector is skipped does not inherit
+ * it. The vendor U-Boot's flash write does the same swap
+ * (check_magic_number() in its gk7101_sflash.c). Reads are never swapped.
  */
 static u32 sf_swap_end;
+static loff_t sf_swap_next;	/* where the last write ended */
 
 /* The length of a chip-order boot image starting at buf, or 0 */
 static u32 sf_boot_len(const u_char *buf, size_t len)
@@ -207,8 +211,11 @@ static u32 sf_boot_len(const u_char *buf, size_t len)
 
 static void sf_swap_detect(loff_t to, size_t len, const u_char *buf)
 {
-	if (to)
+	if (to) {
+		if (to != sf_swap_next)
+			sf_swap_end = 0;
 		return;
+	}
 	sf_swap_end = sf_boot_len(buf, len);
 	if (sf_swap_end)
 		printf("SF: boot image in the chip's byte order, swapping it back\n");
@@ -265,6 +272,7 @@ static int gk_sf_write(struct mtd_info *mtd, loff_t to, size_t len,
 	if (to + len > mtd->size)
 		return -EINVAL;
 	sf_swap_detect(to, len, buf);
+	sf_swap_next = to + len;
 	end = !to && sf_swap_end ? max_t(u32, sf_swap_end, len) : sf_swap_end;
 	*retlen = 0;
 	while (len) {
