@@ -339,11 +339,21 @@ static int dw_adjust_link(struct dw_eth_dev *priv, struct eth_mac_regs *mac_p,
 	else
 		conf &= ~MII_PORTSELECT;
 
+#ifdef CONFIG_ARCH_GK710X
+	/*
+	 * As the Goke U-Boot and kernel drivers set it: FES never (they run
+	 * 10 and 100 Mb/s alike without it), DM always (with DM clear on the
+	 * internal PHY, transmit fails with no carrier).
+	 */
+	conf &= ~FES_100;
+	conf |= FULLDPLXMODE;
+#else
 	if (phydev->speed == 100)
 		conf |= FES_100;
 
 	if (phydev->duplex)
 		conf |= FULLDPLXMODE;
+#endif
 
 	writel(conf, &mac_p->conf);
 
@@ -409,7 +419,8 @@ int designware_eth_init(struct dw_eth_dev *priv, u8 *enetaddr)
 
 	writel(FIXEDBURST | PRIORXTX_41 | DMA_PBL, &dma_p->busmode);
 
-#ifndef CONFIG_DW_MAC_FORCE_THRESHOLD_MODE
+/* GK710x: threshold mode, as the Goke U-Boot driver runs its GMAC */
+#if !defined(CONFIG_DW_MAC_FORCE_THRESHOLD_MODE) && !defined(CONFIG_ARCH_GK710X)
 	writel(readl(&dma_p->opmode) | FLUSHTXFIFO | STOREFORWARD,
 	       &dma_p->opmode);
 #else

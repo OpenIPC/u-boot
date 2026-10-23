@@ -503,70 +503,79 @@ struct gk_gpio_cfg {
 	u32 pmu_ctl;
 };
 
-static const struct gk_gpio_map *gk_map(void)
+static const struct gk_gpio_map *gk_map_by_name(const char *name)
 {
-	const char *name = env_get("gpiomap");
 	int i;
 
-	if (!name)
-		name = GK_GPIO_MAP_DEFAULT;
 	for (i = 0; i < ARRAY_SIZE(gk_maps); i++)
 		if (!strcmp(name, gk_maps[i].name))
 			return &gk_maps[i];
 	return &gk_maps[0];
 }
 
-/*
- * U-Boot itself needs the internal PHY's reference clock, out on GPIO 48
- * in the layouts that have it, and the SD pins where the map is certain. The vendor U-Boot applied
- * the whole map here, but the map is a guess until gpiomap is set, and the
- * v2 map moves UART0 off GPIO 30/31 -- a v1 board would lose its console
- * before anyone could set gpiomap=v1. The other pins stay as the boot ROM
- * left them; the kernel applies the full map it is handed.
- */
-#define GK_EPHY_CLK_PIN		48
-
-/*
- * The SD pin functions: card detect, CMD, CLK, DATA0-3. Their pin types
- * are the same on both dies. With the map's SD power pin they are what
- * U-Boot needs for SD-card recovery; on boards without SD the map has
- * none of them.
- */
-static bool gk_gpio_is_sd(u32 type)
+static const struct gk_gpio_map *gk_map(void)
 {
-	static const u32 sd[] = {
-		0x50010f00, 0xd090181e, 0x9000001f,
-		0xd0881016, 0xd0891117, 0xd08a1218, 0xd08b1319,
-	};
-	int i;
+	const char *name = env_get("gpiomap");
 
-	for (i = 0; i < ARRAY_SIZE(sd); i++)
-		if (type == sd[i])
-			return true;
-	return false;
+	return gk_map_by_name(name ? name : GK_GPIO_MAP_DEFAULT);
 }
 
+static void gk_gpio_apply(const struct gk_gpio_pin *pins, u32 n)
+{
+	u32 i;
+
+	for (i = 0; i < n; i++)
+		gk_gpio_config(pins[i].pin, pins[i].type);	/* 0: left alone */
+}
+
+/*
+ * The board's pin table, as the vendor U-Boot's gpio_init() applies it
+ * before serial_init. The environment is not read yet, so this is the
+ * image's default map; gk_gpio_map_apply() applies the one gpiomap names
+ * once it is. On the GK7101/GK7102, UART0 TX also goes out on GPIO 30,
+ * the v1 layout's TX pin (absent from the v2 table), so that a v1 board
+ * has a console before gpiomap=v1 is set.
+ */
+void gk_gpio_map_early(void)
+{
+	const struct gk_gpio_map *m = gk_map_by_name(GK_GPIO_MAP_DEFAULT);
+
+	gk_gpio_apply(m->pins, m->npins);
+#ifndef CONFIG_GK710X_S
+	gk_gpio_config(30, GK_GPIO_UART0_TX);
+#endif
+	gk_gpio_init();
+}
+
+/* The pin table of the map gpiomap names, once the environment is read */
 void gk_gpio_map_apply(void)
 {
 	const struct gk_gpio_map *m = gk_map();
-	int i;
 
-	for (i = 0; i < m->nintphy; i++)
-		if (m->intphy[i].pin == GK_EPHY_CLK_PIN)
-			gk_gpio_config(m->intphy[i].pin, m->intphy[i].type);
-	/*
-	 * The SD pins only from a map known to be the board's: the GK710xS
-	 * has one, the GK7101/GK7102 default is a guess until gpiomap is set,
-	 * and the v2 SD pins are a v1 board's PHY reset, audio clock and PHY
-	 * data lines (v1 boards have no SD).
-	 */
-	if (!IS_ENABLED(CONFIG_GK710X_S) && !env_get("gpiomap"))
-		m = NULL;
-	for (i = 0; m && i < m->npins; i++)
-		if (gk_gpio_is_sd(m->pins[i].type) ||
-		    m->pins[i].pin == m->sd_power)
-			gk_gpio_config(m->pins[i].pin, m->pins[i].type);
+	gk_gpio_apply(m->pins, m->npins);
 	gk_gpio_init();
+}
+
+/*
+ * The PHY's pins, as the vendor's phy_gpio_init() applies them before the
+ * network starts: the internal-PHY table (the PHY clock on GPIO 48, its
+ * LED, the external-PHY lines as inputs) or, for phytype 1/2, the
+ * external-PHY one (the MII/RMII lines).
+ */
+void gk_gpio_map_phy(int phytype)
+{
+	const struct gk_gpio_map *m = gk_map();
+
+	if (phytype)
+		gk_gpio_apply(m->extphy, m->nextphy);
+	else
+		gk_gpio_apply(m->intphy, m->nintphy);
+}
+
+/* The external PHY's reset pin, or 63: none */
+unsigned int gk_gpio_map_phy_reset(void)
+{
+	return gk_map()->phy_reset;
 }
 
 void gk_gpio_map_save(void *dst)

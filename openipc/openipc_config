@@ -78,6 +78,9 @@ CONFIG_CMD_MEMORY=y
 CONFIG_CMD_CRC32=y
 CONFIG_CMD_SLEEP=y
 
+# The board pin table before the console, as the vendor U-Boot applies it
+CONFIG_BOARD_EARLY_INIT_F=y
+
 # SD card: recovery images and scripts (common/openipc.c); the only way
 # back for a camera without Ethernet
 CONFIG_MMC=y
