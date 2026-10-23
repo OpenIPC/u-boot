@@ -11,6 +11,7 @@
  */
 
 #include <common.h>
+#include <cpu_func.h>
 #include <env.h>
 #include <image.h>
 #include <asm/global_data.h>
@@ -48,14 +49,16 @@ static ulong env_size(const char *name, const char *def)
  *    and on a GK7102C its XZ decompressor then failed straight away
  *    ("XZ decompressor ran out of memory"). The decompressor only adds
  *    bits to ACTLR, so set here it stays. CZ may be changed only with
- *    the caches off and invalidated.
+ *    the caches off and invalidated, so the data cache, should a build
+ *    turn it on, is cleaned and turned off first.
  */
 static void gk_cpu_prep_linux(void)
 {
 	u32 v;
 
+	dcache_disable();
 	asm volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (v));
-	v &= ~(CR_I | CR_A);
+	v &= ~(CR_C | CR_I | CR_A);
 	asm volatile("mcr p15, 0, %0, c1, c0, 0" : : "r" (v));
 	asm volatile("mcr p15, 0, %0, c7, c7, 0" : : "r" (0));
 #ifdef CONFIG_GK710X_S
