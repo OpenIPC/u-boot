@@ -43,3 +43,7 @@ CONFIG_SYS_USB_OHCI_MAX_ROOT_PORTS=1
 # CONFIG_NET_HISFV300 is not set
 CONFIG_NET_HIGMACV300=y
 CONFIG_MII=y
+
+# The split NOR layout: the kernel (OpenIPC/linux hisilicon-hi3516av100)
+# divides one firmware partition from its own device tree.
+CONFIG_OPENIPC_NOR_SPLIT=y
