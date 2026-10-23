@@ -372,10 +372,17 @@ static const struct gk_gpio_pin v1_extphy[] = {
  * ("devkit-v1.1", vendor U-Boot of 2020). Its U-Boot hands the kernel
  * pins 0-32 as function IDs of the GK7102C SDK; here they are the S
  * pin types of the same functions. No PHY pins: the package has no
- * GPIO 48.
+ * GPIO 48. A type of 0 (GPIO_TYPE_UNDEFINED) leaves a pin as it is; U-Boot
+ * and the kernel skip it.
  */
 static const struct gk_gpio_pin c_xref[] = {
-	{  0, 0xa0000024 },	/* output_sf_cs0 */
+	/*
+	 * The flash chip select: left as the boot ROM sets it (output select
+	 * 0). The S type output_sf_cs0 (output select 36) is not that
+	 * function on the GK7102C: written there, flash reads return
+	 * garbage, and the kernel's flash driver found no chip.
+	 */
+	{  0, 0 },
 	{  1, 0xa0000001 },	/* output_1 (sensor reset) */
 	{  2, 0xd0030300 },	/* inout_i2c_data */
 	{  3, 0xd0040400 },	/* inout_i2c_clk */
