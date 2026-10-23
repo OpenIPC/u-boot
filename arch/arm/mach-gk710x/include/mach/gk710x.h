@@ -153,6 +153,10 @@
 /* The CPU PLL setting the vendor U-Boot programs, as the HAL takes it */
 #define GK_ARM_FREQ		0x00112032
 
+/* The vendor's GPIO_TYPE_OUTPUT_UART0_TX / GPIO_TYPE_INPUT_UART0_RX */
+#define GK_GPIO_UART0_TX	0x90000009
+#define GK_GPIO_UART0_RX	0x50010900
+
 #ifndef __ASSEMBLY__
 void gk_gpio_config(unsigned int pin, unsigned int type);
 void gk_gpio_init(void);

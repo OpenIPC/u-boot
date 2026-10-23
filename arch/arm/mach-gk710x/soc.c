@@ -24,6 +24,18 @@ int arch_cpu_init(void)
 	 */
 #ifndef CONFIG_GK710X_S
 	writel(0x01203201, GK_RCT_PLL_CORE);
+	/*
+	 * UART0 reaches its pins only through the GPIO matrix, and the boot
+	 * ROM does not route it: the vendor U-Boot applies its board's pin
+	 * table before serial_init. Before the environment says which board
+	 * this is, TX goes out on the pins of both layouts (26 on v2, 30 on
+	 * v1; each is unused or an input in the other) and RX comes in from
+	 * v2's pin 25. gk_gpio_map_apply() moves RX to 31 for gpiomap=v1.
+	 */
+	gk_gpio_config(26, GK_GPIO_UART0_TX);
+	gk_gpio_config(30, GK_GPIO_UART0_TX);
+	gk_gpio_config(25, GK_GPIO_UART0_RX);
+	gk_gpio_init();
 #else
 	/*
 	 * The GK7102C boot header starts the watchdog (about 10 s); nothing

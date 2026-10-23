@@ -562,6 +562,10 @@ void gk_gpio_map_apply(void)
 	 */
 	if (!IS_ENABLED(CONFIG_GK710X_S) && !env_get("gpiomap"))
 		m = NULL;
+	/* UART0 RX from this map's pin (arch_cpu_init() took v2's) */
+	for (i = 0; m && i < m->npins; i++)
+		if (m->pins[i].type == GK_GPIO_UART0_RX)
+			gk_gpio_config(m->pins[i].pin, m->pins[i].type);
 	for (i = 0; m && i < m->npins; i++)
 		if (gk_gpio_is_sd(m->pins[i].type) ||
 		    m->pins[i].pin == m->sd_power)
