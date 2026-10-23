@@ -1,12 +1,12 @@
 # GK7101 boot ROM set-up: the register writes the mask ROM makes before it
 # copies U-Boot into DDR -- eFuse, DDR PHY, the RCT and the DDR controller.
-# Taken from the header of the SDK's prebuilt uboot-gk7101-rb-ov2710_v2.2.bin
-# (GK710X_LinuxSDK_v2.0.0 boot/prebuild), with the eFuse lines as GK7102
-# cameras in the field have them: the SDK images also write 0xFF39C119 to
-# 0x6000B100 first and start the eFuse load at the end without waiting for
-# it; the vendor U-Boots of 2016-2017 found on cameras do neither, and a
-# GK7102 with the SDK's table did not start. build.sh writes it into the
-# boot header.
+# Taken word for word from the boot header of a GK7101 camera's vendor
+# U-Boot ("U-Boot 2012.10-svn1551 (Apr 12 2017) for GK7101 rb ov2710
+# v2.20"). The SDK's prebuilt uboot-gk7101-rb-ov2710_v2.2.bin of 2016
+# tunes the DDR PHY and controller as for the GK7102 (0x60021A60-6C,
+# 0x60004018/1C) and starts the eFuse load without waiting for it; with
+# that table the camera showed no console output. build.sh writes this
+# table into the boot header.
 #
 #   version: <word>                  header word 1
 #   ddrtest: <address> = <pattern>   header words 5 and 6
@@ -17,9 +17,10 @@
 version: 0x30310801
 ddrtest: 0xC4000000 = 0x5A5A5A5A
 #
-setup: 0x60021A68 = 0x00000300
-setup: 0x60021A60 = 0x00002B52
-setup: 0x60021A64 = 0x00000035
+setup: 0x60021A6C = 0x00008000
+setup: 0x60021A68 = 0x00000200
+setup: 0x60021A60 = 0x0000DF3B
+setup: 0x60021A64 = 0x00000033
 setup: 0x60021A48 = 0x00001000
 setup: 0x60021A48 = 0x00000000
 setup: 0x60021B00 = 0x00000031
@@ -73,9 +74,10 @@ rdcom: 0x60004018 = 0x01000A63
 setup: 0x60004000 = 0x00000006
 setup: 0x60004018 = 0x01010380
 rdcom: 0x60004018 = 0x01010380
-setup: 0x60004018 = 0x01010000
-rdcom: 0x60004018 = 0x01010000
-setup: 0x6000401C = 0x00000210
+setup: 0x60004018 = 0x01010002
+rdcom: 0x60004018 = 0x01010002
+setup: 0x6000401C = 0x0000002A
 setup: 0x60004000 = 0x00000007
 setup: 0x6000B104 = 0x00000001
 rdcom: 0x6000B104 = 0x00000003
+setup: 0x7000914C = 0x00000011
