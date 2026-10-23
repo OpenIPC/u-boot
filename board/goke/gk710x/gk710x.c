@@ -42,9 +42,16 @@ static int gk_ephy_read(struct mii_dev *bus, int addr, int devad, int reg)
 	return addr ? 0xffff : readl(GK_EPHY_BASE + 4 * reg) & 0xffff;
 }
 
+/*
+ * BMCR's soft reset is left out: the vendor U-Boot never resets the
+ * internal PHY, and phy_connect() would do it after gk_ephy_init()'s
+ * analog trim.
+ */
 static int gk_ephy_write(struct mii_dev *bus, int addr, int devad, int reg,
 			 u16 val)
 {
+	if (reg == MII_BMCR)
+		val &= ~BMCR_RESET;
 	if (!addr)
 		writel(val, GK_EPHY_BASE + 4 * reg);
 	return 0;
