@@ -43,7 +43,22 @@ void board_prep_linux(bootm_headers_t *images)
 	memcpy((void *)GK_HAL_ADDR, gk_hal_data, sizeof(gk_hal_data));
 
 	writel(env_get_ulong("phytype", 10, 0), GK_U2K_PHY_TYPE);
+	/*
+	 * The kernel's decompressor (clk_setting() in the vendor
+	 * arch/arm/boot/compressed/misc.c) writes this word to RCT + 0x8c,
+	 * the CPU PLL, before it decompresses. On the GK7101/GK7102 that is
+	 * the setting arch_cpu_init() already made. On the GK710xS the boot
+	 * header sets the PLLs, nothing here programs RCT + 0x8c, and the
+	 * GK7102C's own kernel never writes it; with the GK7101/GK7102 value
+	 * handed over, a GK7102C halted in the decompressor right after that
+	 * write ("XZ decompressor ran out of memory"). Hand over what the PLL
+	 * holds, so that write changes nothing.
+	 */
+#ifdef CONFIG_GK710X_S
+	writel(readl(GK_RCT_PLL_ARM), GK_U2K_ARM_FREQ);
+#else
 	writel(GK_ARM_FREQ, GK_U2K_ARM_FREQ);
+#endif
 	writel(GK_HAL_ADDR, GK_U2K_HAL_ADDR);
 	writel(0, GK_U2K_SOC);
 	writel(env_size("osmem", OPENIPC_OSMEM), GK_U2K_MEM);

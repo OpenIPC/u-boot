@@ -106,6 +106,7 @@
 #define GK_RCT_SCALER_UART	(GK_RCT_BASE + 0x028)
 #define GK_RCT_PLL_SD		(GK_RCT_BASE + 0x014)
 #define GK_RCT_SCALER_SD	(GK_RCT_BASE + 0x018)
+#define GK_RCT_PLL_ARM		(GK_RCT_BASE + 0x08C)	/* the kernel's arm_freq */
 #define GK_RCT_IOCTRL_MISC2	(GK_RCT_BASE + 0x198)
 #define GK_IOCTRL_MISC2_VAL	0x12	/* the flash HOLD pin pulled up */
 /* Pad control words count down from GPIO 55 (gk7101s_gpio.c) */
