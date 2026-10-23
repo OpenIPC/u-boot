@@ -697,6 +697,45 @@ static int nor_split_layout(struct spi_flash *flash, ulong kernel_off, ulong roo
     return 0;
   return rootfs_off == kernel_off + ALIGN(image_get_image_size(&hdr), 0x10000);
 }
+
+/*
+ * Whether the split layout's kernel is whole: its header and its data CRC,
+ * read back from the flash. The scan clears bootfail for a split image, and
+ * a kernel with a sound header but a damaged payload would then fail bootm
+ * with nothing asking for recovery -- the boot-limit fallback retries the
+ * same image. Checked here, it is handed to recovery like a missing one.
+ * Without the memory to check, the kernel is taken as it is; bootm still
+ * checks it.
+ */
+static int nor_split_kernel_ok(struct spi_flash *flash, ulong kernel_off)
+{
+  const ulong chunk = 0x10000;
+  image_header_t hdr;
+  ulong len, off, n;
+  u32 crc = 0;
+  u8 *buf;
+  int ok = 1;
+
+  if (spi_flash_read(flash, kernel_off, sizeof(hdr), &hdr) ||
+      !image_check_hcrc(&hdr))
+    return 0;
+  len = image_get_data_size(&hdr);
+  if (kernel_off + sizeof(hdr) > flash->size ||
+      len > flash->size - kernel_off - sizeof(hdr))
+    return 0;
+  buf = malloc(chunk);
+  if (!buf)
+    return 1;
+  for (off = 0; ok && off < len; off += n) {
+    n = min(len - off, chunk);
+    if (spi_flash_read(flash, kernel_off + sizeof(hdr) + off, n, buf))
+      ok = 0;
+    else
+      crc = crc32(crc, buf, n);
+  }
+  free(buf);
+  return ok && crc == image_get_dcrc(&hdr);
+}
 #endif
 
 int firmware_scan(void) {
@@ -822,6 +861,7 @@ int firmware_scan(void) {
     char str[32], mtds[128], mtdparts[160];
     const char *mtdids = env_get("mtdids");
     ulong kern_slot, root_slot;
+    int kernel_ok = nor_split_kernel_ok(flash, kernel_off);
 
     /*
      * kernsize is what loadkernel reads, and also what uk erases; rootaddr
@@ -865,7 +905,12 @@ int firmware_scan(void) {
      * bootloader must not skip it. RAM only, like the rest of the scan. */
     env_set("verify", NULL);
     nor_split_bootargs();
-    env_set("bootfail", NULL);
+    if (kernel_ok) {
+      env_set("bootfail", NULL);
+    } else {
+      printf("Firmware is absent/corrupt (kernel at 0x%lx fails its CRC)\n", kernel_off);
+      env_set("bootfail", "1");
+    }
     return 0;
   }
 #endif
