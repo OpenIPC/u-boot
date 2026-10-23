@@ -4,6 +4,7 @@
 [![xiongmai build](https://github.com/OpenIPC/u-boot/actions/workflows/build-xm.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-xm.yml)
 [![gk710x build](https://github.com/OpenIPC/u-boot/actions/workflows/build-gk710x.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-gk710x.yml)
 [![anyka build](https://github.com/OpenIPC/u-boot/actions/workflows/build-anyka.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-anyka.yml)
+[![novatek build](https://github.com/OpenIPC/u-boot/actions/workflows/build-novatek.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-novatek.yml)
 
 Unified repository for the U-Boot bootloaders maintained by
 [OpenIPC](https://openipc.org) for supported SoCs.
@@ -19,6 +20,7 @@ family — not bootloader sources.
 | `openipc-xm` | U-Boot for Xiongmai XM510/XM530/XM550 |
 | `openipc-gk710x` | U-Boot for Goke GK7101/GK7102 |
 | `openipc-anyka` | U-Boot for Anyka AK3918EV200, AK391xEV300, AK391xEV330 |
+| `openipc-novatek` | U-Boot for Novatek NT98562, NT98566 |
 | `main` | Fork of upstream mainline U-Boot, kept for rebasing |
 
 New families are added here as they are ported, each with its own
@@ -192,6 +194,44 @@ bash build.sh ak3918ev300   # a single SoC
 
 Images land in `output/` as `u-boot-<soc>-nor.bin`.
 
+## novatek
+
+U-Boot for Novatek's NA51089 camera SoCs, on the same mainline release
+(v2022.10) and with the same OpenIPC boot layer as `openipc-hisilicon`.
+
+**NOR:** `nt98562` (64 MiB of DDR in the package), `nt98566` (128 MiB).
+
+The mask ROM starts Novatek's loader, which trains the DDR, reads a device
+tree from flash and unpacks U-Boot as that tree says. The loader is built
+from the Novatek SDK's sources, in this tree, and `u-boot-<soc>-nor.bin`
+holds all three, to be written at flash offset 0 as it is:
+
+| Offset | Contents |
+| --- | --- |
+| `0x00000` | the loader |
+| `0x10000` | the device tree, a Xiongmai camera's, which the kernel gets too |
+| `0x20000` | U-Boot, LZMA-packed |
+| `0x40000` | the environment (not in the image) |
+
+OpenIPC kernels for these SoCs carry no device tree: U-Boot boots them with
+the loader's, giving Linux the first `osmem` of the DDR and the vendor
+media modules the rest, as the vendor U-Boot does.
+
+These images have so far run only on qemu-hisilicon's NT9856x machines,
+not on a camera.
+
+```sh
+git clone --branch openipc-novatek https://github.com/OpenIPC/u-boot.git
+cd u-boot
+
+bash build.sh               # nt98562 nt98566
+bash build.sh nt98566       # a single SoC
+```
+
+The loader needs an Arm bare-metal toolchain (`arm-none-eabi-`, else the
+one U-Boot uses; `LOADER_CROSS_COMPILE` overrides). Images land in
+`output/` as `u-boot-<soc>-nor.bin`.
+
 ## CI
 
 The [build-hisilicon](.github/workflows/build-hisilicon.yml) workflow runs
@@ -286,6 +326,25 @@ Its `release` input fills this repository's
 
 ```sh
 gh workflow run build-anyka.yml -f release=true -f publish=true
+```
+
+### novatek
+
+The [build-novatek](.github/workflows/build-novatek.yml) workflow has the
+same shape. It runs on pull requests to this branch that change it, on
+pushes and pull requests to `openipc-novatek` (through that branch's
+`ci.yml`), and manually. Both SoCs have a qemu-hisilicon machine model,
+which does the loader's job, so both images are smoke-tested: booted from
+an 8 MiB flash image, then a second time, which must load the environment
+the first boot saved.
+
+Its `release` input fills this repository's
+[`Novatek` release](../../releases/tag/novatek); `publish` uploads to
+`OpenIPC/firmware` `latest`, where no other repository publishes
+`u-boot-nt985*` names, and reports to openipc.org.
+
+```sh
+gh workflow run build-novatek.yml -f release=true -f publish=true
 ```
 
 ## Adding a SoC family
