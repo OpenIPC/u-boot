@@ -62,6 +62,7 @@
 
 /* Audio PLL at 96 MHz / 4 for the internal PHY, in silicon bit order */
 #define GK_PLL_AUDIO_EPHY	0x02402001
+#define GK_PLL_AUDIO_EXTPHY	0x02402101	/* 100 MHz, as the HAL writes 0x00124021 */
 
 #else /* CONFIG_GK710X_S */
 
@@ -114,6 +115,7 @@
 				 ((n) < 56 ? (55 - (n)) / 4 : (n) / 4))
 
 #define GK_PLL_AUDIO_EPHY	0x00124020
+#define GK_PLL_AUDIO_EXTPHY	0x00124021
 
 #endif /* CONFIG_GK710X_S */
 
@@ -153,15 +155,19 @@
 /* The CPU PLL setting the vendor U-Boot programs, as the HAL takes it */
 #define GK_ARM_FREQ		0x00112032
 
-/* The vendor's GPIO_TYPE_OUTPUT_UART0_TX / GPIO_TYPE_INPUT_UART0_RX */
+/* The vendor's GPIO_TYPE_OUTPUT_UART0_TX, GPIO_TYPE_OUTPUT_0 and _1 */
 #define GK_GPIO_UART0_TX	0x90000009
-#define GK_GPIO_UART0_RX	0x50010900
+#define GK_GPIO_OUTPUT_0	0xa0000000
+#define GK_GPIO_OUTPUT_1	0xa0000001
 
 #ifndef __ASSEMBLY__
 void gk_gpio_config(unsigned int pin, unsigned int type);
 void gk_gpio_init(void);
 /* board/goke/gk710x/gpio_map.c */
+void gk_gpio_map_early(void);
 void gk_gpio_map_apply(void);
+void gk_gpio_map_phy(int phytype);
+unsigned int gk_gpio_map_phy_reset(void);
 void gk_gpio_map_save(void *dst);
 #endif
 

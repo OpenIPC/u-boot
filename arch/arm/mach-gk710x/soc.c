@@ -31,24 +31,6 @@ int arch_cpu_init(void)
 	 */
 	writel(0, GK_WDT_CTRL);
 #endif
-	/*
-	 * UART0 reaches its pins only through the GPIO matrix, which the boot
-	 * ROM is not known to set up: the vendor U-Boot applies its board's
-	 * pin table (gpio_init) before serial_init. Before the environment
-	 * says which board this is, TX goes out on pin 26 and RX comes in from
-	 * pin 25, as on every map but the GK7101/GK7102 v1 layout; there TX
-	 * goes to 30 as well (unused, or an input, in the other maps), and
-	 * gk_gpio_map_apply() moves RX to 31 once gpiomap=v1 is set. The same
-	 * types are what the kernel applies from map "c" on a GK7102C.
-	 * gk_gpio_init() also pulls the flash HOLD pin up before the
-	 * environment is read from flash, as the vendor does.
-	 */
-	gk_gpio_config(26, GK_GPIO_UART0_TX);
-#ifndef CONFIG_GK710X_S
-	gk_gpio_config(30, GK_GPIO_UART0_TX);
-#endif
-	gk_gpio_config(25, GK_GPIO_UART0_RX);
-	gk_gpio_init();
 	writel(1, GK_RCT_SCALER_UART);
 	return 0;
 }
