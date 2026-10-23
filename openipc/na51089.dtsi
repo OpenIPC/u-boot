@@ -1,0 +1,978 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * The device tree of a Xiongmai NT98562 camera (IPC_NT98562_80N40_S38,
+ * firmware V5.00.R02, the one its loader carries), with the OpenIPC boot
+ * chain in the nor node: the loader at 0, this tree at 0x10000, U-Boot at
+ * 0x20000.
+ *
+ * The loader reads /nvt_memory_cfg (where U-Boot runs, where this tree
+ * and SHMINFO go) and /nor/partition_uboot. U-Boot hands the tree on to
+ * the kernel, with /memory and /hdal-memory/media split at ${osmem}
+ * (board/novatek/na51089/na51089.c).
+ */
+
+/ {
+	model = "Novatek NA51089";
+	compatible = "novatek,na51089", "nvt,ca9";
+	interrupt-parent = <0x01>;
+	#address-cells = <0x01>;
+	#size-cells = <0x01>;
+
+	cpus {
+		#address-cells = <0x01>;
+		#size-cells = <0x00>;
+
+		cpu@0 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a9";
+			reg = <0x00>;
+			next-level-cache = <0x02>;
+			clock-frequency = "98p";
+			phandle = <0x04>;
+		};
+	};
+
+	cg@f0020000 {
+		compatible = "nvt,core_clk";
+		reg = <0xf0020000 0x1000>;
+	};
+
+	periph_clk {
+		compatible = "nvt,periph_clk";
+		#clock-cells = <0x00>;
+		clock-output-names = "periph_clk";
+		phandle = <0x03>;
+	};
+
+	global_timer@ffd00200 {
+		compatible = "arm,cortex-a9-global-timer";
+		reg = <0xffd00200 0x20>;
+		interrupts = <0x01 0x0b 0xf01>;
+		clocks = <0x03>;
+	};
+
+	private_timer@ffd00600 {
+		compatible = "arm,cortex-a9-twd-timer";
+		reg = <0xffd00600 0x20>;
+		interrupts = <0x01 0x0d 0xf01>;
+		clocks = <0x03>;
+	};
+
+	pmu {
+		compatible = "arm,cortex-a9-pmu";
+		interrupts = <0x00 0x70 0x04>;
+		interrupt-affinity = <0x04>;
+	};
+
+	cache-controller@ffe00000 {
+		compatible = "arm,pl310-cache";
+		reg = <0xffe00000 0x1000>;
+		interrupts = <0x00 0x60 0x04>;
+		cache-unified;
+		arm,shared-override;
+		cache-level = <0x02>;
+		arm,data-latency = <0x02 0x02 0x02>;
+		arm,tag-latency = <0x02 0x02 0x02>;
+		phandle = <0x02>;
+	};
+
+	interrupt-controller@0xffd00000 {
+		compatible = "arm,cortex-a9-gic";
+		#interrupt-cells = <0x03>;
+		interrupt-controller;
+		reg = <0xffd01000 0x1000 0xffd00100 0x1000>;
+		phandle = <0x01>;
+	};
+
+	snoop-control-unit@0xffd00000 {
+		compatible = "arm,cortex-a9-scu";
+		reg = <0xffd00000 0x100>;
+	};
+
+	chosen {
+		bootargs = " ";
+	};
+
+	aliases {
+		mmc0 = "/mmc@f0420000";
+		mmc1 = "/mmc@f0500000";
+	};
+
+	uart@f0290000 {
+		compatible = "ns16550a";
+		reg = <0xf0290000 0x1000>;
+		interrupts = <0x00 0x2b 0x04>;
+		baud = <0x1c200>;
+		reg-shift = <0x02>;
+		reg-io-width = <0x04>;
+		no-loopback-test = <0x01>;
+		clock-frequency = <0x16e3600>;
+		fifo-size = <0x40>;
+		uart_id = <0x00>;
+	};
+
+	uart@f0300000 {
+		compatible = "ns16550a";
+		reg = <0xf0300000 0x1000>;
+		interrupts = <0x00 0x2c 0x04>;
+		baud = <0x1c200>;
+		reg-shift = <0x02>;
+		reg-io-width = <0x04>;
+		no-loopback-test = <0x01>;
+		clock-frequency = <0x2dc6c00>;
+		fifo-size = <0x40>;
+		hw_flowctrl = <0x00>;
+		rx_trig_level = <0x03>;
+		uart_id = <0x01>;
+	};
+
+	uart@f0310000 {
+		compatible = "ns16550a";
+		reg = <0xf0310000 0x1000>;
+		interrupts = <0x00 0x2d 0x04>;
+		baud = <0x1c200>;
+		reg-shift = <0x02>;
+		reg-io-width = <0x04>;
+		no-loopback-test = <0x01>;
+		clock-frequency = <0x2dc6c00>;
+		fifo-size = <0x40>;
+		hw_flowctrl = <0x00>;
+		rx_trig_level = <0x03>;
+		uart_id = <0x02>;
+	};
+
+	cc@f0090000 {
+		compatible = "kdrv_rpc";
+		reg = <0xf0090000 0x300>;
+		interrupts = <0x00 0x3b 0x04>;
+	};
+
+	mmc@f0420000 {
+		compatible = "nvt,nvt_mmc";
+		reg = <0xf0420000 0x1000>;
+		interrupts = <0x00 0x1e 0x04>;
+		max-frequency = <0x2dc6c00>;
+		voltage-switch = <0x00>;
+		max-voltage = <0xce4>;
+		bus-width = <0x04>;
+		neg-sample-edge = <0x00>;
+		driving = <0x0f 0x0f 0x0f 0x14 0x0f 0x0f 0x19 0x19 0x19 0x19 0x19 0x19>;
+		cd_gpio = <0x09 0x00 0x00>;
+	};
+
+	mmc@f0500000 {
+		compatible = "nvt,nvt_mmc2";
+		reg = <0xf0500000 0x1000>;
+		interrupts = <0x00 0x1f 0x04>;
+		max-frequency = <0x2dc6c00>;
+		voltage-switch = <0x00>;
+		max-voltage = <0xce4>;
+		bus-width = <0x04>;
+		neg-sample-edge = <0x00>;
+		driving = <0x0f 0x08 0x08 0x14 0x08 0x08 0x14 0x08 0x08 0x14 0x08 0x08>;
+		cd_gpio = <0x00 0x00 0x01>;
+		status = "disabled";
+	};
+
+	nand@f0400000 {
+		#address-cells = <0x02>;
+		#size-cells = <0x02>;
+		compatible = "nvt,nvt_spinand";
+		reg = <0xf0400000 0x1000>;
+		interrupts = <0x00 0x1d 0x04>;
+		clock-frequency = <0x2625a00>;
+		nvt-devname = "spi_nand.0";
+	};
+
+	nor@f0400000 {
+		#address-cells = <0x02>;
+		#size-cells = <0x02>;
+		compatible = "nvt,nvt_spinor";
+		reg = <0xf0400000 0x1000>;
+		interrupts = <0x00 0x1d 0x04>;
+		clock-frequency = <0x2dc6c00>;
+		nvt-devname = "spi_nor.0";
+		trace-stdtable = <0x01>;
+
+		partition_loader {
+			label = "loader";
+			reg = <0x00 0x00 0x00 0x10000>;
+		};
+
+		partition_fdt {
+			label = "fdt";
+			reg = <0x00 0x10000 0x00 0x10000>;
+		};
+
+		partition_uboot {
+			label = "uboot";
+			reg = <0x00 0x20000 0x00 0x20000>;
+		};
+
+		/* The loader looks a partition up here by its label */
+		nvtpack {
+			ver = "NVTPACK_FW_INI_16072017";
+			method = <0x01>;
+
+			index {
+
+				id0 {
+					partition_name = "loader";
+				};
+
+				id1 {
+					partition_name = "fdt";
+				};
+
+				id2 {
+					partition_name = "uboot";
+				};
+			};
+		};
+	};
+
+	gpio@f0070000 {
+		compatible = "nvt,nvt_gpio";
+		reg = <0xf0070000 0x10000>;
+		interrupts = <0x00 0x18 0x04>;
+		#gpio-cells = <0x02>;
+	};
+
+	eth@f02b0000 {
+		compatible = "nvt,synopsys_eth";
+		reg = <0xf02b0000 0x3800>;
+		interrupts = <0x00 0x22 0x04>;
+		sp-clk = <0x00>;
+		ref-clk-out = <0x00>;
+	};
+
+	phy@f02b3800 {
+		compatible = "nvt,eth_phy";
+		reg = <0xf02b3800 0x400>;
+	};
+
+	wdt@f0050000 {
+		compatible = "nvt,nvt_wdt";
+		reg = <0xf0050000 0x10000>;
+		interrupts = <0x00 0x39 0x04>;
+	};
+
+	pwm@f0210000 {
+		compatible = "nvt,nvt_kdrv_pwm";
+		reg = <0xf0210000 0x2000>;
+		interrupts = <0x00 0x1a 0x04>;
+	};
+
+	adc@f0260000 {
+		compatible = "nvt,nvt_adc";
+		reg = <0xf0260000 0x1000>;
+		interrupts = <0x00 0x2f 0x04>;
+		#io-channel-cells = <0x01>;
+	};
+
+	rtc@f0060000 {
+		compatible = "nvt,nvt_rtc";
+		reg = <0xf0060000 0x100>;
+		interrupts = <0x00 0x38 0x04>;
+	};
+
+	drtc@f00b0000 {
+		compatible = "nvt,nvt_drtc";
+		reg = <0xf00b0000 0x100>;
+	};
+
+	crypto@f0620000 {
+		compatible = "nvt,nvt_crypto";
+		reg = <0xf0620000 0x100>;
+		interrupts = <0x00 0x26 0x04>;
+		mclk = <0x01>;
+	};
+
+	hash@f0670000 {
+		compatible = "nvt,nvt_hash";
+		reg = <0xf0670000 0x100>;
+		interrupts = <0x00 0x1c 0x04>;
+		mclk = <0x01>;
+	};
+
+	rsa@f06a0000 {
+		compatible = "nvt,nvt_rsa";
+		reg = <0xf06a0000 0x100>;
+		interrupts = <0x00 0x14 0x04>;
+		mclk = <0x01>;
+	};
+
+	top@f0010000 {
+		compatible = "nvt,nvt_top";
+		reg = <0xf0010000 0x2000 0xf0030000 0x2000 0xf0070000 0x10000>;
+
+		sdio {
+			pinmux = <0x05>;
+		};
+
+		sdio2 {
+			pinmux = <0x05>;
+		};
+
+		sdio3 {
+			pinmux = <0x00>;
+		};
+
+		nand {
+			pinmux = <0x05>;
+		};
+
+		sensor {
+			pinmux = <0x00>;
+		};
+
+		sensor2 {
+			pinmux = <0x00>;
+		};
+
+		mipi_lvds {
+			pinmux = <0x00>;
+		};
+
+		i2c {
+			pinmux = <0x00>;
+		};
+
+		sif {
+			pinmux = <0x00>;
+		};
+
+		uart {
+			pinmux = <0x01>;
+		};
+
+		spi {
+			pinmux = <0x00>;
+		};
+
+		sdp {
+			pinmux = <0x00>;
+		};
+
+		remote {
+			pinmux = <0x00>;
+		};
+
+		pwm {
+			pinmux = <0x00>;
+		};
+
+		pwm2 {
+			pinmux = <0x00>;
+		};
+
+		ccnt {
+			pinmux = <0x00>;
+		};
+
+		audio {
+			pinmux = <0x00>;
+		};
+
+		lcd {
+			pinmux = <0x10000000>;
+		};
+
+		tv {
+			pinmux = <0x00>;
+		};
+
+		eth {
+			pinmux = <0x22>;
+		};
+
+		misc {
+			pinmux = <0x00>;
+		};
+	};
+
+	sie@f0c00000 {
+		compatible = "nvt,drv_sie";
+		reg = <0xf0c00000 0x900 0xf0d20000 0x900 0xf0d30000 0x900>;
+		interrupts = <0x00 0x01 0x04 0x00 0x02 0x04 0x00 0x03 0x04>;
+	};
+
+	tge@f0cc0000 {
+		compatible = "nvt,kdrv_tge";
+		reg = <0xf0cc0000 0x150>;
+		interrupts = <0x00 0x16 0x04>;
+	};
+
+	rhe@f0ce0000 {
+		compatible = "nvt,kdrv_rhe";
+		reg = <0xf0ce0000 0x900>;
+		interrupts = <0x00 0x0d 0x04>;
+	};
+
+	ime@f0c40000 {
+		compatible = "nvt,kdrv_ime";
+		reg = <0xf0c40000 0x1000>;
+		interrupts = <0x00 0x06 0x04>;
+	};
+
+	ife2@f0d00000 {
+		compatible = "nvt,kdrv_ife2";
+		reg = <0xf0d00000 0x100>;
+		interrupts = <0x00 0x09 0x04>;
+	};
+
+	ise@f0c90000 {
+		compatible = "nvt,kdrv_ise";
+		reg = <0xf0c90000 0x100>;
+		interrupts = <0x00 0x15 0x04 0x00 0x55 0x04>;
+	};
+
+	ipe@f0c30000 {
+		compatible = "nvt,kdrv_ipe";
+		reg = <0xf0c30000 0x900>;
+		interrupts = <0x00 0x05 0x04>;
+	};
+
+	ife@f0c70000 {
+		compatible = "nvt,kdrv_ife";
+		reg = <0xf0c70000 0x800>;
+		interrupts = <0x00 0x08 0x04>;
+	};
+
+	vpe@f0cd0000 {
+		compatible = "nvt,kdrv_vpe";
+		reg = <0xf0cd0000 0x1040>;
+		interrupts = <0x00 0x3e 0x04>;
+	};
+
+	ai@f0c60000 {
+		compatible = "nvt,kdrv_ai";
+		reg = <0xf0c60000 0x23c 0xf0d50000 0x114 0xf0cb0000 0x22c>;
+		interrupts = <0x00 0x0e 0x04 0x00 0x0d 0x04 0x00 0x0b 0x04>;
+		clock-frequency = <0x23c34600 0x1c9c3800 0x23c34600>;
+	};
+
+	md@f0c10000 {
+		compatible = "nvt,kdrv_md";
+		reg = <0xf0c10000 0x150>;
+		interrupts = <0x00 0x2e 0x04>;
+	};
+
+	dis@f0c50000 {
+		compatible = "nvt,kdrv_dis";
+		reg = <0xf0c50000 0x114>;
+		interrupts = <0x00 0x0a 0x04>;
+	};
+
+	coe@f0a11000 {
+		compatible = "nvt,nvt_coe";
+		reg = <0xf0a11000 0x2c0>;
+	};
+
+	dce@f0c20000 {
+		compatible = "nvt,kdrv_dce";
+		reg = <0xf0c20000 0x650>;
+		interrupts = <0x00 0x07 0x04>;
+	};
+
+	ive@f0d70000 {
+		compatible = "nvt,kdrv_ive";
+		reg = <0xf0d70000 0x6c>;
+		interrupts = <0x00 0x35 0x04>;
+	};
+
+	sde@f0d90000 {
+		compatible = "nvt,kdrv_sde";
+		reg = <0xf0d90000 0x90>;
+		interrupts = <0x00 0x4a 0x04>;
+	};
+
+	ide@f0800000 {
+		compatible = "nvt,nvt_ide";
+		reg = <0xf0800000 0x1000>;
+		interrupts = <0x00 0x30 0x04>;
+	};
+
+	dsi@f0840000 {
+		compatible = "nvt,nvt_dsi";
+		reg = <0xf0840000 0x1000>;
+		interrupts = <0x00 0x32 0x04>;
+	};
+
+	csi@f0280000 {
+		compatible = "nvt,nvt_csi";
+		reg = <0xf0280000 0x100 0xf0330000 0x100>;
+		interrupts = <0x00 0x36 0x04 0x00 0x37 0x04>;
+	};
+
+	lvds@f0270000 {
+		compatible = "nvt,nvt_lvds";
+		reg = <0xf0270000 0x200 0xf0370000 0x200>;
+		interrupts = <0x00 0x36 0x04 0x00 0x37 0x04>;
+	};
+
+	senphy@f06b0000 {
+		compatible = "nvt,nvt_senphy";
+		reg = <0xf06b0000 0x100>;
+	};
+
+	ssenif@f0xx0000 {
+		compatible = "nvt,nvt_ssenif";
+		reg = <0xf02c0000 0x2000>;
+		interrupts = <0x00 0x3d 0x04>;
+	};
+
+	sif@f0240000 {
+		compatible = "nvt,nvt_sif";
+		reg = <0xf0240000 0x200>;
+		interrupts = <0x00 0x28 0x04>;
+		clock-frequency = <0xf4240>;
+	};
+
+	graphic@f0c80000 {
+		compatible = "nvt,nvt_graphic";
+		reg = <0xf0c80000 0x300 0xf0d10000 0x100>;
+		interrupts = <0x00 0x12 0x04 0x00 0x13 0x04>;
+	};
+
+	affine@f0ca0000 {
+		compatible = "nvt,nvt_affine";
+		reg = <0xf0ca0000 0x100>;
+		interrupts = <0x00 0x34 0x04>;
+	};
+
+	h26x@f0a10000 {
+		compatible = "nvt,nvt_h26x";
+		reg = <0xf0a10000 0xa00>;
+		interrupts = <0x00 0x10 0x04>;
+		power_saving = <0x00>;
+	};
+
+	timer@f0040000 {
+		compatible = "nvt,nvt_timer";
+		reg = <0xf0040000 0x300>;
+		interrupts = <0x00 0x00 0x04>;
+	};
+
+	eac@f0640000 {
+		compatible = "nvt,nvt_eac";
+		reg = <0xf0640000 0x200>;
+	};
+
+	jpg@f0a00000 {
+		compatible = "nvt,nvt_jpg";
+		reg = <0xf0a00000 0x100>;
+		interrupts = <0x00 0x11 0x04>;
+	};
+
+	nvt_usb2host@f0600000 {
+		compatible = "nvt,ehci-nvtivot";
+		reg = <0xf0600000 0x10000>;
+		interrupts = <0x00 0x1b 0x04>;
+	};
+
+	nvt_usb2dev@f0600000 {
+		compatible = "nvt,fotg200_udc";
+		reg = <0xf0600000 0x10000>;
+		interrupts = <0x00 0x1b 0x04>;
+	};
+
+	nvt_usb_chrg@f0600000 {
+		compatible = "nvt,nvt_usb_chrgdet";
+		reg = <0xf0600000 0x10000>;
+	};
+
+	dai@f0630000 {
+		compatible = "nvt,nvt_dai";
+		reg = <0xf0630000 0xbc>;
+		interrupts = <0x00 0x0f 0x04>;
+	};
+
+	rotate@f0cf0000 {
+		compatible = "nvt,nvt_rotation";
+		reg = <0xf0cf0000 0x100>;
+		interrupts = <0x00 0x51 0x04>;
+	};
+
+	drvdump@0 {
+		compatible = "nvt,nvt_drvdump";
+	};
+
+	dsp@f1430000 {
+		compatible = "nvt,nvt_dsp";
+		reg = <0xf1430000 0x200 0xf2000000 0x1000000 0xf1440000 0x200 0xf3000000 0x1000000>;
+		interrupts = <0x00 0x4c 0x04 0x00 0x4d 0x04>;
+	};
+
+	spi@f0230000 {
+		compatible = "nvt,nvt_spi";
+		reg = <0xf0230000 0x10000>;
+		interrupts = <0x00 0x23 0x04>;
+		dma-support = <0x00>;
+		nvt-devname = <0x00>;
+		status = "okay";
+		#address-cells = <0x01>;
+		#size-cells = <0x00>;
+	};
+
+	spi@f0320000 {
+		compatible = "nvt,nvt_spi";
+		reg = <0xf0320000 0x10000>;
+		interrupts = <0x00 0x24 0x04>;
+		dma-support = <0x00>;
+		nvt-devname = <0x01>;
+		status = "okay";
+	};
+
+	spi@f0340000 {
+		compatible = "nvt,nvt_spi";
+		reg = <0xf0340000 0x10000>;
+		interrupts = <0x00 0x25 0x04>;
+		dma-support = <0x00>;
+		nvt-devname = <0x02>;
+		status = "okay";
+	};
+
+	sdp@f0390000 {
+		compatible = "nvt,nvt_sdp";
+		reg = <0xf0390000 0x28>;
+		interrupts = <0x00 0x0c 0x04>;
+	};
+
+	tse@f0650000 {
+		compatible = "nvt,nvt_tse";
+		reg = <0xf0650000 0x90>;
+		interrupts = <0x00 0x17 0x04>;
+	};
+
+	remote@f0250000 {
+		compatible = "nvt,nvt_remote";
+		reg = <0xf0250000 0x28>;
+		interrupts = <0x00 0x19 0x04>;
+	};
+
+	rng@f0680000 {
+		compatible = "nvt,nvt_rng";
+		reg = <0xf0680000 0x100>;
+	};
+
+	nvt_arb@f0000000 {
+		compatible = "nvt,nvt_arb";
+		reg = <0xf0000000 0xa000 0xf0fe0000 0x300>;
+		interrupts = <0x00 0x21 0x04>;
+	};
+
+	nvt_otp@f0660000 {
+		compatible = "nvt,nvt_otp";
+		reg = <0xf0660000 0x70>;
+	};
+
+	kdrv_ipp {
+		clock-frequency = <0xe4e1c00>;
+	};
+
+	uvcp@f0690000 {
+		compatible = "nvt,nvt_uvcp";
+		reg = <0xf0690000 0x200>;
+		interrupts = <0x00 0x3b 0x04>;
+	};
+
+	pll_preset@0 {
+
+		pll3 {
+			pll_config = <0x03 0x00 0x00>;
+		};
+
+		pll4 {
+			pll_config = <0x04 0x00 0x00>;
+		};
+
+		pll5 {
+			pll_config = <0x05 0x11b3dc40 0x01>;
+		};
+
+		pll6 {
+			pll_config = <0x06 0x00 0x00>;
+		};
+
+		pll7 {
+			pll_config = <0x07 0x00 0x00>;
+		};
+
+		pll8 {
+			pll_config = <0x08 0x00 0x00>;
+		};
+
+		pll9 {
+			pll_config = <0x09 0x00 0x00>;
+		};
+
+		pll11 {
+			pll_config = <0x0b 0x00 0x00>;
+		};
+
+		pll12 {
+			pll_config = <0x0c 0x00 0x01>;
+		};
+	};
+
+	clocksource@f0040000 {
+		compatible = "nvt,nvt_clk_src";
+		reg = <0xf0040000 0x300>;
+		interrupts = <0x00 0x00 0x04>;
+		clock-frequency1 = <0x2dc6c0>;
+		clock-frequency2 = <0x2dc6c0>;
+		clksrc = <0x01>;
+		bits = <0x20>;
+		clock-names = "f0040000.timer";
+	};
+
+	ptp-dte@f0040000 {
+		compatible = "nvt,ptp-dte";
+		reg = <0xf0040000 0x300>;
+		clock-frequency = <0x2dc6c0>;
+		interrupts = <0x00 0x00 0x04>;
+	};
+
+	i2c@f0220000 {
+		compatible = "nvt,nvt_i2c";
+		reg = <0xf0220000 0x100>;
+		interrupts = <0x00 0x29 0x04>;
+		clock-frequency = <0x61a80>;
+		id = <0x00>;
+		#address-cells = <0x01>;
+		#size-cells = <0x00>;
+	};
+
+	i2c2@f0350000 {
+		compatible = "nvt,nvt_i2c";
+		reg = <0xf0350000 0x100>;
+		interrupts = <0x00 0x2a 0x04>;
+		clock-frequency = <0x61a80>;
+		id = <0x01>;
+		#address-cells = <0x01>;
+		#size-cells = <0x00>;
+	};
+
+	i2c3@f03a0000 {
+		compatible = "nvt,nvt_i2c";
+		reg = <0xf03a0000 0x100>;
+		interrupts = <0x00 0x3c 0x04>;
+		clock-frequency = <0x61a80>;
+		id = <0x02>;
+		#address-cells = <0x01>;
+		#size-cells = <0x00>;
+	};
+
+	audio@1 {
+		type = "none";
+		i2s_ctrl = <0x00>;
+		sif_channel = <0x00>;
+		gpio_cold_reset = <0x00>;
+		gpio_data = <0x00>;
+		gpio_clk = <0x00>;
+		gpio_cs = <0x00>;
+		adc_zero = <0x00>;
+	};
+
+	audio@2 {
+		type = "embedded";
+		i2s_ctrl = <0x04>;
+		sif_channel = <0x00>;
+		gpio_cold_reset = <0x00>;
+		gpio_data = <0x00>;
+		gpio_clk = <0x00>;
+		gpio_cs = <0x00>;
+		adc_zero = <0x00>;
+	};
+
+	display {
+		type = "lcd";
+		lcd_ctrl = <0x01>;
+		sif_channel = <0x02>;
+		gpio_cs = <0x2a>;
+		gpio_clk = <0x2b>;
+		gpio_data = <0x2c>;
+	};
+
+	nvtmpp {
+		compatible = "nvt,nvtmpp";
+	};
+
+	isf_stream {
+		compatible = "nvt,isf_stream";
+	};
+
+	isf_flow {
+		compatible = "nvt,isf_flow";
+	};
+
+	isf_vdocap {
+		compatible = "nvt,isf_vdocap";
+	};
+
+	isf_vdoprc {
+		compatible = "nvt,isf_vdoprc";
+	};
+
+	isf_dummy {
+		compatible = "nvt,isf_dummy";
+	};
+
+	isf_vdoenc {
+		compatible = "nvt,isf_vdoenc";
+	};
+
+	isf_vdodec {
+		compatible = "nvt,isf_vdodec";
+	};
+
+	isf_vdoout {
+		compatible = "nvt,isf_vdoout";
+	};
+
+	dispobj {
+		compatible = "nvt,nvt_dispobj";
+	};
+
+	dispdev {
+		compatible = "nvt,nvt_dispdev";
+	};
+
+	audio {
+		compatible = "nvt,nvt_audio";
+	};
+
+	msdcnvt {
+		compatible = "nvt,msdcnvt";
+	};
+
+	msdcnvt_adj {
+		compatible = "nvt,msdcnvt_adj";
+	};
+
+	msdcnvt_custom_si {
+		compatible = "nvt,msdcnvt_custom_si";
+	};
+
+	wavstudio {
+		compatible = "nvt,wavstudio";
+	};
+
+	isf_audenc {
+		compatible = "nvt,isf_audenc";
+	};
+
+	isf_auddec {
+		compatible = "nvt,isf_auddec";
+	};
+
+	isf_audcap {
+		compatible = "nvt,isf_audcap";
+	};
+
+	isf_audout {
+		compatible = "nvt,isf_audout";
+	};
+
+	nvt_ipc {
+		compatible = "nvt,nvt_ipc";
+	};
+
+	nvt_memory_cfg {
+		#address-cells = <0x01>;
+		#size-cells = <0x01>;
+
+		dram {
+			reg = <0x00 0x4000000>;
+		};
+
+		core2entry1 {
+			reg = <0x00 0x100000>;
+		};
+
+		fdt {
+			reg = <0x100000 0x100000>;
+		};
+
+		shmem {
+			reg = <0x200000 0x100000>;
+		};
+
+		loader {
+			reg = <0x1000000 0x100000>;
+		};
+
+		linuxtmp {
+			reg = <0x1100000 0x200000>;
+		};
+
+		uboot {
+			reg = <0x3900000 0x6c0000>;
+		};
+
+		core2entry2 {
+			reg = <0x3fc0000 0x40000>;
+		};
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x00 0x2800000>;
+	};
+
+	hdal-memory {
+		#address-cells = <0x01>;
+		#size-cells = <0x01>;
+
+		media {
+			reg = <0x2800000 0x1800000>;
+		};
+	};
+
+	hdal-maxpath-cfg {
+		vdocap_active_list = <0x01 0x00 0x00 0x00 0x00 0x00 0x00 0x00>;
+		vdoprc_maxdevice = <0x02>;
+		vdoenc_maxpath = <0x03>;
+		vdodec_maxpath = <0x00>;
+		vdoout_maxdevice = <0x00>;
+		adocap_maxdevice = <0x01>;
+		adoout_maxdevice = <0x01>;
+		adoenc_maxpath = <0x01>;
+		adodec_maxpath = <0x01>;
+		gfx_maxjob = <0x01>;
+		stamp_maximg = <0x08>;
+		vdoprc_maxstamp = <0x0a 0x10>;
+		vdoprc_maxmask = <0x0a 0x10>;
+		vdoenc_maxstamp = <0x0a 0x10>;
+		vdoenc_maxmask = <0x00 0x08>;
+		vdoout_maxstamp = <0x00 0x00>;
+		vdoout_maxmask = <0x00 0x00>;
+	};
+
+	nvt_info {
+		BIN_NAME = "FW98562A";
+		BIN_NAME_T = "FW98562T";
+		EMBMEM_BLK_SIZE = "0x10000";
+		EMBMEM = "EMBMEM_SPI_NOR";
+		NVT_CFG_APP_EXTERNAL = " ";
+		NVT_CFG_APP = "mem";
+		NVT_ROOTFS_ETC = [00];
+		NVT_BINARY_FILE_STRIP = "yes";
+		NVT_CFG_KERNEL_CFG = "na51089_evb_small_defconfig_nor_release";
+		NVT_CFG_UBOOT_CFG = [00];
+		NVT_LINUX_SMP = "NVT_LINUX_SMP_OFF";
+		NVT_CHIP_ID = "CHIP_NA51089";
+		NVT_DEFAULT_NETWORK_BOOT_PROTOCOL = "NVT_DEFAULT_NETWORK_BOOT_PROTOCOL_STATIC_IP";
+		NVT_ROOTFS_TYPE = "NVT_ROOTFS_TYPE_SQUASH";
+		NVT_ETHERNET = "NVT_ETHERNET_EQOS";
+		NVT_SDIO_WIFI = "NVT_SDIO_WIFI_NONE";
+		NVT_USB_WIFI = "NVT_USB_WIFI_NONE";
+		NVT_USB_4G = "NVT_USB_4G_NONE";
+		WIFI_RTK_MDL = "WIFI_RTK_MDL_8189";
+		WIFI_BRCM_MDL = "WIFI_BRCM_MDL_43438a1_ampk6212axtal26";
+		WIFI_NVT_MDL = "WIFI_NVT_MDL_18211";
+		NVT_CURL_SSL = "NVT_CURL_SSL_OPENSSL";
+		NVT_UBOOT_ENV_IN_STORG_SUPPORT = "NVT_UBOOT_ENV_IN_STORG_SUPPORT_OFF";
+	};
+};

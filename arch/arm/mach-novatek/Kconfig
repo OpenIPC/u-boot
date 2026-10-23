@@ -1,0 +1,36 @@
+if ARCH_NOVATEK
+
+choice
+	prompt "Novatek SoC"
+	default TARGET_NT98562
+
+config TARGET_NT98562
+	bool "NT98562"
+	select NVT_NA51089
+	help
+	  NA51089 with 64 MiB of DDR2 in the package.
+
+config TARGET_NT98566
+	bool "NT98566"
+	select NVT_NA51089
+	help
+	  NA51089 with 128 MiB of DDR3 in the package.
+
+endchoice
+
+config NVT_NA51089
+	bool
+
+config SYS_SOC
+	default "novatek"
+
+config SYS_VENDOR
+	default "novatek"
+
+config SYS_BOARD
+	default "na51089"
+
+config SYS_CONFIG_NAME
+	default "novatek"
+
+endif

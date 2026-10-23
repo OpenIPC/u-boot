@@ -1,0 +1,556 @@
+#----------------------------------------------------------------------
+# Local variable to determine create library or binary file
+#----------------------------------------------------------------------
+OUTPUT_FILE = BIN
+
+#----------------------------------------------------------------------
+# include make common and make option files
+#----------------------------------------------------------------------
+include $(MAKE_COMMON_DIR)/MakeOption.txt
+include $(MAKE_COMMON_DIR)/MakeCommon.txt
+
+#----------------------------------------------------------------------
+# CHIPCFG parameters
+#----------------------------------------------------------------------
+ifeq "$(CHIPCFG)" ""
+  CHIPCFG := CHIPCFG
+endif
+
+#----------------------------------------------------------------------
+# get force link ThirdParty symbols for both debug and release
+#----------------------------------------------------------------------
+ifeq "$(USE_ECOS_KERNEL)" "ON"
+rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) $(filter $(subst *,%,$2),$d))
+LIB_ECOS_RTK_WIFI_DIR = $(ROOT_DIR)/ThirdParty/devs_eCos-rtl
+LIB_ECOS_SELECT_RTK_WIFI_DIR = $(ROOT_DIR)/ThirdParty/devs_eCos-rtl$(WIFIMDL)es
+LIB_ECOS_BASE_DIR = $(ROOT_DIR)/ThirdParty
+LIB_ECOS_TMP = $(call rwildcard,$(LIB_ECOS_BASE_DIR)/,*.a)
+LIB_ECOS_WO_RTK_WIFI_LIB = $(filter-out $(LIB_ECOS_RTK_WIFI_DIR)%, $(LIB_ECOS_TMP))
+LIB_ECOS_RTK_WIFI_LIB = $(call rwildcard,$(LIB_ECOS_SELECT_RTK_WIFI_DIR)/,*.a)
+LIB_ECOS = $(LIB_ECOS_WO_RTK_WIFI_LIB) $(LIB_ECOS_RTK_WIFI_LIB)
+#There are two eCos .o not in archive
+ALL_OBJ_R += $(wildcard $(LIB_ECOS_BASE_DIR)/eCos/lib/*.o)
+ALL_OBJ_D += $(wildcard $(LIB_ECOS_BASE_DIR)/eCos/lib/*.o)
+endif
+
+#----------------------------------------------------------------------
+# get force link IPL symbols for both debug and release
+#----------------------------------------------------------------------
+SYMBOL_IPL         := IPL_SetDZoomFCB IPL_SetSleepFCB IPL_SetWakeupFCB IPL_GetCapRawFCB IPL_SetPauseDMAFCB IPL_SetResumeDMAFCB IPL_SetImgInOutFCB IPL_SetVAFCB IPL_GetIMEHalIdxFCB IPL_GetIPLInfoFCB IPL_TrigFCB IPL_SetTrigInfoFCB IPL_Stream2PauseFCB IPL_Pause2StreamFCB DCE_D2D_CB IPE_D2D_CB IFE_D2D_CB IFE2_D2D_CB IME_D2D_CB DRE_D2D_CB RHEIME_D2D_IFECB RHEIME_D2D_DCECB RHEIME_D2D_IPECB RHEIME_D2D_IMECB RHEIME_D2D_RHECB IPL_GetCtrlFlowFCB IQUC_InitCtrlItem
+
+#----------------------------------------------------------------------
+# include the libraries
+#----------------------------------------------------------------------
+#
+# get Debug LIBs
+#
+LIB_ALG_DIR_D = $(ARC_BASE_DIR)/../Alg/ARC/Debug
+LIB_APP_DIR_D = $(ARC_BASE_DIR)/App/Debug
+LIB_COM_DIR_D = $(ARC_BASE_DIR)/Common/Debug
+LIB_DRV_DIR_D = $(ARC_BASE_DIR)/Drv/Debug
+LIB_LIB_DIR_D = $(ARC_BASE_DIR)/Lib/Debug
+
+# get Alg libraries
+LIB_ALG_D := $(wildcard $(LIB_ALG_DIR_D)/*.a)
+
+# get App/AppExt libraries
+LIB_APP_D := $(wildcard $(LIB_APP_DIR_D)/*.a)
+
+# get Common libraries
+LIB_COM_D := $(wildcard $(LIB_COM_DIR_D)/*.a)
+
+# get Drv/DrvExt libraries
+LIB_DRV_ALL_D       := $(wildcard $(LIB_DRV_DIR_D)/*.a)
+
+# get LIBs in App (except capture library), AppExt
+# and LIB module (except driver and slide-effect libraries)
+LIB_LIB_DIR_D = $(ARC_BASE_DIR)/Lib/Debug
+LIB_STRGEXT_ALL_D := $(wildcard $(LIB_LIB_DIR_D)/STRGEXT_*.a)
+LIB_STRGEXT_D := $(wildcard $(LIB_LIB_DIR_D)/STRGEXT_$(STORAGEEXT)_D.a)
+LIB_STRGINT_ALL_D := $(wildcard $(LIB_LIB_DIR_D)/STRGINT_*.a)
+LIB_STRGINT_D := $(wildcard $(LIB_LIB_DIR_D)/STRGINT_$(STORAGEINT)_D.a)
+LIB_REMAP_ALL_D := $(wildcard $(LIB_LIB_DIR_D)/Remap_*.a)
+LIB_REMAP_D := $(wildcard $(LIB_LIB_DIR_D)/Remap_$(RESETFLAG)_D.a)
+LIB_RESET_ALL_D := $(wildcard $(LIB_LIB_DIR_D)/Reset_*.a)
+LIB_RESET_D := $(wildcard $(LIB_LIB_DIR_D)/Reset_$(RESETCHIP)_D.a)
+LIB_COMMON_ALL_D := $(wildcard $(LIB_LIB_DIR_D)/Common_*.a)
+LIB_COMMON_D := $(wildcard $(LIB_LIB_DIR_D)/Common_$(COMMON_LIB)_D.a)
+# get LIBs in App (except capture library), AppExt
+# and LIB module (except driver and slide-effect libraries)
+LIB_LIB_ALL_D       := $(filter-out $(LIB_PARSER_ALL_D) $(LIB_SLIDE_ALL_D), $(wildcard $(LIB_LIB_DIR_D)/*.a))
+
+LIB_LIB_D           := $(filter-out $(LIB_STRGEXT_ALL_D) $(LIB_STRGINT_ALL_D) $(LIB_REMAP_ALL_D) $(LIB_RESET_ALL_D) $(LIB_COMMON_ALL_D), $(LIB_LIB_ALL_D))
+
+#
+# get Release LIBs
+#
+LIB_LIB_DIR_R = $(ARC_BASE_DIR)/Lib/Release
+LIB_STRGEXT_ALL_R := $(wildcard $(LIB_LIB_DIR_R)/STRGEXT_*.a)
+LIB_STRGEXT_R := $(wildcard $(LIB_LIB_DIR_R)/STRGEXT_$(STORAGEEXT).a)
+LIB_STRGINT_ALL_R := $(wildcard $(LIB_LIB_DIR_R)/STRGINT_*.a)
+LIB_STRGINT_R := $(wildcard $(LIB_LIB_DIR_R)/STRGINT_$(STORAGEINT).a)
+LIB_REMAP_ALL_R := $(wildcard $(LIB_LIB_DIR_R)/Remap_*.a)
+LIB_REMAP_R := $(wildcard $(LIB_LIB_DIR_R)/Remap_$(RESETFLAG).a)
+LIB_RESET_ALL_R := $(wildcard $(LIB_LIB_DIR_R)/Reset_*.a)
+LIB_RESET_R := $(wildcard $(LIB_LIB_DIR_R)/Reset_$(RESETCHIP).a)
+LIB_COMMON_ALL_R := $(wildcard $(LIB_LIB_DIR_R)/Common_*.a)
+LIB_COMMON_R := $(wildcard $(LIB_LIB_DIR_R)/Common_$(COMMON_LIB).a)
+# get LIBs in App (except capture library), AppExt
+# and LIB module (except driver and slide-effect libraries)
+LIB_LIB_ALL_R       := $(filter-out $(LIB_PARSER_ALL_R) $(LIB_SLIDE_ALL_R), $(wildcard $(LIB_LIB_DIR_R)/*.a))
+
+#LIB_LIB_R           := $(filter-out $(LIB_STRGEXT_ALL_R) $(LIB_STRGINT_ALL_R) $(LIB_REMAP_ALL_R), $(LIB_LIB_ALL_R))
+LIB_LIB_R           := $(filter-out $(LIB_STRGEXT_ALL_R) $(LIB_REMAP_ALL_R) $(LIB_RESET_ALL_R) $(LIB_COMMON_ALL_R), $(LIB_LIB_ALL_R))
+
+
+# get total libraries for Debug & Release mode; note we cannot get string of LIB_R from LIB_D, or vice versa,
+# because we may build Debug and Release output separately, the library of one mode maybe not exist, and cause
+# the link problem. So, while adding/deleting libraries, please be patient to do it for Debug and Release mode both.
+
+LIB_R := \
+    $(LIB_LIB_R) \
+    $(LIB_STRGEXT_R) \
+    $(LIB_REMAP_R) \
+	$(LIB_RESET_R) \
+	$(LIB_COMMON_R)
+
+LIB_D := \
+    $(LIB_LIB_D) \
+    $(LIB_STRGEXT_D) \
+    $(LIB_REMAP_D) \
+	$(LIB_RESET_D) \
+	$(LIB_COMMON_D)
+
+# If some libraries only available in Release mode, add these libraries in Debug mode too.
+LIB_D += $(filter-out $(subst Debug/,Release/,$(LIB_D:_D.a=.a)),$(LIB_R))
+
+# Append eCos library to both Debug and Release mode
+# (We don't have debug mode's eCos library)
+LIB_R += $(LIB_ECOS)
+LIB_D += $(LIB_ECOS)
+
+#----------------------------------------------------------------------
+# set the make outputs
+#----------------------------------------------------------------------
+# for debug target
+IMAGE_D = $(IMG_DEBUG)/$(PRJ_NAME)_D.axf
+BIN_D   = $(IMG_DEBUG)/$(LDR_NAME).bin
+MAP_D   = $(IMG_DEBUG)/$(PRJ_NAME)_D.txt
+MAP2_D   = $(IMG_DEBUG)/$(PRJ_NAME)_ldmap_D.txt
+SYM_D   = $(IMG_DEBUG)/$(PRJ_NAME)_D.sym
+DASM_D  = $(IMG_DEBUG)/$(PRJ_NAME)_dasm_D.txt
+ifeq "$(MODELEXT_BUILT_IN)" "MODELEXT_BUILT_IN_OFF"
+MODELEXT_D = $(IMG_DEBUG)/$(BIN_NAME).ext.bin
+endif
+
+
+# for release target
+IMAGE_R = $(IMG_RELEASE)/$(PRJ_NAME).axf
+BIN_R   = $(IMG_RELEASE)/$(LDR_NAME).bin
+MAP_R   = $(IMG_RELEASE)/$(PRJ_NAME).txt
+MAP2_R   = $(IMG_RELEASE)/$(PRJ_NAME)_ldmap.txt
+SYM_R   = $(IMG_RELEASE)/$(PRJ_NAME).sym
+DASM_R  = $(IMG_RELEASE)/$(PRJ_NAME)_dasm.txt
+ifeq "$(MODELEXT_BUILT_IN)" "MODELEXT_BUILT_IN_OFF"
+MODELEXT_R = $(IMG_RELEASE)/$(BIN_NAME).ext.bin
+endif
+
+#----------------------------------------------------------------------
+# if enable LDS_MAP
+#----------------------------------------------------------------------
+ifeq "$(LDS_MAP)" "ON"
+LDMAP_D = -Map $(MAP2_D)
+LDMAP_R = -Map $(MAP2_R)
+endif
+
+#----------------------------------------------------------------------
+# set the warning/error log file option
+#----------------------------------------------------------------------
+log_file = log_Prj.txt
+
+# 0: Standard input (stdin), 1: Standard output (stdout), 2: Standard error (stderr)
+# 2>>$(log_file) means redirect standard error to $(log_file)
+# 2>>/dev/null means redirect standard error to NULL (Don't display error message)
+ifeq "$(LOG_ERR)" "ON"
+LOG_OPTION = 2>>$(log_file)
+endif
+
+#----------------------------------------------------------------------
+# set robustness checking log file
+#----------------------------------------------------------------------
+lint_file       = lint_Prj.txt
+lintopt_file    = options_Prj.lnt
+lintsum_file    = lintsum_Prj.txt
+
+#----------------------------------------------------------------------
+# set the make targets
+#----------------------------------------------------------------------
+build_D: make_debug_begin prepare_log $(IMAGE_D) $(BIN_D)
+build_R: make_release_begin prepare_log $(IMAGE_R) $(BIN_R)
+build_pipe_D: $(IMAGE_D) $(BIN_D)
+build_pipe_R: $(IMAGE_R) $(BIN_R)
+
+ifeq "$(ISOLATE_DEP)" "ON"
+build_DEP: make_dep_begin $(SRC) $(ASM) $(CPP_SRC) $(ALL_DEP)
+endif
+
+build_LINT: make_lint_begin $(LINT_FILE)
+
+prepare_log:
+	@$(LOG_OPTION)
+
+ifeq "$(ARCH)" "ARM"
+#arm-none-eabi-gcc -march=armv7-a -mcpu=cortex-a9 -mfpu=neon -mfloat-abi=softfp -print-file-name=libm.a
+ifeq "$(FPU)" "hard"
+libgcc_path     = $(shell $(CC) -march=armv7-a -mcpu=$(CPU) -mabi=aapcs -mfpu=neon -mfloat-abi=$(FPU) -print-libgcc-file-name)
+libgcc_dir_el   = $(shell dirname "$(libgcc_path)")
+libstdc_path    = $(shell $(CC) -msoft-float -print-file-name=libstdc++.a)
+libstdc_dir_el  = $(shell dirname "$(libstdc_path)")
+libm_path    		= $(shell $(CC) -march=armv7-a -mcpu=$(CPU) -mfpu=neon -mfloat-abi=$(FPU) -print-file-name=libm.a)
+libm_dir  			= $(shell dirname "$(libm_path)")
+else
+libgcc_path     = $(shell $(CC) -march=armv7-a -mcpu=$(CPU) -mabi=aapcs -mfloat-abi=$(FPU) -print-libgcc-file-name)
+libgcc_dir_el   = $(shell dirname "$(libgcc_path)")
+libstdc_path    = $(shell $(CC) -msoft-float -print-file-name=libstdc++.a)
+libstdc_dir_el  = $(shell dirname "$(libstdc_path)")
+libm_path    		= $(shell $(CC) -march=armv7-a -mcpu=$(CPU) -mfloat-abi=$(FPU) -print-file-name=libm.a)
+libm_dir  			= $(shell dirname "$(libm_path)")
+endif
+endif
+
+define append_modelext
+	echo Append $1 into $4. \
+	&& $(AR) x $3 $1.o \
+	&& $(FE) --only-section=modelext_header.$1 -O binary -S -R .comment -R .note $1.o $2/$1.header \
+	&& cat $2/$1.header >> $4 \
+    && $(FE) --only-section=modelext_data.$1 -O binary -S -R .comment -R .note $1.o $2/$1.data \
+    && cat $2/$1.data >> $4
+endef
+
+
+#Replace string existing in lds file
+ifeq "$(SCATTER)" "EmuKit_cpu2.lds"
+ifeq "$(PLATFORM_MEM_SIZE)" "SDRAM_SIZE_256"
+    BOARD_UITRON_ADDR = 0x8000000
+endif
+ifeq "$(PLATFORM_MEM_SIZE)" "SDRAM_SIZE_512"
+    BOARD_UITRON_ADDR = 0x10000000
+endif
+ifeq "$(PLATFORM_MEM_SIZE)" "SDRAM_SIZE_1024"
+    BOARD_UITRON_ADDR = 0x20000000
+endif
+endif
+
+LD_REMAP_LIB = Remap_$(RESETFLAG)
+LD_DOREMAP = doremap$(RESETFLAG)
+LD_RESET_LIB = Reset_$(RESETCHIP)
+LD_COMMON_LIB = Common_$(COMMON_LIB)
+ifeq "$(BL_COMPRESS)" "ENABLE"
+LD_CONFIGRAM = configramLZ
+else
+LD_CONFIGRAM = configramNM
+endif
+LD_REPLACE_VAR = sed \
+	-e 's/$$LD_REMAP_LIB/$(LD_REMAP_LIB)/g' \
+	-e 's/$$LD_DOREMAP/$(LD_DOREMAP)/g' \
+	-e 's/$$LD_CONFIGRAM/$(LD_CONFIGRAM)/g' \
+	-e 's/$$LD_BASE_ADDR/$(LD_BASE_ADDR)/g' \
+	-e 's/$$LD_RESET_LIB/$(LD_RESET_LIB)/g' \
+	-e 's/$$LD_COMMON_LIB/$(LD_COMMON_LIB)/g' \
+	$(SCATTER)
+
+#The folder, the working space to fill the full path into lds file
+LD_DIR_WORKING_D= $(IMG_BASE_DIR)/Debug/ObjectLds
+#Generate the working folder and temp lds file called replace.lds
+LD_REPLACE_LDS_D= $(shell mkdir -p $(LD_DIR_WORKING_D)) $(shell $(OBJDUMP) -h $(LIB_D) | grep ".version.info" > tmp_awk1) $(shell $(LD_REPLACE_VAR) > $(LD_DIR_WORKING_D)/replace.lds)
+#The real lds file replaced of using by linker
+LD_PATH_LDS_D   = $(LD_DIR_WORKING_D)/$(basename $(SCATTER))_D.lds
+#Here have some steps as following to get a some files explained below,
+#Step 1: Generate temp lds file
+#Step 2: export the contents of $(LIB_D) into libs.txt
+#Step 3: export the contents of $(ALL_OBJ_D) into objs.txt
+#Step 4: Give mips-nvt.exe libs.txt, objs.txt and replace.lds to get ld_ext.d, ld_lib.txt, ld_lib_ban.txt and real lds file for linker.
+#  Where,
+#    ld_ext.d is a decency file depends on .o used in lds file
+#    ld_lib_ban is a list of .a files to ban, because linker should use the .a file after extracting .o.
+#    real lds file is replaced by full path.
+LD_DFILE_D      = $(LD_REPLACE_LDS_D) $(shell echo $(LIB_D) > $(LD_DIR_WORKING_D)/libs.txt ) $(shell echo $(ALL_OBJ_D) > $(LD_DIR_WORKING_D)/objs.txt ) $(shell $(LDNVT) --lds-dst=$(LD_PATH_LDS_D) --lds-dir=$(LD_DIR_WORKING_D) --lds-src=$(LD_DIR_WORKING_D)/replace.lds --libs-src=$(LD_DIR_WORKING_D)/libs.txt --objs-src=$(LD_DIR_WORKING_D)/objs.txt --objs-dir=$(OBJ_DEBUG)) $(LD_DIR_WORKING_D)/ld_ext.d
+#Getting the contents of ld_lib.txt
+LD_LIB_D        = $(shell cat $(LD_DIR_WORKING_D)/ld_lib.txt 2>>/dev/null)
+#Getting the contents of ld_lib_ban.txt
+LD_LIB_BAN_D    = $(shell cat $(LD_DIR_WORKING_D)/ld_lib_ban.txt 2>>/dev/null)
+tmp_awk2        = $(shell awk -F" " '{print $$2}' tmp_awk1 | awk -F"." '{print $$5}')
+tmp_awk3        = $(addsuffix _LIBRARY_VERSION_INFO, $(tmp_awk2))
+
+ifeq ($(MAKECMDGOALS), $(filter $(MAKECMDGOALS),debug build_pipe_D))
+include $(LD_DFILE_D)
+endif
+
+$(LD_LIB_D): $(MODELEXT_D)
+
+#$(MODELEXT_D): $(LIB_MODELEXT_D)
+#	@echo Creating modelext $@ ... \
+#	&& rm -f $@ \
+#	&& $(call append_modelext,modelext_info,$(OBJ_DEBUG),$<,$@) \
+#	&& $(call append_modelext,bin_info,$(OBJ_DEBUG),$<,$@) \
+#	&& $(call append_modelext,pinmux_cfg,$(OBJ_DEBUG),$<,$@) \
+#	&& $(call append_modelext,intdir_cfg,$(OBJ_DEBUG),$<,$@) \
+#	&& $(call append_modelext,emb_partition_info,$(OBJ_DEBUG),$<,$@) \
+#	&& $(call append_modelext,gpio_info,$(OBJ_DEBUG),$<,$@) \
+#	&& $(call append_modelext,dram_partition_info,$(OBJ_DEBUG),$<,$@) \
+#	&& $(call append_modelext,model_cfg,$(OBJ_DEBUG),$<,$@) \
+#	&& $(EBIN) $(EBIN_METHOD) $@ 0x18 $(EBIN_MNAME)
+#	@BIN_SIZE=`ls -l $@ | cut -d ' ' -f 5`; \
+#	RESIDUAL=$$(($${BIN_SIZE} % 4)); \
+#	if [ "$${RESIDUAL}" -ne "0" ]; then \
+#		echo "sizeof($@) is not 4-byte aligned"; \
+#		exit 1; \
+#	fi
+
+$(IMAGE_D): $(SRC) $(ASM) $(CPP_SRC) $(ALL_OBJ_D) $(LIB_D) $(LD_LIB_D) $(MODELEXT_D)
+	$(shell mv *.o $(IMG_BASE_DIR)/Debug/ObjectCode 2>>/dev/null)
+	@echo '-o $@ $(ALL_OBJ_D)'> ld_d.tmp
+	@echo '--start-group $(LD_LIB_D) $(filter-out $(LD_LIB_BAN_D),$(LIB_D)) --end-group -Bstatic -EL --no-wchar-size-warning --gc-sections -T $(LD_PATH_LDS_D) -L "$(libgcc_dir_el)" -L"$(libstdc_dir_el)" -L"$(libm_dir)" -lgcc "$(libm_path)" $(LDMAP_D)' >> ld_d.tmp
+ifeq "$(SCATTER)" "EmuKit_cpu2.lds"
+	@echo "Linking CA53_core2...$(LD_PATH_LDS_D)" \
+	&& echo Creating image $@ ... \
+	&& $(LD) @ld_d.tmp $(LOG_OPTION) \
+	&& $(OBJDUMP) -x -h -t $@ > $(MAP_D) \
+	&& $(NM) -n $@ > tmp_sym_d \
+	&& grep -v '\( [aNUw] \)\|\(__crc_\)\|\( \$[adt]\)' tmp_sym_d > $(SYM_D) \
+	&& rm -f tmp_sym_d \
+	&& rm -f ld_d.tmp \
+	&& rm -f tmp_awk1
+else
+	@echo "Linking ..." \
+	&& echo Creating image $@ ... \
+	&& $(LD) @ld_d.tmp $(LOG_OPTION) \
+	&& $(OBJDUMP) -x -h -t $@ > $(MAP_D) \
+	&& $(NM) -n $@ > tmp_sym_d \
+	&& grep -v '\( [aNUw] \)\|\(__crc_\)\|\( \$[adt]\)' tmp_sym_d > $(SYM_D) \
+	&& rm -f tmp_sym_d \
+	&& rm -f ld_d.tmp \
+	&& rm -f tmp_awk1
+endif
+
+
+$(BIN_D): $(IMAGE_D)
+ifeq "$(MULTI_REGIONS)" "ON"
+	@echo Creating executable $@ ... \
+	&& $(FE) --gap-fill=0xff -O binary $< $@ \
+	&& mv $(IMG_DEBUG)/SPECIAL_RO $(BIN_D)
+else
+	@echo Creating executable $@ ... \
+	&& $(FE) --gap-fill=0xff -O binary $< $@
+endif
+ifeq "$(LDS_MAP)" "ON"
+	@echo Generate LDS map file $(MAP2_D): ok
+endif
+ifeq "$(AXF_DIS)" "ON"
+	@echo Translate AXF $< to disassembly... \
+	&& $(OBJDUMP) -D $(IMAGE_D) > $(DASM_D)
+endif
+
+ifeq "$(BL_COMPRESS)" "ENABLE"
+	@echo Compressing file $(@)\
+	&& $(BFC) c lz $(BIN_D) tmp 1 $(UNCOMPRESSEDPART_SIZE_OFFSET) \
+	&& cp -f tmp $(BIN_D) \
+	&& rm -f tmp \
+	&& echo Encrypt binary file $@ for $(CHIP)... $(CHIP_VER) $(DMA_CLOCK) $(SDRAM_SIZE) $(LOADER_VERSION) $(CONFIG_RAM_GUI_EN) $(PHY_ANALOG_HV) $(DUTY_CALIBRATION) $(DUTY_CALIBRATION_LOG) $(DUTY_CALIBRATION_TYPE)\
+	&& $(EBIN) $@ $@ 680
+	$(CFGRAM) $@ -ini=../../Tools/ConfigRam/$(DDR_INI_STR) -ini2=../../Tools/ConfigRam/$(DDR_INI_STR) -chip=660 -package=$(CHIP) -ldver=$(LOADER_VERSION) -gui=$(CONFIG_RAM_GUI_EN) -storage=$(STORAGEINT) -inv_rst=$(DRAM1_RST_PARAM)
+#	$(CFGRAM) $@ ../../Tools/ConfigRam/$(CHIP)_$(CHIP_VER)_$(DMA_CLOCK)_$(SDRAM_SIZE)$(DDR_FILE_STR).ini 650 $(LOADER_VERSION) $(CONFIG_RAM_GUI_EN) $(PHY_ANALOG_HV) $(DUTY_CALIBRATION) $(DUTY_CALIBRATION_LOG) $(DUTY_CALIBRATION_TYPE) $(LV1_CLK)
+else
+	@echo Encrypt binary file $@ for $(CHIP)...\
+    && $(EBIN) $@ $@ 680 $(SECURE_BOOT)
+endif
+
+ifeq "$(COPY_BIN_2_STG)" "ON"
+ifneq "$(NVT_STG_PATH)" ""
+	@-echo Copy \""$(BIN_D)\"" to $(NVT_STG_PATH) ... \
+	&& cp -f -v $(BIN_D) $(NVT_STG_PATH)$(notdir $(BIN_D))
+endif
+ifneq "$(NVT_STG_PATH_MIPS2)" ""
+	@-echo Copy \""$(BIN_D)\"" to $(NVT_STG_PATH_MIPS2)_FWMIPS2.bin ... \
+	&& cp -f -v $(BIN_D) $(NVT_STG_PATH_MIPS2)_FWMIPS2.bin
+endif
+
+ifneq "$(NVT_STG_PATH_CA532)" ""
+	@-echo Copy \""$(BIN_D)\"" to $(NVT_STG_PATH_CA532)_FWCA532.bin ... \
+	&& cp -f -v $(BIN_D) $(NVT_STG_PATH_CA532)_FWCA532.bin
+endif
+endif
+
+#Please refer LD_DIR_WORKING_D for getting explanation. Ohters are in the same way.
+LD_DIR_WORKING_R= $(IMG_BASE_DIR)/Release/ObjectLds
+LD_REPLACE_LDS_R= $(shell mkdir -p $(LD_DIR_WORKING_R)) $(shell $(OBJDUMP) -h $(LIB_R) | grep ".version.info" > tmp_awk1) $(shell $(LD_REPLACE_VAR) > $(LD_DIR_WORKING_R)/replace.lds)
+LD_PATH_LDS_R   = $(LD_DIR_WORKING_R)/$(basename $(SCATTER))_R.lds
+LD_DFILE_R      = $(LD_REPLACE_LDS_R) $(shell echo $(LIB_R) > $(LD_DIR_WORKING_R)/libs.txt ) $(shell echo $(ALL_OBJ_R) > $(LD_DIR_WORKING_R)/objs.txt ) $(shell $(LDNVT) --lds-dst=$(LD_PATH_LDS_R) --lds-dir=$(LD_DIR_WORKING_R) --lds-src=$(LD_DIR_WORKING_R)/replace.lds --libs-src=$(LD_DIR_WORKING_R)/libs.txt --objs-src=$(LD_DIR_WORKING_R)/objs.txt --objs-dir=$(OBJ_RELEASE)) $(LD_DIR_WORKING_R)/ld_ext.d
+LD_LIB_R        = $(shell cat $(LD_DIR_WORKING_R)/ld_lib.txt 2>>/dev/null)
+LD_LIB_BAN_R    = $(shell cat $(LD_DIR_WORKING_R)/ld_lib_ban.txt 2>>/dev/null)
+tmp_awk2        = $(shell awk -F" " '{print $$2}' tmp_awk1 | awk -F"." '{print $$5}')
+tmp_awk3        = $(addsuffix _LIBRARY_VERSION_INFO, $(tmp_awk2))
+
+ifeq ($(MAKECMDGOALS), $(filter $(MAKECMDGOALS),release build_pipe_R))
+include $(LD_DFILE_R)
+endif
+
+$(LD_LIB_R): $(MODELEXT_R)
+
+#$(MODELEXT_R): $(LIB_MODELEXT_R)
+#	@echo Creating modelext $@ \
+#	&& rm -f $@ \
+#	&& $(call append_modelext,modelext_info,$(OBJ_RELEASE),$<,$@) \
+#	&& $(call append_modelext,bin_info,$(OBJ_RELEASE),$<,$@) \
+#	&& $(call append_modelext,pinmux_cfg,$(OBJ_RELEASE),$<,$@) \
+#	&& $(call append_modelext,intdir_cfg,$(OBJ_RELEASE),$<,$@) \
+#	&& $(call append_modelext,emb_partition_info,$(OBJ_RELEASE),$<,$@) \
+#	&& $(call append_modelext,gpio_info,$(OBJ_RELEASE),$<,$@)  \
+#	&& $(call append_modelext,dram_partition_info,$(OBJ_RELEASE),$<,$@) \
+#	&& $(call append_modelext,model_cfg,$(OBJ_RELEASE),$<,$@) \
+#	&& $(EBIN) $(EBIN_METHOD) $@ 0x18 $(EBIN_MNAME)
+#	@BIN_SIZE=`ls -l $@ | cut -d ' ' -f 5`; \
+#	RESIDUAL=$$(($${BIN_SIZE} % 4)); \
+#	if [ "$${RESIDUAL}" -ne "0" ]; then \
+#		echo "sizeof($@) is not 4-byte aligned"; \
+#		exit 1; \
+#	fi
+
+$(IMAGE_R): $(SRC) $(ASM) $(CPP_SRC) $(ALL_OBJ_R) $(LIB_R) $(LD_LIB_R) $(MODELEXT_R)
+	$(shell mv *.o $(IMG_BASE_DIR)/Release/ObjectCode 2>>/dev/null)
+	@echo '-o $@ $(ALL_OBJ_R) '> ld_r.tmp
+	@echo '--start-group $(LD_LIB_R) $(filter-out $(LD_LIB_BAN_R),$(LIB_R)) --end-group -Bstatic -EL --no-wchar-size-warning --gc-sections -T $(LD_PATH_LDS_R) -L"$(libgcc_dir_el)" -L"$(libstdc_dir_el)" -lgcc "$(libm_path)" $(LDMAP_R)' >> ld_r.tmp
+
+ifeq "$(SCATTER)" "EmuKit_cpu2.lds"
+	@echo "Linking CA53_core2...$(LD_PATH_LDS_R)" \
+	&& echo Creating image $@ ... \
+	&& $(LD) @ld_r.tmp $(LOG_OPTION) \
+	&& $(OBJDUMP) -x -h -t $@ > $(MAP_R) \
+	&& $(NM) -n $@ > tmp_sym_r \
+	&& grep -v '\( [aNUw] \)\|\(__crc_\)\|\( \$[adt]\)' tmp_sym_r > $(SYM_R) \
+	&& rm -f tmp_sym_r \
+	&& rm -f ld_r.tmp \
+	&& rm -f tmp_awk1
+else
+	@echo "Linking ... " \
+	&& echo Creating image $@ ...\
+	&& $(LD) @ld_r.tmp $(LOG_OPTION) \
+	&& $(OBJDUMP) -x -h -t -marm $@ > $(MAP_R) \
+	&& $(NM) -n $@ > tmp_sym_r \
+	&& grep -v '\( [aNUw] \)\|\(__crc_\)\|\( \$[adt]\)' tmp_sym_r > $(SYM_R) \
+	&& rm -f tmp_sym_r \
+	&& rm -f ld_r.tmp \
+	&& rm -f tmp_awk1
+endif
+
+$(BIN_R): $(IMAGE_R)
+ifeq "$(MULTI_REGIONS)" "ON"
+	@echo Creating executable $@ ... \
+	&& $(FE) --gap-fill=0xff -O binary $< $@ \
+	&& mv $(IMG_RELEASE)/SPECIAL_RO $(BIN_R)
+else
+	@echo Creating executable $@ ... \
+	&& $(FE) --gap-fill=0xff -O binary $< $@
+endif
+
+ifeq "$(LDS_MAP)" "ON"
+	@echo Generate LDS map file $(MAP2_R): ok
+endif
+ifeq "$(AXF_DIS)" "ON"
+	@echo Translate AXF $< to disassembly... \
+	&& $(OBJDUMP) -D $(IMAGE_R) > $(DASM_R)
+endif
+ifeq "$(PROCESS_2ND_CHECKSUM)" "ON"
+	@echo Process compressing file $(@) checksum ...\
+	&& $(EBIN) $@ $@ $(CHIPID) 10
+endif
+ifeq "$(BL_COMPRESS)" "ENABLE"
+	@echo Compressing file $(@)\
+	&& $(BFC) c lz $(BIN_R) tmp 1 $(UNCOMPRESSEDPART_SIZE_OFFSET) \
+	&& cp -f tmp $(BIN_R) \
+	&& rm -f tmp \
+	&& echo Encrypt binary file $@ for $(CHIP)... $(CHIP_VER) $(DMA_CLOCK) $(SDRAM_SIZE) $(LOADER_VERSION) $(CONFIG_RAM_GUI_EN) $(PHY_ANALOG_HV) $(DUTY_CALIBRATION) $(DUTY_CALIBRATION_LOG) $(DUTY_CALIBRATION_TYPE)\
+	&& $(EBIN) $@ $@ $(CHIPID)
+ifeq "$(NC520_525_COMBO)" "ON"
+	$(CFGRAM) $@ -freq=$(DRAM1_CLK) -ini=../../Tools/ConfigRam/$(DDR_INI_STR) -ini2=../../Tools/ConfigRam/$(DDR_INI2_STR) -chip=$(CHIPID) -package=$(CHIP) -ldver=$(LOADER_VERSION) -storage=$(STORAGEINT)  -inv_rst=$(DRAM1_RST_PARAM) -dram_number=$(DRAM_NUMBER_DET_PARAM) -ini_NC520_525_combo=../../Tools/ConfigRam/$(DDR_INI_STR_NC520_525_COMBO) -dram_ssc=$(DRAM_SSC_PARAM) -52x_combo_528=$(52x_528_COMBO)
+	$(EBIN) $@ $@ $(CHIPID) $(SECURE_BOOT) $(ENCRYPT_DATA) $(SECUREBOOT_MSG) $(AES_KEY_FILE_DIR) $(RSA_PUB_KEY_FILE_DIR) $(RSA_PRV_KEY_FILE_DIR)
+else
+ifeq "$(CHIPID)" "560"
+	$(CFGRAM) $@ -freq=$(DRAM1_CLK) -ini=../../Tools/ConfigRam/$(DDR_INI_STR) -chip=$(CHIPID) -package=$(CHIP) -ldver=$(LOADER_VERSION) -storage=$(STORAGEINT)  -inv_rst=$(DRAM1_RST_PARAM) -dram_ssc=$(DRAM_SSC_PARAM) -dram_wt=$(DDR_TREFI_PARAM) -dram_2nd_tlb=$(2ND_INI) -dram_2nd_tlb_gpio_no=$(GPIO_NUM) -2nd_ini=../../Tools/ConfigRam/$(DDR_INI_STR2) -odt_select=$(ODT_SELECT) -tx_drv=$(TX_DRV) -ddr_ldo=$(DDR_LDO) -pll_ldo=$(PLL_LDO) -rx_pad=$(RX_PAD)
+	$(EBIN) $@ $@ $(CHIPID) $(SECURE_BOOT) $(ENCRYPT_DATA) $(SECUREBOOT_MSG) $(AES_KEY_FILE_DIR) $(RSA_PUB_KEY_FILE_DIR) $(RSA_PRV_KEY_FILE_DIR)
+endif
+endif
+#	$(CFGRAM) $@ -ini=../../Tools/ConfigRam/$(DDR_INI_STR) -ini2=../../Tools/ConfigRam/$(DDR_INI_STR) -chip=660 -package=$(CHIP) -ldver=$(LOADER_VERSION) -gui=$(CONFIG_RAM_GUI_EN) -storage=$(STORAGEINT)
+#	$(CFGRAM) $@ ../../Tools/ConfigRam/$(CHIP)_$(CHIP_VER)_$(DMA_CLOCK)_$(SDRAM_SIZE)$(DDR_FILE_STR).ini 650 $(LOADER_VERSION) $(CONFIG_RAM_GUI_EN) $(PHY_ANALOG_HV) $(DUTY_CALIBRATION) $(DUTY_CALIBRATION_LOG) $(DUTY_CALIBRATION_TYPE) $(LV1_CLK)
+else
+#	No compress
+	@echo Encrypt binary file $@ for $(CHIP)...\
+    && $(EBIN) $@ $@ $(CHIPID) $(SECURE_BOOT) \
+   	&& $(CFGRAM) $@ -freq=$(DRAM1_CLK) -ini=../../Tools/ConfigRam/$(DDR_INI_STR) -ini2=../../Tools/ConfigRam/$(DDR_INI2_STR) -chip=$(CHIPID) -package=$(CHIP) -ldver=$(LOADER_VERSION) -storage=$(STORAGEINT) -inv_rst=$(DRAM1_RST_PARAM) -dram_number=$(DRAM_NUMBER_DET_PARAM) -dram_ssc=$(DRAM_SSC_PARAM)
+endif
+
+ifeq "$(COPY_BIN_2_STG)" "ON"
+ifneq "$(NVT_STG_PATH)" ""
+	@-echo Copy \""$(BIN_R)\"" to $(NVT_STG_PATH) ... \
+	&& cp -f -v $(BIN_R) $(NVT_STG_PATH)$(notdir $(BIN_R))
+endif
+ifneq "$(NVT_STG_PATH_MIPS2)" ""
+	@-echo Copy \""$(BIN_R)\"" to $(NVT_STG_PATH_MIPS2) ... \
+	&& cp -f -v $(BIN_R) $(NVT_STG_PATH_MIPS2)_FWMIPS2.bin
+endif
+
+ifneq "$(NVT_STG_PATH_CA532)" ""
+	@-echo Copy \""$(BIN_R)\"" to $(NVT_STG_PATH_CA532)_FWCA532.bin ... \
+	&& cp -f -v $(BIN_R) $(NVT_STG_PATH_CA532)_FWCA532.bin
+endif
+endif
+
+.PHONY:
+rm_log:
+ifeq "$(CLEAN_LOG)" "ON"
+	@-rm -f $(log_file)
+endif
+
+clean:
+	@-echo Clean $(basename $(notdir $(IMAGE_R))) ... \
+	&& rm -rf --no-preserve-root $(IMG_BASE_DIR) $(log_file) $(lint_file)
+
+ifeq "$(ISOLATE_DEP)" "ON"
+all: rm_log
+	@make dep
+	@make debug
+	@make release
+
+rebuild:
+	@make clean
+	@make dep
+	@make debug
+	@make release
+
+dep: build_DEP
+else
+rebuild: clean build_D build_R
+endif
+
+debug: rm_log make_debug_begin
+ifeq ($(OS),Linux)
+	$(MAKE) build_pipe_D
+else
+	$(MAKE) build_pipe_D $(JOB_FLAGS)
+endif
+
+release: rm_log make_release_begin
+ifeq ($(OS),Linux)
+	$(MAKE) build_pipe_R
+else
+	$(MAKE) build_pipe_R $(JOB_FLAGS)
+endif
+
+#remove unused remap.a for sdk
+remap:
+	rm -v $(filter-out $(LIB_REMAP_D), $(LIB_REMAP_ALL_D)) $(filter-out $(LIB_REMAP_R), $(LIB_REMAP_ALL_R))
+
+codesize: $(IMAGE_R)
+	@$(OBJDUMP) -t $< > $<.sym && \
+	$(LDNVT) -j $<.sym && \
+	mv RO_RW.txt ZI.txt $(IMG_RELEASE)

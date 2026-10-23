@@ -1,0 +1,907 @@
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+#------------------------------------------------------------------------------
+# Loader version : unsigned long loader version definition
+#------------------------------------------------------------------------------
+LOADER_VERSION = 0x01000001
+BL_LOADER_VER_PARAM = \
+	-D_LDR_VER_="$(LOADER_VERSION)"
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#
+# Hardware device selection
+#
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#------------------------------------------------------------------------------
+# Select main chip ID
+#------------------------------------------------------------------------------
+#CHIP = 520
+
+#------------------------------------------------------------------------------
+# Select chip version
+#------------------------------------------------------------------------------
+#CHIP_VER = A
+#CHIP_VER = B
+
+#------------------------------------------------------------------------------
+# Select LV1 clock rate
+# LV1: 491MHz / 593MHz
+#------------------------------------------------------------------------------
+#LV1_CLK = 491
+#LV1_CLK = 593
+
+#------------------------------------------------------------------------------
+# Select DMA clock rate
+#------------------------------------------------------------------------------
+#DMA_CLOCK = LV0
+#DMA_CLOCK = LV1
+
+#ifeq "$(DMA_CLOCK)" "LV1"
+#ifeq "$(LV1_CLK)" "491"
+#DMA_CLOCK = LV1_4
+#else
+#DMA_CLOCK = LV1_5
+#endif
+#endif
+
+ifeq "$(CHIP)" "566"
+
+ifeq "$(DRAM1_CLK)" "933"
+DRAM1_CLK = 933
+else ifeq "$(DRAM1_CLK)" "507"
+DRAM1_CLK = 507
+else ifeq "$(DRAM1_CLK)" "760"
+DRAM1_CLK = 760
+else ifeq "$(DRAM1_CLK)" "400"
+DRAM1_CLK = 400
+else
+DRAM1_CLK = 507
+endif
+
+SDRAM_SIZE = 1024
+
+else ifeq "$(CHIP)" "562"
+
+ifeq "$(DRAM1_CLK)" "666"
+DRAM1_CLK = 666
+else ifeq "$(DRAM1_CLK)" "400"
+DRAM1_CLK = 400
+else
+DRAM1_CLK = 522
+endif
+
+SDRAM_SIZE = 512
+
+else ifeq "$(CHIP)" "561"
+
+ifeq "$(DRAM1_CLK)" "400"
+DRAM1_CLK = 400
+else
+DRAM1_CLK = 522
+endif
+SDRAM_SIZE = 512
+
+else ifeq "$(CHIP)" "563"
+
+ifeq "$(DRAM1_CLK)" "666"
+DRAM1_CLK = 666
+else ifeq "$(DRAM1_CLK)" "400"
+DRAM1_CLK = 400
+else
+DRAM1_CLK = 522
+endif
+SDRAM_SIZE = 512
+
+else ifeq "$(CHIP)" "565"
+
+ifeq "$(DRAM1_CLK)" "933"
+DRAM1_CLK = 933
+else ifeq "$(DRAM1_CLK)" "507"
+DRAM1_CLK = 507
+else ifeq "$(DRAM1_CLK)" "760"
+DRAM1_CLK = 760
+else ifeq "$(DRAM1_CLK)" "400"
+DRAM1_CLK = 400
+else
+DRAM1_CLK = 507
+endif
+
+SDRAM_SIZE = 1024
+
+else
+endif
+
+#------------------------------------------------------------------------------
+# Select DRAM Size (unit: Giga bit)
+#------------------------------------------------------------------------------
+#SDRAM_SIZE = 1024
+#SDRAM_SIZE = 2048
+#SDRAM_SIZE = 4096
+
+#------------------------------------------------------------------------------
+# Select DRAM Type (DDR3L curruently NOT available)
+#------------------------------------------------------------------------------
+#DRAM_TYPE = DDR3
+#DRAM_TYPE = DDR3L
+
+#------------------------------------------------------------------------------
+# Select Phy analog block LV / HV
+# (Don't modify this item)
+#------------------------------------------------------------------------------
+PHY_ANALOG_HV = HV
+
+#------------------------------------------------------------------------------
+# CPU Core version configuration
+# (Don't modify this item)
+#------------------------------------------------------------------------------
+#CA53_ARCH32
+#CA9
+CPU_CORE = CA9
+
+#------------------------------------------------------------------------------
+# Select internal storage device
+#------------------------------------------------------------------------------
+#STORAGEINT = NandEccRS
+#STORAGEINT = NandSpi
+#STORAGEINT = SpiFlash
+
+#------------------------------------------------------------------------------
+# Select external storage device
+#------------------------------------------------------------------------------
+#STORAGEEXT = Sdio1
+#STORAGEEXT = Sdio2
+#STORAGEEXT = Usb
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#
+# Software function selection
+#
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#------------------------------------------------------------------------------
+# Dram range scan loader support enable
+# (Don't modify this item)
+#------------------------------------------------------------------------------
+DRAM_RANGE_SCAN_SUPPORT_EN = ENABLE
+#DRAM_RANGE_SCAN_SUPPORT_EN = DISABLE
+
+#------------------------------------------------------------------------------
+# Select GUI interface display or not
+#------------------------------------------------------------------------------
+# [CONFIG_RAM_GUI_EN]
+# ENABLE
+# DISABLE
+CONFIG_RAM_GUI_EN = DISABLE
+
+#------------------------------------------------------------------------------
+# Set binary file build name
+#------------------------------------------------------------------------------
+CHIP_SHORT = $(shell echo $(CHIP)|awk '{print substr($$0,length($$0)-2,3)}')
+ifeq "$(CHIP)" "575"
+BIN_NAME = LD96575A
+else ifeq "$(CHIP)" "570"
+BIN_NAME = LD96570A
+else ifeq "$(CHIP)" "580"
+BIN_NAME = LD96580A
+endif
+ifeq "$(CHIP)" "523_A"
+BIN_NAME = LD523_AA
+endif
+ifeq "$(STORAGEEXT)" "Eth"
+LDR_NAME = loader
+else
+LDR_NAME = $(BIN_NAME)
+endif
+BL_UPDATE_CALNAME = FW96$(CHIP_SHORT)C.BIN
+BL_CALIBRATION_FWNAME = CALFW680.BIN
+TMP_NAME = LD96$(CHIP)1
+
+#------------------------------------------------------------------------------
+# 1st NAND configuration support list
+#------------------------------------------------------------------------------
+ifeq "$(LOADER_SUPPORT_NAND_1st)" "DEFAULT_NAND_TYPE"
+	_LOADER_NAND_SUPPORT_NAND_1st_ = default_1
+else
+ifeq "$(LOADER_SUPPORT_NAND_1st)" ""
+  _LOADER_NAND_SUPPORT_NAND_1st_ = default_1
+else
+  _LOADER_NAND_SUPPORT_NAND_1st_ = $(LOADER_SUPPORT_NAND_1st)
+endif
+endif
+#------------------------------------------------------------------------------
+# 1st NAND configuration support list
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+# 2nd NAND configuration support list
+#------------------------------------------------------------------------------
+ifeq "$(LOADER_SUPPORT_NAND_2nd)" "DEFAULT_NAND_TYPE"
+	_LOADER_NAND_SUPPORT_NAND_2nd_=default_2
+else
+ifeq "$(LOADER_SUPPORT_NAND_2nd)" ""
+  _LOADER_NAND_SUPPORT_NAND_2nd_ = default_2
+else
+  _LOADER_NAND_SUPPORT_NAND_2nd_ = $(LOADER_SUPPORT_NAND_2nd)
+endif
+endif
+#------------------------------------------------------------------------------
+# 2nd NAND configuration support list
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+# 3rd NAND configuration support list
+#------------------------------------------------------------------------------
+ifeq "$(LOADER_SUPPORT_NAND_3rd)" "DEFAULT_NAND_TYPE"
+	_LOADER_NAND_SUPPORT_NAND_3rd_ = default_3
+else
+ifeq "$(LOADER_SUPPORT_NAND_3rd)" ""
+  _LOADER_NAND_SUPPORT_NAND_3rd_ = default_3
+else
+  _LOADER_NAND_SUPPORT_NAND_3rd_ = $(LOADER_SUPPORT_NAND_3rd)
+endif
+endif
+
+#------------------------------------------------------------------------------
+# 3rd NAND configuration support list
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+# Set bootloader specific strings
+#------------------------------------------------------------------------------
+STR_MODEL = $(MODEL_DESC)
+STR_DATE = $(shell date +%m/%d/%Y)
+STR_TIME = $(shell date +%H:%M:%S)
+
+BL_START = "Loader NT98$(CHIP) Start ..."
+BL_UPDATE_LOADERNAME = $(BIN_NAME).BIN
+ifeq "$(CHIP)" "575"
+BL_UPDATE_FWNAME := FW96575A.BIN
+BL_UPDATE_CALNAME := FW96575C.BIN
+BL_RUN_FWNAME := FW96575T.BIN
+BL_CALIBRATION_FWNAME := CALFW575.BIN
+BL_START = "Loader NT96$(CHIP) Start ..."
+else ifeq "$(CHIP)" "570"
+BL_UPDATE_FWNAME := FW96570A.BIN
+BL_UPDATE_CALNAME := FW96570C.BIN
+BL_RUN_FWNAME := FW96570T.BIN
+BL_CALIBRATION_FWNAME := CALFW570.BIN
+BL_START = "Loader NT96$(CHIP) Start ..."
+else ifeq "$(CHIP)" "580"
+BL_UPDATE_FWNAME := FW96580A.BIN
+BL_UPDATE_CALNAME := FW96580C.BIN
+BL_RUN_FWNAME := FW96580T.BIN
+BL_CALIBRATION_FWNAME := CALFW580.BIN
+BL_START = "Loader NT96$(CHIP) Start ..."
+endif
+ifeq "$(CHIP)" "523_A"
+BL_UPDATE_FWNAME := FW523_AA.BIN
+BL_UPDATE_CALNAME := FW523_AC.BIN
+BL_RUN_FWNAME := FW523_AT.BIN
+BL_CALIBRATION_FWNAME := CALFW523.BIN
+BL_START = "Loader NT98$(CHIP) Start ..."
+endif
+
+BL_WRKEY_FWNAME := WRKEY.BIN
+BL_UBOOT_FWNAME := UBOOTBIN.BIN
+
+ifneq "$(DRAM_2ND_TBL_DETECT)" "Normal"
+MODEL_DESC2 = "$(CHIP)$(CHIP_VER)_DRAM1_$(DRAM1_2ND_CLK)_$(SDRAM_2ND_SIZE)Mb"
+BL_VERSION2 = "$(MODEL_DESC2) $(STR_DATE) $(STR_TIME)"
+endif
+
+ifeq "$(NC520_525_COMBO)" "ON"
+MODEL_DESC = "$(CHIP)$(CHIP_VER)_DRAM1_$(DRAM1_CLK)_$(SDRAM_SIZE)Mb_DRAM2_$(DRAM2_CLK)_$(SDRAM2_SIZE)Mb_combo_NC520_DRAM1_$(NC520_COMBO_DRAM1_CLK)_$(NC520_COMBO_SDRAM_SIZE)Mb_DRAM2_NULL"
+else
+MODEL_DESC = "$(CHIP)$(CHIP_VER)_DRAM1_$(DRAM1_CLK)_$(SDRAM_SIZE)Mb"
+endif
+BL_VERSION = "$(MODEL_DESC) $(STR_DATE) $(STR_TIME)"
+
+#------------------------------------------------------------------------------
+# Select bootloader compression
+# (Don't modify this item)
+#------------------------------------------------------------------------------
+# [BL_COMPRESS]
+# ENABLE
+# DISABLE
+BL_COMPRESS = ENABLE
+
+#Do not modify this parameter 0x08 if loader compress enabled
+# [UNCOMPRESSEDPART_SIZE_OFFSET]
+# 0x60
+# 0x08
+UNCOMPRESSEDPART_SIZE_OFFSET = 0x08
+
+#------------------------------------------------------------------------------
+# Select compressable f/w (main code)
+#------------------------------------------------------------------------------
+# [MAINCODE_COMPRESS]
+# ENABLE
+# DISABLE
+MAINCODE_COMPRESS = DISABLE
+
+#------------------------------------------------------------------------------
+# Select firmware image checksum validation
+#------------------------------------------------------------------------------
+# [CHKFWIMAGE]
+# NOCHECK
+# CHECKSUM
+# CRC
+CHKFWIMAGE = CHECKSUM
+
+#------------------------------------------------------------------------------
+# Select loader flow
+# (Don't modify this item)
+#------------------------------------------------------------------------------
+# [LOADER_FLOW ]
+# NORMAL_LDR_FLOW
+# MODULE_TST_FLOW
+LOADER_FLOW = NORMAL_LDR_FLOW
+
+ifeq "$(LOADER_FLOW)" "NORMAL_LDR_FLOW"
+BL_LOADER_FLOW = 0
+else
+BL_LOADER_FLOW = 1
+endif
+
+BL_LOADER_FLOW_PARAM = \
+-D_BL_MAIN_SPECIAL_FLOW_=$(BL_LOADER_FLOW)
+
+#------------------------------------------------------------------------------
+# Select Duty calibration ENABLE / DISABLE
+#------------------------------------------------------------------------------
+DUTY_CALIBRATION = DISABLE
+
+#------------------------------------------------------------------------------
+# Select Duty calibration type
+# (Don't modify this item)
+#------------------------------------------------------------------------------
+# [DUTY_CALIBRATION_TYPE ]
+# AUTO
+# MANUAL
+DUTY_CALIBRATION_TYPE = AUTO
+
+ifeq "$(DUTY_CALIBRATION_TYPE)" "AUTO"
+BL_DUTY_CALIBRATION_TYPE = 0
+else
+BL_DUTY_CALIBRATION_TYPE = 1
+endif
+
+BL_DUTY_CALIBRATION_TYPE_PARAM = \
+-D_LOADER_DUTY_CALIBRATION_TYPE_=$(BL_DUTY_CALIBRATION_TYPE)
+
+#------------------------------------------------------------------------------
+# Select Duty calibration LOG ENABLE / DISABLE
+#------------------------------------------------------------------------------
+# [DUTY_CALIBRATION_LOG]
+# ENABLE
+# DISABLE
+DUTY_CALIBRATION_LOG = DISABLE
+
+ifeq "$(LOADER_FLOW)" "MODULE_TST_FLOW"
+DUTY_CALIBRATION = DISABLE
+endif
+
+ifeq "$(DUTY_CALIBRATION)" "DISABLE"
+DUTY_CALIBRATION_LOG = DISABLE
+else
+ifeq "$(DUTY_CALIBRATION_TYPE)" "MANUAL"
+DUTY_CALIBRATION_LOG = DISABLE
+endif
+endif
+
+ifeq "$(DUTY_CALIBRATION)" "ENABLE"
+BL_DUTY_CALIBRATION = 1
+else
+BL_DUTY_CALIBRATION = 0
+endif
+
+ifeq "$(DUTY_CALIBRATION_LOG)" "ENABLE"
+BL_DUTY_CALIBRATION_LOG = 1
+else
+BL_DUTY_CALIBRATION_LOG = 0
+endif
+
+BL_DUTY_CALIBRATION_PARAM = \
+-D_LOADER_DUTY_CALIBRATION_LOG_=$(BL_DUTY_CALIBRATION_LOG)\
+-D_LOADER_DUTY_CALIBRATION_=$(BL_DUTY_CALIBRATION)
+
+
+#------------------------------------------------------------------------------
+# Bootloader update image file name parameters
+#------------------------------------------------------------------------------
+BL_UPDATE_NAME_PARAM = \
+	-D_UPDATE_FW_NAME_=\"$(BL_UPDATE_FWNAME)\" \
+	-D_UPDATE_LOADER_NAME_=\"$(BL_UPDATE_LOADERNAME)\" \
+	-D_RUN_FW_NAME_=\"$(BL_RUN_FWNAME)\" \
+	-D_UPDATE_CALFW_NAME_=\"$(BL_UPDATE_CALNAME)\"\
+	-D_RUN_CAL_FW_NAME_=\"$(BL_CALIBRATION_FWNAME)\" \
+	-D_WR_KEY_FW_NAME_=\"$(BL_WRKEY_FWNAME)\" \
+	-D_RUN_UBOOT_NAME_=\"$(BL_UBOOT_FWNAME)\"
+
+
+#------------------------------------------------------------------------------
+# Bootloader specific strings parameters
+#------------------------------------------------------------------------------
+BL_STRINGS_PARAM = \
+-D_LOADER_VERSION_STR_=\"\\\r\\\n$(BL_VERSION)\\\r\\\n\\\r\\\n\" \
+-D_LOADER_VERSION_STR2_=\"\\\r\\\n$(BL_VERSION2)\\\r\\\n\\\r\\\n\" \
+-D_LOADER_START_STR_=\"\\\r\\\n$(BL_START)\\\r\\\n\"
+
+#------------------------------------------------------------------------------
+# Bootloader compression parameters
+#------------------------------------------------------------------------------
+ifeq "$(BL_COMPRESS)" "ENABLE"
+  BL_COMPRESS_CFG = 1
+  ifeq "$(CHIP)" "560"
+    RESETFLAG = LZ560
+  else ifeq "$(CHIP)" "562"
+    RESETFLAG = LZ562
+  else ifeq "$(CHIP)" "563"
+    RESETFLAG = LZ563
+  else ifeq "$(CHIP)" "565"
+    RESETFLAG = LZ565
+  else ifeq "$(CHIP)" "566"
+    RESETFLAG = LZ566
+  else ifeq "$(CHIP)" "561"
+    RESETFLAG = LZ561
+  else
+    RESETFLAG = LZ
+  endif
+
+  ifeq "$(CHIP)" "560"
+	RESETCHIP = 560
+	SCATTER_EXT=
+  else ifeq "$(CHIP)" "562"
+	RESETCHIP = 560
+	SCATTER_EXT=
+  else ifeq "$(CHIP)" "563"
+	RESETCHIP = 560
+	SCATTER_EXT=
+  else ifeq "$(CHIP)" "565"
+	RESETCHIP = 560
+	SCATTER_EXT=
+  else ifeq "$(CHIP)" "566"
+	RESETCHIP = 560
+	SCATTER_EXT=
+  else ifeq "$(CHIP)" "561"
+	RESETCHIP = 560
+	SCATTER_EXT=
+  else
+	RESETCHIP = 56x
+	SCATTER_EXT=
+  endif
+
+  ifeq "$(EXFAT_FILESYSTEM_SUPPORT)" "EXFAT"
+	COMMON_LIB = exFAT
+  else
+	COMMON_LIB = normal
+  endif
+
+else
+  BL_COMPRESS_CFG = 0
+  ifeq "$(CHIP)" "560"
+    RESETFLAG = NM560
+  else
+    RESETFLAG = NM
+  endif
+
+  ifeq "$(CHIP)" "560"
+	RESETCHIP = 560
+  else
+	RESETCHIP = 56x
+  endif
+
+  ifeq "$(EXFAT_FILESYSTEM_SUPPORT)" "EXFAT"
+	COMMON_LIB = exFAT
+  else
+	COMMON_LIB = normal
+  endif
+endif
+
+ifeq "$(MAINCODE_COMPRESS)" "ENABLE"
+  FWCOMPRESS_PARAM = -D_MAINCODE_COMPRESS_=1
+else
+  FWCOMPRESS_PARAM = -D_MAINCODE_COMPRESS_=0
+endif
+
+BL_COMPRESS_PARAM = \
+-D_LOADER_COMPRESSED_=$(BL_COMPRESS_CFG)
+
+BL_COMPRESS_PARAM_ASM =
+#\
+#-PD "_LOADER_COMPRESSED_ SETA $(BL_COMPRESS_CFG)"
+
+#------------------------------------------------------------------------------
+# Firmware image checksum validation parameters
+#------------------------------------------------------------------------------
+ifeq "$(CHKFWIMAGE)" "NOCHECK"
+    CHKFWIMAGE_CFG = FW_CHECK_NOCHECK
+endif
+
+ifeq "$(CHKFWIMAGE)" "CHECKSUM"
+    CHKFWIMAGE_CFG = FW_CHECK_CHECKSUM
+endif
+
+ifeq "$(CHKFWIMAGE)" "CRC"
+    CHKFWIMAGE_CFG = FW_CHECK_CRC
+endif
+
+CHKFWIMAGE_PARAM = \
+    -DFW_CHECK_NOCHECK=0 \
+    -DFW_CHECK_CHECKSUM=1 \
+    -DFW_CHECK_CRC=2 \
+    -DFW_CHECK_METHOD=$(CHKFWIMAGE_CFG)
+
+#------------------------------------------------------------------------------
+# External Storage define
+#------------------------------------------------------------------------------
+
+ifeq "$(STORAGEINT)" "EMMC_NAND_COMBO"
+ifeq "$(STORAGEEXT)" "NONE"
+else
+$(error STORAGEEXT MUST = [NONE] if STORAGEINT= [EMMC_NAND_COMBO]=>Please check [ModelConfig_EMU_EVB.txt] configuration)
+endif
+endif
+
+
+ifeq "$(STORAGEEXT)" "Sdio1"
+    STORAGE_EXT_TYPE = STORAGE_EXT_SDIO1
+else ifeq "$(STORAGEEXT)" "Sdio2"
+    STORAGE_EXT_TYPE = STORAGE_EXT_SDIO2
+else ifeq "$(STORAGEEXT)" "Usb"
+    STORAGE_EXT_TYPE = STORAGE_EXT_USB
+else ifeq "$(STORAGEEXT)" "Eth"
+    STORAGE_EXT_TYPE = STORAGE_EXT_ETH
+else ifeq "$(STORAGEEXT)" "Uart"
+    STORAGE_EXT_TYPE = STORAGE_EXT_UART
+else ifeq "$(STORAGEEXT)" "NONE"
+	STORAGE_EXT_TYPE = STORAGE_EXT_NONE
+else
+    STORAGE_EXT_TYPE = STORAGE_EXT_UNKOWN
+endif
+
+EXTSTRG_PARAM = \
+	-DSTORAGE_EXT_UNKOWN=0 \
+	-DSTORAGE_EXT_SDIO1=1 \
+	-DSTORAGE_EXT_SDIO2=2 \
+	-DSTORAGE_EXT_UART=3 \
+	-DSTORAGE_EXT_USB=4 \
+	-DSTORAGE_EXT_ETH=5 \
+	-DSTORAGE_EXT_NONE=6\
+	-DSTORAGE_EXT_TYPE=$(STORAGE_EXT_TYPE)
+
+#------------------------------------------------------------------------------
+# SPI define
+#------------------------------------------------------------------------------
+ifeq "$(STORAGEINT)" "SpiFlash"
+    STORAGE_INT_TYPE = -DSTORAGEINT_SPI=1
+else
+    STORAGE_INT_TYPE =
+endif
+
+ifeq "$(SPI_SETTING)" "SPI_4BITS"
+    SPI_PINMUX = SPI_PINMUX_4BITS
+endif
+
+ifeq "$(SPI_SETTING)" "SPI_NORMAL"
+    SPI_PINMUX = SPI_PINMUX_NORMAL
+endif
+
+SPIPINMUX_PARAM = \
+	-DSPI_PINMUX_NORMAL=0 \
+	-DSPI_PINMUX_4BITS=1 \
+	-DSPI_PINMUX_SETTING=$(SPI_PINMUX)
+
+#------------------------------------------------------------------------------
+# EMMC define
+#------------------------------------------------------------------------------
+ifeq "$(EMMC_SETTING)" "EMMC_8BITS"
+    EMMC_PINMUX = EMMC_PINMUX_8BITS
+endif
+
+ifeq "$(EMMC_SETTING)" "EMMC_NORMAL"
+    EMMC_PINMUX = EMMC_PINMUX_NORMAL
+endif
+
+ifeq "$(EMMC_SETTING)" ""
+    EMMC_PINMUX = EMMC_PINMUX_8BITS
+endif
+
+EMMCPINMUX_PARAM = \
+	-DEMMC_PINMUX_NORMAL=0 \
+	-DEMMC_PINMUX_8BITS=1 \
+	-DEMMC_PINMUX_SETTING=$(EMMC_PINMUX)
+
+#------------------------------------------------------------------------------
+# Dram range scan support enable parameters
+#------------------------------------------------------------------------------
+ifeq "$(DRAM_RANGE_SCAN_SUPPORT_EN)" "ENABLE"
+    DRAM_SCAN_EN = 1
+else
+	DRAM_SCAN_EN = 0
+endif
+
+DRAMSCAN_PARAM = -DDRAM_RANGE_SCAN_EN=$(DRAM_SCAN_EN)
+
+#------------------------------------------------------------------------------
+# Chip ID related parameters
+#------------------------------------------------------------------------------
+ifeq "$(CHIP)" "560"
+CHIPID = 560
+else
+CHIPID = 560
+endif
+#------------------------------------------------------------------------------
+# Secure boot parameters
+#------------------------------------------------------------------------------
+ifeq "$(SECUREBOOT)" "Secure"
+SECUREBOOT_MSG = 0
+ifeq "$(SIGNATUREMETHOD)" "AES128"
+#Secure enable + AES signature
+SECURE_BOOT = 1
+else
+#Secure enable + RSA signature
+SECURE_BOOT = 2
+endif
+ifeq "$(ENCRYPTDATA)" "AES128"
+ENCRYPT_DATA = 1
+else
+ENCRYPT_DATA = 0
+endif
+else
+SECURE_BOOT = 0
+endif
+
+
+
+#------------------------------------------------------------------------------
+# DRAM ini file name generation
+#------------------------------------------------------------------------------
+#ifeq "$(DRAM_TYPE)" "DDR3L"
+#    ifeq "$(DMA_CLOCK)" "LV0"
+#        $(error DDR3L only support DMA_CLOCK = LV1)
+#    endif
+#    ifeq "$(LV1_CLK)" "373"
+#        $(error DDR3L only support LV1_CLK = 400)
+#    endif
+#    DDR_FILE_STR = _DDR3L
+#else
+#    DDR_FILE_STR =
+#endif
+
+ifeq "$(DMA_CLOCK)" "LV0"
+
+DDR_INI_STR = $(CHIP)/51055A_DRAM1_$(DRAM1_CLK)_$(SDRAM_SIZE).ini
+#DDR_INI2_STR = $(CHIP)/51055A_DRAM2_$(DRAM2_CLK)_$(SDRAM2_SIZE).ini
+#DDR_INI_STR = 680_$(CHIP_VER)_LV0_$(SDRAM_SIZE).ini
+ifeq "$(LV1_CLK)" "491"
+#DDR_INI2_STR = 680_$(CHIP_VER)_LV1_4_$(SDRAM_SIZE).ini
+else
+#DDR_INI2_STR = 680_$(CHIP_VER)_LV1_5_$(SDRAM_SIZE).ini
+endif
+
+else
+
+ifneq "$(DRAM_2ND_TBL_DETECT)" "Normal"
+
+DDR_INI_STR = $(CHIP)/51089A_DRAM1_$(DRAM1_CLK)_$(SDRAM_SIZE).ini
+#DDR_INI2_STR = $(CHIP)/51089A_DRAM2_$(DRAM2_CLK)_$(SDRAM2_SIZE).ini
+
+DDR_INI_STR2 = $(CHIP)/51089A_DRAM1_$(DRAM1_2ND_CLK)_$(SDRAM_2ND_SIZE).ini
+#DDR_INI2_STR2 = $(CHIP)/51089A_DRAM2_$(DRAM2_2ND_CLK)_$(SDRAM2_2ND_SIZE).ini
+
+2ND_INI = $(DRAM_2ND_TBL_DETECT)
+GPIO_NUM = $(DRAM_2ND_TBL_DETECT_GPIO_NO)
+
+else
+
+DDR_INI_STR = $(CHIP)/51089A_DRAM1_$(DRAM1_CLK)_$(SDRAM_SIZE).ini
+#DR_INI2_STR = $(CHIP)/51089A_DRAM2_$(DRAM2_CLK)_$(SDRAM2_SIZE).ini
+
+
+2ND_INI = ""
+GPIO_NUM = 0
+
+endif
+endif
+
+ifeq "$(DRAM1_POWEROFF_S3)" "Enabled"
+DRAM1_RST_PARAM = 1
+else
+DRAM1_RST_PARAM = 0
+endif
+
+
+ifeq "$(DRAM_SSC_ENABLE)" "Normal"
+DRAM_SSC_PARAM = 0
+else ifeq "$(DRAM_SSC_ENABLE)" "1"
+DRAM_SSC_PARAM = 1
+else ifeq "$(DRAM_SSC_ENABLE)" "2"
+DRAM_SSC_PARAM = 2
+else ifeq "$(DRAM_SSC_ENABLE)" "3"
+DRAM_SSC_PARAM = 3
+else ifeq "$(DRAM_SSC_ENABLE)" "4"
+DRAM_SSC_PARAM = 4
+else ifeq "$(DRAM_SSC_ENABLE)" "5"
+DRAM_SSC_PARAM = 5
+else
+DRAM_SSC_PARAM = 0
+endif
+
+ifeq "$(DRAM_ODT)" "Normal"
+ODT_SELECT = ""
+else ifeq "$(DRAM_ODT)" "Enable"
+ODT_SELECT = "ENABLE"
+else ifeq "$(DRAM_ODT)" "Disable"
+ODT_SELECT = "DISABLE"
+else
+ODT_SELECT = ""
+endif
+
+ifeq "$(DRAM_TX_DRV)" "Normal"
+TX_DRV = ""
+else ifeq "$(DRAM_TX_DRV)" "Enable"
+TX_DRV = "ENABLE"
+else
+TX_DRV = ""
+endif
+
+ifeq "$(DRAM_LDO)" "Normal"
+DDR_LDO = ""
+else ifeq "$(DRAM_LDO)" "Enable"
+DDR_LDO = "ENABLE"
+else
+DDR_LDO = ""
+endif
+
+ifeq "$(MPLL_LDO)" "Normal"
+PLL_LDO = ""
+else ifeq "$(MPLL_LDO)" "Enable"
+PLL_LDO = "ENABLE"
+else
+PLL_LDO = ""
+endif
+
+ifeq "$(DRAM_RX_PAD)" "Normal"
+RX_PAD = ""
+else ifeq "$(DRAM_RX_PAD)" "Enable"
+RX_PAD = "ENABLE"
+else
+RX_PAD = ""
+endif
+
+#-------------------------------------------------------------------------------
+# set the scatter file name here
+#-------------------------------------------------------------------------------
+ifeq "$(BL_COMPRESS)" "ENABLE"
+SCATTER = LDS_LZ$(SCATTER_EXT).lds
+else
+SCATTER = LDS_NM.lds
+endif
+
+#-------------------------------------------------------------------------------
+# set loader execution DRAM address
+#-------------------------------------------------------------------------------
+# 255MB
+ifeq "$(SDRAM_SIZE)" "512"
+LD_BASE_ADDR = 0x3C00000
+else ifeq "$(SDRAM_SIZE)" "1024"
+LD_BASE_ADDR = 0x7C00000
+else ifeq "$(SDRAM_SIZE)" "2048"
+LD_BASE_ADDR = 0xFC00000
+else
+LD_BASE_ADDR = 0xFC00000
+endif
+BL_LDADDR_PARAM = \
+-DLD_BASE_ADDR=$(LD_BASE_ADDR)
+
+#-------------------------------------------------------------------------------
+# set loader internal storage type
+#-------------------------------------------------------------------------------
+BL_STORAGEINT_PARAM = \
+-D_STORAGEINT_$(STORAGEINT)_
+
+#-------------------------------------------------------------------------------
+# Model parameters
+#-------------------------------------------------------------------------------
+ifeq "$(MODEL)" "EMU_EVB"
+  MODEL_TYPE = _MODEL_EMU_EVB_
+endif
+
+ifeq "$(MODEL)" "DEMO1_EVB"
+  MODEL_TYPE = _MODEL_DEMO1_EVB_
+endif
+
+ifeq "$(MODEL)" "ARTOSYN_EVB"
+  MODEL_TYPE = _MODEL_ARTOSYN_EVB_
+endif
+MODEL_PARAM = \
+    -D_MODEL_EMU_EVB_=0 \
+    -D_MODEL_DEMO1_EVB_=1  \
+    -D_MODEL_ARTOSYN_EVB_=2  \
+    -D_MODEL_DSC_=$(MODEL_TYPE)
+
+#-------------------------------------------------------------------------------
+# uboot encrypt binary or not parameters
+#-------------------------------------------------------------------------------
+ifeq "$(SECUREBOOT_DECRYPT_UBOOT)" "Normal"
+  UBOOT_DECRYPT_TYPE = _SECURE_DECRYPT_UBOOT_DISABLE_
+else ifeq "$(SECUREBOOT_DECRYPT_UBOOT)" "Secure"
+  UBOOT_DECRYPT_TYPE = _SECURE_DECRYPT_UBOOT_ENABLE_
+else
+  UBOOT_DECRYPT_TYPE = _SECURE_DECRYPT_UBOOT_DISABLE_
+endif
+
+SECURE_DECRYPT_UBOOT_PARAM = \
+    -D_SECURE_DECRYPT_UBOOT_DISABLE_=0 \
+    -D_SECURE_DECRYPT_UBOOT_ENABLE_=1  \
+    -DSECURE_DECRYPT_UBOOT=$(UBOOT_DECRYPT_TYPE)
+
+#-------------------------------------------------------------------------------
+# optee parameters
+#-------------------------------------------------------------------------------
+ifeq "$(SECUREBOOT_DECRYPT_OPTEE)" "Normal"
+  OPTEE_DECRYPT_TYPE = _SECURE_DECRYPT_OPTEE_DISABLE_
+else ifeq "$(SECUREBOOT_DECRYPT_OPTEE)" "Secure"
+  OPTEE_DECRYPT_TYPE = _SECURE_DECRYPT_OPTEE_ENABLE_
+else
+  OPTEE_DECRYPT_TYPE = _SECURE_DECRYPT_OPTEE_DISABLE_
+endif
+
+
+SECURE_DECRYPT_OPTEE_PARAM = \
+    -D_SECURE_DECRYPT_OPTEE_DISABLE_=0 \
+    -D_SECURE_DECRYPT_OPTEE_ENABLE_=1  \
+    -DSECURE_DECRYPT_OPTEE_OS=$(OPTEE_DECRYPT_TYPE)
+
+
+#-------------------------------------------------------------------------------
+# optee or uboot digital signature parameters
+#-------------------------------------------------------------------------------
+ifeq "$(SIGNATUREMETHOD)" "AES128"
+# => AES signature
+OPTEE_UBOOT_DIGITAL_SIGNATURE_TYPE = _UBOOT_OPTEE_SIGNATURE_USE_AES128_
+else
+# => RSA signature
+OPTEE_UBOOT_DIGITAL_SIGNATURE_TYPE = _UBOOT_OPTEE_SIGNATURE_USE_RSA_
+endif
+
+OPTEE_UBOOT_SIGNATURE_PARAM = \
+    -D_UBOOT_OPTEE_SIGNATURE_USE_RSA_=0 \
+    -D_UBOOT_OPTEE_SIGNATURE_USE_AES128_=1  \
+    -DSECURE_SIGNATURE_BY_AES=$(OPTEE_UBOOT_DIGITAL_SIGNATURE_TYPE)
+
+
+#-------------------------------------------------------------------------------
+# optee or uboot digital signature parameters
+#-------------------------------------------------------------------------------
+ifeq "$(CHIP)" "565"
+CARD_DETECT_PIN_TYPE = _CARD_DETECT_TYPE_1_
+else ifeq "$(CHIP)" "563"
+CARD_DETECT_PIN_TYPE = _CARD_DETECT_TYPE_1_
+else ifeq "$(CHIP)" "562"
+CARD_DETECT_PIN_TYPE = _CARD_DETECT_TYPE_2_
+else ifeq "$(CHIP)" "561"
+CARD_DETECT_PIN_TYPE = _CARD_DETECT_TYPE_2_
+else ifeq "$(CHIP)" "566"
+CARD_DETECT_PIN_TYPE = _CARD_DETECT_TYPE_2_
+else
+CARD_DETECT_PIN_TYPE = _CARD_DETECT_TYPE_1_
+endif
+
+CARDDET_PIN_PARAM = \
+    -D_CARD_DETECT_TYPE_0_=0 \
+    -D_CARD_DETECT_TYPE_1_=1  \
+	-D_CARD_DETECT_TYPE_2_=2  \
+    -DCARD_DETECT_PIN=$(CARD_DETECT_PIN_TYPE)
+
+ifeq "$(DDR_TREFI)" "Extend"
+DDR_TREFI_PARAM = 1
+else
+DDR_TREFI_PARAM = 0
+endif
+
