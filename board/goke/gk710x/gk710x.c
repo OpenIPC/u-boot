@@ -102,8 +102,12 @@ static const struct {
 	{ 0x3b0, 0xb0 }, { 0x3b1, 0x30 },	/* analog */
 };
 
+/* REG_EPHY_POWER in the vendor kernel: 0 all on, 0x3ff all off */
+#define GK_EPHY_POWER		0x474
+
 static void gk_ephy_init(void)
 {
+	ulong start;
 	int i;
 
 	/* Its reference clock: the audio PLL at 96 MHz / 4, out on a pin */
@@ -127,6 +131,18 @@ static void gk_ephy_init(void)
 
 	/* The MAC talks to the internal PHY, not the MII pins */
 	writel(readl(GK_AHB_GENERAL0) & ~BIT(1), GK_AHB_GENERAL0);
+
+	/*
+	 * Power it fully on, as the vendor kernel does before it uses the
+	 * PHY (GK_EPHY_POWER_ON() in GKETH_open()): the trim above leaves
+	 * 0x0003, which the vendor U-Boot can live with because it never
+	 * reads the PHY. Then give it time to answer on its MII registers.
+	 */
+	writel(0, GK_EPHY_BASE + GK_EPHY_POWER);
+	start = get_timer(0);
+	while ((readl(GK_EPHY_BASE + 4 * MII_PHYSID1) & 0xffff) == 0xffff &&
+	       get_timer(start) < 500)
+		udelay(1000);
 }
 
 /*
