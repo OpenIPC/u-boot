@@ -11,10 +11,12 @@
  */
 
 #include <common.h>
+#include <cpu_func.h>
 #include <env.h>
 #include <image.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
+#include <asm/system.h>
 #include <asm/arch/gk710x.h>
 #include <linux/sizes.h>
 #include <linux/stringify.h>
@@ -36,6 +38,35 @@ static ulong env_size(const char *name, const char *def)
 	return ustrtoul(s ? s : def, &end, 0);
 }
 
+/*
+ * The CPU as the vendor's boot flow leaves it for the kernel:
+ *  - alignment checking off, as the vendor U-Boot's ARM1176_set_and_go()
+ *    clears SCTLR.A before the jump. With it on (start.S sets it), a
+ *    GK7102C restarted from an exception in the kernel's decompressor;
+ *  - GK710xS: the caches restricted to 16 KiB each (ACTLR.CZ), as the
+ *    GK7102C vendor kernel's decompressor sets it before it turns the
+ *    caches on. The gk7102s kernel built from the SDK source does not,
+ *    and on a GK7102C its XZ decompressor then failed straight away
+ *    ("XZ decompressor ran out of memory"). The decompressor only adds
+ *    bits to ACTLR, so set here it stays. CZ may be changed only with
+ *    the caches off and invalidated, so the data cache, should a build
+ *    turn it on, is cleaned and turned off first.
+ */
+static void gk_cpu_prep_linux(void)
+{
+	u32 v;
+
+	dcache_disable();
+	asm volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (v));
+	v &= ~(CR_C | CR_I | CR_A);
+	asm volatile("mcr p15, 0, %0, c1, c0, 0" : : "r" (v));
+	asm volatile("mcr p15, 0, %0, c7, c7, 0" : : "r" (0));
+#ifdef CONFIG_GK710X_S
+	asm volatile("mrc p15, 0, %0, c1, c0, 1" : "=r" (v));
+	asm volatile("mcr p15, 0, %0, c1, c0, 1" : : "r" (v | BIT(6)));
+#endif
+}
+
 void board_prep_linux(bootm_headers_t *images)
 {
 	const ulong top = GK_DDR_BASE + gd->ram_size;
@@ -49,9 +80,7 @@ void board_prep_linux(bootm_headers_t *images)
 	 * the CPU PLL, before it decompresses. On the GK7101/GK7102 that is
 	 * the setting arch_cpu_init() already made. On the GK710xS the boot
 	 * header sets the PLLs, nothing here programs RCT + 0x8c, and the
-	 * GK7102C's own kernel never writes it; with the GK7101/GK7102 value
-	 * handed over, a GK7102C halted in the decompressor right after that
-	 * write ("XZ decompressor ran out of memory"). Hand over what the PLL
+	 * GK7102C's own kernel never writes it. Hand over what the PLL
 	 * holds, so that write changes nothing.
 	 */
 #ifdef CONFIG_GK710X_S
@@ -68,4 +97,5 @@ void board_prep_linux(bootm_headers_t *images)
 	writel(gd->ram_size / SZ_1M, GK_U2K_TOTAL_MEM);
 
 	gk_gpio_map_save((void *)(top - GK_USR_SIZE));
+	gk_cpu_prep_linux();
 }
