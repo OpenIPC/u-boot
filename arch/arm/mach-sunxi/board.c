@@ -135,6 +135,10 @@ static int gpio_init(void)
 	sunxi_gpio_set_cfgpin(SUNXI_GPH(0), SUN50I_H616_GPH_UART0);
 	sunxi_gpio_set_cfgpin(SUNXI_GPH(1), SUN50I_H616_GPH_UART0);
 	sunxi_gpio_set_pull(SUNXI_GPH(1), SUNXI_GPIO_PULL_UP);
+#elif CONFIG_CONS_INDEX == 1 && defined(CONFIG_MACH_SUN8I_V831)
+	sunxi_gpio_set_cfgpin(SUNXI_GPH(9), SUN8I_V831_GPH_UART0);
+	sunxi_gpio_set_cfgpin(SUNXI_GPH(10), SUN8I_V831_GPH_UART0);
+	sunxi_gpio_set_pull(SUNXI_GPH(10), SUNXI_GPIO_PULL_UP);
 #elif CONFIG_CONS_INDEX == 1 && defined(CONFIG_MACH_SUN8I_A83T)
 	sunxi_gpio_set_cfgpin(SUNXI_GPB(9), SUN8I_A83T_GPB_UART0);
 	sunxi_gpio_set_cfgpin(SUNXI_GPB(10), SUN8I_A83T_GPB_UART0);
@@ -278,6 +282,15 @@ uint32_t sunxi_get_boot_device(void)
 	 * binary over USB. If it is found, it determines where SPL was
 	 * read from.
 	 */
+	/*
+	 * The V831/V833 images boot from SPI NOR alone: an SPL with a valid
+	 * header came from there, whatever the boot-media byte says (the
+	 * boot ROM's stand-in in QEMU does not write it).
+	 */
+	if (IS_ENABLED(CONFIG_MACH_SUN8I_V831) && !IS_ENABLED(CONFIG_SPL_MMC) &&
+	    boot_source != SUNXI_INVALID_BOOT_SOURCE)
+		return BOOT_DEVICE_SPI;
+
 	switch (boot_source) {
 	case SUNXI_INVALID_BOOT_SOURCE:
 		return BOOT_DEVICE_BOARD;

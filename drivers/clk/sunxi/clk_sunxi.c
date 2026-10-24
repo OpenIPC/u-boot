@@ -198,6 +198,8 @@ static const struct udevice_id sunxi_clk_ids[] = {
 #ifdef CONFIG_CLK_SUN50I_H6
 	{ .compatible = "allwinner,sun50i-h6-ccu",
 	  .data = (ulong)&h6_ccu_desc },
+	{ .compatible = "allwinner,sun8i-v831-ccu",
+	  .data = (ulong)&h6_ccu_desc },
 #endif
 #ifdef CONFIG_CLK_SUN50I_H6_R
 	{ .compatible = "allwinner,sun50i-h6-r-ccu",
