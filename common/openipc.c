@@ -1081,10 +1081,41 @@ static void altbootcmd_migrate(void) {
   env_save();
 }
 
+#if !defined(CONFIG_FMC_SPI_NAND) && defined(CONFIG_OPENIPC_NOR_SPLIT)
+/*
+ * fwwrite writes only a file that fits fwsize, the firmware area from
+ * kernaddr to the end of the chip, and the layout scan sets it. Recovery
+ * runs before the scan, so a script.txt that runs fwupd would find no
+ * fwsize on a fresh environment and write nothing. Set it from the flash
+ * here; the scan sets it again from what it finds.
+ */
+static void nor_split_fwsize(void)
+{
+  struct spi_flash *flash;
+  const char *ka = env_get("kernaddr");
+  ulong start = ka ? hextoul(ka, NULL) : CONFIG_ENV_KERNADDR;
+  char str[32];
+
+  flash = spi_flash_probe(CONFIG_SF_DEFAULT_BUS, CONFIG_SF_DEFAULT_CS,
+                          CONFIG_SF_DEFAULT_SPEED, CONFIG_SF_DEFAULT_MODE);
+  if (!flash)
+    return;
+  if (start < flash->size) {
+    sprintf(str, "0x%lx", (ulong)(flash->size - start));
+    env_set("fwsize", str);
+  }
+  spi_flash_free(flash);
+}
+#endif
+
 int openipc_helper(void) {
   char msize[16];
   sprintf(msize, "%ldM", gd->ram_size / 1024 / 1024);
   env_set("totalmem", msize);
+
+#if !defined(CONFIG_FMC_SPI_NAND) && defined(CONFIG_OPENIPC_NOR_SPLIT)
+  nor_split_fwsize();
+#endif
 
   /* Recovery checks what it runs: a board may already have set verify=n
    * (so that the split scan below can clear it), and source would then run
