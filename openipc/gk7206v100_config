@@ -41,3 +41,7 @@ CONFIG_PHY_VENDOR_USB=y
 CONFIG_FMC=y
 CONFIG_FMC_SPI_NOR=y
 CONFIG_MTD_PARTITIONS=y
+
+# The split NOR layout: the kernel (OpenIPC/linux goke-gk7206v100)
+# divides one firmware partition from its own device tree.
+CONFIG_OPENIPC_NOR_SPLIT=y

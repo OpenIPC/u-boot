@@ -78,11 +78,12 @@ int board_early_init_f(void)
 
 int misc_init_r(void)
 {
+	/* before the scan: a split image clears it, so bootm checks its CRC */
+	env_set("verify", "n");
 	openipc_helper();
 #ifdef CONFIG_RANDOM_ETHADDR
 	random_init_r();
 #endif
-	env_set("verify", "n");
 
 	return 0;
 }
