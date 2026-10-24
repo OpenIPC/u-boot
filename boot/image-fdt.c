@@ -561,6 +561,19 @@ int boot_get_fdt(int flag, int argc, char *const argv[], uint8_t arch,
 			debug("## Using FDT at ${fdtaddr}=Ox%lx\n", fdt_addr);
 		}
 #endif
+#ifdef CONFIG_MACH_SUN8I_V831
+	} else if (images->legacy_hdr_valid && env_get_hex("fdtaddr", 0)) {
+		/*
+		 * A plain uImage boots with the device tree the board keeps
+		 * at ${fdtaddr}: on the V831/V833, the vendor kernel's, built
+		 * into U-Boot (board/sunxi/v83x.c).
+		 */
+		fdt_addr = env_get_hex("fdtaddr", 0);
+		fdt_blob = map_sysmem(fdt_addr, 0);
+		if (fdt_check_header(fdt_blob))
+			goto no_fdt;
+		printf("   Booting using the fdt blob at %#08lx\n", fdt_addr);
+#endif
 	} else {
 		debug("## No Flattened Device Tree\n");
 		goto no_fdt;

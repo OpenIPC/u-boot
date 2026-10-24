@@ -49,6 +49,11 @@
 #include <sy8106a.h>
 #include <asm/setup.h>
 #include <status_led.h>
+#include <openipc.h>
+
+void v83x_board_init(void);
+void v83x_kernel_fdt(void);
+void v83x_ft_board_setup(void *blob);
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -260,6 +265,9 @@ int board_init(void)
 #endif
 
 	eth_init_board();
+
+	if (IS_ENABLED(CONFIG_MACH_SUN8I_V831))
+		v83x_board_init();
 
 	return 0;
 }
@@ -860,6 +868,13 @@ int misc_init_r(void)
 
 	setup_environment(gd->fdt_blob);
 
+	if (IS_ENABLED(CONFIG_MACH_SUN8I_V831))
+		v83x_kernel_fdt();
+
+#ifdef CONFIG_OPENIPC
+	openipc_helper();
+#endif
+
 	return 0;
 }
 
@@ -917,6 +932,9 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 	fdt_fixup_ethernet(blob);
 
 	bluetooth_dt_fixup(blob);
+
+	if (IS_ENABLED(CONFIG_MACH_SUN8I_V831))
+		v83x_ft_board_setup(blob);
 
 #ifdef CONFIG_VIDEO_DT_SIMPLEFB
 	r = sunxi_simplefb_setup(blob);
