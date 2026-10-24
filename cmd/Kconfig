@@ -1431,7 +1431,7 @@ config CMD_SDRAM
 
 config CMD_SF
 	bool "sf"
-	depends on DM_SPI_FLASH || SPI_FLASH || FMC_SPI_NOR
+	depends on DM_SPI_FLASH || SPI_FLASH || FMC_SPI_NOR || HISFC350_SPI_NOR
 	default y if DM_SPI_FLASH
 	help
 	  SPI Flash support
