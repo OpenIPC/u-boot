@@ -37,3 +37,7 @@ CONFIG_XMEDIA_DISABLE_DOWNLOAD=y
 # CONFIG_CMD_CREAD is not set
 # CONFIG_CMD_UGZIP is not set
 # CONFIG_DDR_TRAINING_V2 is not set
+
+# The split NOR layout: the kernel (OpenIPC/linux hisilicon-hi3536cv100)
+# divides one firmware partition from its own device tree.
+CONFIG_OPENIPC_NOR_SPLIT=y
