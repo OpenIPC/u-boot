@@ -19,6 +19,7 @@
 #include <linux/mtd/mtd.h>
 #include <linux/delay.h>
 #include <openipc.h>
+#include <cpu_func.h>
 #if CONFIG_IS_ENABLED(CMD_TIMESTAMP)
 #include "cmd_timestamp.h"
 #endif
@@ -399,7 +400,7 @@ int dram_init(void)
 	return 0;
 }
 
-void reset_cpu(ulong addr)
+void reset_cpu(void)
 {
 	writel(WATCH_DOG_LOAD_VAL, REG_BASE_WATCH_DOG);
 	writel(WATCH_DOG_ENABLE, WATCH_DOG_CONTROL);

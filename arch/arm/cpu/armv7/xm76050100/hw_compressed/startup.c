@@ -20,6 +20,9 @@ const uintptr_t image_entry = (CONFIG_SYS_TEXT_BASE);
 #define putstr(_s)	uart_early_puts(_s)
 
 #include "hw_decompress.c"
+
+/* reset.S; the argument is ignored */
+void reset_cpu(unsigned long addr);
 #define GZIP_SIZE_OFFSET 0x4
 
 #ifndef CONFIG_SYS_ICACHE_OFF

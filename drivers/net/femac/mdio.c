@@ -6,6 +6,7 @@
 
 #include "bspeth.h"
 #include "mdio.h"
+#include <linux/delay.h>
 
 /* write mdio registers reset value */
 static void mdio_reg_reset(struct bspeth_netdev_local *ld)

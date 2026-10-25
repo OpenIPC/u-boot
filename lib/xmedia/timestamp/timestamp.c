@@ -7,6 +7,7 @@
 #include <command.h>
 #include <common.h>
 #include <asm/io.h>
+#include <linux/delay.h>
 
 #if defined(CONFIG_TARGET_XM720XXX) || defined(CONFIG_TARGET_XMORCA)
 static timestamp_type stopwatch_get_running_timer(void);

@@ -24,6 +24,9 @@
 #include <common.h>
 #include <watchdog.h>
 
+/* defined further down, used before it (the hw_compressed loader has no header for it) */
+void __udelay(unsigned long usec);
+
 #ifndef CONFIG_WD_PERIOD
 # define CONFIG_WD_PERIOD	(10 * 1000 * 1000)	/* 10 seconds default*/
 #endif

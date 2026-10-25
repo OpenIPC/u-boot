@@ -28,7 +28,7 @@
 #ifndef bit
 #define bit(nr) (1UL << (nr))
 #endif
-#define mdelay(n) udelay((n)*1000)
+#include <linux/delay.h>
 /* ***********************************************************
  *
  * Global varibles and defintions

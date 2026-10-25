@@ -7,6 +7,7 @@
 #include <malloc.h>
 #include <sdhci.h>
 #include "mmc_private.h"
+#include <linux/delay.h>
 
 #ifdef CONFIG_XMEDIA_SDHCI
 #define MIN_FREQ	400000

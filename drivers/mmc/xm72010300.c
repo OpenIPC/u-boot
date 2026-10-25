@@ -7,6 +7,7 @@
 #include <malloc.h>
 #include <sdhci.h>
 #include "mmc_private.h"
+#include <linux/delay.h>
 
 #define MIN_FREQ	400000
 #define NOT_FOUND	(-1)

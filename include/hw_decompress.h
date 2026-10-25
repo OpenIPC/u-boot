@@ -27,6 +27,11 @@ void hw_dec_uinit(void);
  *
  * note: only support v1 version now for sections feature
  */
+#ifndef CONFIG_HI35XX_FAMILY_V500
+int hw_dec_decompress(const unsigned char *dst, int *dstlen,
+		      const unsigned char *src, int srclen, const void *unused);
+#endif
+
 int hw_dec_decompress_ex(hw_decompress_op_type op_type, const unsigned char *dst,
 	int *dstlen, const unsigned char *src, int srclen);
 #endif

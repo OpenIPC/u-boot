@@ -9,6 +9,7 @@
 
 #include <common.h>
 #include <linux/string.h>
+#include <command.h>
 
 #define USTART 0xFA
 #define UHEAD 0xFE

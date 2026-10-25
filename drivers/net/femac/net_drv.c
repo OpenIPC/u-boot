@@ -14,6 +14,7 @@
 #include <miiphy.h>
 #include <net.h>
 #include <cpu_func.h>
+#include <linux/delay.h>
 /*************************************************************************/
 int bspeth_mdiobus_driver_init(struct bspeth_netdev_local *ld);
 void bspeth_mdiobus_driver_exit(struct bspeth_netdev_local *ld);

@@ -15,6 +15,7 @@
 #include <sdhci.h>
 #include <cpu_common.h>
 #include <asm/mach-types.h>
+#include <cpu_func.h>
 
 #ifndef CONFIG_SYS_DCACHE_OFF
 void enable_caches(void)
@@ -177,7 +178,7 @@ int dram_init(void)
 	return 0;
 }
 
-void reset_cpu(ulong addr)
+void reset_cpu(void)
 {
 	/* 0x12345678:writing any value will cause a reset. */
 	writel(0x12345678, SYS_CTRL_REG_BASE + REG_SC_SYSRES);
