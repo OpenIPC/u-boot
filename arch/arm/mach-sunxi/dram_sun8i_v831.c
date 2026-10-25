@@ -1058,7 +1058,7 @@ unsigned long sunxi_dram_init(void)
 
 	/*
 	 * The geometry the library found, checked against the DRAM itself:
-	 * past the part's size the addresses alias. (Under QEMU, which does
+	 * past the part's size the addresses alias. (Under a QEMU that does
 	 * not model the controller's address mapping, the library's scan,
 	 * like the vendor's boot0, reports 4160 MiB.)
 	 */
