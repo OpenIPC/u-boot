@@ -90,12 +90,20 @@ build_v500() {
 #
 # arch picks the cross compiler (arm: CROSS_COMPILE, arm64: CROSS_COMPILE64);
 # packer is the image_tool directory of the SoC's SDK generation; gsl is the
-# GSL source the packer's input/gsl.bin is built from, or "-" to use the
-# prebuilt one it ships. A model of "-" names the image after the SoC alone.
+# GSL source the packer's input/gsl.bin is built from, a prebuilt GSL to pack
+# instead of it, or "-" to use the prebuilt one it ships. A model of "-" names
+# the image after the SoC alone.
+#
+# hi3516cv610 20s/20g pack image_tool/input/gsl-20250416.bin, the GSL of a
+# production K662C6S (ddr param version 20250416): on that module the shipped
+# gsl.bin hangs in DDR training right after the boot table (u-boot#69,
+# defib#148). Only there: on a Hi3516CV608 with an FM25Q64A it trains, but
+# Linux's bsp-sfc then fails to probe the flash ("spi nor register fail"),
+# so it is not a replacement for gsl.bin.
 BOOTIMG_TABLE="
 hi3516cv610 10b     Hi3516CV610-DMEB_4L_DDR2_1333M_64MB_16bit-A7_950M_QFN.bin        arm   image_tool             -
-hi3516cv610 20s     Hi3516CV610-DMEB_4L_DDR3_2133M_128MB_16bit-A7_950M_QFN.bin       arm   image_tool             -
-hi3516cv610 20g     Hi3516CV610-DMEB_4L_DDR3_2133M_128MB_16bit-A7_950M_QFN.bin       arm   image_tool             -
+hi3516cv610 20s     Hi3516CV610-DMEB_4L_DDR3_2133M_128MB_16bit-A7_950M_QFN.bin       arm   image_tool             image_tool/input/gsl-20250416.bin
+hi3516cv610 20g     Hi3516CV610-DMEB_4L_DDR3_2133M_128MB_16bit-A7_950M_QFN.bin       arm   image_tool             image_tool/input/gsl-20250416.bin
 hi3516cv610 00s     Hi3516CV610-DMEB_4L_DDR3_2133M_512MB_16bit-A7_950M_BGA.bin       arm   image_tool             -
 hi3516cv610 00g     Hi3516CV610-DMEB_4L_DDR3_2133M_512MB_16bit-A7_950M_BGA.bin       arm   image_tool             -
 hi3516cv608 -       Hi3516CV608-DMEB_4L_DDR2_1333M_64MB_16bit-A7_950M_QFN.bin        arm   image_tool             -
@@ -130,8 +138,20 @@ build_bootimg() {
     make ${MAKE_OPTS} CROSS_COMPILE=${cc} u-boot-z.clean </dev/null && \
     cp ${BOOT_BUILDDIR}/u-boot-${soc}.bin output/smoke-${soc}.bin || return 1
 
+    # The packer reads one fixed input/gsl.bin. A row that names a prebuilt
+    # GSL swaps it in for its own image only, so the tracked default is put
+    # back before every other row and once the table is done.
+    # A packer whose GSL is built from source ships no default.
+    packer=$(echo "${rows}" | awk 'NR == 1 {print $5}')
+    dflt=${BOOT_BUILDDIR}/gsl-default.bin
+    rm -f ${dflt}
+    [ -f ${packer}/input/gsl.bin ] && { cp ${packer}/input/gsl.bin ${dflt} || return 1; }
     echo "${rows}" | while read -r _ model reginfo _ packer gsl; do
-        if [ "${gsl}" != - ]; then
+        if [ "${gsl}" = - ]; then
+            cp ${dflt} ${packer}/input/gsl.bin || return 1
+        elif [ -f "${gsl}" ]; then
+            cp ${gsl} ${packer}/input/gsl.bin || return 1
+        else
             # Its Makefile takes include paths from $(PWD): build from inside.
             (cd ${gsl} && make CROSS_COMPILE=${cc} CHIP=${soc} </dev/null >/dev/null) && \
             cp ${gsl}/pub/gsl.bin ${packer}/input/gsl.bin || return 1
@@ -145,7 +165,9 @@ build_bootimg() {
         (cd ${packer}/oem && python3 oem_quick_build.py >/dev/null) && \
         test -f ${packer}/image/oem/boot_image.bin && \
         mv ${packer}/image/oem/boot_image.bin output/${out} || return 1
-    done
+    done || return 1
+    [ -f ${dflt} ] && cp ${dflt} ${packer}/input/gsl.bin
+    return 0
 }
 
 # ARM926EJS families (hi3516cv200 / hi3518ev200, hi3516cv300 / hi3516ev100):
