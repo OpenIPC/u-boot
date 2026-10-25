@@ -51,6 +51,11 @@ config DRAM_SUN50I_H616
 	  Select this dram controller driver for some sun50i platforms,
 	  like H616.
 
+config DRAM_SUN8I_V831
+	bool
+	help
+	  Select this dram controller driver for the V831/V833 (sun8iw19).
+
 if DRAM_SUN50I_H616
 config DRAM_SUN50I_H616_WRITE_LEVELING
 	bool "H616 DRAM write leveling"
@@ -130,8 +135,8 @@ config SUNXI_GEN_SUN6I
 
 config SUN50I_GEN_H6
 	bool
-	select FIT
-	select SPL_LOAD_FIT
+	select FIT if ARM64
+	select SPL_LOAD_FIT if ARM64
 	select MMC_SUNXI_HAS_NEW_MODE
 	select SUPPORT_SPL
 	---help---
@@ -312,6 +317,20 @@ config MACH_SUN8I_V3S
 	select SUPPORT_SPL
 	select ARMV7_BOOT_SEC_DEFAULT if OLD_SUNXI_KERNEL_COMPAT
 
+config MACH_SUN8I_V831
+	bool "sun8i (Allwinner V831/V833)"
+	select CPU_V7A
+	select CPU_V7_HAS_NONSEC
+	select CPU_V7_HAS_VIRT
+	select ARCH_SUPPORT_PSCI
+	select SPL_ARMV7_SET_CORTEX_SMPEN
+	select DRAM_SUN8I_V831
+	select SUN50I_GEN_H6
+	help
+	  The V831 and V833 (sun8iw19): one Cortex-A7 and the H6's
+	  peripherals, clocks and memory map, with DDR2 (V831, 64 MiB) or
+	  DDR3 (V833, 128 MiB) in the package.
+
 config MACH_SUN9I
 	bool "sun9i (Allwinner A80)"
 	select CPU_V7A
@@ -461,6 +480,7 @@ config DRAM_TYPE
 config DRAM_CLK
 	int "sunxi dram clock speed"
 	default 792 if MACH_SUN9I
+	default 528 if MACH_SUN8I_V831
 	default 648 if MACH_SUN8I_R40
 	default 312 if MACH_SUN6I || MACH_SUN8I
 	default 360 if MACH_SUN4I || MACH_SUN5I || MACH_SUN7I || \
@@ -489,6 +509,7 @@ config DRAM_ZQ
 		       MACH_SUN8I_A23 || MACH_SUN8I_A33 || MACH_SUN8I_A83T
 	default 127 if MACH_SUN7I
 	default 14779 if MACH_SUN8I_V3S
+	default 3065 if MACH_SUN8I_V831
 	default 3881979 if MACH_SUNXI_H3_H5 || MACH_SUN8I_R40 || MACH_SUN50I_H6
 	default 4145117 if MACH_SUN9I
 	default 3881915 if MACH_SUN50I
@@ -505,6 +526,82 @@ config DRAM_ODT_EN
 	default y if MACH_SUN50I_H616
 	---help---
 	Select this to enable dram odt (on die termination).
+
+if DRAM_SUN8I_V831
+# The vendor's dram_para words (boot0 header, sys_config.fex [dram_para]).
+# The defaults are the V831's (DDR2 in the package); a V833 board config
+# overrides them with the V833's (DDR3).
+config DRAM_SUN8I_V831_TYPE
+	int "DRAM type (2: DDR2, 3: DDR3)"
+	default 2
+
+config DRAM_SUN8I_V831_ODT_EN
+	hex "dram_odt_en"
+	default 0x0
+
+config DRAM_SUN8I_V831_PARA1
+	hex "dram_para1"
+	default 0xd2
+
+config DRAM_SUN8I_V831_PARA2
+	hex "dram_para2"
+	default 0x0
+
+config DRAM_SUN8I_V831_MR0
+	hex "dram_mr0"
+	default 0xe73
+
+config DRAM_SUN8I_V831_MR1
+	hex "dram_mr1"
+	default 0x2
+
+config DRAM_SUN8I_V831_MR2
+	hex "dram_mr2"
+	default 0x0
+
+config DRAM_SUN8I_V831_MR3
+	hex "dram_mr3"
+	default 0x0
+
+config DRAM_SUN8I_V831_TPR0
+	hex "dram_tpr0"
+	default 0x00471992
+
+config DRAM_SUN8I_V831_TPR1
+	hex "dram_tpr1"
+	default 0x0131a10c
+
+config DRAM_SUN8I_V831_TPR2
+	hex "dram_tpr2"
+	default 0x00057041
+
+config DRAM_SUN8I_V831_TPR5
+	hex "dram_tpr5"
+	default 0x48484848
+
+config DRAM_SUN8I_V831_TPR6
+	hex "dram_tpr6"
+	default 0x48
+
+config DRAM_SUN8I_V831_TPR7
+	hex "dram_tpr7"
+	default 0x1621121e
+
+config DRAM_SUN8I_V831_TPR11
+	hex "dram_tpr11"
+	default 0x00120000
+
+config DRAM_SUN8I_V831_TPR12
+	hex "dram_tpr12"
+	default 0x23
+
+config DRAM_SUN8I_V831_TPR13
+	hex "dram_tpr13"
+	default 0x34000903
+	help
+	  Feature bits of the vendor DRAM library. Bit 0 set: the geometry
+	  in dram_para1/2 is used as it is, no scan.
+endif
 
 if MACH_SUN4I || MACH_SUN5I || MACH_SUN7I
 config DRAM_EMR1
@@ -592,6 +689,7 @@ config SYS_CLK_FREQ
 	default 1008000000 if MACH_SUN6I
 	default 912000000 if MACH_SUN7I
 	default 816000000 if MACH_SUN50I || MACH_SUN50I_H5
+	default 816000000 if MACH_SUN8I_V831
 	default 1008000000 if MACH_SUN8I
 	default 1008000000 if MACH_SUN9I
 	default 888000000 if MACH_SUN50I_H6
@@ -604,6 +702,7 @@ config SYS_CONFIG_NAME
 	default "sun6i" if MACH_SUN6I
 	default "sun7i" if MACH_SUN7I
 	default "sun8i" if MACH_SUN8I
+	default "v83x" if MACH_SUN8I_V831
 	default "sun9i" if MACH_SUN9I
 	default "sun50i" if MACH_SUN50I
 	default "sun50i" if MACH_SUN50I_H6
@@ -992,13 +1091,14 @@ config SPL_STACK_R_ADDR
 	default 0x4fe00000 if MACH_SUN6I
 	default 0x4fe00000 if MACH_SUN7I
 	default 0x4fe00000 if MACH_SUN8I
+	default 0x43e00000 if MACH_SUN8I_V831
 	default 0x2fe00000 if MACH_SUN9I
 	default 0x4fe00000 if MACH_SUN50I
 	default 0x4fe00000 if SUN50I_GEN_H6
 
 config SPL_SPI_SUNXI
 	bool "Support for SPI Flash on Allwinner SoCs in SPL"
-	depends on MACH_SUN4I || MACH_SUN5I || MACH_SUN7I || MACH_SUNXI_H3_H5 || MACH_SUN50I || MACH_SUN8I_R40 || MACH_SUN50I_H6 || MACH_SUNIV
+	depends on MACH_SUN4I || MACH_SUN5I || MACH_SUN7I || MACH_SUNXI_H3_H5 || MACH_SUN50I || MACH_SUN8I_R40 || MACH_SUN50I_H6 || MACH_SUNIV || MACH_SUN8I_V831
 	help
 	  Enable support for SPI Flash. This option allows SPL to read from
 	  sunxi SPI Flash. It uses the same method as the boot ROM, so does

@@ -1,0 +1,75 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * A V831/V833 IP camera as the vendor's reference design wires it:
+ * console on UART0 (PH9/PH10), SPI NOR on SPI0 (PC0-PC3), the SD card on
+ * SMHC0 (PF0-PF5), an RMII PHY on the EMAC (PD), clocked by the SoC's
+ * 25 MHz output and reset on PD19.
+ */
+
+/dts-v1/;
+
+#include "sun8i-v831.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+
+/ {
+	model = "OpenIPC V831/V833";
+	compatible = "openipc,v83x", "allwinner,sun8i-v831";
+
+	aliases {
+		ethernet0 = &emac;
+		serial0 = &uart0;
+		spi0 = &spi0;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+};
+
+&emac {
+	pinctrl-names = "default";
+	pinctrl-0 = <&rmii_pins>;
+	phy-mode = "rmii";
+	phy-handle = <&rmii_phy>;
+	allwinner,tx-delay-ps = <700>;
+	allwinner,rx-delay-ps = <3100>;
+	snps,reset-gpio = <&pio 3 19 GPIO_ACTIVE_HIGH>;	/* PD19 */
+	snps,reset-active-low;
+	snps,reset-delays-us = <0 10000 50000>;
+	status = "okay";
+};
+
+&mdio {
+	/*
+	 * No address: the boards strap their PHYs differently, so the MDIO
+	 * bus is scanned, as the vendor driver does
+	 */
+	rmii_phy: ethernet-phy {
+		compatible = "ethernet-phy-ieee802.3-c22";
+	};
+};
+
+&mmc0 {
+	bus-width = <4>;
+	broken-cd;
+	status = "okay";
+};
+
+&spi0 {
+	status = "okay";
+
+	flash@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <50000000>;
+	};
+};
+
+&uart0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart0_ph_pins>;
+	status = "okay";
+};

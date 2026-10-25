@@ -49,6 +49,12 @@
 #include <sy8106a.h>
 #include <asm/setup.h>
 #include <status_led.h>
+#include <openipc.h>
+
+void v83x_board_init(void);
+void v83x_kernel_fdt(void);
+void v83x_ft_board_setup(void *blob);
+void v83x_boot_source(void);
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -179,6 +185,13 @@ enum env_location env_get_location(enum env_operation op, int prio)
 			return ENVL_FAT;
 		if (IS_ENABLED(CONFIG_ENV_IS_IN_UBI))
 			return ENVL_UBI;
+		/*
+		 * The V831/V833 images keep it in the SPI NOR alone, also
+		 * when the SPL and U-Boot came from an SD card
+		 */
+		if (IS_ENABLED(CONFIG_MACH_SUN8I_V831) &&
+		    IS_ENABLED(CONFIG_ENV_IS_IN_SPI_FLASH))
+			return ENVL_SPI_FLASH;
 	}
 
 	return ENVL_UNKNOWN;
@@ -260,6 +273,9 @@ int board_init(void)
 #endif
 
 	eth_init_board();
+
+	if (IS_ENABLED(CONFIG_MACH_SUN8I_V831))
+		v83x_board_init();
 
 	return 0;
 }
@@ -860,6 +876,17 @@ int misc_init_r(void)
 
 	setup_environment(gd->fdt_blob);
 
+	if (IS_ENABLED(CONFIG_MACH_SUN8I_V831))
+		v83x_kernel_fdt();
+
+#ifdef CONFIG_OPENIPC
+	openipc_helper();
+#endif
+
+	/* after the helper, which may save the default environment */
+	if (IS_ENABLED(CONFIG_MACH_SUN8I_V831))
+		v83x_boot_source();
+
 	return 0;
 }
 
@@ -917,6 +944,9 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 	fdt_fixup_ethernet(blob);
 
 	bluetooth_dt_fixup(blob);
+
+	if (IS_ENABLED(CONFIG_MACH_SUN8I_V831))
+		v83x_ft_board_setup(blob);
 
 #ifdef CONFIG_VIDEO_DT_SIMPLEFB
 	r = sunxi_simplefb_setup(blob);

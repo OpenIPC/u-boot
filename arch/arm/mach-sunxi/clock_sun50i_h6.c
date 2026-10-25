@@ -18,6 +18,13 @@ void clock_init_safe(void)
 		setbits_le32(&prcm->res_cal_ctrl, 2);
 	}
 
+	if (IS_ENABLED(CONFIG_MACH_SUN8I_V831)) {
+		/* boot0: the analog (ADDA) supply and the calibration circuit */
+		setbits_le32(&prcm->sys_pwroff_gating, 0x10);
+		/* boot0: PLL_CPUX tuning step */
+		clrsetbits_le32(SUNXI_CCM_BASE + 0x400, 0x7 << 28, 0x1 << 28);
+	}
+
 	clrbits_le32(&prcm->res_cal_ctrl, 1);
 	setbits_le32(&prcm->res_cal_ctrl, 1);
 
@@ -35,11 +42,18 @@ void clock_init_safe(void)
 		;
 
 	clrsetbits_le32(&ccm->cpu_axi_cfg, CCM_CPU_AXI_APB_MASK | CCM_CPU_AXI_AXI_MASK,
+			IS_ENABLED(CONFIG_MACH_SUN8I_V831) ? 0x302 :
 			CCM_CPU_AXI_DEFAULT_FACTORS);
 
 	writel(CCM_PSI_AHB1_AHB2_DEFAULT, &ccm->psi_ahb1_ahb2_cfg);
 	writel(CCM_AHB3_DEFAULT, &ccm->ahb3_cfg);
 	writel(CCM_APB1_DEFAULT, &ccm->apb1_cfg);
+
+	if (IS_ENABLED(CONFIG_MACH_SUN8I_V831)) {
+		/* the MBUS runs at a quarter of the DRAM clock: no mux */
+		writel(MBUS_RESET, &ccm->mbus_cfg);
+		return;
+	}
 
 	/*
 	 * The mux and factor are set, but the clock will be enabled in
@@ -105,7 +119,7 @@ unsigned int clock_get_pll6(void)
 {
 	struct sunxi_ccm_reg *const ccm =
 		(struct sunxi_ccm_reg *)SUNXI_CCM_BASE;
-	int m = IS_ENABLED(CONFIG_MACH_SUN50I_H6) ? 4 : 2;
+	int m = IS_ENABLED(CONFIG_MACH_SUN50I_H6) ? 4 : 2;	/* H616, V831: 2X */
 
 	uint32_t rval = readl(&ccm->pll6_cfg);
 	int n = ((rval & CCM_PLL6_CTRL_N_MASK) >> CCM_PLL6_CTRL_N_SHIFT) + 1;

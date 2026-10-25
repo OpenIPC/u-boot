@@ -689,6 +689,23 @@ static const struct sunxi_pinctrl_desc __maybe_unused sun50i_h6_r_pinctrl_desc =
 	.num_banks	= 2,
 };
 
+static const struct sunxi_pinctrl_function sun8i_v831_pinctrl_functions[] = {
+	{ "emac",	5 },	/* PD1-PD21 */
+	{ "gpio_in",	0 },
+	{ "gpio_out",	1 },
+	{ "mmc0",	2 },	/* PF0-PF5 */
+	{ "mmc1",	2 },	/* PG0-PG5 */
+	{ "spi0",	4 },	/* PC0-PC3 */
+	{ "uart0",	5 },	/* PH9-PH10 */
+};
+
+static const struct sunxi_pinctrl_desc __maybe_unused sun8i_v831_pinctrl_desc = {
+	.functions	= sun8i_v831_pinctrl_functions,
+	.num_functions	= ARRAY_SIZE(sun8i_v831_pinctrl_functions),
+	.first_bank	= SUNXI_GPIO_A,
+	.num_banks	= 9,
+};
+
 static const struct sunxi_pinctrl_function sun50i_h616_pinctrl_functions[] = {
 	{ "emac0",	2 },	/* PI0-PI16 */
 	{ "gpio_in",	0 },
@@ -869,6 +886,12 @@ static const struct udevice_id sunxi_pinctrl_ids[] = {
 	{
 		.compatible = "allwinner,sun50i-h6-r-pinctrl",
 		.data = (ulong)&sun50i_h6_r_pinctrl_desc,
+	},
+#endif
+#ifdef CONFIG_PINCTRL_SUN8I_V831
+	{
+		.compatible = "allwinner,sun8i-v831-pinctrl",
+		.data = (ulong)&sun8i_v831_pinctrl_desc,
 	},
 #endif
 #ifdef CONFIG_PINCTRL_SUN50I_H616

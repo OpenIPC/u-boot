@@ -274,6 +274,18 @@ struct sunxi_ccm_reg {
 
 /* apb1 bit field */
 #define CCM_APB1_DEFAULT		0x03000102
+#elif CONFIG_MACH_SUN8I_V831
+/* PLL_PERI0(2X) 1200 MHz, as boot0 sets it */
+#define CCM_PLL6_DEFAULT		0xa0003100
+
+/* psi_ahb1_ahb2 bit field: PLL_PERI0(1X) / 3 = 200 MHz */
+#define CCM_PSI_AHB1_AHB2_DEFAULT	0x03000002
+
+/* ahb3 bit field: 200 MHz */
+#define CCM_AHB3_DEFAULT		0x03000002
+
+/* apb1 bit field: 100 MHz */
+#define CCM_APB1_DEFAULT		0x03000102
 #elif CONFIG_MACH_SUN50I_H616
 #define CCM_PLL6_DEFAULT		0xa8003100
 

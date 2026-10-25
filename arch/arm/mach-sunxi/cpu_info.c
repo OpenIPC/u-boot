@@ -103,6 +103,8 @@ int print_cpuinfo(void)
 	puts("CPU:   Allwinner H6 (SUN50I)\n");
 #elif defined CONFIG_MACH_SUN50I_H616
 	puts("CPU:   Allwinner H616 (SUN50I)\n");
+#elif defined CONFIG_MACH_SUN8I_V831
+	puts("CPU:   Allwinner V831/V833 (SUN8IW19)\n");
 #else
 #warning Please update cpu_info.c with correct CPU information
 	puts("CPU:   SUNXI Family\n");
