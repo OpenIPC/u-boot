@@ -146,6 +146,15 @@ build_bootimg() {
     dflt=${BOOT_BUILDDIR}/gsl-default.bin
     rm -f ${dflt}
     [ -f ${packer}/input/gsl.bin ] && { cp ${packer}/input/gsl.bin ${dflt} || return 1; }
+    # An interrupted build can still leave a row's prebuilt there; saving it
+    # as the default would pack it into every "-" row.
+    for f in $(echo "${rows}" | awk '{print $6}'); do
+        if [ -f "${f}" ] && [ -f ${dflt} ] && cmp -s ${f} ${dflt}; then
+            echo "${packer}/input/gsl.bin holds ${f}, not the default:" \
+                "restore it with git checkout -- ${packer}/input/gsl.bin" >&2
+            return 1
+        fi
+    done
     echo "${rows}" | while read -r _ model reginfo _ packer gsl; do
         if [ "${gsl}" = - ]; then
             cp ${dflt} ${packer}/input/gsl.bin || return 1
