@@ -28,9 +28,9 @@ own branch:
   loader, built from source in the tree. CI: `build-novatek.yml`, called
   from that branch's `ci.yml`. Its own `CLAUDE.md` covers the loader, the
   image layout and the kernel hand-off.
-- `openipc-allwinner`: U-Boot for Allwinner V831/V833 (sun8iw19), on
-  the same mainline release with the same OpenIPC layer, as a mainline
-  sunxi SoC with its own SPL and DRAM driver. CI: `build-allwinner.yml`,
+- `openipc-allwinner`: U-Boot for Allwinner V3s, V831/V833 (sun8iw19)
+  and V851s, on the same mainline release with the same OpenIPC layer, as
+  mainline sunxi SoCs with their own SPL and DRAM drivers. CI: `build-allwinner.yml`,
   called from that branch's `ci.yml`. Its own `CLAUDE.md` covers the SPL,
   the DRAM port and the kernel hand-off.
 - `main`: a fork of upstream mainline U-Boot, kept for rebasing.
@@ -159,9 +159,10 @@ The build logic lives here. Other branches call it:
   `resolve`/`ref` rules, NOR only (256 KiB boot partition: the SPL, then
   U-Boot LZMA-packed at 0x8000).
 - The build legs also install `xz-utils`, for the LZMA image.
-- **No `hold`:** both SoCs have qemu-hisilicon machines (`v831`,
-  `v833`). The `-mmc` legs need its boot ROM stand-in to boot from the SD
-  card (qemu-bench #204).
+- **No `hold`:** every SoC has a qemu-hisilicon machine (`v3s`, `v831`,
+  `v833`, `v851s`). The `-mmc` legs need its boot ROM stand-in to boot
+  from the SD card (qemu-bench #204); `v3s` and `v851s` are
+  `allwinner-cam.c` there.
 - **Two kinds per SoC:** `u-boot-<soc>-nor.bin` and `-mmc.bin` (SD card
   boot: the SPL reads U-Boot from the card); one artifact holds both, the
   smoke matrix has a leg per kind.
@@ -172,9 +173,11 @@ The build logic lives here. Other branches call it:
 - **Release and publish:**
   - `release` uploads to the `allwinner` tag.
   - `publish` shares the `publish-firmware-latest` concurrency group and
-    reports a `uboot-allwinner-…` build id. OpenIPC/u-boot-allwinner
-    publishes `u-boot-v851s-nor.bin` to the same release; the names do
-    not overlap.
+    reports a `uboot-allwinner-…` build id. It skips `u-boot-v851s-*`,
+    in the upload and in the report: OpenIPC/u-boot-allwinner publishes
+    the camera-tested `u-boot-v851s-nor.bin` to the same release, and
+    `--clobber` would replace it. Lift the filter only once these V851s
+    images have run on a camera.
   - openipc.org accepts the report only from workflows it allowlists
     (OpenIPC/website `service/internal/builds/verify.go`).
     `build-allwinner.yml` has to be added there before the first

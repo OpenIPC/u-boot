@@ -22,7 +22,7 @@ family — not bootloader sources.
 | `openipc-gk710x` | U-Boot for Goke GK7101/GK7102 |
 | `openipc-anyka` | U-Boot for Anyka AK3918EV200, AK391xEV300, AK391xEV330 |
 | `openipc-novatek` | U-Boot for Novatek NT98562, NT98566 |
-| `openipc-allwinner` | U-Boot for Allwinner V831, V833 |
+| `openipc-allwinner` | U-Boot for Allwinner V3s, V831, V833, V851s |
 | `main` | Fork of upstream mainline U-Boot, kept for rebasing |
 
 New families are added here as they are ported, each with its own
@@ -236,18 +236,19 @@ one U-Boot uses; `LOADER_CROSS_COMPILE` overrides). Images land in
 
 ## allwinner
 
-U-Boot for the Allwinner V831 and V833 (sun8iw19), on the same mainline
-release (v2022.10) and with the same OpenIPC boot layer as
-`openipc-hisilicon`, as a mainline sunxi SoC with its own SPL: no vendor
-boot0, OP-TEE or boot package.
+U-Boot for the Allwinner camera SoCs, on the same mainline release
+(v2022.10) and with the same OpenIPC boot layer as `openipc-hisilicon`,
+as mainline sunxi SoCs with their own SPL: no vendor boot0, OP-TEE or
+boot package.
 
-**NOR and SD card:** `v831` (64 MiB DDR2 in the package), `v833`
-(128 MiB DDR3).
+**NOR and SD card:** `v3s` (64 MiB DDR2 in the package), `v831` (64 MiB
+DDR2), `v833` (128 MiB DDR3), `v851s` (64 MiB DDR2).
 
 The boot ROM loads the SPL from flash offset 0 into SRAM. The SPL brings
-up the DDR -- the vendor boot0's DRAM library, translated to C -- and
-unpacks U-Boot, LZMA-packed, from offset 0x8000. `u-boot-<soc>-nor.bin`
-holds both, ~170 KiB, to be written at flash offset 0 as it is:
+up the DDR -- on the V831/V833 the vendor boot0's DRAM library,
+translated to C; on the V3s and V851s mainline's drivers -- and unpacks
+U-Boot, LZMA-packed, from offset 0x8000. `u-boot-<soc>-nor.bin` holds
+both, 160-175 KiB, to be written at flash offset 0 as it is:
 
 | Offset | Contents |
 | --- | --- |
@@ -269,18 +270,20 @@ partition (`source` is `fatload mmc 0`): `run ub` writes
 `u-boot-<soc>-nor.bin` to the flash, `run fwupd` `rootfs.squashfs.<soc>`
 and `uImage.<soc>`. Remove the card and the camera boots from the flash.
 
-OpenIPC kernels for these SoCs carry no device tree: U-Boot boots them
-with the vendor's (the Tina SDK's reference board), built into U-Boot,
-in the normal world with PSCI, as the vendor's OP-TEE and U-Boot do.
+OpenIPC kernels for the V831/V833 carry no device tree: U-Boot boots
+them with the vendor's (the Tina SDK's reference board), built into
+U-Boot, in the normal world with PSCI, as the vendor's OP-TEE and U-Boot
+do. The V3s and V851s kernels carry theirs appended and get ATAGs.
 
-These images have so far run only on qemu-hisilicon's V831/V833
-machines, not on a camera.
+These images have so far run only on qemu-hisilicon's machines, not on a
+camera. For the V851s, OpenIPC/u-boot-allwinner's camera-tested
+`u-boot-v851s-nor.bin` stays the one OpenIPC/firmware publishes.
 
 ```sh
 git clone --branch openipc-allwinner https://github.com/OpenIPC/u-boot.git
 cd u-boot
 
-bash build.sh               # v831 v833
+bash build.sh               # v3s v831 v833 v851s
 bash build.sh v831          # a single SoC
 ```
 
@@ -414,8 +417,9 @@ second time, which must load the environment the first saved.
 
 Its `release` input will fill this repository's
 [`Allwinner` release](../../releases/tag/allwinner); `publish` uploads to
-`OpenIPC/firmware` `latest`, where OpenIPC/u-boot-allwinner publishes only
-`u-boot-v851s-nor.bin`, and reports to openipc.org.
+`OpenIPC/firmware` `latest` and reports to openipc.org, all but the
+V851s images: there OpenIPC/u-boot-allwinner publishes
+`u-boot-v851s-nor.bin`.
 
 ```sh
 gh workflow run build-allwinner.yml -f release=true -f publish=true

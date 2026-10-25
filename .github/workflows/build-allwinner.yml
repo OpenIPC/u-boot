@@ -60,8 +60,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - { soc: v3s, files: "output/u-boot-v3s-*.bin" }
           - { soc: v831, files: "output/u-boot-v831-*.bin" }
           - { soc: v833, files: "output/u-boot-v833-*.bin" }
+          - { soc: v851s, files: "output/u-boot-v851s-*.bin" }
 
     steps:
       - name: Checkout
@@ -164,7 +166,8 @@ jobs:
           path: qemu-arm
 
   # QEMU smoke test -- boots each freshly-built image from flash through
-  # qemu-hisilicon's v831/v833 machines, which do the boot ROM's job (load
+  # qemu-hisilicon's v3s/v831/v833/v851s machines, which do the boot ROM's
+  # job (load
   # the eGON.BT0 SPL into SRAM; the SPL brings up the DDR and unpacks
   # U-Boot), and asserts it reaches the autoboot prompt. Every SoC has a
   # machine model, so every image is a hard gate on release. The -mmc legs
@@ -180,10 +183,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - { soc: v3s, kind: nor }
+          - { soc: v3s, kind: mmc }
           - { soc: v831, kind: nor }
           - { soc: v831, kind: mmc }
           - { soc: v833, kind: nor }
           - { soc: v833, kind: mmc }
+          - { soc: v851s, kind: nor }
+          - { soc: v851s, kind: mmc }
     steps:
       - name: Download qemu-arm
         uses: actions/download-artifact@v4
@@ -302,11 +309,13 @@ jobs:
           files: artifacts/**/*.bin
           fail_on_unmatched_files: true
 
-  # Publish every image to the OpenIPC/firmware `latest` release and tell
+  # Publish the images to the OpenIPC/firmware `latest` release and tell
   # openipc.org what was uploaded. openipc.org keeps, per file name, the
   # newest uboot build that names it, so this run adds or refreshes the
-  # u-boot-v831/v833 names and leaves the other repositories' files alone
-  # (OpenIPC/u-boot-allwinner publishes u-boot-v851s-nor.bin). The
+  # u-boot-v3s/v831/v833 names and leaves the other repositories' files
+  # alone. The V851s images are built, smoke-tested and released here but
+  # not published: OpenIPC/u-boot-allwinner publishes u-boot-v851s-nor.bin,
+  # run on cameras, which these (so far QEMU only) must not replace. The
   # concurrency group, shared with build-hisilicon.yml, keeps a second run
   # from uploading between this run's upload and its report.
   publish:
@@ -345,7 +354,8 @@ jobs:
               sleep $((i*10))
             done
           }
-          find artifacts -type f -name '*.bin' | sort | while read -r f; do
+          find artifacts -type f -name '*.bin' ! -name 'u-boot-v851s-*' |
+            sort | while read -r f; do
             echo "publishing $f"
             upload "$f"
           done
@@ -368,7 +378,9 @@ jobs:
         run: |
           set -eu
           mkdir published
-          find artifacts -type f -name '*.bin' -exec cp {} published/ \;
+          # the files uploaded above: not the V851s ones
+          find artifacts -type f -name '*.bin' ! -name 'u-boot-v851s-*' \
+            -exec cp {} published/ \;
           python3 firmware/.github/scripts/push_build.py \
             --source uboot \
             --build-id "uboot-allwinner-$(date -u +%Y%m%dT%H%M%SZ)-${AW_SHA::7}" \
