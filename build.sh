@@ -165,9 +165,14 @@ build_bootimg() {
         (cd ${packer}/oem && python3 oem_quick_build.py >/dev/null) && \
         test -f ${packer}/image/oem/boot_image.bin && \
         mv ${packer}/image/oem/boot_image.bin output/${out} || return 1
-    done || return 1
-    [ -f ${dflt} ] && cp ${dflt} ${packer}/input/gsl.bin
-    return 0
+    done
+    st=$?
+    # Put the default back whether or not every row packed: a row that fails
+    # after its prebuilt was swapped in would otherwise leave it in place,
+    # and the next build would save it as the default and pack it into the
+    # "-" rows, cv608 included.
+    [ -f ${dflt} ] && { cp ${dflt} ${packer}/input/gsl.bin || return 1; }
+    return ${st}
 }
 
 # ARM926EJS families (hi3516cv200 / hi3518ev200, hi3516cv300 / hi3516ev100):
