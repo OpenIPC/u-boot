@@ -535,8 +535,9 @@ static int ccu_set_pll_ddr_clk(int index, struct dram_para *para)
 
 	udelay(20);
 
-	// enable PLL output
-	setbits_le32(&ccm->pll1_cfg, BIT(27));
+	// enable PLL output: PLL_DDR's (mainline and awboot set PLL_CPU's
+	// bit 27; PLL_DDR's is set at reset, so both worked)
+	setbits_le32(&ccm->pll5_cfg, BIT(27));
 
 	// turn clock gate on
 	val = readl(&ccm->dram_clk_cfg);

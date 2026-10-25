@@ -153,7 +153,12 @@ enum sunxi_gpio_number {
 /* GPIO pin function config */
 #define SUNXI_GPIO_INPUT	0
 #define SUNXI_GPIO_OUTPUT	1
+/* the D1 generation's 4-bit function fields: 0xf is "IO disabled" */
+#ifdef CONFIG_SUNXI_NEW_PINCTRL
+#define SUNXI_GPIO_DISABLE	0xf
+#else
 #define SUNXI_GPIO_DISABLE	7
+#endif
 
 #define SUN8I_H3_GPA_UART0	2
 #define SUN8I_H3_GPA_UART2	2

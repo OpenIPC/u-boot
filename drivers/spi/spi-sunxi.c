@@ -239,6 +239,18 @@ static void sun4i_spi_set_speed_mode(struct udevice *dev)
 	u32 reg;
 
 	/*
+	 * No divider inside (R329, D1, V851s): the module clock, the
+	 * 24 MHz HOSC, is the bus clock; sample in the normal mode
+	 */
+	if (!priv->variant->has_clk_ctl) {
+		clrsetbits_le32(SPI_REG(priv, SPI_TCR),
+				SPI_BIT(priv, SPI_TCR_SDC) |
+				SPI_BIT(priv, SPI_TCR_SDM),
+				SPI_BIT(priv, SPI_TCR_SDM));
+		goto mode;
+	}
+
+	/*
 	 * Setup clock divider.
 	 *
 	 * We have two choices there. Either we can use the clock
@@ -274,6 +286,7 @@ static void sun4i_spi_set_speed_mode(struct udevice *dev)
 
 	writel(reg, SPI_REG(priv, SPI_CCR));
 
+mode:
 	reg = readl(SPI_REG(priv, SPI_TCR));
 	reg &= ~(SPI_BIT(priv, SPI_TCR_CPOL) | SPI_BIT(priv, SPI_TCR_CPHA));
 
@@ -305,18 +318,7 @@ static int sun4i_spi_claim_bus(struct udevice *dev)
 	setbits_le32(SPI_REG(priv, SPI_TCR), SPI_BIT(priv, SPI_TCR_CS_MANUAL) |
 		     SPI_BIT(priv, SPI_TCR_CS_ACTIVE_LOW));
 
-	if (priv->variant->has_clk_ctl) {
-		sun4i_spi_set_speed_mode(dev->parent);
-	} else {
-		/*
-		 * No divider inside (R329, D1, V851s): the module clock, the
-		 * 24 MHz HOSC, is the bus clock; sample in the normal mode
-		 */
-		clrsetbits_le32(SPI_REG(priv, SPI_TCR),
-				SPI_BIT(priv, SPI_TCR_SDC) |
-				SPI_BIT(priv, SPI_TCR_SDM),
-				SPI_BIT(priv, SPI_TCR_SDM));
-	}
+	sun4i_spi_set_speed_mode(dev->parent);
 
 	return 0;
 }
