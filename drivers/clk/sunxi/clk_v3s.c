@@ -15,6 +15,7 @@
 
 static struct ccu_clk_gate v3s_gates[] = {
 	[CLK_BUS_MMC0]		= GATE(0x060, BIT(8)),
+	[CLK_BUS_EMAC]		= GATE(0x060, BIT(17)),
 	[CLK_BUS_MMC1]		= GATE(0x060, BIT(9)),
 	[CLK_BUS_MMC2]		= GATE(0x060, BIT(10)),
 	[CLK_BUS_SPI0]		= GATE(0x060, BIT(20)),
@@ -24,6 +25,7 @@ static struct ccu_clk_gate v3s_gates[] = {
 
 	[CLK_BUS_I2C0]		= GATE(0x06c, BIT(0)),
 	[CLK_BUS_I2C1]		= GATE(0x06c, BIT(1)),
+	[CLK_BUS_EPHY]		= GATE(0x070, BIT(0)),
 	[CLK_BUS_UART0]		= GATE(0x06c, BIT(16)),
 	[CLK_BUS_UART1]		= GATE(0x06c, BIT(17)),
 	[CLK_BUS_UART2]		= GATE(0x06c, BIT(18)),
@@ -37,6 +39,7 @@ static struct ccu_reset v3s_resets[] = {
 	[RST_USB_PHY0]		= RESET(0x0cc, BIT(0)),
 
 	[RST_BUS_MMC0]		= RESET(0x2c0, BIT(8)),
+	[RST_BUS_EMAC]		= RESET(0x2c0, BIT(17)),
 	[RST_BUS_MMC1]		= RESET(0x2c0, BIT(9)),
 	[RST_BUS_MMC2]		= RESET(0x2c0, BIT(10)),
 	[RST_BUS_SPI0]		= RESET(0x2c0, BIT(20)),
@@ -44,6 +47,7 @@ static struct ccu_reset v3s_resets[] = {
 
 	[RST_BUS_I2C0]		= RESET(0x2d8, BIT(0)),
 	[RST_BUS_I2C1]		= RESET(0x2d8, BIT(1)),
+	[RST_BUS_EPHY]		= RESET(0x2c8, BIT(2)),
 	[RST_BUS_UART0]		= RESET(0x2d8, BIT(16)),
 	[RST_BUS_UART1]		= RESET(0x2d8, BIT(17)),
 	[RST_BUS_UART2]		= RESET(0x2d8, BIT(18)),

@@ -685,9 +685,12 @@ dtb-$(CONFIG_MACH_SUN8I_V3S) += \
 	sun8i-s3-elimo-initium.dtb \
 	sun8i-s3-pinecube.dtb \
 	sun8i-v3-sl631-imx179.dtb \
-	sun8i-v3s-licheepi-zero.dtb
+	sun8i-v3s-licheepi-zero.dtb \
+	sun8i-v3s-openipc.dtb
 dtb-$(CONFIG_MACH_SUN8I_V831) += \
 	sun8i-v831-openipc.dtb
+dtb-$(CONFIG_MACH_SUN8I_V851S) += \
+	sun8i-v851s-openipc.dtb
 dtb-$(CONFIG_MACH_SUN50I_H5) += \
 	sun50i-h5-bananapi-m2-plus.dtb \
 	sun50i-h5-emlid-neutis-n5-devboard.dtb \

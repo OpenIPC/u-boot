@@ -902,6 +902,7 @@ static int sun8i_emac_eth_of_to_plat(struct udevice *dev)
 
 static const struct udevice_id sun8i_emac_eth_ids[] = {
 	{.compatible = "allwinner,sun8i-h3-emac", .data = (uintptr_t)H3_EMAC },
+	{.compatible = "allwinner,sun8i-v3s-emac", .data = (uintptr_t)H3_EMAC },
 	{.compatible = "allwinner,sun50i-a64-emac",
 		.data = (uintptr_t)A64_EMAC },
 	{.compatible = "allwinner,sun8i-a83t-emac",

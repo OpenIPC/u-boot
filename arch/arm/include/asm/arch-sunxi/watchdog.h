@@ -28,8 +28,14 @@ struct sunxi_wdog {
 
 #else
 
-#define WDT_CFG_RESET		(0x1)
-#define WDT_MODE_EN		(0x1)
+/* NCAT2 (D1, V851s): CFG and MODE take writes with this key only */
+#ifdef CONFIG_SUNXI_GEN_NCAT2
+#define WDT_KEY_FIELD		(0x16aa << 16)
+#else
+#define WDT_KEY_FIELD		0
+#endif
+#define WDT_CFG_RESET		(WDT_KEY_FIELD | 0x1)
+#define WDT_MODE_EN		(WDT_KEY_FIELD | 0x1)
 
 struct sunxi_wdog {
 	u32 irq_en;		/* 0x00 */

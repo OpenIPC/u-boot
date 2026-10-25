@@ -1,0 +1,15 @@
+# V851s: 64 MiB of DDR2 in the package, mainline's D1 DRAM driver with
+# the parameters of OpenIPC's hardware-tested V851s U-Boot (mainline
+# 2024.10), the Kconfig defaults
+CONFIG_PRODUCT_SOC="v851s"
+CONFIG_MACH_SUN8I_V851S=y
+CONFIG_DEFAULT_DEVICE_TREE="sun8i-v851s-openipc"
+CONFIG_IDENT_STRING=" Allwinner V851s"
+# SPL stack: the end of SRAM A1 (0x20000-0x3ffff)
+CONFIG_SPL_STACK=0x40000
+# Kernel hand-off: non-secure, PSCI from U-Boot's own monitor, as the
+# OpenIPC V851s U-Boot does
+CONFIG_ARMV7_NONSEC=y
+CONFIG_ARMV7_PSCI=y
+CONFIG_ARMV7_PSCI_1_0=y
+CONFIG_ARMV7_PSCI_NR_CPUS=1

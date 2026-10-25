@@ -231,6 +231,7 @@ struct sunxi_ccm_reg {
 #define CCM_PLL1_LOCK_EN		BIT(29)
 #define CCM_PLL1_LOCK			BIT(28)
 #define CCM_PLL1_OUT_EN			BIT(27)
+#define CCM_PLL1_LDO_EN			BIT(30)		/* NCAT2 */
 #define CCM_PLL1_CLOCK_TIME_2		(2 << 24)
 #define CCM_PLL1_CTRL_P(p)		((p) << 16)
 #define CCM_PLL1_CTRL_N(n)		(((n) - 1) << 8)
@@ -254,6 +255,8 @@ struct sunxi_ccm_reg {
 #define CCM_PLL6_CTRL_DIV1_MASK		(0x1 << CCM_PLL6_CTRL_DIV1_SHIFT)
 #define CCM_PLL6_CTRL_DIV2_SHIFT	1
 #define CCM_PLL6_CTRL_DIV2_MASK		(0x1 << CCM_PLL6_CTRL_DIV2_SHIFT)
+#define CCM_PLL6_CTRL_P0_SHIFT		16		/* NCAT2 */
+#define CCM_PLL6_CTRL_P0_MASK		(0x7 << CCM_PLL6_CTRL_P0_SHIFT)
 
 /* cpu_axi bit field*/
 #define CCM_CPU_AXI_MUX_MASK		(0x3 << 24)
@@ -285,6 +288,11 @@ struct sunxi_ccm_reg {
 #define CCM_AHB3_DEFAULT		0x03000002
 
 /* apb1 bit field: 100 MHz */
+#define CCM_APB1_DEFAULT		0x03000102
+#elif CONFIG_MACH_SUN8I_V851S
+/* OpenIPC's hardware-tested V851s U-Boot (mainline 2024.10)'s values */
+#define CCM_PLL6_DEFAULT		0xe8216310
+#define CCM_PSI_AHB1_AHB2_DEFAULT	0x03000002
 #define CCM_APB1_DEFAULT		0x03000102
 #elif CONFIG_MACH_SUN50I_H616
 #define CCM_PLL6_DEFAULT		0xa8003100

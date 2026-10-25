@@ -81,7 +81,7 @@ build_v83x() {
 build_soc() {
     soc=$1
     case "${soc}" in
-        v831|v833)
+        v3s|v831|v833|v851s)
             build_v83x "${soc}" nor && build_v83x "${soc}" mmc ;;
         *)
             echo "unsupported SoC: ${soc}" >&2
@@ -89,7 +89,7 @@ build_soc() {
     esac
 }
 
-ALL_SOCS="v831 v833"
+ALL_SOCS="v3s v831 v833 v851s"
 
 SOCS="$@"
 [ -z "${SOCS}" ] && SOCS="${ALL_SOCS}"
