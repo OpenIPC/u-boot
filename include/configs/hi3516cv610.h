@@ -7,6 +7,7 @@
 
 #include <asm/arch/platform.h>
 #include <linux/sizes.h>
+#include <linux/stringify.h>
 
 #define CONFIG_REMAKE_ELF
 
@@ -392,6 +393,10 @@ func(DHCP, dhcp, na)
 
 /* One firmware image serves the family: firmware.bin.hi3516cv6xx */
 #define OPENIPC_FW_SOC "hi3516cv6xx"
+
+/* UART0 is the console on both parts, and their kernel builds in the PL011
+ * earlycon (u-boot#67). */
+#define OPENIPC_EARLYCON "earlycon=pl011," __stringify(UART0_REG_BASE) " "
 
 #include "openipc-common.h"
 

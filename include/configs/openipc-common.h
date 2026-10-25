@@ -126,7 +126,17 @@ void hi_gpio_status(void);
 #endif
 #define OPENIPC_FW_FILE "firmware.bin." OPENIPC_FW_SOC
 
-#define OPENIPC_BOOTARGSNFS "mem=\\${osmem} console=ttyAMA0,115200 panic=20 root=/dev/nfs rootfstype=nfs ip=${ipaddr}:::255.255.255.0::eth0 nfsroot=${serverip}:${nfsroot},v3,nolock rw \\${extras}"
+/*
+ * A kernel argument that starts the console before the serial driver loads,
+ * for a SoC whose header names its UART. Without it, a kernel that stops in
+ * setup_arch() prints nothing after "Starting kernel ..." (u-boot#67). Empty
+ * unless the SoC's header defines it; it carries its own trailing space.
+ */
+#ifndef OPENIPC_EARLYCON
+#define OPENIPC_EARLYCON ""
+#endif
+
+#define OPENIPC_BOOTARGSNFS "mem=\\${osmem} " OPENIPC_EARLYCON "console=ttyAMA0,115200 panic=20 root=/dev/nfs rootfstype=nfs ip=${ipaddr}:::255.255.255.0::eth0 nfsroot=${serverip}:${nfsroot},v3,nolock rw \\${extras}"
 
 /* NOR partition list; the reserved 'mtdparts' variable holds the full
  * "<mtd-id>:<list>" string, the bootargs compose it from mtdids/mtds. */
@@ -193,7 +203,7 @@ void hi_gpio_status(void);
 #define SFC "sfc"
 #endif
 
-#define CONFIG_BOOTARGS "mem=\\${osmem} console=ttyAMA0,115200 panic=20 root=/dev/mtdblock3 rootfstype=squashfs init=/init mtdparts=\\${mtdparts} \\${extras}"
+#define CONFIG_BOOTARGS "mem=\\${osmem} " OPENIPC_EARLYCON "console=ttyAMA0,115200 panic=20 root=/dev/mtdblock3 rootfstype=squashfs init=/init mtdparts=\\${mtdparts} \\${extras}"
 
 /*
  * Recovery. A board that boots the split layout takes the whole firmware
@@ -266,7 +276,7 @@ void hi_gpio_status(void);
 #define CONFIG_ENV_SIZE 0x40000
 #define CONFIG_ENV_SECT_SIZE 0x20000
 
-#define CONFIG_BOOTARGS "mem=\\${osmem} console=ttyAMA0,115200 panic=20 init=/init root=ubi0:rootfs rootfstype=ubifs ubi.mtd=2,2048 mtdparts=\\${mtdparts} \\${extras}"
+#define CONFIG_BOOTARGS "mem=\\${osmem} " OPENIPC_EARLYCON "console=ttyAMA0,115200 panic=20 init=/init root=ubi0:rootfs rootfstype=ubifs ubi.mtd=2,2048 mtdparts=\\${mtdparts} \\${extras}"
 
 /*
  * The NAND layout is one UBI device after boot and env, holding the UBIFS
