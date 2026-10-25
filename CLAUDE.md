@@ -159,11 +159,9 @@ The build logic lives here. Other branches call it:
   `resolve`/`ref` rules, NOR only (256 KiB boot partition: the SPL, then
   U-Boot LZMA-packed at 0x8000).
 - The build legs also install `xz-utils`, for the LZMA image.
-- **`hold`:** both SoCs are held (artifacts `hold-u-boot-<soc>`, skipped
-  by release and publish) until qemu-hisilicon's master has the `v831`
-  and `v833` machines. A held SoC's smoke leg warns and passes when the
-  machine is missing; one that is not held fails. Releasing them means
-  setting `hold: false` in both matrices.
+- **No `hold`:** both SoCs have qemu-hisilicon machines (`v831`,
+  `v833`). The `-mmc` legs need its boot ROM stand-in to boot from the SD
+  card (qemu-bench #204).
 - **Two kinds per SoC:** `u-boot-<soc>-nor.bin` and `-mmc.bin` (SD card
   boot: the SPL reads U-Boot from the card); one artifact holds both, the
   smoke matrix has a leg per kind.

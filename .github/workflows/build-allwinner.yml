@@ -60,12 +60,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Built on every run, but held back from release/publish
-          # (hold: true) until qemu-hisilicon's master has the v831/v833
-          # machines to smoke-test them (they boot there from their
-          # allwinner-v83x branch), or the images have booted on hardware.
-          - { soc: v831, files: "output/u-boot-v831-*.bin", hold: true }
-          - { soc: v833, files: "output/u-boot-v833-*.bin", hold: true }
+          - { soc: v831, files: "output/u-boot-v831-*.bin" }
+          - { soc: v833, files: "output/u-boot-v833-*.bin" }
 
     steps:
       - name: Checkout
@@ -132,12 +128,10 @@ jobs:
           check_kind mmc 256 "output/*${soc}*-mmc.bin"
           exit $rc
 
-      # A held SoC's artifact is named hold-u-boot-<soc>, which the
-      # release and publish jobs' u-boot-* download pattern skips.
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.hold && 'hold-' || '' }}u-boot-${{ matrix.soc }}
+          name: u-boot-${{ matrix.soc }}
           path: ${{ matrix.files }}
           if-no-files-found: error
 
@@ -172,9 +166,9 @@ jobs:
   # QEMU smoke test -- boots each freshly-built image from flash through
   # qemu-hisilicon's v831/v833 machines, which do the boot ROM's job (load
   # the eGON.BT0 SPL into SRAM; the SPL brings up the DDR and unpacks
-  # U-Boot), and asserts it reaches the autoboot prompt. A SoC that is not
-  # held is a hard gate on release; a held one is smoke-tested when the
-  # machine exists and skipped with a warning when it does not.
+  # U-Boot), and asserts it reaches the autoboot prompt. Every SoC has a
+  # machine model, so every image is a hard gate on release. The -mmc legs
+  # boot from the SD card, which the machines' boot ROM tries first.
   #
   # The second boot must load the environment the first saved, which
   # proves the driver's writes land where its reads find them.
@@ -186,10 +180,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { soc: v831, kind: nor, hold: true }
-          - { soc: v831, kind: mmc, hold: true }
-          - { soc: v833, kind: nor, hold: true }
-          - { soc: v833, kind: mmc, hold: true }
+          - { soc: v831, kind: nor }
+          - { soc: v831, kind: mmc }
+          - { soc: v833, kind: nor }
+          - { soc: v833, kind: mmc }
     steps:
       - name: Download qemu-arm
         uses: actions/download-artifact@v4
@@ -199,7 +193,7 @@ jobs:
       - name: Download u-boot artifact
         uses: actions/download-artifact@v4
         with:
-          name: ${{ matrix.hold && 'hold-' || '' }}u-boot-${{ matrix.soc }}
+          name: u-boot-${{ matrix.soc }}
 
       - name: Install QEMU runtime deps
         run: |
@@ -240,14 +234,6 @@ jobs:
           FLASH="-M ${soc},flash-file=/tmp/flash.bin"
           [ "$kind" = mmc ] && FLASH="$FLASH -drive if=sd,format=raw,file=/tmp/sd.img"
           chmod +x ./qemu-arm
-          if ! ./qemu-arm -M help | grep -q "^${soc} "; then
-            if [ '${{ matrix.hold }}' = true ]; then
-              echo "::warning::qemu-hisilicon has no ${soc} machine yet; ${soc} is held, not smoke-tested"
-              exit 0
-            fi
-            echo "FAIL: qemu-hisilicon has no ${soc} machine"
-            exit 1
-          fi
           # Two boots: the first finds an erased environment and saves the
           # default one; the second must load it back.
           for boot in 1 2; do
@@ -278,6 +264,13 @@ jobs:
               exit 1
             fi
           done
+          # The first boot finds the environment erased and the OpenIPC
+          # helper saves the default one (no command over the UART needed);
+          # the second must read it back.
+          if ! grep -q 'Saving Environment to SPIFlash' /tmp/uboot1.txt; then
+            echo "FAIL: the first boot did not save the environment"
+            exit 1
+          fi
           if grep -q 'bad CRC' /tmp/uboot2.txt; then
             echo "FAIL: the environment saved on the first boot did not land"
             exit 1

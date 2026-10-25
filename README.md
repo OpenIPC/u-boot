@@ -215,20 +215,6 @@ holds all three, to be written at flash offset 0 as it is:
 | `0x20000` | U-Boot, LZMA-packed |
 | `0x40000` | the environment (not in the image) |
 
-**SD card (unbricking):** `u-boot-<soc>-mmc.bin` is the same image with
-an SPL that loads U-Boot from the card. The boot ROM tries the card
-before the flash, so a camera with a broken or empty flash boots from a
-card that has it at 8 KiB, before the first partition:
-
-```sh
-dd if=u-boot-v831-mmc.bin of=/dev/sdX bs=1k seek=8 conv=fsync
-```
-
-Booted that way, U-Boot reads its update files from the card's FAT
-partition (`source` is `fatload mmc 0`): `run ub` writes
-`u-boot-<soc>-nor.bin` to the flash, `run fwupd` `rootfs.squashfs.<soc>`
-and `uImage.<soc>`. Remove the card and the camera boots from the flash.
-
 OpenIPC kernels for these SoCs carry no device tree: U-Boot boots them with
 the loader's, giving Linux the first `osmem` of the DDR and the vendor
 media modules the rest, as the vendor U-Boot does.
@@ -255,7 +241,8 @@ release (v2022.10) and with the same OpenIPC boot layer as
 `openipc-hisilicon`, as a mainline sunxi SoC with its own SPL: no vendor
 boot0, OP-TEE or boot package.
 
-**NOR:** `v831` (64 MiB DDR2 in the package), `v833` (128 MiB DDR3).
+**NOR and SD card:** `v831` (64 MiB DDR2 in the package), `v833`
+(128 MiB DDR3).
 
 The boot ROM loads the SPL from flash offset 0 into SRAM. The SPL brings
 up the DDR -- the vendor boot0's DRAM library, translated to C -- and
@@ -268,12 +255,26 @@ holds both, ~170 KiB, to be written at flash offset 0 as it is:
 | `0x08000` | U-Boot, LZMA-packed |
 | `0x40000` | the environment (not in the image) |
 
+**SD card (unbricking):** `u-boot-<soc>-mmc.bin` is the same image with
+an SPL that loads U-Boot from the card. The boot ROM tries the card
+before the flash, so a camera with a broken or empty flash boots from a
+card that has it at 8 KiB, before the first partition:
+
+```sh
+dd if=u-boot-v831-mmc.bin of=/dev/sdX bs=1k seek=8 conv=fsync
+```
+
+Booted that way, U-Boot reads its update files from the card's FAT
+partition (`source` is `fatload mmc 0`): `run ub` writes
+`u-boot-<soc>-nor.bin` to the flash, `run fwupd` `rootfs.squashfs.<soc>`
+and `uImage.<soc>`. Remove the card and the camera boots from the flash.
+
 OpenIPC kernels for these SoCs carry no device tree: U-Boot boots them
 with the vendor's (the Tina SDK's reference board), built into U-Boot,
 in the normal world with PSCI, as the vendor's OP-TEE and U-Boot do.
 
 These images have so far run only on qemu-hisilicon's V831/V833
-machines (which are not on its master yet), not on a camera.
+machines, not on a camera.
 
 ```sh
 git clone --branch openipc-allwinner https://github.com/OpenIPC/u-boot.git
@@ -284,7 +285,7 @@ bash build.sh v831          # a single SoC
 ```
 
 The toolchain is `arm-linux-gnueabi-`, and `xz` packs U-Boot. Images land
-in `output/` as `u-boot-<soc>-nor.bin`.
+in `output/` as `u-boot-<soc>-nor.bin` and `u-boot-<soc>-mmc.bin`.
 
 ## CI
 
@@ -406,12 +407,10 @@ gh workflow run build-novatek.yml -f release=true -f publish=true
 The [build-allwinner](.github/workflows/build-allwinner.yml) workflow has
 the same shape. It runs on pull requests to this branch that change it,
 on pushes and pull requests to `openipc-allwinner` (through that branch's
-`ci.yml`), and manually. Both SoCs are held (`hold: true`): built on every
-run, not released or published, until qemu-hisilicon's master has the
-v831/v833 machines; until then their smoke legs warn and pass. With a
-machine, each image is booted -- the `-nor` one from an 8 MiB flash, the
-`-mmc` one from a card with the flash erased -- then a second time, which
-must load the environment the first saved.
+`ci.yml`), and manually. Every SoC has a qemu-hisilicon machine
+model, so every image is smoke-tested: booted -- the `-nor` one from an
+8 MiB flash, the `-mmc` one from a card with the flash erased -- then a
+second time, which must load the environment the first saved.
 
 Its `release` input will fill this repository's
 [`Allwinner` release](../../releases/tag/allwinner); `publish` uploads to
