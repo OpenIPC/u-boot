@@ -143,8 +143,9 @@ static void do_phy_init(void)
 
 int misc_init_r(void)
 {
-	openipc_helper();
+	/* before the scan: a split image clears it, so bootm checks its CRC */
 	env_set("verify", "n");
+	openipc_helper();
 	do_phy_init();
 
 	return 0;
