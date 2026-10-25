@@ -1,0 +1,378 @@
+name: Build allwinner
+
+on:
+  # Pull requests against this branch change the workflow itself; they
+  # build the current openipc-allwinner.  Code changes reach it through
+  # workflow_call from the caller on openipc-allwinner, which passes the revision
+  # to build.  Only workflow_dispatch can release or publish.
+  pull_request:
+    branches: [openipc]
+    paths:
+      - .github/workflows/build-allwinner.yml
+  workflow_call:
+    inputs:
+      ref:
+        description: openipc-allwinner revision to build
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Publish to this repo's Allwinner release
+        type: boolean
+        default: false
+      publish:
+        description: Publish to OpenIPC/firmware latest and report to openipc.org
+        type: boolean
+        default: false
+
+# The shape of build-hisilicon.yml:
+#   build (matrix, every SoC) -> qemu (prep) -> qemu_smoke (hard gate) ->
+#   release (own, `release` input) + publish (OpenIPC/firmware latest +
+#   openipc.org report, `publish` input).
+# build.sh takes SoCs as arguments; the matrix calls it with one SoC per leg.
+
+jobs:
+  # Resolve the openipc-allwinner revision this run builds from. The workflow
+  # lives on the openipc branch, so github.sha is the openipc commit, not
+  # the revision being built; release provenance must name the commit that
+  # build.sh actually compiled.
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.rev.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || 'openipc-allwinner' }}
+          path: src
+
+      - name: Resolve revision
+        id: rev
+        run: echo "sha=$(git -C src rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { soc: v831, files: "output/u-boot-v831-*.bin" }
+          - { soc: v833, files: "output/u-boot-v833-*.bin" }
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # The commit resolve recorded, not the ref again: every leg then
+          # builds the revision the release and openipc.org report name,
+          # even if the branch moves while the matrix runs.
+          ref: ${{ needs.resolve.outputs.sha }}
+
+      - name: Install dependencies
+        timeout-minutes: 15
+        run: |
+          # apt mirrors on hosted runners intermittently HANG on the
+          # mirrorlist fetch (not just fail). Bound each attempt with its own
+          # `timeout` so a hang is killed fast and the retry actually fires.
+          install() {
+            sudo timeout 180 apt-get update && \
+            sudo timeout 240 apt-get install -y --no-install-recommends \
+              build-essential gcc-arm-linux-gnueabi device-tree-compiler \
+              bison flex bc libssl-dev python3 xz-utils
+          }
+          for i in 1 2 3 4; do
+            install && break
+            [ "$i" = 4 ] && { echo "apt failed after 4 attempts" >&2; exit 1; }
+            echo "apt attempt $i failed/timed out; retrying in $((i*10))s" >&2
+            sleep $((i*10))
+          done
+
+      - name: Build ${{ matrix.soc }}
+        run: bash build.sh ${{ matrix.soc }}
+
+      - name: Check partition fit
+        run: |
+          # The boot partition from this tree's mtdparts: NOR boot = 256 KiB
+          # (env at 0x40000). An image larger than it overflows into env and
+          # bricks the device on upgrade. The image is the SPL (eGON.BT0)
+          # and the LZMA-packed U-Boot behind it.
+          soc='${{ matrix.soc }}'
+          rc=0
+          check_kind() {
+            kind=$1
+            limit_kb=$2
+            pattern=$3
+            found=0
+            for f in $pattern; do
+              [ -f "$f" ] || continue
+              found=1
+              # Compare bytes: rounding down to KiB would pass an image up
+              # to 1023 bytes into the environment.
+              size=$(stat -c %s "$f")
+              limit=$((limit_kb * 1024))
+              echo "- $f: [${size}/${limit} bytes]"
+              if [ "$size" -gt "$limit" ]; then
+                echo "-- size exceeded by: $((size - limit)) bytes" >&2
+                rc=1
+              fi
+            done
+            [ "$found" = 1 ] || { echo "missing ${kind} image for ${soc} (${pattern})" >&2; rc=1; }
+          }
+          check_kind nor 256 "output/*${soc}*-nor.bin"
+          # On a card the image starts at 8 KiB and the first partition
+          # at 1 MiB, but it must also fit the NOR it is there to flash.
+          check_kind mmc 256 "output/*${soc}*-mmc.bin"
+          exit $rc
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: u-boot-${{ matrix.soc }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+
+  # Build qemu-system-arm once and share it with every smoke leg.
+  qemu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Install QEMU build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            build-essential ninja-build meson pkg-config \
+            libglib2.0-dev libpixman-1-dev libfdt-dev zlib1g-dev \
+            libslirp-dev python3 python3-venv
+
+      - name: Build qemu-system-arm
+        run: |
+          git clone --depth 1 --branch master \
+            https://github.com/widgetii/qemu-hisilicon qemu-hisilicon
+          cd qemu-hisilicon
+          bash qemu/setup.sh
+          cp qemu-src/build/qemu-system-arm "$GITHUB_WORKSPACE/qemu-arm"
+          chmod +x "$GITHUB_WORKSPACE/qemu-arm"
+
+      - name: Upload qemu-arm
+        uses: actions/upload-artifact@v4
+        with:
+          name: qemu-arm
+          path: qemu-arm
+
+  # QEMU smoke test -- boots each freshly-built image from flash through
+  # qemu-hisilicon's v831/v833 machines, which do the boot ROM's job (load
+  # the eGON.BT0 SPL into SRAM; the SPL brings up the DDR and unpacks
+  # U-Boot), and asserts it reaches the autoboot prompt. Every SoC has a
+  # machine model, so every image is a hard gate on release. The -mmc legs
+  # boot from the SD card, which the machines' boot ROM tries first.
+  #
+  # The second boot must load the environment the first saved, which
+  # proves the driver's writes land where its reads find them.
+  qemu_smoke:
+    needs: [build, qemu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { soc: v831, kind: nor }
+          - { soc: v831, kind: mmc }
+          - { soc: v833, kind: nor }
+          - { soc: v833, kind: mmc }
+    steps:
+      - name: Download qemu-arm
+        uses: actions/download-artifact@v4
+        with:
+          name: qemu-arm
+
+      - name: Download u-boot artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: u-boot-${{ matrix.soc }}
+
+      - name: Install QEMU runtime deps
+        run: |
+          # qemu-arm is built once in the `qemu` job and downloaded here,
+          # so this leg needs the shared libraries it links against.
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            libglib2.0-0 libpixman-1-0 libfdt1 zlib1g libslirp0
+          if ldd ./qemu-arm | grep -qi 'not found'; then
+            echo "qemu-arm has unresolved libraries:" >&2
+            ldd ./qemu-arm >&2
+            exit 1
+          fi
+
+      - name: Smoke-test in QEMU
+        timeout-minutes: 3
+        run: |
+          soc='${{ matrix.soc }}'
+          kind='${{ matrix.kind }}'
+          UBOOT="u-boot-${soc}-${kind}.bin"
+          test -f "$UBOOT"
+          echo "booting $UBOOT"
+          # nor: 8 MiB NOR, U-Boot at 0, the rest erased. mmc: the NOR
+          # erased, U-Boot at 8 KiB of a 64 MiB card, which the boot ROM
+          # tries first; the environment is in the NOR either way.
+          python3 - "$UBOOT" "$kind" /tmp/flash.bin /tmp/sd.img <<'PY'
+          import sys
+          u = open(sys.argv[1], 'rb').read()
+          img = bytearray(b'\xff' * (8 << 20))
+          if sys.argv[2] == 'nor':
+              img[:len(u)] = u
+          else:
+              sd = bytearray(64 << 20)
+              sd[8192:8192 + len(u)] = u
+              open(sys.argv[4], 'wb').write(sd)
+          open(sys.argv[3], 'wb').write(img)
+          PY
+          FLASH="-M ${soc},flash-file=/tmp/flash.bin"
+          [ "$kind" = mmc ] && FLASH="$FLASH -drive if=sd,format=raw,file=/tmp/sd.img"
+          chmod +x ./qemu-arm
+          # Two boots: the first finds an erased environment and saves the
+          # default one; the second must load it back.
+          for boot in 1 2; do
+            mkfifo /tmp/uart.in /tmp/uart.out
+            ./qemu-arm $FLASH \
+              -nographic -serial pipe:/tmp/uart \
+              -monitor none > /tmp/qemu.log 2>&1 &
+            QEMU_PID=$!
+            # Wait for the autoboot prompt, not the banner: the banner prints
+            # before the board init that can hang. Up to 30 s.
+            cat /tmp/uart.out > /tmp/uboot$boot.txt &
+            CAT_PID=$!
+            for i in $(seq 1 60); do
+              grep -q 'Hit Ctrl-C' /tmp/uboot$boot.txt 2>/dev/null && break
+              sleep 0.5
+            done
+            kill "$QEMU_PID" "$CAT_PID" 2>/dev/null || true
+            wait 2>/dev/null || true
+            rm -f /tmp/uart.in /tmp/uart.out
+            echo "== boot $boot: captured u-boot output =="
+            cat /tmp/uboot$boot.txt
+            echo
+            if ! grep -q 'Hit Ctrl-C' /tmp/uboot$boot.txt; then
+              echo "FAIL: boot $boot did not reach the autoboot prompt"
+              echo
+              echo "== qemu stderr =="
+              tail -40 /tmp/qemu.log || true
+              exit 1
+            fi
+          done
+          # The first boot finds the environment erased and the OpenIPC
+          # helper saves the default one (no command over the UART needed);
+          # the second must read it back.
+          if ! grep -q 'Saving Environment to SPIFlash' /tmp/uboot1.txt; then
+            echo "FAIL: the first boot did not save the environment"
+            exit 1
+          fi
+          if grep -q 'bad CRC' /tmp/uboot2.txt; then
+            echo "FAIL: the environment saved on the first boot did not land"
+            exit 1
+          fi
+          echo "PASS: u-boot reached the autoboot prompt, and its saved environment survived a reset"
+
+  # Mirror every built image to this repository's own Allwinner release.
+  release:
+    needs: [resolve, build, qemu_smoke]
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: u-boot-*
+
+      - name: Upload to releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: allwinner
+          name: Allwinner
+          target_commitish: ${{ needs.resolve.outputs.sha }}
+          prerelease: true
+          files: artifacts/**/*.bin
+          fail_on_unmatched_files: true
+
+  # Publish every image to the OpenIPC/firmware `latest` release and tell
+  # openipc.org what was uploaded. openipc.org keeps, per file name, the
+  # newest uboot build that names it, so this run adds or refreshes the
+  # u-boot-v831/v833 names and leaves the other repositories' files alone
+  # (OpenIPC/u-boot-allwinner publishes u-boot-v851s-nor.bin). The
+  # concurrency group, shared with build-hisilicon.yml, keeps a second run
+  # from uploading between this run's upload and its report.
+  publish:
+    needs: [resolve, build, qemu_smoke]
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: publish-firmware-latest
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: u-boot-*
+
+      - name: Upload to OpenIPC/firmware latest release
+        env:
+          GH_TOKEN: ${{ secrets.FIRMWARE_RELEASE_TOKEN }}
+        run: |
+          set -eu
+          # Releases API occasionally returns 502/503. Retry with backoff:
+          # 10s, 20s, 30s, 40s -- total ~100s before giving up.
+          upload() {
+            local f="$1" i
+            for i in 1 2 3 4 5; do
+              if gh release upload latest "$f" --clobber -R OpenIPC/firmware; then
+                return 0
+              fi
+              [ "$i" = "5" ] && return 1
+              echo "upload attempt $i failed; sleeping $((i*10))s" >&2
+              sleep $((i*10))
+            done
+          }
+          find artifacts -type f -name '*.bin' | sort | while read -r f; do
+            echo "publishing $f"
+            upload "$f"
+          done
+
+      # The push script is OpenIPC/firmware's, at a fixed commit: the only
+      # code this job checks out, since it holds an id-token.
+      - uses: actions/checkout@v4
+        with:
+          repository: OpenIPC/firmware
+          ref: 7fa63ce694cb5d27c19d4f19058ba2c044849db4
+          sparse-checkout: .github/scripts
+          path: firmware
+
+      # The contract is PUSH.md in OpenIPC/website (source `uboot`, release
+      # `latest`, one id per run). The digests are of the files uploaded
+      # above, hashed here, so the push describes exactly those bytes.
+      - name: Report to openipc.org
+        env:
+          AW_SHA: ${{ needs.resolve.outputs.sha }}
+        run: |
+          set -eu
+          mkdir published
+          find artifacts -type f -name '*.bin' -exec cp {} published/ \;
+          python3 firmware/.github/scripts/push_build.py \
+            --source uboot \
+            --build-id "uboot-allwinner-$(date -u +%Y%m%dT%H%M%SZ)-${AW_SHA::7}" \
+            --release latest \
+            --sha "$AW_SHA" \
+            --built-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --assets 'published/*.bin'

@@ -28,6 +28,11 @@ own branch:
   loader, built from source in the tree. CI: `build-novatek.yml`, called
   from that branch's `ci.yml`. Its own `CLAUDE.md` covers the loader, the
   image layout and the kernel hand-off.
+- `openipc-allwinner`: U-Boot for Allwinner V831/V833 (sun8iw19), on
+  the same mainline release with the same OpenIPC layer, as a mainline
+  sunxi SoC with its own SPL and DRAM driver. CI: `build-allwinner.yml`,
+  called from that branch's `ci.yml`. Its own `CLAUDE.md` covers the SPL,
+  the DRAM port and the kernel hand-off.
 - `main`: a fork of upstream mainline U-Boot, kept for rebasing.
 
 To change bootloader code, check out `openipc-hisilicon`, or read it with
@@ -147,6 +152,33 @@ The build logic lives here. Other branches call it:
   - openipc.org accepts the report only from workflows it allowlists
     (OpenIPC/website `service/internal/builds/verify.go`).
     `build-novatek.yml` has to be added there before the first `publish`.
+
+## `build-allwinner.yml`
+
+- It is `build-anyka.yml` for `openipc-allwinner`: the same job graph and
+  `resolve`/`ref` rules, NOR only (256 KiB boot partition: the SPL, then
+  U-Boot LZMA-packed at 0x8000).
+- The build legs also install `xz-utils`, for the LZMA image.
+- **No `hold`:** both SoCs have qemu-hisilicon machines (`v831`,
+  `v833`). The `-mmc` legs need its boot ROM stand-in to boot from the SD
+  card (qemu-bench #204).
+- **Two kinds per SoC:** `u-boot-<soc>-nor.bin` and `-mmc.bin` (SD card
+  boot: the SPL reads U-Boot from the card); one artifact holds both, the
+  smoke matrix has a leg per kind.
+- **Smoke test:** two boots, `-nor` from an 8 MiB flash holding only the
+  image, `-mmc` from a 64 MiB card with it at 8 KiB and the flash erased.
+  It passes on `Hit Ctrl-C`, and fails if the second boot reports a bad
+  environment CRC (the environment is in the flash for both).
+- **Release and publish:**
+  - `release` uploads to the `allwinner` tag.
+  - `publish` shares the `publish-firmware-latest` concurrency group and
+    reports a `uboot-allwinner-…` build id. OpenIPC/u-boot-allwinner
+    publishes `u-boot-v851s-nor.bin` to the same release; the names do
+    not overlap.
+  - openipc.org accepts the report only from workflows it allowlists
+    (OpenIPC/website `service/internal/builds/verify.go`).
+    `build-allwinner.yml` has to be added there before the first
+    `publish`.
 
 ## Invariants to keep when editing `build-hisilicon.yml`
 

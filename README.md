@@ -5,6 +5,7 @@
 [![gk710x build](https://github.com/OpenIPC/u-boot/actions/workflows/build-gk710x.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-gk710x.yml)
 [![anyka build](https://github.com/OpenIPC/u-boot/actions/workflows/build-anyka.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-anyka.yml)
 [![novatek build](https://github.com/OpenIPC/u-boot/actions/workflows/build-novatek.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-novatek.yml)
+[![allwinner build](https://github.com/OpenIPC/u-boot/actions/workflows/build-allwinner.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-allwinner.yml)
 
 Unified repository for the U-Boot bootloaders maintained by
 [OpenIPC](https://openipc.org) for supported SoCs.
@@ -21,6 +22,7 @@ family — not bootloader sources.
 | `openipc-gk710x` | U-Boot for Goke GK7101/GK7102 |
 | `openipc-anyka` | U-Boot for Anyka AK3918EV200, AK391xEV300, AK391xEV330 |
 | `openipc-novatek` | U-Boot for Novatek NT98562, NT98566 |
+| `openipc-allwinner` | U-Boot for Allwinner V831, V833 |
 | `main` | Fork of upstream mainline U-Boot, kept for rebasing |
 
 New families are added here as they are ported, each with its own
@@ -232,6 +234,59 @@ The loader needs an Arm bare-metal toolchain (`arm-none-eabi-`, else the
 one U-Boot uses; `LOADER_CROSS_COMPILE` overrides). Images land in
 `output/` as `u-boot-<soc>-nor.bin`.
 
+## allwinner
+
+U-Boot for the Allwinner V831 and V833 (sun8iw19), on the same mainline
+release (v2022.10) and with the same OpenIPC boot layer as
+`openipc-hisilicon`, as a mainline sunxi SoC with its own SPL: no vendor
+boot0, OP-TEE or boot package.
+
+**NOR and SD card:** `v831` (64 MiB DDR2 in the package), `v833`
+(128 MiB DDR3).
+
+The boot ROM loads the SPL from flash offset 0 into SRAM. The SPL brings
+up the DDR -- the vendor boot0's DRAM library, translated to C -- and
+unpacks U-Boot, LZMA-packed, from offset 0x8000. `u-boot-<soc>-nor.bin`
+holds both, ~170 KiB, to be written at flash offset 0 as it is:
+
+| Offset | Contents |
+| --- | --- |
+| `0x00000` | the SPL (eGON.BT0) |
+| `0x08000` | U-Boot, LZMA-packed |
+| `0x40000` | the environment (not in the image) |
+
+**SD card (unbricking):** `u-boot-<soc>-mmc.bin` is the same image with
+an SPL that loads U-Boot from the card. The boot ROM tries the card
+before the flash, so a camera with a broken or empty flash boots from a
+card that has it at 8 KiB, before the first partition:
+
+```sh
+dd if=u-boot-v831-mmc.bin of=/dev/sdX bs=1k seek=8 conv=fsync
+```
+
+Booted that way, U-Boot reads its update files from the card's FAT
+partition (`source` is `fatload mmc 0`): `run ub` writes
+`u-boot-<soc>-nor.bin` to the flash, `run fwupd` `rootfs.squashfs.<soc>`
+and `uImage.<soc>`. Remove the card and the camera boots from the flash.
+
+OpenIPC kernels for these SoCs carry no device tree: U-Boot boots them
+with the vendor's (the Tina SDK's reference board), built into U-Boot,
+in the normal world with PSCI, as the vendor's OP-TEE and U-Boot do.
+
+These images have so far run only on qemu-hisilicon's V831/V833
+machines, not on a camera.
+
+```sh
+git clone --branch openipc-allwinner https://github.com/OpenIPC/u-boot.git
+cd u-boot
+
+bash build.sh               # v831 v833
+bash build.sh v831          # a single SoC
+```
+
+The toolchain is `arm-linux-gnueabi-`, and `xz` packs U-Boot. Images land
+in `output/` as `u-boot-<soc>-nor.bin` and `u-boot-<soc>-mmc.bin`.
+
 ## CI
 
 The [build-hisilicon](.github/workflows/build-hisilicon.yml) workflow runs
@@ -345,6 +400,25 @@ Its `release` input fills this repository's
 
 ```sh
 gh workflow run build-novatek.yml -f release=true -f publish=true
+```
+
+### allwinner
+
+The [build-allwinner](.github/workflows/build-allwinner.yml) workflow has
+the same shape. It runs on pull requests to this branch that change it,
+on pushes and pull requests to `openipc-allwinner` (through that branch's
+`ci.yml`), and manually. Every SoC has a qemu-hisilicon machine
+model, so every image is smoke-tested: booted -- the `-nor` one from an
+8 MiB flash, the `-mmc` one from a card with the flash erased -- then a
+second time, which must load the environment the first saved.
+
+Its `release` input will fill this repository's
+[`Allwinner` release](../../releases/tag/allwinner); `publish` uploads to
+`OpenIPC/firmware` `latest`, where OpenIPC/u-boot-allwinner publishes only
+`u-boot-v851s-nor.bin`, and reports to openipc.org.
+
+```sh
+gh workflow run build-allwinner.yml -f release=true -f publish=true
 ```
 
 ## Adding a SoC family
