@@ -28,6 +28,8 @@
 
 #include "mmc_private.h"
 #include "himci.h"
+#include <cpu_func.h>
+#include "mmc_internal.h"
 
 #define MMC_CS_ERROR_MASK   0xFDFFA080
 
@@ -719,7 +721,7 @@ request_end:
 	return ret;
 }
 
-static void hi_mci_set_ios(struct mmc *mmc)
+static int hi_mci_set_ios(struct mmc *mmc)
 {
 	struct himci_host *host = mmc->priv;
 	unsigned int tmp_reg;
@@ -753,6 +755,7 @@ static void hi_mci_set_ios(struct mmc *mmc)
 
 	hi_mci_set_drv_cap(mmc, 0);
 	hi_mci_set_default_phase(mmc);
+	return 0;
 }
 
 static int hi_mci_init(struct mmc *mmc)
@@ -852,7 +855,7 @@ tuning_retry:
 	}
 	err = mmc_send_tuning(mmc, opcode, NULL);
 	hi_mci_send_stop(mmc);
-	mmc_send_status(mmc ,1000);
+	mmc_poll_for_busy(mmc, 1000);
 	return err;
 }
 
