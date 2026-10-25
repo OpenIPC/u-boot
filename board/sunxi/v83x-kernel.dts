@@ -7,6 +7,7 @@
  * preprocessed and flattened, with what the vendor U-Boot changes in it
  * before it boots a kernel from SPI NOR (traced under QEMU from a camera's
  * flash): SPI0, the flash, enabled; and without the memory OP-TEE took.
+ * The CPU idle states are left out: U-Boot's PSCI has no CPU_SUSPEND.
  * /memory, /chosen and /dram/dram_para2 (the DRAM size) are set at boot.
  */
 
@@ -2935,45 +2936,10 @@
 			clock-frequency = <0x3c14dc00>;
 			clock-latency = <0x1e8480>;
 			operating-points-v2 = <0xa2>;
-			cpu-idle-states = <0xa3 0xa4 0xa5>;
 			cooling-min-level = <0x05>;
 			cooling-max-level = <0x00>;
 			#cooling-cells = <0x02>;
 			dynamic-power-coefficient = <0x96>;
-		};
-
-		idle-states {
-			entry-method = "arm,psci";
-
-			cpu-sleep-0 {
-				compatible = "arm,idle-state";
-				arm,psci-suspend-param = <0x10000>;
-				entry-latency-us = <0x2d>;
-				exit-latency-us = <0x5a>;
-				min-residency-us = <0xbb8>;
-				local-timer-stop;
-				phandle = <0xa3>;
-			};
-
-			cluster-sleep-0 {
-				compatible = "arm,idle-state";
-				arm,psci-suspend-param = <0x1010000>;
-				entry-latency-us = <0x37>;
-				exit-latency-us = <0x23a>;
-				min-residency-us = <0x4268>;
-				local-timer-stop;
-				phandle = <0xa4>;
-			};
-
-			sys-sleep-0 {
-				compatible = "arm,idle-state";
-				arm,psci-suspend-param = <0x2010000>;
-				entry-latency-us = <0xffffffff>;
-				exit-latency-us = <0xffffffff>;
-				min-residency-us = <0xffffffff>;
-				local-timer-stop;
-				phandle = <0xa5>;
-			};
 		};
 	};
 

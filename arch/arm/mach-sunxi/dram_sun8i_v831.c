@@ -55,7 +55,7 @@ struct dram_para {
 	u32 tpr0;
 	u32 tpr1;
 	u32 tpr2;
-	u32 tpr3;
+	u32 tpr3;	/* the DRAM supply voltages, for dram_vol_set() */
 	u32 tpr4;
 	u32 tpr5;
 	u32 tpr6;
@@ -1043,7 +1043,6 @@ unsigned long sunxi_dram_init(void)
 		.tpr0	= CONFIG_DRAM_SUN8I_V831_TPR0,
 		.tpr1	= CONFIG_DRAM_SUN8I_V831_TPR1,
 		.tpr2	= CONFIG_DRAM_SUN8I_V831_TPR2,
-		.tpr3	= CONFIG_DRAM_SUN8I_V831_TPR3,
 		.tpr5	= CONFIG_DRAM_SUN8I_V831_TPR5,
 		.tpr6	= CONFIG_DRAM_SUN8I_V831_TPR6,
 		.tpr7	= CONFIG_DRAM_SUN8I_V831_TPR7,

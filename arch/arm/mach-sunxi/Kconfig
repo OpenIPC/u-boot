@@ -575,10 +575,6 @@ config DRAM_SUN8I_V831_TPR2
 	hex "dram_tpr2"
 	default 0x00057041
 
-config DRAM_SUN8I_V831_TPR3
-	hex "dram_tpr3"
-	default 0xb4787896
-
 config DRAM_SUN8I_V831_TPR5
 	hex "dram_tpr5"
 	default 0x48484848
