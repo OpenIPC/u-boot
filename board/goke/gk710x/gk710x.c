@@ -49,6 +49,9 @@ int misc_init_r(void)
  * are memory mapped, register n in the low half of the word at +4n (the
  * vendor kernel's gkhw_mdio_read() with phytype=0). It answers at address 0.
  */
+/* An ID for the internal PHY, which has none: "GK", 0x7101 */
+#define GK_EPHY_FAKE_ID		0x474b7101
+
 /*
  * The internal PHY's MII registers, memory mapped. Its BMSR does not set
  * the link bit: the vendor kernel driver reports the link up once
@@ -63,6 +66,18 @@ static int gk_ephy_read(struct mii_dev *bus, int addr, int devad, int reg)
 	val = readl(GK_EPHY_BASE + 4 * reg) & 0xffff;
 	if (reg == MII_BMSR && (val & BMSR_ANEGCOMPLETE))
 		val |= BMSR_LSTATUS;
+	/*
+	 * It has no ID either (a GK7101 reads 0 in both ID registers, the
+	 * vendor kernel prints "mii id = 0"), and phylib skips a PHY whose ID
+	 * is 0. Give it one that no driver claims, so the generic driver runs
+	 * it.
+	 */
+	if (reg == MII_PHYSID1 && !val &&
+	    !(readl(GK_EPHY_BASE + 4 * MII_PHYSID2) & 0xffff))
+		val = GK_EPHY_FAKE_ID >> 16;
+	else if (reg == MII_PHYSID2 && !val &&
+		 !(readl(GK_EPHY_BASE + 4 * MII_PHYSID1) & 0xffff))
+		val = GK_EPHY_FAKE_ID & 0xffff;
 	return val;
 }
 
