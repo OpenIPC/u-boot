@@ -109,6 +109,7 @@ __pycache__
 !openipc/*_reginfo.bin
 !reginfo/*.bin
 !image_tool/input/gsl.bin
+!image_tool/input/gsl-20250416.bin
 !arch/arm/cpu/armv7/xm72050500/auxcode_sign.img
 !arch/arm/cpu/armv7/xm720xxx/auxcode_sign.img
 
