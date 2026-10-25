@@ -10,6 +10,9 @@
 #include <securec.h>
 #include <crc16.h>
 
+/* drivers/usb/gadget: <usb/udc.h> needs <usbdevice.h>, which clashes with <usb.h> */
+void udc_connect(void);
+
 #ifdef DUMP_SWITCH
 static void dump_buf(char *buf, int len)
 {
@@ -193,10 +196,8 @@ __attribute__((weak)) void download_boot(const int (*handle)(void))
 				SELF_BOOT_TYPE_USBDEV) {
 #ifdef CONFIG_USB_GADGET
 #ifndef CONFIG_MINI_BOOT
-			if (udc_connect() < 0) {
-				printf("[error] download_boot by usb error: init error");
-				break;
-			}
+			/* udc_connect() returns nothing: there is no failure to catch */
+			udc_connect();
 #endif
 #else
 			printf("[error] download_boot by usb is not supported.\n");

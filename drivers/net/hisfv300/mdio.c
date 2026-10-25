@@ -10,6 +10,7 @@
 
 #include "hieth.h"
 #include "mdio.h"
+#include <linux/delay.h>
 
 /* write mdio registers reset value */
 static void mdio_reg_reset(struct hieth_netdev_local *ld)

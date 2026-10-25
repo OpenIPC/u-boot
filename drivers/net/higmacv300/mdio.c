@@ -12,6 +12,7 @@
 #include "ctrl.h"
 #include "mdio.h"
 #include "util.h"
+#include <linux/delay.h>
 
 static void mdio_set_phywrite_val(struct higmac_netdev_local *ld, unsigned short val)
 {

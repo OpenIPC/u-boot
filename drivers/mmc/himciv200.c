@@ -7,6 +7,8 @@
 #include <himciv200_reg.h>
 
 #include "himciv200.h"
+#include <linux/delay.h>
+#include "mmc_private.h"
 
 #define MMC_CS_ERROR_MASK		0xFDFFA080
 #define TIMEOUT				-19
@@ -657,7 +659,7 @@ request_end:
 	return ret;
 }
 
-static void hi_mci_set_ios(struct mmc *mmc)
+static int hi_mci_set_ios(struct mmc *mmc)
 {
 	struct himci_host *host = mmc->priv;
 	unsigned int tmp_reg;
@@ -688,6 +690,7 @@ static void hi_mci_set_ios(struct mmc *mmc)
 		tmp_reg |= (CARD_WIDTH_1BIT<<host->port);
 
 	himci_writel(tmp_reg, host->base + MCI_CTYPE);
+	return 0;
 }
 
 static int hi_mci_init(struct mmc *mmc)

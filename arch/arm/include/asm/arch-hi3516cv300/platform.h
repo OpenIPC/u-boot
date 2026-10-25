@@ -167,6 +167,9 @@
 
 #define FMC_CLK_SEL(_clk) \
 	(((_clk) << FMC_CLK_SEL_SHIFT) & FMC_CLK_SEL_MASK)
+/* the read side, as the V500 parts spell it; the SPI NAND driver uses it */
+#define get_fmc_clk_type(_reg) \
+	(((_reg) & FMC_CLK_SEL_MASK) >> FMC_CLK_SEL_SHIFT)
 #define GET_FMC_CLK_TYPE(_reg) \
 	(((_reg) & FMC_CLK_SEL_MASK) >> FMC_CLK_SEL_SHIFT)
 

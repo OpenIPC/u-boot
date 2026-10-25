@@ -9,6 +9,8 @@
 #include "util.h"
 #include "higmac.h"
 #include "ctrl.h"
+#include <linux/delay.h>
+#include <linux/bug.h>
 
 #if defined(CONFIG_TARGET_HI3531DV200) || defined(CONFIG_TARGET_HI3535AV100)
 void higmac_set_macif(struct higmac_netdev_local *ld, int mode, unsigned int speed)

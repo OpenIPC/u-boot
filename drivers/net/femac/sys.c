@@ -6,6 +6,7 @@
 #include <config.h>
 #include "bspeth.h"
 #include "sys.h"
+#include <linux/delay.h>
 
 #define BSPETH_CRG_REG (CRG_REG_BASE + REG_ETH_CRG)
 

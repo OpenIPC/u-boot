@@ -421,10 +421,13 @@ static inline const struct device_node *nanddev_get_of_node(struct nand_device *
  *
  * Attach a DT node to a NAND device.
  */
+#if IS_ENABLED(CONFIG_DM)
+/* mtd_set_ofnode() exists only with driver model (linux/mtd/mtd.h) */
 static inline void nanddev_set_ofnode(struct nand_device *nand, ofnode node)
 {
 	mtd_set_ofnode(nand->mtd, node);
 }
+#endif
 #endif /* __UBOOT__ */
 
 /**

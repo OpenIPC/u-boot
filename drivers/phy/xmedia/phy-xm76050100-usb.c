@@ -8,6 +8,7 @@
 #include <usb.h>
 #include <usb/xhci.h>
 #include "phy-usb.h"
+#include <linux/delay.h>
 
 /* offset 0x140 */
 #define USB2_CTRL				0x140

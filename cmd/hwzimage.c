@@ -39,6 +39,7 @@
 #include <serial.h>
 
 #include <linux/lhs_tags.h>
+#include <cpu_func.h>
 
 /************************************************************************************************/
 //#define CONFIG_SETUP_BOOT_PARAMS_BY_LIBFDT

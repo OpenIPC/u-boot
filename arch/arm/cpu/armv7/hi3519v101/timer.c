@@ -39,6 +39,9 @@
 #include <asm/proc-armv/ptrace.h>
 #include <asm/arch/platform.h>
 #include <asm/io.h>
+
+/* defined further down, used before it (the hw_compressed loader has no header for it) */
+void __udelay(unsigned long usec);
 #define TIMER_LOAD_VAL 0xffffffff
 
 #define CFG_TIMER_CLK		3000000

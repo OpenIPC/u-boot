@@ -17,6 +17,8 @@
 #include <config.h>
 #include <miiphy.h>
 #include <net.h>
+#include <cpu_func.h>
+#include <linux/delay.h>
 /*************************************************************************/
 int hieth_mdiobus_driver_init(struct hieth_netdev_local *ld);
 void hieth_mdiobus_driver_exit(struct hieth_netdev_local *ld);

@@ -33,6 +33,12 @@
 #include <asm/mach-types.h>
 #include <env.h>
 #include <hicpu_common.h>
+/*
+ * Not <cpu_func.h>: it declares reset_cpu(void), and hicpu_common.h, which
+ * the hw_compressed loader shares, declares it (ulong).
+ */
+void dcache_enable(void);
+void flush_dcache_all(void);
 
 #ifndef CONFIG_SYS_DCACHE_OFF
 void enable_caches(void)
@@ -239,16 +245,22 @@ int save_bootdata_to_flash(void)
 	sd_update_flag = readl(REG_BASE_SCTL + REG_SC_GEN4);
 	if (sd_update_flag == START_MAGIC) {
 #if defined(CONFIG_FMC)
+#if defined(CONFIG_FMC_SPI_NOR)
+		/* data_to_spiflash() exists only where SPI NOR is built in */
 		if (boot_media == BOOT_MEDIA_SPIFLASH) {
 			ret = data_to_spiflash();
 			if (ret != 0)
 				return ret;
 		}
+#endif
+#if defined(CONFIG_FMC_SPI_NAND)
+		/* data_to_nandflash() exists only where SPI NAND is built in */
 		if (boot_media == BOOT_MEDIA_NAND) {
 			ret = data_to_nandflash();
 			if (ret != 0)
 				return ret;
 		}
+#endif
 #endif
 #if defined(CONFIG_SUPPORT_EMMC_BOOT)
 		if (boot_media == BOOT_MEDIA_EMMC) {

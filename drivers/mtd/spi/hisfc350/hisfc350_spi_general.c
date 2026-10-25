@@ -12,6 +12,7 @@
 
 #include "spi_ids.h"
 #include "hisfc350.h"
+#include <linux/delay.h>
 
 #define DEBUG_SPI 0
 #define DEBUG_GET_SR 0

@@ -10,6 +10,7 @@
 #include <config.h>
 #include "hieth.h"
 #include "sys.h"
+#include <linux/delay.h>
 
 #if defined(CONFIG_GODBOX) || defined(CONFIG_GODBOX_V1)
 #define HIETH_CRG_REG (REG_BASE_CRG + REG_PERI_CRG26)

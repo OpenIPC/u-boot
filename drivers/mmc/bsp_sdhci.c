@@ -2,6 +2,8 @@
  * Copyright (c) XMEDIA. All rights reserved.
  */
 
+#include "mmc_internal.h"
+
 static void enable_card_clk(struct sdhci_host *host)
 {
 	u16 clk;

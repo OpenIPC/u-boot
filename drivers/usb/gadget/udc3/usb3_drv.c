@@ -7,6 +7,7 @@
 #include <cpu_func.h>
 #include <linux/compat.h>
 #include "../../../phy/xmedia/usb.h"
+#include <linux/delay.h>
 
 void usb3_handle_event(usb3_device_t *dev);
 void usb3_enable_device_interrupts(usb3_device_t *dev);

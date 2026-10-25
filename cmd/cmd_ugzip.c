@@ -16,6 +16,7 @@
 #include <serial.h>
 #include <linux/lhs_tags.h>
 #include <linux/ctype.h>
+#include <cpu_func.h>
 
 /*
  * note: change it larger if rugzip cmd is abnormal

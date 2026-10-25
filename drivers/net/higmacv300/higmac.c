@@ -12,6 +12,7 @@
 #include "higmac.h"
 #include "ctrl.h"
 #include "mdio.h"
+#include <cpu_func.h>
 
 typedef enum {
 	GSF0_PORT0,

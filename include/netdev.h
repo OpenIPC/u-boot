@@ -32,6 +32,7 @@ int cpu_eth_init(struct bd_info *bis);
 int ax88180_initialize(struct bd_info *bis);
 int bcm_sf2_eth_register(struct bd_info *bis, u8 dev_num);
 int bfin_EMAC_initialize(struct bd_info *bis);
+int bspeth_initialize(struct bd_info *bis);
 int cs8900_initialize(u8 dev_num, int base_addr);
 int dc21x4x_initialize(struct bd_info *bis);
 int designware_initialize(ulong base_addr, u32 interface);
@@ -48,6 +49,8 @@ int fecmxc_initialize_multi(struct bd_info *bis, int dev_id, int phy_id,
 int ftmac100_initialize(struct bd_info *bits);
 int ftmac110_initialize(struct bd_info *bits);
 int ftgmac030_initialize(struct bd_info *bd);
+int hieth_initialize(struct bd_info *bis);
+int higmac_initialize(struct bd_info *bis);
 void gt6426x_eth_initialize(struct bd_info *bis);
 int ks8851_mll_initialize(u8 dev_num, int base_addr);
 int lan91c96_initialize(u8 dev_num, int base_addr);
