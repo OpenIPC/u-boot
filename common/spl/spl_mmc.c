@@ -16,6 +16,46 @@
 #include <errno.h>
 #include <mmc.h>
 #include <image.h>
+#include <malloc.h>
+
+static ulong spl_mem_load_read(struct spl_load_info *load, ulong offs,
+				ulong size, void *buf)
+{
+	memcpy(buf, (u8 *)load->priv + offs, size);
+
+	return size;
+}
+
+/*
+ * A compressed legacy image cannot be read to its load address: read it
+ * whole, then let spl_load_legacy_img() unpack it there.
+ */
+static int mmc_load_legacy_compressed(struct spl_image_info *spl_image,
+				      struct spl_boot_device *bootdev,
+				      struct mmc *mmc, ulong sector,
+				      struct image_header *header)
+{
+	struct blk_desc *bd = mmc_get_blk_desc(mmc);
+	ulong len = sizeof(*header) + image_get_data_size(header);
+	ulong blocks = DIV_ROUND_UP(len, bd->blksz);
+	struct spl_load_info load;
+	void *buf;
+
+	buf = malloc(blocks * bd->blksz);
+	if (!buf)
+		return -ENOMEM;
+
+	if (blk_dread(bd, sector, blocks, buf) != blocks)
+		return -EIO;
+
+	load.dev = NULL;
+	load.priv = buf;
+	load.filename = NULL;
+	load.bl_len = 1;
+	load.read = spl_mem_load_read;
+
+	return spl_load_legacy_img(spl_image, bootdev, &load, 0);
+}
 
 static int mmc_load_legacy(struct spl_image_info *spl_image,
 			   struct spl_boot_device *bootdev,
@@ -27,6 +67,12 @@ static int mmc_load_legacy(struct spl_image_info *spl_image,
 	unsigned long count;
 	u32 image_offset;
 	int ret;
+
+	if (IS_ENABLED(CONFIG_SPL_LZMA) &&
+	    image_get_magic(header) == IH_MAGIC &&
+	    image_get_comp(header) == IH_COMP_LZMA)
+		return mmc_load_legacy_compressed(spl_image, bootdev, mmc,
+						  sector, header);
 
 	ret = spl_parse_image_header(spl_image, bootdev, header);
 	if (ret)

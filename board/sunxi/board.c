@@ -54,6 +54,7 @@
 void v83x_board_init(void);
 void v83x_kernel_fdt(void);
 void v83x_ft_board_setup(void *blob);
+void v83x_boot_source(void);
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -184,6 +185,12 @@ enum env_location env_get_location(enum env_operation op, int prio)
 			return ENVL_FAT;
 		if (IS_ENABLED(CONFIG_ENV_IS_IN_UBI))
 			return ENVL_UBI;
+		/*
+		 * The V831/V833 images keep it in the SPI NOR alone, also
+		 * when the SPL and U-Boot came from an SD card
+		 */
+		if (IS_ENABLED(CONFIG_ENV_IS_IN_SPI_FLASH))
+			return ENVL_SPI_FLASH;
 	}
 
 	return ENVL_UNKNOWN;
@@ -874,6 +881,10 @@ int misc_init_r(void)
 #ifdef CONFIG_OPENIPC
 	openipc_helper();
 #endif
+
+	/* after the helper, which may save the default environment */
+	if (IS_ENABLED(CONFIG_MACH_SUN8I_V831))
+		v83x_boot_source();
 
 	return 0;
 }

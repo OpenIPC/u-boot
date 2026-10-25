@@ -9,6 +9,8 @@
 #include <malloc.h>
 #include <asm/io.h>
 #include <asm/arch/cpu.h>
+#include <asm/arch/spl.h>
+#include <spl.h>
 #include <linux/bitops.h>
 #include <asm/global_data.h>
 #include <linux/libfdt.h>
@@ -51,6 +53,21 @@ void v83x_kernel_fdt(void)
 	}
 
 	env_set_hex("fdtaddr", (ulong)fdt);
+}
+
+/*
+ * Booted from an SD card (the -mmc images): that card is where the
+ * unbricking files are, so ub/uk/ur read them from it, as after srcmmc.
+ * Set for this boot only, not saved: the next boot from the SPI NOR keeps
+ * the environment's source.
+ */
+void v83x_boot_source(void)
+{
+	if (sunxi_get_boot_device() != BOOT_DEVICE_MMC1)
+		return;
+
+	printf("V83x: booted from the SD card, update source: fatload mmc 0\n");
+	env_set("source", "fatload mmc 0");
 }
 
 /* What the vendor U-Boot sets at boot besides /memory and /chosen */

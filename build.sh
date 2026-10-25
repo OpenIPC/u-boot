@@ -12,7 +12,9 @@ export CROSS_COMPILE=${CROSS_COMPILE:-arm-linux-gnueabi-}
 
 BOOT_SRCDIR=$(pwd)
 
-# The boot partition: the environment starts at 0x40000
+# The boot partition: the environment starts at 0x40000. On an SD card
+# the image starts at 8 KiB and must end before the first partition at
+# 1 MiB; the NOR limit is the tighter.
 BOOT_PART_SIZE=262144
 # U-Boot proper's offset in the image, where the SPL reads it from
 UBOOT_OFFSET=32768
@@ -28,17 +30,21 @@ mkconfig() {
     cat "$@" > "${builddir}/.config"
 }
 
-# Allwinner V831/V833: the boot ROM loads the SPL (eGON.BT0) from SPI NOR
-# offset 0 into SRAM; the SPL brings up the DDR and unpacks U-Boot, an
-# LZMA-compressed legacy image, from offset 0x8000 to its link address.
+# Allwinner V831/V833: the boot ROM loads the SPL (eGON.BT0) into SRAM,
+# from SPI NOR offset 0 ("nor") or SD card sector 16 ("mmc"); the SPL
+# brings up the DDR and unpacks U-Boot, an LZMA-compressed legacy image,
+# from 0x8000 after itself to its link address.
 build_v83x() {
     soc=$1
-    builddir=${BOOT_SRCDIR}/output/build-${soc}-nor
+    kind=$2
+    builddir=${BOOT_SRCDIR}/output/build-${soc}-${kind}
     make_opts="-C ${BOOT_SRCDIR} O=${builddir} -j$(nproc)"
-    out=output/u-boot-${soc}-nor.bin
+    out=output/u-boot-${soc}-${kind}.bin
+    fragments="openipc/openipc_config openipc/${soc}_config"
+    [ "${kind}" = mmc ] && fragments="${fragments} openipc/mmc_config"
 
     rm -rf "${builddir}"
-    mkconfig "${builddir}" openipc/openipc_config openipc/${soc}_config && \
+    mkconfig "${builddir}" ${fragments} && \
     make ${make_opts} olddefconfig </dev/null >/dev/null && \
     make ${make_opts} </dev/null || return 1
 
@@ -76,7 +82,7 @@ build_soc() {
     soc=$1
     case "${soc}" in
         v831|v833)
-            build_v83x "${soc}" ;;
+            build_v83x "${soc}" nor && build_v83x "${soc}" mmc ;;
         *)
             echo "unsupported SoC: ${soc}" >&2
             return 1 ;;

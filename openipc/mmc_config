@@ -1,0 +1,8 @@
+# SD card boot: the boot ROM finds the SPL at sector 16 (8 KiB) of the
+# card, before it tries the SPI NOR; the SPL loads U-Boot from the card
+# too, 32 KiB after itself (sunxi's U_BOOT_SECTOR 0x40 counts from the
+# SPL, DATA_PART_OFFSET adds the 16 sectors before it). The image is the
+# NOR one's layout: dd it to the card at 8 KiB. U-Boot itself is the NOR
+# image's, its environment in the SPI NOR.
+CONFIG_SPL_MMC=y
+CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_USE_SECTOR=y
