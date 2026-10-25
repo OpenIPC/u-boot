@@ -1144,7 +1144,7 @@ config ARCH_SOCFPGA
 
 config ARCH_SUNXI
 	bool "Support sunxi (Allwinner) SoCs"
-	select BINMAN if !MACH_SUN8I_V831
+	select BINMAN if !OPENIPC
 	select CMD_GPIO
 	select CMD_MMC if MMC
 	select CMD_USB if DISTRO_DEFAULTS && USB_HOST

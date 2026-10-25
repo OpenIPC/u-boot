@@ -35,6 +35,8 @@
 #include <asm/arch/dram_suniv.h>
 #elif defined(CONFIG_MACH_SUN8I_V831)
 #include <asm/arch/dram_sun8i_v831.h>
+#elif defined(CONFIG_MACH_SUN8I_V851S)
+/* dram_sun20i_d1.c keeps its structures in its own header */
 #else
 #include <asm/arch/dram_sun4i.h>
 #endif

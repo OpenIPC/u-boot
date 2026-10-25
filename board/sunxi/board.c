@@ -54,7 +54,6 @@
 void v83x_board_init(void);
 void v83x_kernel_fdt(void);
 void v83x_ft_board_setup(void *blob);
-void v83x_boot_source(void);
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -186,10 +185,10 @@ enum env_location env_get_location(enum env_operation op, int prio)
 		if (IS_ENABLED(CONFIG_ENV_IS_IN_UBI))
 			return ENVL_UBI;
 		/*
-		 * The V831/V833 images keep it in the SPI NOR alone, also
+		 * The OpenIPC images keep it in the SPI NOR alone, also
 		 * when the SPL and U-Boot came from an SD card
 		 */
-		if (IS_ENABLED(CONFIG_MACH_SUN8I_V831) &&
+		if (IS_ENABLED(CONFIG_OPENIPC) &&
 		    IS_ENABLED(CONFIG_ENV_IS_IN_SPI_FLASH))
 			return ENVL_SPI_FLASH;
 	}
@@ -199,6 +198,23 @@ enum env_location env_get_location(enum env_operation op, int prio)
 
 #ifdef CONFIG_DM_MMC
 static void mmc_pinmux_setup(int sdc);
+#endif
+
+#ifdef CONFIG_OPENIPC
+/*
+ * Booted from an SD card (the -mmc images): that card is where the
+ * unbricking files are, so ub/uk/ur read them from it, as after srcmmc.
+ * Set for this boot only, not saved: the next boot from the SPI NOR keeps
+ * the environment's source.
+ */
+static void openipc_boot_source(void)
+{
+	if (sunxi_get_boot_device() != BOOT_DEVICE_MMC1)
+		return;
+
+	printf("OpenIPC: booted from the SD card, update source: fatload mmc 0\n");
+	env_set("source", "fatload mmc 0");
+}
 #endif
 
 /* add board specific code here */
@@ -881,11 +897,9 @@ int misc_init_r(void)
 
 #ifdef CONFIG_OPENIPC
 	openipc_helper();
-#endif
-
 	/* after the helper, which may save the default environment */
-	if (IS_ENABLED(CONFIG_MACH_SUN8I_V831))
-		v83x_boot_source();
+	openipc_boot_source();
+#endif
 
 	return 0;
 }

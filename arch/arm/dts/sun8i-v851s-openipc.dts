@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * A V851s IP camera as OpenIPC boots it: console on UART0 (PH9/PH10),
+ * SPI NOR on SPI0 (PC0-PC5), the SD card on SMHC0 (PF0-PF5).
+ */
+
+/dts-v1/;
+
+#include "sun8i-v851s.dtsi"
+
+/ {
+	model = "OpenIPC V851s";
+	compatible = "openipc,v851s", "allwinner,sun8i-v851s";
+
+	aliases {
+		serial0 = &uart0;
+		spi0 = &spi0;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+};
+
+&mmc0 {
+	bus-width = <4>;
+	broken-cd;
+	status = "okay";
+};
+
+&spi0 {
+	status = "okay";
+
+	flash@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <50000000>;
+	};
+};
+
+&uart0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart0_ph_pins>;
+	status = "okay";
+};

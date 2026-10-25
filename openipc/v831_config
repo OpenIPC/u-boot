@@ -1,6 +1,17 @@
 # V831: 64 MiB of DDR2 in the package, the vendor's parameters (the
 # v831 reference boards' sys_config.fex, the same on every V831 flash seen)
 CONFIG_PRODUCT_SOC="v831"
+CONFIG_MACH_SUN8I_V831=y
+CONFIG_DEFAULT_DEVICE_TREE="sun8i-v831-openipc"
+CONFIG_IDENT_STRING=" Allwinner V83x"
+# SPL stack: the end of SRAM A2, as on the H6
+CONFIG_SPL_STACK=0x118000
+# Kernel hand-off: non-secure, PSCI 1.0 from U-Boot's own monitor, as
+# the vendor kernels expect from OP-TEE
+CONFIG_ARMV7_NONSEC=y
+CONFIG_ARMV7_PSCI=y
+CONFIG_ARMV7_PSCI_1_0=y
+CONFIG_ARMV7_PSCI_NR_CPUS=1
 CONFIG_DRAM_CLK=528
 CONFIG_DRAM_ZQ=3065
 CONFIG_DRAM_SUN8I_V831_TYPE=2

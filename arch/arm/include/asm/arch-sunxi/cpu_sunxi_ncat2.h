@@ -1,0 +1,56 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
+/*
+ * The D1/T113 ("NCAT2") memory map: V851s here. From mainline's
+ * cpu_sunxi_ncat2.h (2023), with the names this tree's sunxi code uses.
+ */
+
+#ifndef _SUNXI_CPU_SUNXI_NCAT2_H
+#define _SUNXI_CPU_SUNXI_NCAT2_H
+
+#define SUNXI_SRAM_A1_BASE		CONFIG_SUNXI_SRAM_ADDRESS
+
+#define SUNXI_PIO_BASE			0x02000000
+#define SUNXI_CCM_BASE			0x02001000
+#define SUNXI_TIMER_BASE		0x02050000
+
+#define SUNXI_UART0_BASE		0x02500000
+#define SUNXI_UART1_BASE		0x02500400
+#define SUNXI_UART2_BASE		0x02500800
+#define SUNXI_UART3_BASE		0x02500C00
+
+#define SUNXI_TWI0_BASE			0x02502000
+#define SUNXI_TWI1_BASE			0x02502400
+#define SUNXI_TWI2_BASE			0x02502800
+#define SUNXI_TWI3_BASE			0x02502C00
+
+#define SUNXI_SRAMC_BASE		0x03000000
+/* SID address space starts at 0x03006000, but e-fuse is at offset 0x200 */
+#define SUNXI_SIDC_BASE			0x03006000
+#define SUNXI_SID_BASE			0x03006200
+#define SUNXI_GIC400_BASE		0x03020000
+
+#define SUNXI_DRAM_COM_BASE		0x03102000
+#define SUNXI_DRAM_PHY_BASE		0x03103000
+
+#define SUNXI_MMC0_BASE			0x04020000
+#define SUNXI_MMC1_BASE			0x04021000
+#define SUNXI_MMC2_BASE			0x04022000
+
+#define SUNXI_SPI0_BASE			0x04025000
+#define SUNXI_GMAC_BASE			0x04500000
+
+#define SUNXI_R_CPUCFG_BASE		0x07000400
+#define SUNXI_PRCM_BASE			0x07010000
+#define SUNXI_R_PIO_BASE		0x07022000
+#define SUNXI_R_UART_BASE		0x07080000
+#define SUNXI_RTC_BASE			0x07090000
+
+#define SUNXI_CPUCFG_BASE		0x09010000
+
+#ifndef __ASSEMBLY__
+void sunxi_board_init(void);
+void sunxi_reset(void);
+int sunxi_get_sid(unsigned int *sid);
+#endif
+
+#endif /* _SUNXI_CPU_SUNXI_NCAT2_H */

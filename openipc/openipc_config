@@ -1,11 +1,8 @@
-# OpenIPC base configuration for the Allwinner V831/V833 targets. build.sh
+# OpenIPC base configuration for the Allwinner targets. build.sh
 # appends the per-SoC fragment and runs olddefconfig, so a later line
 # overrides an earlier one.
 CONFIG_ARM=y
 CONFIG_ARCH_SUNXI=y
-CONFIG_MACH_SUN8I_V831=y
-CONFIG_DEFAULT_DEVICE_TREE="sun8i-v831-openipc"
-CONFIG_IDENT_STRING=" Allwinner V83x"
 CONFIG_CC_OPTIMIZE_FOR_SIZE=y
 # 32 MiB into the DDR: below what the smallest part (64 MiB) has
 CONFIG_SYS_TEXT_BASE=0x42000000
@@ -21,8 +18,6 @@ CONFIG_MISC_INIT_R=y
 # SPL: the boot ROM loads it from SPI NOR offset 0 (eGON.BT0) into SRAM;
 # it brings up clocks and DDR, then loads U-Boot from offset 0x8000
 CONFIG_SPL=y
-# end of SRAM A2, as on the H6
-CONFIG_SPL_STACK=0x118000
 CONFIG_SPL_SPI_SUNXI=y
 CONFIG_SYS_SPI_U_BOOT_OFFS=0x8000
 # U-Boot is LZMA-packed (build.sh), to fit the 256 KiB boot partition
@@ -35,12 +30,11 @@ CONFIG_SPL_LZMA=y
 # CONFIG_SPL_DOS_PARTITION is not set
 # CONFIG_SPL_EFI_PARTITION is not set
 
-# Kernel hand-off: non-secure, PSCI 1.0 from U-Boot's own monitor, as
-# the vendor kernels expect from OP-TEE
-CONFIG_ARMV7_NONSEC=y
-CONFIG_ARMV7_PSCI=y
-CONFIG_ARMV7_PSCI_1_0=y
-CONFIG_ARMV7_PSCI_NR_CPUS=1
+# Kernel hand-off: ATAGs for the kernels with their device tree appended
+# (V3s, V851s); the V831/V833 fragments add theirs
+CONFIG_SUPPORT_PASSING_ATAGS=y
+CONFIG_SETUP_MEMORY_TAGS=y
+CONFIG_CMDLINE_TAG=y
 
 # Console: UART0
 CONFIG_CONS_INDEX=1

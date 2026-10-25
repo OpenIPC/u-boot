@@ -52,12 +52,23 @@
 #define SUNXI_GPIO_M	12
 #define SUNXI_GPIO_N	13
 
+#ifdef CONFIG_SUNXI_NEW_PINCTRL
+/* D1/T113 (NCAT2): four drive registers, 4 bits a pin; banks 0x30 apart */
+struct sunxi_gpio {
+	u32 cfg[4];
+	u32 dat;
+	u32 drv[4];
+	u32 pull[2];
+	u32 res;
+};
+#else
 struct sunxi_gpio {
 	u32 cfg[4];
 	u32 dat;
 	u32 drv[2];
 	u32 pull[2];
 };
+#endif
 
 /* gpio interrupt control */
 struct sunxi_gpio_int {
@@ -69,7 +80,11 @@ struct sunxi_gpio_int {
 
 struct sunxi_gpio_reg {
 	struct sunxi_gpio gpio_bank[SUNXI_GPIO_BANKS];
+#ifdef CONFIG_SUNXI_NEW_PINCTRL
+	u8 res[0x50];
+#else
 	u8 res[0xbc];
+#endif
 	struct sunxi_gpio_int gpio_int;
 };
 
@@ -86,8 +101,13 @@ struct sunxi_gpio_reg {
 #define GPIO_CFG_INDEX(pin)	(((pin) & 0x1f) >> 3)
 #define GPIO_CFG_OFFSET(pin)	((((pin) & 0x1f) & 0x7) << 2)
 
+#ifdef CONFIG_SUNXI_NEW_PINCTRL
+#define GPIO_DRV_INDEX(pin)	(((pin) & 0x1f) >> 3)
+#define GPIO_DRV_OFFSET(pin)	((((pin) & 0x1f) & 0x7) << 2)
+#else
 #define GPIO_DRV_INDEX(pin)	(((pin) & 0x1f) >> 4)
 #define GPIO_DRV_OFFSET(pin)	((((pin) & 0x1f) & 0xf) << 1)
+#endif
 
 #define GPIO_PULL_INDEX(pin)	(((pin) & 0x1f) >> 4)
 #define GPIO_PULL_OFFSET(pin)	((((pin) & 0x1f) & 0xf) << 1)
@@ -133,7 +153,12 @@ enum sunxi_gpio_number {
 /* GPIO pin function config */
 #define SUNXI_GPIO_INPUT	0
 #define SUNXI_GPIO_OUTPUT	1
+/* the D1 generation's 4-bit function fields: 0xf is "IO disabled" */
+#ifdef CONFIG_SUNXI_NEW_PINCTRL
+#define SUNXI_GPIO_DISABLE	0xf
+#else
 #define SUNXI_GPIO_DISABLE	7
+#endif
 
 #define SUN8I_H3_GPA_UART0	2
 #define SUN8I_H3_GPA_UART2	2
@@ -188,6 +213,7 @@ enum sunxi_gpio_number {
 #define SUN50I_H6_GPH_UART0	2
 #define SUN50I_H616_GPH_UART0	2
 #define SUN8I_V831_GPH_UART0	5
+#define SUN8I_V851S_GPH_UART0	5
 
 #define SUNXI_GPI_SDC3		2
 

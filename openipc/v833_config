@@ -2,6 +2,17 @@
 # lindenis board's sys_config.fex); tpr13 bit 0 clear: the rank, width
 # and size are scanned
 CONFIG_PRODUCT_SOC="v833"
+CONFIG_MACH_SUN8I_V831=y
+CONFIG_DEFAULT_DEVICE_TREE="sun8i-v831-openipc"
+CONFIG_IDENT_STRING=" Allwinner V83x"
+# SPL stack: the end of SRAM A2, as on the H6
+CONFIG_SPL_STACK=0x118000
+# Kernel hand-off: non-secure, PSCI 1.0 from U-Boot's own monitor, as
+# the vendor kernels expect from OP-TEE
+CONFIG_ARMV7_NONSEC=y
+CONFIG_ARMV7_PSCI=y
+CONFIG_ARMV7_PSCI_1_0=y
+CONFIG_ARMV7_PSCI_NR_CPUS=1
 CONFIG_DRAM_CLK=792
 CONFIG_DRAM_ZQ=3067
 CONFIG_DRAM_SUN8I_V831_TYPE=3

@@ -73,13 +73,20 @@
 #define SUN6I_CTL_MASTER            BIT(1)
 #define SUN6I_CTL_SRST              BIT(31)
 #define SUN6I_TCR_XCH               BIT(31)
+#define SUN6I_TCR_SDM               BIT(13)
 
 /*****************************************************************************/
 
 #define CCM_AHB_GATING0             (0x01C20000 + 0x60)
-#define CCM_H6_SPI_BGR_REG          (0x03001000 + 0x96c)
-#if defined(CONFIG_MACH_SUN50I_H6) || defined(CONFIG_MACH_SUN8I_V831)
-#define CCM_SPI0_CLK                (0x03001000 + 0x940)
+#ifdef CONFIG_SUNXI_GEN_NCAT2
+#define CCM_H6_BASE                 0x02001000
+#else
+#define CCM_H6_BASE                 0x03001000
+#endif
+#define CCM_H6_SPI_BGR_REG          (CCM_H6_BASE + 0x96c)
+#if defined(CONFIG_MACH_SUN50I_H6) || defined(CONFIG_MACH_SUN8I_V831) || \
+    defined(CONFIG_SUNXI_GEN_NCAT2)
+#define CCM_SPI0_CLK                (CCM_H6_BASE + 0x940)
 #else
 #define CCM_SPI0_CLK                (0x01C20000 + 0xA0)
 #endif
@@ -100,11 +107,15 @@
  * The H6 uses PC0, PC2, PC3, PC5.
  */
 
-/* The V831/V833 have the H6's SPI controller, at the H6's address */
+/*
+ * The V831/V833 have the H6's SPI controller, at the H6's address; the
+ * NCAT2 SoCs (V851s) the same with their own CCU and SPI0 addresses.
+ */
 static bool is_h6_spi(void)
 {
 	return IS_ENABLED(CONFIG_MACH_SUN50I_H6) ||
-	       IS_ENABLED(CONFIG_MACH_SUN8I_V831);
+	       IS_ENABLED(CONFIG_MACH_SUN8I_V831) ||
+	       IS_ENABLED(CONFIG_SUNXI_GEN_NCAT2);
 }
 static void spi0_pinmux_setup(unsigned int pin_function)
 {
@@ -117,6 +128,12 @@ static void spi0_pinmux_setup(unsigned int pin_function)
 		sunxi_gpio_set_cfgpin(SUNXI_GPC(1), pin_function);
 	else
 		sunxi_gpio_set_cfgpin(SUNXI_GPC(5), pin_function);
+
+	/* The V851s boot ROM sets up all of PC0-PC5 (with HOLD, WP) */
+	if (IS_ENABLED(CONFIG_MACH_SUN8I_V851S)) {
+		sunxi_gpio_set_cfgpin(SUNXI_GPC(4), pin_function);
+		sunxi_gpio_set_cfgpin(SUNXI_GPC(5), pin_function);
+	}
 
 	/* Older generations use PC23 for CS, newer ones use PC3. */
 	if (IS_ENABLED(CONFIG_MACH_SUN4I) || IS_ENABLED(CONFIG_MACH_SUN7I) ||
@@ -135,6 +152,9 @@ static uintptr_t spi0_base_address(void)
 {
 	if (IS_ENABLED(CONFIG_MACH_SUN8I_R40))
 		return 0x01C05000;
+
+	if (IS_ENABLED(CONFIG_SUNXI_GEN_NCAT2))
+		return 0x04025000;
 
 	if (is_h6_spi())
 		return 0x05010000;
@@ -168,9 +188,10 @@ static void spi0_enable_clock(void)
 		/* Divide by 32, clock source is AHB clock 200MHz */
 		writel(SPI0_CLK_DIV_BY_32, base + SUN6I_SPI0_CCTL);
 	} else {
-		/* Divide by 4 */
-		writel(SPI0_CLK_DIV_BY_4, base + (is_sun6i_gen_spi() ?
-					  SUN6I_SPI0_CCTL : SUN4I_SPI0_CCTL));
+		/* Divide by 4; NCAT2 controllers have no divider inside */
+		if (!IS_ENABLED(CONFIG_SUNXI_GEN_NCAT2))
+			writel(SPI0_CLK_DIV_BY_4, base + (is_sun6i_gen_spi() ?
+				SUN6I_SPI0_CCTL : SUN4I_SPI0_CCTL));
 		/* 24MHz from OSC24M */
 		writel((1 << 31), CCM_SPI0_CLK);
 	}
@@ -182,6 +203,13 @@ static void spi0_enable_clock(void)
 		/* Wait for completion */
 		while (readl(base + SUN6I_SPI0_GCR) & SUN6I_CTL_SRST)
 			;
+
+		/*
+		 * NCAT2: the sample mode depends on the input clock; from
+		 * the 24 MHz OSC24M, normal sampling (TCR SDM)
+		 */
+		if (IS_ENABLED(CONFIG_SUNXI_GEN_NCAT2))
+			setbits_le32(base + SUN6I_SPI0_TCR, SUN6I_TCR_SDM);
 	} else {
 		/* Enable SPI in the master mode and reset FIFO */
 		setbits_le32(base + SUN4I_SPI0_CTL, SUN4I_CTL_MASTER |

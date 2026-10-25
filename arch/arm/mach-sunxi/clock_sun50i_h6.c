@@ -25,8 +25,10 @@ void clock_init_safe(void)
 		clrsetbits_le32(SUNXI_CCM_BASE + 0x400, 0x7 << 28, 0x1 << 28);
 	}
 
-	clrbits_le32(&prcm->res_cal_ctrl, 1);
-	setbits_le32(&prcm->res_cal_ctrl, 1);
+	if (!IS_ENABLED(CONFIG_SUNXI_GEN_NCAT2)) {
+		clrbits_le32(&prcm->res_cal_ctrl, 1);
+		setbits_le32(&prcm->res_cal_ctrl, 1);
+	}
 
 	if (IS_ENABLED(CONFIG_MACH_SUN50I_H6)) {
 		/* set key field for ldo enable */
@@ -46,7 +48,9 @@ void clock_init_safe(void)
 			CCM_CPU_AXI_DEFAULT_FACTORS);
 
 	writel(CCM_PSI_AHB1_AHB2_DEFAULT, &ccm->psi_ahb1_ahb2_cfg);
+#ifdef CCM_AHB3_DEFAULT
 	writel(CCM_AHB3_DEFAULT, &ccm->ahb3_cfg);
+#endif
 	writel(CCM_APB1_DEFAULT, &ccm->apb1_cfg);
 
 	if (IS_ENABLED(CONFIG_MACH_SUN8I_V831)) {
@@ -104,6 +108,9 @@ void clock_set_pll1(unsigned int clk)
 #ifdef CONFIG_MACH_SUN50I_H616
 	       CCM_PLL1_OUT_EN |
 #endif
+#ifdef CONFIG_SUNXI_GEN_NCAT2
+	       CCM_PLL1_OUT_EN | CCM_PLL1_LDO_EN |
+#endif
 	       CCM_PLL1_CTRL_N(clk / 24000000), &ccm->pll1_cfg);
 	while (!(readl(&ccm->pll1_cfg) & CCM_PLL1_LOCK)) {}
 
@@ -127,6 +134,13 @@ unsigned int clock_get_pll6(void)
 			CCM_PLL6_CTRL_DIV1_SHIFT) + 1;
 	int div2 = ((rval & CCM_PLL6_CTRL_DIV2_MASK) >>
 			CCM_PLL6_CTRL_DIV2_SHIFT) + 1;
+
+	/* NCAT2: P0 divides PLL_PERI0 (1X), as mainline's R528 code does */
+	if (IS_ENABLED(CONFIG_SUNXI_GEN_NCAT2)) {
+		div1 = ((rval & CCM_PLL6_CTRL_P0_MASK) >>
+			CCM_PLL6_CTRL_P0_SHIFT) + 1;
+		m = 1;
+	}
 	/* The register defines PLL6-2X or PLL6-4X, not plain PLL6 */
 	return 24000000 / m * n / div1 / div2;
 }

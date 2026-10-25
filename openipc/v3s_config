@@ -1,0 +1,9 @@
+# V3s: 64 MiB of DDR2 in the package, mainline's V3s DRAM driver
+# (dram_sunxi_dw, SUNXI_DRAM_DDR2_V3S) at mainline's 360 MHz
+CONFIG_PRODUCT_SOC="v3s"
+CONFIG_MACH_SUN8I_V3S=y
+CONFIG_DEFAULT_DEVICE_TREE="sun8i-v3s-openipc"
+CONFIG_IDENT_STRING=" Allwinner V3s"
+CONFIG_DRAM_CLK=360
+# SPL stack: the end of the first 32 KiB of SRAM, as on the LicheePi Zero
+CONFIG_SPL_STACK=0x8000

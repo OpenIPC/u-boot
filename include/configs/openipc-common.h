@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 /*
- * Common OpenIPC configuration for the Allwinner V831/V833 targets.
+ * Common OpenIPC configuration for the Allwinner targets.
  *
  * The single place for the default environment, kept in step with
  * include/configs/openipc-common.h on the openipc-hisilicon branch: the
@@ -26,10 +26,9 @@
 /*
  * Kernel memory (mem=): all of the DDR in the package, as the vendor
  * U-Boot leaves it (it passes no mem=); the vendor media drivers take
- * their buffers from the kernel's CMA. DDR3 is the V833's 128 MiB, DDR2
- * the V831's 64 MiB.
+ * their buffers from the kernel's CMA.
  */
-#if CONFIG_DRAM_SUN8I_V831_TYPE == 3
+#if PHYS_SDRAM_1_SIZE == 0x08000000
 #define OPENIPC_OSMEM		"128M"
 #else
 #define OPENIPC_OSMEM		"64M"

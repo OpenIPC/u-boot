@@ -56,6 +56,12 @@ config DRAM_SUN8I_V831
 	help
 	  Select this dram controller driver for the V831/V833 (sun8iw19).
 
+config DRAM_SUN20I_D1
+	bool
+	help
+	  Select this dram controller driver for the D1/R528/T113s/V851s
+	  (from mainline U-Boot's drivers/ram/sunxi/dram_sun20i_d1.c).
+
 if DRAM_SUN50I_H616
 config DRAM_SUN50I_H616_WRITE_LEVELING
 	bool "H616 DRAM write leveling"
@@ -107,7 +113,7 @@ config AXP_PMIC_BUS
 config SUNXI_SRAM_ADDRESS
 	hex
 	default 0x10000 if MACH_SUN9I || MACH_SUN50I || MACH_SUN50I_H5
-	default 0x20000 if SUN50I_GEN_H6
+	default 0x20000 if SUN50I_GEN_H6 || SUNXI_GEN_NCAT2
 	default 0x0
 	---help---
 	Older Allwinner SoCs have their mask boot ROM mapped just below 4GB,
@@ -142,6 +148,20 @@ config SUN50I_GEN_H6
 	---help---
 	Select this for sunxi SoCs which have H6 like peripherals, clocks
 	and memory map.
+
+config SUNXI_GEN_NCAT2
+	bool
+	select MMC_SUNXI_HAS_NEW_MODE
+	select SUPPORT_SPL
+	---help---
+	Select this for sunxi SoCs which have D1 like peripherals, clocks
+	and memory map.
+
+config SUNXI_NEW_PINCTRL
+	bool
+	---help---
+	The D1 generation's PIO: banks 0x30 apart, four bits a pin for the
+	drive strength.
 
 config SUNXI_DRAM_DW
 	bool
@@ -331,6 +351,20 @@ config MACH_SUN8I_V831
 	  peripherals, clocks and memory map, with DDR2 (V831, 64 MiB) or
 	  DDR3 (V833, 128 MiB) in the package.
 
+config MACH_SUN8I_V851S
+	bool "sun8i (Allwinner V851s/V853)"
+	select CPU_V7A
+	select CPU_V7_HAS_NONSEC
+	select CPU_V7_HAS_VIRT
+	select ARCH_SUPPORT_PSCI
+	select SPL_ARMV7_SET_CORTEX_SMPEN
+	select SUNXI_GEN_NCAT2
+	select SUNXI_NEW_PINCTRL
+	select DRAM_SUN20I_D1
+	help
+	  The V851s (sun8iw21): one Cortex-A7 with the D1's peripherals,
+	  clocks and memory map, and 64 MiB of DDR2 in the package.
+
 config MACH_SUN9I
 	bool "sun9i (Allwinner A80)"
 	select CPU_V7A
@@ -480,7 +514,7 @@ config DRAM_TYPE
 config DRAM_CLK
 	int "sunxi dram clock speed"
 	default 792 if MACH_SUN9I
-	default 528 if MACH_SUN8I_V831
+	default 528 if MACH_SUN8I_V831 || MACH_SUN8I_V851S
 	default 648 if MACH_SUN8I_R40
 	default 312 if MACH_SUN6I || MACH_SUN8I
 	default 360 if MACH_SUN4I || MACH_SUN5I || MACH_SUN7I || \
@@ -510,6 +544,7 @@ config DRAM_ZQ
 	default 127 if MACH_SUN7I
 	default 14779 if MACH_SUN8I_V3S
 	default 3065 if MACH_SUN8I_V831
+	default 8092665 if MACH_SUN8I_V851S
 	default 3881979 if MACH_SUNXI_H3_H5 || MACH_SUN8I_R40 || MACH_SUN50I_H6
 	default 4145117 if MACH_SUN9I
 	default 3881915 if MACH_SUN50I
@@ -526,6 +561,42 @@ config DRAM_ODT_EN
 	default y if MACH_SUN50I_H616
 	---help---
 	Select this to enable dram odt (on die termination).
+
+if DRAM_SUN20I_D1
+
+# The defaults are OpenIPC's hardware-tested V851s U-Boot's (64 MiB DDR2)
+config DRAM_SUNXI_ODT_EN
+	hex "DRAM ODT EN parameter"
+	default 0x0
+
+config DRAM_SUNXI_PARA1
+	hex "DRAM PARA1 parameter"
+	default 0xd2
+
+config DRAM_SUNXI_MR1
+	hex "DRAM MR1 parameter"
+	default 0x2
+
+config DRAM_SUNXI_TPR11
+	hex "DRAM TPR11 parameter"
+	default 0x22
+
+config DRAM_SUNXI_TPR12
+	hex "DRAM TPR12 parameter"
+	default 0x77
+
+config DRAM_SUNXI_TPR13
+	hex "DRAM TPR13 parameter"
+	default 0x34000100
+	help
+	  TPR13 value from vendor DRAM settings. It tells which features
+	  should be configured.
+
+config SUNXI_DRAM_TYPE
+	int "DRAM type: 2 DDR2, 3 DDR3, 6 LPDDR2, 7 LPDDR3"
+	default 2
+
+endif
 
 if DRAM_SUN8I_V831
 # The vendor's dram_para words (boot0 header, sys_config.fex [dram_para]).
@@ -690,19 +761,20 @@ config SYS_CLK_FREQ
 	default 912000000 if MACH_SUN7I
 	default 816000000 if MACH_SUN50I || MACH_SUN50I_H5
 	default 816000000 if MACH_SUN8I_V831
+	default 912000000 if MACH_SUN8I_V851S
 	default 1008000000 if MACH_SUN8I
 	default 1008000000 if MACH_SUN9I
 	default 888000000 if MACH_SUN50I_H6
 	default 1008000000 if MACH_SUN50I_H616
 
 config SYS_CONFIG_NAME
+	default "openipc-sunxi" if OPENIPC
 	default "suniv" if MACH_SUNIV
 	default "sun4i" if MACH_SUN4I
 	default "sun5i" if MACH_SUN5I
 	default "sun6i" if MACH_SUN6I
 	default "sun7i" if MACH_SUN7I
 	default "sun8i" if MACH_SUN8I
-	default "v83x" if MACH_SUN8I_V831
 	default "sun9i" if MACH_SUN9I
 	default "sun50i" if MACH_SUN50I
 	default "sun50i" if MACH_SUN50I_H6
@@ -873,6 +945,7 @@ config VIDEO_SUNXI
 	depends on !MACH_SUN9I
 	depends on !MACH_SUN50I
 	depends on !SUN50I_GEN_H6
+	depends on !SUNXI_GEN_NCAT2
 	select DM_VIDEO
 	select DISPLAY
 	imply VIDEO_DT_SIMPLEFB
@@ -1091,14 +1164,14 @@ config SPL_STACK_R_ADDR
 	default 0x4fe00000 if MACH_SUN6I
 	default 0x4fe00000 if MACH_SUN7I
 	default 0x4fe00000 if MACH_SUN8I
-	default 0x43e00000 if MACH_SUN8I_V831
+	default 0x43e00000 if MACH_SUN8I_V831 || MACH_SUN8I_V851S
 	default 0x2fe00000 if MACH_SUN9I
 	default 0x4fe00000 if MACH_SUN50I
 	default 0x4fe00000 if SUN50I_GEN_H6
 
 config SPL_SPI_SUNXI
 	bool "Support for SPI Flash on Allwinner SoCs in SPL"
-	depends on MACH_SUN4I || MACH_SUN5I || MACH_SUN7I || MACH_SUNXI_H3_H5 || MACH_SUN50I || MACH_SUN8I_R40 || MACH_SUN50I_H6 || MACH_SUNIV || MACH_SUN8I_V831
+	depends on MACH_SUN4I || MACH_SUN5I || MACH_SUN7I || MACH_SUNXI_H3_H5 || MACH_SUN50I || MACH_SUN8I_R40 || MACH_SUN50I_H6 || MACH_SUNIV || MACH_SUN8I_V831 || MACH_SUN8I_V3S || MACH_SUN8I_V851S
 	help
 	  Enable support for SPI Flash. This option allows SPL to read from
 	  sunxi SPI Flash. It uses the same method as the boot ROM, so does
