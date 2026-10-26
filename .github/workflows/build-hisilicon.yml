@@ -131,11 +131,17 @@ jobs:
       # there is nothing to download. Keyed on the image, so a new image
       # starts a new cache rather than restoring packages it may not want;
       # bump the trailing version when the package list below changes.
+      # ImageOS/ImageVersion are the runner's environment, which the
+      # expression context cannot see: read them in a shell.
+      - name: Runner image
+        id: image
+        run: echo "id=${ImageOS:-unknown}-${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+
       - name: Cache apt archives
         uses: actions/cache@v4
         with:
           path: ~/apt-archives
-          key: apt-${{ runner.os }}-${{ env.ImageOS }}-${{ env.ImageVersion }}-${{ matrix.soc == 'hi3519dv500' && 'arm64' || 'arm' }}-v1
+          key: apt-${{ runner.os }}-${{ steps.image.outputs.id }}-${{ matrix.soc == 'hi3519dv500' && 'arm64' || 'arm' }}-v1
 
       - name: Install dependencies
         timeout-minutes: 25
@@ -159,10 +165,21 @@ jobs:
               u-boot-tools device-tree-compiler \
               bison flex bc lzop libssl-dev python3 python3-pip
           }
+          # A slow mirror trickles rather than going idle, so the timeouts
+          # above do not move apt off it: a retry points the runner's
+          # mirrorlist (which its sources read) at another mirror instead.
+          mirrors="http://archive.ubuntu.com/ubuntu/ http://mirrors.edge.kernel.org/ubuntu/"
           for i in 1 2 3; do
             install && break
             [ "$i" = 3 ] && { echo "apt failed after 3 attempts" >&2; exit 1; }
-            echo "apt attempt $i failed/timed out; retrying in $((i*10))s" >&2
+            m=$(echo $mirrors | cut -d' ' -f$i)
+            echo "apt attempt $i failed/timed out; retrying in $((i*10))s from $m" >&2
+            if [ -f /etc/apt/apt-mirrors.txt ]; then
+              echo "$m" | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+            else
+              sudo sed -i "s|http://azure.archive.ubuntu.com/ubuntu/\?|$m|g" \
+                /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true
+            fi
             sleep $((i*10))
           done
           # apt ran as root; the cache step saves as the runner user.
