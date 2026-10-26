@@ -1,9 +1,9 @@
 #ifndef _SPI020_H_
 #define _SPI020_H_
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+/* string.c: nsboot has no C library */
+extern void *memcpy(void *dst, const void *src, unsigned int n);
+extern void memset(void *dst, unsigned char val, unsigned int n);
 #include "spi_flash.h"
 
 #define FTSPI020_DMA_TX_CH  0

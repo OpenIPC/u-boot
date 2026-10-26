@@ -34,7 +34,9 @@ LD = $(CROSS_COMPILE)ld
 NM = $(CROSS_COMPILE)nm
 OBJCOPY = $(CROSS_COMPILE)objcopy
 
-CFLAGS = -Wall -O2 -ffunction-sections -fdata-sections -fno-exceptions -fno-builtin\
+# Freestanding: only the compiler's own headers (stdarg.h, stddef.h)
+CFLAGS = -nostdinc -isystem $(shell $(CC) -print-file-name=include) -ffreestanding \
+	 -Wall -O2 -ffunction-sections -fdata-sections -fno-exceptions -fno-builtin\
 	 -march=armv4 -msoft-float -fno-stack-protector -fno-pie
 
 LDFLAGS = -Wl,-T,$(LINK_SCRIPT) -Wl,-Ttext,$(TEXT_START_ADDR) -Wl,--gc-sections -nostartfiles
