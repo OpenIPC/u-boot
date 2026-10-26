@@ -124,25 +124,50 @@ jobs:
         with:
           python-version: '3.12'
 
+      # The .debs, cached: every leg installed the same ~94 MB from the
+      # runner's mirror, and that mirror stalls -- a 13 MB package sat for
+      # three minutes, the attempt was killed, and with 40-odd legs a run
+      # rarely finished without one of them timing out. With the cache warm
+      # there is nothing to download. Keyed on the image, so a new image
+      # starts a new cache rather than restoring packages it may not want;
+      # bump the trailing version when the package list below changes.
+      - name: Cache apt archives
+        uses: actions/cache@v4
+        with:
+          path: ~/apt-archives
+          key: apt-${{ runner.os }}-${{ env.ImageOS }}-${{ env.ImageVersion }}-${{ matrix.soc == 'hi3519dv500' && 'arm64' || 'arm' }}-v1
+
       - name: Install dependencies
-        timeout-minutes: 15
+        timeout-minutes: 25
         run: |
-          # apt mirrors on hosted runners intermittently HANG on the
-          # mirrorlist fetch (not just fail). Bound each attempt with its own
-          # `timeout` so a hang is killed fast and the retry actually fires.
+          # apt mirrors on hosted runners intermittently hang on the
+          # mirrorlist fetch, not just fail: each attempt keeps its own
+          # `timeout`, so a hang is killed and the retry actually fires.
+          # Only hi3519dv500 is arm64; the other legs need no aarch64 compiler,
+          # which was half of what each of them downloaded.
+          cross=gcc-arm-linux-gnueabi
+          [ "${{ matrix.soc }}" = hi3519dv500 ] && cross="$cross gcc-aarch64-linux-gnu"
+          mkdir -p ~/apt-archives/partial
+          # A stalled download should fail over to the next mirror in the
+          # runner's mirrorlist, not sit until the attempt is killed: apt's
+          # default wait is two minutes per connection.
+          apt_opts="-o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=3 -o Dir::Cache::Archives=$HOME/apt-archives"
           install() {
-            sudo timeout 180 apt-get update && \
-            sudo timeout 240 apt-get install -y --no-install-recommends \
-              build-essential gcc-arm-linux-gnueabi gcc-aarch64-linux-gnu \
+            sudo timeout 180 apt-get $apt_opts update && \
+            sudo timeout 300 apt-get $apt_opts install -y --no-install-recommends \
+              build-essential $cross \
               u-boot-tools device-tree-compiler \
               bison flex bc lzop libssl-dev python3 python3-pip
           }
-          for i in 1 2 3 4; do
+          for i in 1 2 3; do
             install && break
-            [ "$i" = 4 ] && { echo "apt failed after 4 attempts" >&2; exit 1; }
+            [ "$i" = 3 ] && { echo "apt failed after 3 attempts" >&2; exit 1; }
             echo "apt attempt $i failed/timed out; retrying in $((i*10))s" >&2
             sleep $((i*10))
           done
+          # apt ran as root; the cache step saves as the runner user.
+          sudo rm -rf ~/apt-archives/partial ~/apt-archives/lock
+          sudo chown -R "$(id -u):$(id -g)" ~/apt-archives
           python3 -m pip install --upgrade pip
           python3 -m pip install pycryptodome
           # vendor recipes rely on bash features when invoked as /bin/sh
