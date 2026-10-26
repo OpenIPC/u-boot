@@ -1,0 +1,2 @@
+# The vendor ramboots are binaries: no end-of-line conversion
+*.ramboot binary
