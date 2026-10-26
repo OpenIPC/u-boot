@@ -453,5 +453,12 @@ const struct flash_info spi_nor_ids[] = {
 	/* XTX Technology (Shenzhen) Limited */
 	{ INFO("xt25f128b", 0x0b4018, 0, 64 * 1024, 256, SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
 #endif
+#ifdef CONFIG_SPI_FLASH_BOYA
+	/* Boya Microelectronics */
+	{ INFO("by25q16a", 0x684015, 0, 64 * 1024, 32, SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
+	{ INFO("by25q32bs", 0x684016, 0, 64 * 1024, 64, SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
+	{ INFO("by25q64as", 0x684017, 0, 64 * 1024, 128, SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
+	{ INFO("by25q128as", 0x684018, 0, 64 * 1024, 256, SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
+#endif
 	{ },
 };
