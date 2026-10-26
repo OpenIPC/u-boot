@@ -182,17 +182,55 @@ void designware_board_adjust_link(struct phy_device *phydev)
 		clrbits_le32(FH_PMU_SYS_CTRL, FH_SYS_CTRL_MAC_100M);
 }
 
+#define PHY_ID_IP101G		0x02430c54
+#define PHY_ID_RTL8201		0x001cc816
+#define FH_SYS_CTRL_RMII_CLK	BIT(28)
+#define FH_SYS_CTRL_EXT_CLK	BIT(26)
+
+/* The external PHYs' own set-up, as the vendor GMAC_PhyInit() does it */
+static void fh_ext_phy_init(int addr, u32 id)
+{
+	if ((id & 0xfffffff0) == (PHY_ID_IP101G & 0xfffffff0)) {
+		fh_mdio_write(addr, 20, 16);
+		fh_mdio_write(addr, 16, 0x1006);
+#ifndef CONFIG_FH8632
+		fh_mdio_write(addr, 26, 0xc5ed);	/* RXD drive */
+#endif
+		fh_mdio_write(addr, 20, 16);
+	} else if ((id & 0xfffffff0) == (PHY_ID_RTL8201 & 0xfffffff0)) {
+		fh_mdio_write(addr, 31, 7);
+		fh_mdio_write(addr, 16, 0x1ffa);	/* RMII, clock in */
+		fh_mdio_write(addr, 31, 0);
+	}
+}
+
 #if defined(CONFIG_FH885XV200) || defined(CONFIG_FH865X)
 /*
- * The SoC's own 10/100 PHY (ID 0x00441400), which every V200 and FH865x
- * board uses: fh_in_out_phy_sel_init(), fh_inside_phy_reset() and the
- * register writes of the vendor's fh_gmac_phyt.c.
+ * V200 and FH865x boards have either an RMII PHY on the MAC pads (an
+ * FH8852V200 camera with a JL1101 is one) or use the SoC's own 10/100 PHY
+ * (ID 0x00441400). As the vendor's auto_find_phy() does, try the
+ * external one first -- the pads in their RMII functions, the internal PHY
+ * off, the PHY reset with RXDV strapped low -- and fall back to the
+ * internal one when nothing answers on MDIO. Unlike the vendor U-Boots,
+ * which take only the IDs on their list, any PHY that answers is taken.
  */
 #define FH_EPHY_REG0		(FH_PMU_BASE + 0x2108)
 #define FH_PMU_SWRSTN_NSR	(FH_PMU_BASE + 0x078)
 #define FH_PMU_EPHY_PARAM	(FH_PMU_BASE + 0x340)	/* trim, from eFuse */
-#define FH_SYS_CTRL_EPHY	BIT(28)
-#define FH_SYS_CTRL_EXT_CLK	BIT(26)
+
+#define FH_PHY_RESET_GPIO	29
+#define FH_PHY_RESET_PAD	64
+#define FH_RXDV_GPIO		54
+#define FH_RXDV_PAD		27
+
+/* RMII_CLK, REF_CLK (the 50 MHz out), TXD0/1, TXEN, RXD0/1, RXDV, MDC, MDIO */
+#define FH_RMII_PAD0		20
+#define FH_RMII_PADS		10
+
+static const u32 fh_rmii_pad_val[FH_RMII_PADS] = {
+	0x10001120, 0x10001120, 0x10001120, 0x10001120, 0x10001120,
+	0x10001120, 0x10001120, 0x10001120, 0x10001100, 0x10001100,
+};
 
 static const u16 fh_ephy_regs[][2] = {
 	{ 0x1f, 0x100 }, { 0x12, 0x4824 }, { 0x1f, 0x200 }, { 0x18, 0 },
@@ -201,13 +239,69 @@ static const u16 fh_ephy_regs[][2] = {
 	{ 0x1d, 0x844 }, { 0x1f, 0x600 }, { 0x15, 0x1320 },
 };
 
-static void fh_phy_setup(void)
+/* The MAC out of reset, at 100M until the link says otherwise */
+static void fh_gmac_reset(void)
+{
+	setbits_le32(FH_PMU_SYS_CTRL, FH_SYS_CTRL_MAC_100M | FH_SYS_CTRL_RMII_CLK);
+	fh_pmu_reset(FH_PMU_SWRST_AHB, FH_SWRST_GMAC);
+}
+
+static int fh_ext_phy_setup(void)
+{
+	u32 saved[FH_RMII_PADS + 1], id;
+	int i, addr;
+
+	for (i = 0; i < FH_RMII_PADS; i++) {
+		saved[i] = readl(FH_PMU_PAD(FH_RMII_PAD0 + i));
+		writel(fh_rmii_pad_val[i], FH_PMU_PAD(FH_RMII_PAD0 + i));
+	}
+	saved[FH_RMII_PADS] = readl(FH_PMU_PAD(FH_PHY_RESET_PAD));
+	writel(0x10001100, FH_PMU_PAD(FH_PHY_RESET_PAD));	/* GPIO29 */
+
+	/* fh_in_out_phy_sel_init(EXTERNAL_PHY): the internal PHY off */
+	clrbits_le32(FH_EPHY_REG0, BIT(24));
+	setbits_le32(FH_PMU_CLK_GATE1, BIT(0));
+	fh_pmu_update(FH_PMU_CLK_DIV6, 0xf000000, 1 << 24);	/* 50 MHz ref */
+	clrbits_le32(FH_PMU_CLK_GATE, BIT(25) | BIT(28));
+	setbits_le32(FH_PMU_SYS_CTRL, FH_SYS_CTRL_EXT_CLK);
+
+	/* fh_gmac_phy_reset(): RXDV is a strap, low through the reset */
+	writel(0x01001030, FH_PMU_PAD(FH_RXDV_PAD));
+	fh_gpio_output(FH_RXDV_GPIO, 0);
+	fh_gpio_output(FH_PHY_RESET_GPIO, 1);
+	mdelay(150);
+	fh_gpio_output(FH_PHY_RESET_GPIO, 0);
+	mdelay(10);
+	fh_gpio_output(FH_PHY_RESET_GPIO, 1);
+	writel(fh_rmii_pad_val[FH_RXDV_PAD - FH_RMII_PAD0],
+	       FH_PMU_PAD(FH_RXDV_PAD));
+	mdelay(10);
+
+	fh_gmac_reset();
+	addr = fh_phy_find(&id);
+	if (addr >= 0) {
+		printf("external PHY %08x at %d, ", id, addr);
+		fh_ext_phy_init(addr, id);
+		return 0;
+	}
+
+	/* Nothing there: the pads back as the board had them */
+	for (i = 0; i < FH_RMII_PADS; i++)
+		writel(saved[i], FH_PMU_PAD(FH_RMII_PAD0 + i));
+	writel(saved[FH_RMII_PADS], FH_PMU_PAD(FH_PHY_RESET_PAD));
+	return -ENODEV;
+}
+
+/*
+ * The internal PHY: fh_in_out_phy_sel_init(INTERNAL_PHY),
+ * fh_inside_phy_reset() and the register writes of fh_gmac_phyt.c
+ */
+static void fh_int_phy_setup(void)
 {
 	u32 trim, id;
 	int addr, i, r;
 
 	/* The MAC on the internal PHY, clocked from it */
-	setbits_le32(FH_PMU_SYS_CTRL, FH_SYS_CTRL_EPHY);
 	setbits_le32(FH_EPHY_REG0, BIT(24));
 	setbits_le32(FH_PMU_CLK_GATE, BIT(25) | BIT(28));
 	clrbits_le32(FH_PMU_CLK_GATE1, BIT(0));
@@ -225,13 +319,11 @@ static void fh_phy_setup(void)
 	fh_pmu_update(FH_EPHY_REG0, 0xf << 27,
 		      (trim & BIT(4) ? trim & 0xf : 0) << 27);
 
-	/* The MAC out of reset, at 100M until the link says otherwise */
-	setbits_le32(FH_PMU_SYS_CTRL, FH_SYS_CTRL_MAC_100M);
-	fh_pmu_reset(FH_PMU_SWRST_AHB, FH_SWRST_GMAC);
-
+	fh_gmac_reset();
 	addr = fh_phy_find(&id);
 	if (addr < 0)
 		return;
+	printf("internal PHY %08x at %d, ", id, addr);
 	for (i = 0; i < ARRAY_SIZE(fh_ephy_regs); i++)
 		fh_mdio_write(addr, fh_ephy_regs[i][0], fh_ephy_regs[i][1]);
 	r = fh_mdio_read(addr, 0x15);
@@ -239,6 +331,12 @@ static void fh_phy_setup(void)
 		fh_mdio_write(addr, 0x15,
 			      (r & ~0x1f1f) | 0x1000 | 0x1f | BIT(13));
 	fh_mdio_write(addr, 0x1f, 0);
+}
+
+static void fh_phy_setup(void)
+{
+	if (fh_ext_phy_setup())
+		fh_int_phy_setup();
 }
 #else
 /*
@@ -257,9 +355,6 @@ static void fh_phy_setup(void)
 #define FH_RXDV_GPIO		41
 #define FH_PAD_RXDV_NUM		26
 #define FH_SYS_CTRL_RMII	(BIT(24) | BIT(25) | BIT(26))
-
-#define PHY_ID_IP101G		0x02430c54
-#define PHY_ID_RTL8201		0x001cc816
 
 static void fh_phy_setup(void)
 {
@@ -284,20 +379,8 @@ static void fh_phy_setup(void)
 	fh_pmu_reset(FH_PMU_SWRST_AHB, FH_SWRST_GMAC);
 
 	addr = fh_phy_find(&id);
-	if (addr < 0)
-		return;
-	if ((id & 0xfffffff0) == (PHY_ID_IP101G & 0xfffffff0)) {
-		fh_mdio_write(addr, 20, 16);
-		fh_mdio_write(addr, 16, 0x1006);
-#ifndef CONFIG_FH8632
-		fh_mdio_write(addr, 26, 0xc5ed);	/* RXD drive */
-#endif
-		fh_mdio_write(addr, 20, 16);
-	} else if ((id & 0xfffffff0) == (PHY_ID_RTL8201 & 0xfffffff0)) {
-		fh_mdio_write(addr, 31, 7);
-		fh_mdio_write(addr, 16, 0x1ffa);	/* RMII, clock in */
-		fh_mdio_write(addr, 31, 0);
-	}
+	if (addr >= 0)
+		fh_ext_phy_init(addr, id);
 }
 #endif
 

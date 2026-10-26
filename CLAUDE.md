@@ -159,14 +159,17 @@ programmer, `sf write` or SD/TFTP recovery (`ubwrite`).
 - **Ethernet:** the GMAC at `0xE0600000` is a DesignWare MAC with normal
   descriptors, DMA at +0x1000, on RMII. `fh_phy_setup()` does what the
   vendor drivers do before their PHY code, over raw MDIO:
-  - V200 / FH865x: the SoC's own 10/100 PHY (`0x00441400`): select and
-    clock it, reset it, load its eFuse trim (PMU 0x340), reset the MAC,
-    write the vendor's PHY registers. External-PHY V200 boards are not
-    handled. The vendor U-Boots and kernels probe an external PHY first and
-    fall back to this one, so their binaries do not say which a board has;
-    the FH8852V200, FH8856V200 and FH8652 camera builds point to the
-    internal one: their RMII pads boot as GPIOs and, on the V200 ones, the
-    external PHY's reset pin (GPIO 29, pad 64) is left to the link LED;
+  - V200 / FH865x: an RMII PHY on the MAC pads, or the SoC's own 10/100
+    PHY (`0x00441400`). As the vendor's `auto_find_phy()` does, the
+    external one is tried first: pads 20-29 in their RMII functions (REF_CLK
+    drives the 50 MHz out), the internal PHY off, the PHY reset (GPIO 29,
+    pad 64) pulsed with RXDV (pad 27) strapped low through GPIO 54. If
+    nothing answers on MDIO, the pads go back as they were and the internal
+    PHY is selected, clocked, reset, given its eFuse trim (PMU 0x340) and
+    the vendor's register writes. Any PHY that answers is taken -- the
+    vendor U-Boots take only IP101G, RTL8201 and the internal one, so an
+    FH8852V200 camera with a JL1101 has no network in its own U-Boot. QEMU
+    has an IP101G, so only the external path runs there;
   - V100 / FH8626V100 / FH8632: an IP101G or RTL8201 on the pads. RXDV is a
     strap held low through GPIO 41 while the PHY's reset GPIO (11; 2 on
     FH8632) is pulsed; then `SYS_CTRL |= 0x07000000` and the MAC reset; the
@@ -242,7 +245,11 @@ under QEMU**.
 
 - `mem=` stays the first kernel argument, as on the other OpenIPC targets.
 - The boot counter is the DRAM word at `0xA1F20000`, DDR + 0x1f20000 as on
-  the other families.
+  the other families, inside the kernel's 32M on V200 / FH865x. With
+  `mem=29M` (V100, FH8626V100, FH8632) the media pool starts at
+  `0xA1D00000`, over that word, so there it is `0xA1C20000`. The kernels
+  have no device tree to name it, so OpenIPC's `bootcount-clear` does not
+  clear it: after two boots the boot limit boots with `failsafe`.
 - The environment is at 0x40000, 64 KiB, as in the vendor layout and
   OpenIPC/firmware's `fw_env.config`.
 
