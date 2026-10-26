@@ -1,5 +1,3 @@
-#include <stdio.h>
-#include <string.h>
 #include "spi020.h"
 #include "spi_flash.h"
 #include "kprint.h"

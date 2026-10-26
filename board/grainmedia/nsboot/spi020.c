@@ -1,5 +1,3 @@
-#include <stdio.h>
-#include <string.h>
 #include "spi020.h"
 #include "ahb_dma.h"
 #include "kprint.h"
