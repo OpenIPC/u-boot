@@ -343,7 +343,7 @@ void FCS_irq_data(void)
 //volatile int tt=0;
 void entry(void)
 {
-    unsigned int image_offset;
+    unsigned int image_offset = (unsigned int)-1;
     struct spi_flash *spi_chip = NULL;
     unsigned int reg;
     void (*image_entry) (void) = (void *)LOAD_ADDR;
@@ -406,9 +406,10 @@ void entry(void)
         image_offset = fLib_NOR_Copy_Image((unsigned int)LOAD_ADDR);
     }
 
-    if (image_offset < 0) {
+    /* The copy functions return (unsigned) -1 when the load fails */
+    if (image_offset == (unsigned int)-1) {
         KPrint("image_offset < 0\n");
-        return;
+        hang();
     }
 //tt++;
 //while(tt > 0);            
