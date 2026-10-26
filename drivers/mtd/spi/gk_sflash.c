@@ -74,6 +74,12 @@
 #define MFR_GIGADEVICE		0xc8
 #define MFR_WINBOND		0xef
 #define MFR_XMC			0x20
+#define MFR_MACRONIX		0xc2
+
+/* Macronix: security register, its WPSEL bit, global block unlock */
+#define CMD_MX_RDSCUR		0x2b
+#define MX_SCUR_WPSEL		BIT(7)
+#define CMD_MX_GBULK		0x98
 
 static u32 sf_reg_read(u8 op, unsigned int nbytes)
 {
@@ -119,6 +125,18 @@ static void sf_unprotect(u32 jedec)
 
 	if (sr1 == 0xff)
 		return;
+	/*
+	 * A Macronix part in individual block protection mode (WPSEL) ignores
+	 * the status register's BP bits; the vendor U-Boot unlocks every block
+	 * with GBULK there.
+	 */
+	if (mfr == MFR_MACRONIX &&
+	    (sf_reg_read(CMD_MX_RDSCUR, 1) & MX_SCUR_WPSEL)) {
+		printf("SF: per-block protection (WPSEL), unlocking\n");
+		sf_cmd(CMD_WREN);
+		sf_cmd(CMD_MX_GBULK);
+		sf_wait_ready();
+	}
 	if (mfr == MFR_GIGADEVICE || mfr == MFR_WINBOND || mfr == MFR_XMC) {
 		/* QE lives in SR2, written as WRSR's second byte: keep it */
 		if (sr1 & SR1_BP) {

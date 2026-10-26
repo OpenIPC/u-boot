@@ -70,24 +70,29 @@ static void gk_cpu_prep_linux(void)
 void board_prep_linux(bootm_headers_t *images)
 {
 	const ulong top = GK_DDR_BASE + gd->ram_size;
+	u32 arm_freq;
 
 	memcpy((void *)GK_HAL_ADDR, gk_hal_data, sizeof(gk_hal_data));
 
 	writel(env_get_ulong("phytype", 10, 0), GK_U2K_PHY_TYPE);
 	/*
-	 * The kernel's decompressor (clk_setting() in the vendor
-	 * arch/arm/boot/compressed/misc.c) writes this word to RCT + 0x8c,
-	 * the CPU PLL, before it decompresses. On the GK7101/GK7102 that is
-	 * the setting arch_cpu_init() already made. On the GK710xS the boot
-	 * header sets the PLLs, nothing here programs RCT + 0x8c, and the
-	 * GK7102C's own kernel never writes it. Hand over what the PLL
-	 * holds, so that write changes nothing.
+	 * The kernel's decompressor (clk_setting() in the SDK's
+	 * arch/arm/boot/compressed/misc.c) writes this word to RCT + 0x8c, the
+	 * CPU PLL. The vendor U-Boot hands over env arm_freq, by default
+	 * 0x00112032 (600 MHz); on the GK710xS that is how the SDK kernel
+	 * brings the CPU up to speed, as neither S boot header programs the
+	 * PLL. The gk7102s image carries the GK7102C's boot header, and the
+	 * GK7102C's own kernel never writes that register: there the PLL is
+	 * handed over as it is, the setting the camera has been booted with.
 	 */
-#ifdef CONFIG_GK710X_S
-	writel(readl(GK_RCT_PLL_ARM), GK_U2K_ARM_FREQ);
+#ifdef CONFIG_TARGET_GK7102S
+	arm_freq = readl(GK_RCT_PLL_ARM);
 #else
-	writel(GK_ARM_FREQ, GK_U2K_ARM_FREQ);
+	arm_freq = GK_ARM_FREQ;
 #endif
+	if (env_get("arm_freq"))
+		arm_freq = env_get_hex("arm_freq", arm_freq);
+	writel(arm_freq, GK_U2K_ARM_FREQ);
 	writel(GK_HAL_ADDR, GK_U2K_HAL_ADDR);
 	writel(0, GK_U2K_SOC);
 	writel(env_size("osmem", OPENIPC_OSMEM), GK_U2K_MEM);
