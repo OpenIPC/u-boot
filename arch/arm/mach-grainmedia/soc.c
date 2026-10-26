@@ -73,9 +73,11 @@ int arch_cpu_init(void)
 int timer_init(void)
 {
 	/*
-	 * Channel 0 counts APB clocks down over the whole 32 bits, its
-	 * overflow interrupt off (CR bit 2). The interrupt mask stays as it
-	 * is: the vendor kernel never clears it, and its tick would stop.
+	 * Channel 0 counts APB clocks down over the whole 32 bits: CR bits
+	 * 2:0 are its enable, external clock and overflow interrupt enable,
+	 * which the kernel sets again for itself. The interrupt mask
+	 * register (0x38) is not touched: the vendor kernel never clears it,
+	 * and with timer 0's interrupts masked its tick would never come.
 	 */
 	clrbits_le32(GM_TIMER_CR, 7);
 	writel(0xffffffff, GM_TIMER0_LOAD);
