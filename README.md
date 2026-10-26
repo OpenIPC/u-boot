@@ -6,6 +6,7 @@
 [![anyka build](https://github.com/OpenIPC/u-boot/actions/workflows/build-anyka.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-anyka.yml)
 [![novatek build](https://github.com/OpenIPC/u-boot/actions/workflows/build-novatek.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-novatek.yml)
 [![allwinner build](https://github.com/OpenIPC/u-boot/actions/workflows/build-allwinner.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-allwinner.yml)
+[![fullhan build](https://github.com/OpenIPC/u-boot/actions/workflows/build-fullhan.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-fullhan.yml)
 
 Unified repository for the U-Boot bootloaders maintained by
 [OpenIPC](https://openipc.org) for supported SoCs.
@@ -23,6 +24,7 @@ family — not bootloader sources.
 | `openipc-anyka` | U-Boot for Anyka AK3918EV200, AK391xEV300, AK391xEV330 |
 | `openipc-novatek` | U-Boot for Novatek NT98562, NT98566 |
 | `openipc-allwinner` | U-Boot for Allwinner V3s, V831, V833, V851s |
+| `openipc-fullhan` | U-Boot for Fullhan FH8632, FH885x V100, FH8626V100, FH885xV200, FH865x |
 | `main` | Fork of upstream mainline U-Boot, kept for rebasing |
 
 New families are added here as they are ported, each with its own
@@ -290,6 +292,36 @@ bash build.sh v831          # a single SoC
 The toolchain is `arm-linux-gnueabi-`, and `xz` packs U-Boot. Images land
 in `output/` as `u-boot-<soc>-nor.bin` and `u-boot-<soc>-mmc.bin`.
 
+## fullhan
+
+U-Boot for Fullhan's camera SoCs, on the same mainline release (v2022.10)
+and with the same OpenIPC boot layer as `openipc-hisilicon`.
+
+**NOR:** `fh8852v200`, `fh8856v200`, `fh8858v200` and their V210 names
+(`fh8852v210`, `fh8856v210`, `fh8858v210`); `fh8652`, `fh8656`, `fh8658`
+(Cortex-A7); `fh8852v100`, `fh8856v100`; `fh8626v100`; `fh8833v100`
+(the FH8632).
+
+The mask ROM runs the DDR script listed in the flash header and loads
+U-Boot -- or, on the FH865x and the V100 parts, the vendor's ramboot,
+which loads U-Boot -- to DDR and starts it. `u-boot-<soc>-nor.bin` holds
+the header, its DDR scripts (the vendor's, as cameras and the SDKs carry
+them), the ramboot where there is one, and U-Boot, to be written at flash
+offset 0 as it is; the environment is at 0x40000.
+
+These images have so far run only on qemu-hisilicon's Fullhan machines,
+not on a camera. QEMU does not run the ramboots or train DDR.
+
+```sh
+git clone --branch openipc-fullhan https://github.com/OpenIPC/u-boot.git
+cd u-boot
+
+bash build.sh                 # every SoC above
+bash build.sh fh8852v200      # a single SoC
+```
+
+Images land in `output/` as `u-boot-<soc>-nor.bin`.
+
 ## CI
 
 The [build-hisilicon](.github/workflows/build-hisilicon.yml) workflow runs
@@ -423,6 +455,25 @@ V851s images: there OpenIPC/u-boot-allwinner publishes
 
 ```sh
 gh workflow run build-allwinner.yml -f release=true -f publish=true
+```
+
+### fullhan
+
+The [build-fullhan](.github/workflows/build-fullhan.yml) workflow has the
+same shape. It runs on pull requests to this branch that change it, on
+pushes and pull requests to `openipc-fullhan` (through that branch's
+`ci.yml`), and manually. Every SoC has a qemu-hisilicon machine model
+(the V210 images boot on their V200 machine, `fh8833v100` on `fh8632`),
+so every image is smoke-tested: booted from an 8 MiB flash image, then a
+second time, which must load the environment the first boot saved.
+
+Its `release` input fills this repository's
+[`Fullhan` release](../../releases/tag/fullhan); `publish` uploads to
+`OpenIPC/firmware` `latest`, where no other repository publishes
+`u-boot-fh*` names, and reports to openipc.org.
+
+```sh
+gh workflow run build-fullhan.yml -f release=true -f publish=true
 ```
 
 ## Adding a SoC family
