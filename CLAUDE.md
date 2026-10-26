@@ -33,6 +33,11 @@ own branch:
   mainline sunxi SoCs with their own SPL and DRAM drivers. CI: `build-allwinner.yml`,
   called from that branch's `ci.yml`. Its own `CLAUDE.md` covers the SPL,
   the DRAM port and the kernel hand-off.
+- `openipc-fullhan`: U-Boot for Fullhan FH8632, FH885x V100,
+  FH8626V100, FH885xV200 and FH865x, on the same mainline release with
+  the same OpenIPC layer. CI: `build-fullhan.yml`, called from that
+  branch's `ci.yml`. Its own `CLAUDE.md` covers the boot header and its
+  DDR scripts, the vendor ramboots and the kernel hand-off.
 - `main`: a fork of upstream mainline U-Boot, kept for rebasing.
 
 To change bootloader code, check out `openipc-hisilicon`, or read it with
@@ -182,6 +187,26 @@ The build logic lives here. Other branches call it:
     (OpenIPC/website `service/internal/builds/verify.go`).
     `build-allwinner.yml` has to be added there before the first
     `publish`.
+
+## `build-fullhan.yml`
+
+- It is `build-novatek.yml` for `openipc-fullhan`: the same job graph and
+  `resolve`/`ref` rules, NOR only (256 KiB boot partition: the ROM header
+  and DDR scripts, the ramboot on FH865x/V100, U-Boot).
+- **No `hold`:** every SoC has a qemu-hisilicon machine (qemu-bench #207).
+  The smoke matrix maps images to machines: `fh885{2,6,8}v210` boot on
+  `fh885{2,6,8}v200`, `fh8833v100` on `fh8632`. Keep the build matrix,
+  the smoke matrix and the README's list in step.
+- **Smoke test:** two boots of an 8 MiB flash image holding only the
+  image. It passes on `Hit Ctrl-C`, and fails if the second boot reports
+  a bad environment CRC.
+- **Release and publish:**
+  - `release` uploads to the `fullhan` tag.
+  - `publish` shares the `publish-firmware-latest` concurrency group and
+    reports a `uboot-fullhan-…` build id.
+  - openipc.org accepts the report only from workflows it allowlists
+    (OpenIPC/website `service/internal/builds/verify.go`).
+    `build-fullhan.yml` has to be added there before the first `publish`.
 
 ## Invariants to keep when editing `build-hisilicon.yml`
 
