@@ -1,0 +1,5 @@
+CONFIG_TARGET_FH8856V100=y
+CONFIG_PRODUCT_SOC="fh8856v100"
+# mem=29M: the media pool starts at 0xA1D00000, so the counter goes
+# below it, in the kernel's memory as on the other families
+CONFIG_SYS_BOOTCOUNT_ADDR=0xA1C20000
