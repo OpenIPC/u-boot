@@ -1,0 +1,19 @@
+if ARCH_GRAINMEDIA
+
+# One die in three packages: GM8136 (external DDR), GM8136S (128 MiB in
+# the package) and GM8135S (64 MiB). nsboot and U-Boot tell them apart
+# by the PMU's package ID, so a single image serves all three.
+
+config SYS_SOC
+	default "grainmedia"
+
+config SYS_VENDOR
+	default "grainmedia"
+
+config SYS_BOARD
+	default "grainmedia"
+
+config SYS_CONFIG_NAME
+	default "grainmedia"
+
+endif

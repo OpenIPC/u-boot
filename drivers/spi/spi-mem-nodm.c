@@ -8,8 +8,12 @@
 #include <spi.h>
 #include <spi-mem.h>
 
-int spi_mem_exec_op(struct spi_slave *slave,
-		    const struct spi_mem_op *op)
+/*
+ * Weak: a controller that runs whole flash commands itself, rather than
+ * shifting bytes, provides its own.
+ */
+int __weak spi_mem_exec_op(struct spi_slave *slave,
+			   const struct spi_mem_op *op)
 {
 	unsigned int pos = 0;
 	const u8 *tx_buf = NULL;

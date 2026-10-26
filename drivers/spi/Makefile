@@ -33,6 +33,7 @@ obj-$(CONFIG_DESIGNWARE_SPI) += designware_spi.o
 obj-$(CONFIG_EXYNOS_SPI) += exynos_spi.o
 obj-$(CONFIG_FSL_DSPI) += fsl_dspi.o
 obj-$(CONFIG_FSL_ESPI) += fsl_espi.o
+obj-$(CONFIG_FTSPI020) += ftspi020.o
 obj-$(CONFIG_SYNQUACER_SPI) += spi-synquacer.o
 obj-$(CONFIG_GXP_SPI) += gxp_spi.o
 obj-$(CONFIG_ICH_SPI) +=  ich.o

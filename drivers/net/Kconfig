@@ -94,7 +94,7 @@ config DSA_SANDBOX
 menuconfig NETDEVICES
 	bool "Network device support"
 	depends on NET
-	select DM_ETH
+	select DM_ETH if DM
 	help
 	  You must select Y to enable any network device support
 	  Generally if you have any networking support this is a given
@@ -402,6 +402,15 @@ config FTGMAC100
 	  and supports IEEE 802.1Q VLAN tag insertion and removal. It
 	  offers high-priority transmit queue for QoS and CoS
 	  applications.
+
+config FTGMAC100_NODM
+	bool "Ftgmac100 Ethernet Support without driver model"
+	depends on !DM_ETH
+	help
+	  The FTGMAC100 driver as it was before driver model, for boards
+	  without it: the board registers the MAC with
+	  ftgmac100_initialize(). It finds the PHY on MDIO itself and
+	  supports 10/100 Mbit/s links.
 
 config SYS_DISCOVER_PHY
 	bool

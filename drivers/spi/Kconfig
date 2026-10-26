@@ -525,6 +525,20 @@ config FSL_ESPI
 	  access the SPI interface and SPI NOR flash on platforms embedding
 	  this Freescale eSPI IP core.
 
+config FTSPI020
+	bool "Faraday FTSPI020 SPI flash controller"
+	depends on !DM_SPI
+	select SPI_MEM
+	help
+	  The flash controller of Grain Media's GM813x camera SoCs, under
+	  the legacy (non-DM) SPI API. It runs whole flash commands, so it
+	  takes the spi-nor layer's spi-mem operations directly.
+
+config FTSPI020_BASE
+	hex "FTSPI020 register base"
+	depends on FTSPI020
+	default 0x92300000 if ARCH_GRAINMEDIA
+
 config SH_QSPI
 	bool "Renesas Quad SPI driver"
 	help
