@@ -38,6 +38,11 @@ own branch:
   the same OpenIPC layer. CI: `build-fullhan.yml`, called from that
   branch's `ci.yml`. Its own `CLAUDE.md` covers the boot header and its
   DDR scripts, the vendor ramboots and the kernel hand-off.
+- `openipc-grainmedia`: U-Boot for Grain Media GM8135S, GM8136 and
+  GM8136S, on the same mainline release with the same OpenIPC layer,
+  plus the SDK's nsboot, built from source in the tree. CI:
+  `build-grainmedia.yml`, called from that branch's `ci.yml`. Its own
+  `CLAUDE.md` covers nsboot, the image layout and the kernel hand-off.
 - `main`: a fork of upstream mainline U-Boot, kept for rebasing.
 
 To change bootloader code, check out `openipc-hisilicon`, or read it with
@@ -207,6 +212,27 @@ The build logic lives here. Other branches call it:
   - openipc.org accepts the report only from workflows it allowlists
     (OpenIPC/website `service/internal/builds/verify.go`).
     `build-fullhan.yml` has to be added there before the first `publish`.
+
+## `build-grainmedia.yml`
+
+- It is `build-fullhan.yml` for `openipc-grainmedia`: the same job graph
+  and `resolve`/`ref` rules, NOR only (256 KiB boot partition: the flash
+  header, nsboot, U-Boot).
+- **Images are not machines:** one image serves several packages, so the
+  smoke matrix boots `gm8136` on both `gm8136` and `gm8136s`, `gm8135` on
+  `gm8135s`. Keep the build matrix, the smoke matrix and the README's list
+  in step.
+- **Smoke test:** two boots of an 8 MiB flash image holding only the
+  image; qemu-hisilicon runs nsboot from it. It passes on `Hit Ctrl-C`,
+  and fails if the second boot reports a bad environment CRC.
+- **Release and publish:**
+  - `release` uploads to the `grainmedia` tag.
+  - `publish` shares the `publish-firmware-latest` concurrency group and
+    reports a `uboot-grainmedia-…` build id.
+  - openipc.org accepts the report only from workflows it allowlists
+    (OpenIPC/website `service/internal/builds/verify.go`).
+    `build-grainmedia.yml` has to be added there before the first
+    `publish`.
 
 ## Invariants to keep when editing `build-hisilicon.yml`
 
