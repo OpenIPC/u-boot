@@ -331,6 +331,13 @@ static int ftgmac100_init(struct eth_device *dev, struct bd_info *bd)
 	}
 	rxdes = priv->rxdes;
 
+	/*
+	 * Each session starts from a reset MAC, as the driver model driver's
+	 * does: the reset puts the MAC's ring pointers back at the first
+	 * descriptor, where tx_index and rx_index start.
+	 */
+	ftgmac100_reset(dev);
+
 	/* set the ethernet address */
 	ftgmac100_set_mac(dev, dev->enetaddr);
 
@@ -341,9 +348,6 @@ static int ftgmac100_init(struct eth_device *dev, struct bd_info *bd)
 	priv->tx_index = 0;
 	priv->rx_index = 0;
 
-	txdes[PKTBUFSTX - 1].txdes0	= FTGMAC100_TXDES0_EDOTR;
-	rxdes[PKTBUFSRX - 1].rxdes0	= FTGMAC100_RXDES0_EDORR;
-
 	for (i = 0; i < PKTBUFSTX; i++) {
 		/* TXBUF_BADR */
 		if (!txdes[i].txdes2) {
@@ -353,8 +357,11 @@ static int ftgmac100_init(struct eth_device *dev, struct bd_info *bd)
 			txdes[i].txdes3 = virt_to_phys(buf);
 			txdes[i].txdes2 = (uint)buf;
 		}
+		/* owned by software, and nothing left of the last session */
+		txdes[i].txdes0 = 0;
 		txdes[i].txdes1 = 0;
 	}
+	txdes[PKTBUFSTX - 1].txdes0 = FTGMAC100_TXDES0_EDOTR;
 
 	for (i = 0; i < PKTBUFSRX; i++) {
 		/* RXBUF_BADR */
@@ -363,8 +370,10 @@ static int ftgmac100_init(struct eth_device *dev, struct bd_info *bd)
 			rxdes[i].rxdes3 = virt_to_phys(buf);
 			rxdes[i].rxdes2 = (uint)buf;
 		}
-		rxdes[i].rxdes0 &= ~FTGMAC100_RXDES0_RXPKT_RDY;
+		/* free for the MAC */
+		rxdes[i].rxdes0 = 0;
 	}
+	rxdes[PKTBUFSRX - 1].rxdes0 = FTGMAC100_RXDES0_EDORR;
 
 	/* transmit ring */
 	writel(priv->txdes_dma, &ftgmac100->txr_badr);
