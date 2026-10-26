@@ -1,0 +1,119 @@
+if ARCH_FULLHAN
+
+choice
+	prompt "Fullhan SoC"
+	default TARGET_FH8852V200
+
+config TARGET_FH8852V200
+	bool "FH8852V200 / FH8852V210"
+	select FH885XV200
+	help
+	  FH8852V200: ARM1176 with 64 MiB of DDR2 in the package.
+
+config TARGET_FH8856V200
+	bool "FH8856V200 / FH8856V210"
+	select FH885XV200
+	help
+	  FH8856V200: the FH8852V200 die with 128 MiB of DDR in the package.
+
+config TARGET_FH8858V200
+	bool "FH8858V200 / FH8858V210"
+	select FH885XV200
+	help
+	  FH8858V200: the FH8852V200 die with 256 MiB of DDR.
+
+config TARGET_FH8652
+	bool "FH8652"
+	select FH865X
+	help
+	  FH8652: Cortex-A7 with 64 MiB of DDR in the package.
+
+config TARGET_FH8656
+	bool "FH8656"
+	select FH865X
+	help
+	  FH8656: the FH8652 die with 128 MiB of DDR in the package.
+
+config TARGET_FH8658
+	bool "FH8658"
+	select FH865X
+	help
+	  FH8658: the FH8652 die with external DDR3.
+
+config TARGET_FH8852V100
+	bool "FH8852 (V100)"
+	select FH885XV100
+	help
+	  FH8852: ARM1176 with 64 MiB of DDR2 in the package.
+
+config TARGET_FH8856V100
+	bool "FH8856 (V100)"
+	select FH885XV100
+	help
+	  FH8856: the FH8852 die with 128 MiB of DDR in the package.
+
+config TARGET_FH8626V100
+	bool "FH8626V100"
+	select FH8626V100
+	help
+	  FH8626V100: ARM1176 with 64 MiB of DDR2 in the package.
+
+config TARGET_FH8632
+	bool "FH8632 / FH8632v2 (FH8833)"
+	select FH8632
+	help
+	  FH8632: ARM1176 with 64 MiB of DDR2 in the package. Its kernels
+	  call the die FH8833.
+
+endchoice
+
+config FH885XV200
+	bool
+	select CPU_ARM1176
+
+config FH865X
+	bool
+	select CPU_V7A
+
+config FH885XV100
+	bool
+	select CPU_ARM1176
+	select FH_ATAG_PHYMODE
+
+config FH8626V100
+	bool
+	select CPU_ARM1176
+	select FH_ATAG_PHYMODE
+
+config FH8632
+	bool
+	select CPU_ARM1176
+	select FH_ATAG_PHYMODE
+
+config FH_ATAG_PHYMODE
+	bool
+	help
+	  Pass the vendor's PHY mode tag (RMII) to the kernel, which the
+	  3.0.8 kernels' Ethernet driver reads.
+
+config FH_DDR_MAX
+	hex
+	default 0x10000000 if TARGET_FH8858V200 || TARGET_FH8658
+	default 0x08000000 if TARGET_FH8856V200 || TARGET_FH8656 || TARGET_FH8856V100
+	default 0x04000000
+	help
+	  The most DDR the part can carry; dram_init() sizes it up to this.
+
+config SYS_SOC
+	default "fullhan"
+
+config SYS_VENDOR
+	default "fullhan"
+
+config SYS_BOARD
+	default "fullhan"
+
+config SYS_CONFIG_NAME
+	default "fullhan"
+
+endif
