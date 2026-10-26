@@ -41,3 +41,7 @@ CONFIG_CMD_MMC=y
 CONFIG_USB_OHCI_LEGACY=y
 CONFIG_SYS_USB_OHCI_SLOT_NAME="hiusb-ohci"
 CONFIG_SYS_USB_OHCI_MAX_ROOT_PORTS=1
+
+# The split NOR layout: the kernel (OpenIPC/linux hisilicon-hi3516cv100) registers
+# its partitions from the images in the firmware area, no device tree.
+CONFIG_OPENIPC_NOR_SPLIT=y
