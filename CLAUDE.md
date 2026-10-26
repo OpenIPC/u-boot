@@ -98,9 +98,21 @@ size, flash offset, load, entry, type and `~crc32` of the data.
      FH8626V100 and FH8632. FH8632's SDK image has an SPL there, which
      loaded U-Boot from 0x50000 -- past the OpenIPC environment -- so this
      tree has the ROM load U-Boot as FH885x V100/FH8626V100 cameras do;
-   - **a vendor ramboot** in SRAM, on FH865x and FH885x V100. It sizes or
-     trains the DDR and loads the **type-0x11** U-Boot from wherever the
-     header says, checking its CRC.
+   - **a vendor ramboot** in SRAM, on FH865x and FH885x V100. It loads the
+     **type-0x11** U-Boot from wherever the header says, with its own SPI
+     driver. Run under Unicorn on these images, both reach U-Boot with the
+     right bytes at `0xA0800000`:
+     - the FH865x one is needed: the ROM has run the package's type-0x43
+       script, and the ramboot writes the DDR size (PMU 0x334), copies the
+       eFuse trims (the internal PHY's to PMU 0x340), and for external DDR3
+       (FH8658) probes the size and runs the matching 0x1x53 script. It
+       checks U-Boot's CRC and starts it with r1 = 9999, r2 = 0xA0000100;
+     - the V100 one runs the type-0x43 script of the package itself (an
+       "adaptive DDR" header, one image for the FH8852 and FH8856), sets
+       the flash's quad-enable bit on Winbond and GigaDevice parts, and
+       does not check U-Boot's CRC. The FH8852 cameras seen boot without
+       it, from a type-0x23 script the ROM runs; it is kept so that one
+       image serves both packages;
 3. DDR is up before U-Boot runs: no SPL, an empty `lowlevel_init`.
 
 `openipc/<generation>.boot` holds, as text, the header of a camera's flash
@@ -150,12 +162,18 @@ programmer, `sf write` or SD/TFTP recovery (`ubwrite`).
   - V200 / FH865x: the SoC's own 10/100 PHY (`0x00441400`): select and
     clock it, reset it, load its eFuse trim (PMU 0x340), reset the MAC,
     write the vendor's PHY registers. External-PHY V200 boards are not
-    handled;
+    handled. The vendor U-Boots and kernels probe an external PHY first and
+    fall back to this one, so their binaries do not say which a board has;
+    the FH8852V200, FH8856V200 and FH8652 camera builds point to the
+    internal one: their RMII pads boot as GPIOs and, on the V200 ones, the
+    external PHY's reset pin (GPIO 29, pad 64) is left to the link LED;
   - V100 / FH8626V100 / FH8632: an IP101G or RTL8201 on the pads. RXDV is a
     strap held low through GPIO 41 while the PHY's reset GPIO (11; 2 on
     FH8632) is pulsed; then `SYS_CTRL |= 0x07000000` and the MAC reset; the
     PHY's RMII set-up registers. FH8632 feeds the PHY its 50 MHz from
     AC_MCLK (pad 59).
+  The pads are written field by field, as each vendor pinctrl does: the
+  V100 / FH8626V100 one never sets output enable, so it is kept.
 - **SD:** SD0 (`0xE2000000`) for recovery, 50 MHz source, the vendor's
   clock phase; power is GPIO 5, low on, before V200. FH8632's package has
   only D0/D1 bonded: 1-bit.

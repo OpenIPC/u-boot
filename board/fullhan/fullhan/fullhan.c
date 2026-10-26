@@ -30,12 +30,19 @@ struct fh_pad {
 };
 
 /*
- * Pad words: function in 27:24, input enable 12, Schmitt trigger 8, drive
- * 6:4, and pulls and output enable that move between generations. The
- * values are the words the vendor pinctrl writes for UART0, the flash and
- * SD0 (and RMII, for an external PHY).
+ * Pad words: function in 27:24, pulls 20 and 16, input enable 12, Schmitt
+ * trigger 8, drive 6:4, output enable 28. The values are the words the
+ * vendor pinctrl leaves for UART0, the flash and SD0 (and RMII, for an
+ * external PHY), and only the fields it writes are written: the V200 one
+ * sets output enable, the older ones keep it as it is, and all keep slew
+ * (bit 0) and 1.8 V (bit 7).
  */
-#define PAD(n, v)	{ n, v, 0xffffffff }
+#if defined(CONFIG_FH885XV200) || defined(CONFIG_FH865X)
+#define FH_PAD_FIELDS	0x1f111170
+#else
+#define FH_PAD_FIELDS	0x0f111170
+#endif
+#define PAD(n, v)	{ n, v, FH_PAD_FIELDS }
 #define PAD_FUNC(n, f)	{ n, (f) << 24 | BIT(12), 0x0f000000 | BIT(12) }
 
 static const struct fh_pad fh_pads[] = {
@@ -87,7 +94,7 @@ static const struct fh_pad fh_pads[] = {
 	PAD_FUNC(58, 1),				/* GPIO54: flash CS */
 	PAD_FUNC(37, 1),				/* GPIO2: PHY reset */
 	PAD_FUNC(40, 1),				/* GPIO5: SD0 power */
-	PAD(59, 0x03001000),				/* AC_MCLK: RMII clock */
+	{ 59, 0x03001000, 0xffffffff },			/* AC_MCLK: RMII clock */
 	PAD_FUNC(15, 0), PAD_FUNC(16, 0), PAD_FUNC(17, 0),	/* RMII */
 	PAD_FUNC(18, 0), PAD_FUNC(21, 0), PAD_FUNC(22, 0),
 	PAD_FUNC(23, 0), PAD_FUNC(26, 0), PAD_FUNC(27, 0),
