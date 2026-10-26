@@ -324,6 +324,11 @@ static int _dw_write_hwaddr(struct dw_eth_dev *priv, u8 *mac_id)
 	return 0;
 }
 
+/* For a board whose glue outside the MAC must follow the link's speed */
+__weak void designware_board_adjust_link(struct phy_device *phydev)
+{
+}
+
 static int dw_adjust_link(struct dw_eth_dev *priv, struct eth_mac_regs *mac_p,
 			  struct phy_device *phydev)
 {
@@ -346,6 +351,7 @@ static int dw_adjust_link(struct dw_eth_dev *priv, struct eth_mac_regs *mac_p,
 		conf |= FULLDPLXMODE;
 
 	writel(conf, &mac_p->conf);
+	designware_board_adjust_link(phydev);
 
 	printf("Speed: %d, %s duplex%s\n", phydev->speed,
 	       (phydev->duplex) ? "full" : "half",

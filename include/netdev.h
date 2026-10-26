@@ -35,6 +35,8 @@ int bfin_EMAC_initialize(struct bd_info *bis);
 int cs8900_initialize(u8 dev_num, int base_addr);
 int dc21x4x_initialize(struct bd_info *bis);
 int designware_initialize(ulong base_addr, u32 interface);
+struct phy_device;
+void designware_board_adjust_link(struct phy_device *phydev);
 int dm9000_initialize(struct bd_info *bis);
 int dnet_eth_initialize(int id, void *regs, unsigned int phy_addr);
 int e1000_initialize(struct bd_info *bis);
