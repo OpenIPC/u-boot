@@ -35,7 +35,7 @@ NM = $(CROSS_COMPILE)nm
 OBJCOPY = $(CROSS_COMPILE)objcopy
 
 CFLAGS = -Wall -O2 -ffunction-sections -fdata-sections -fno-exceptions -fno-builtin\
-	 -march=armv4 -msoft-float
+	 -march=armv4 -msoft-float -fno-stack-protector -fno-pie
 
 LDFLAGS = -Wl,-T,$(LINK_SCRIPT) -Wl,-Ttext,$(TEXT_START_ADDR) -Wl,--gc-sections -nostartfiles
 
@@ -145,7 +145,7 @@ LIBS = $(GCCLIB)
 all: $(TARGET)
 
 $(TARGET): $(HEADOBJ) $(OBJS)
-	$(LD) -O2 -G 0 -gc-sections -nostartfiles -T $(LINK_SCRIPT) -Ttext $(TEXT_START_ADDR) \
+	$(LD) -O2 -G 0 --gc-sections -T $(LINK_SCRIPT) -Ttext $(TEXT_START_ADDR) \
 		$(HEADOBJ) $(OBJS) $(LIBS) -o $@
 	$(OBJCOPY) -O binary $@ $@.bin
 	$(NM) $@ | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map

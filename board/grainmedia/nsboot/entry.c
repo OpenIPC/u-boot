@@ -52,6 +52,13 @@ void __div0(void)
     hang();
 }
 
+/* libgcc's division by zero handler on Linux toolchains */
+int raise(int sig)
+{
+    hang();
+    return 0;
+}
+
 #ifdef DO_DEBUG
 
 static void hexdump(unsigned char *data, int len)
