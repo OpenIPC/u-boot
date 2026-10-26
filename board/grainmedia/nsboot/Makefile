@@ -96,7 +96,7 @@ endif
 
 #=== 8135S ==================================
 #CPU 712, default setting
-MFLAGS = -DGM8135S -DDDR_950 -DMODE_4 -DDDR_SZ_8135_512Mbx1
+#MFLAGS = -DGM8135S -DDDR_950 -DMODE_4 -DDDR_SZ_8135_512Mbx1
 
 #CPU 590
 #MFLAGS = -DGM8135S -DDDR_790 -DMODE_1 -DDDR_SZ_8135_512Mbx1
@@ -134,12 +134,23 @@ MFLAGS = -DGM8135S -DDDR_950 -DMODE_4 -DDDR_SZ_8135_512Mbx1
 #MFLAGS = -DGM8136S -DDDR_1240 -DMODE_5 -DDDR_SZ_8136_1Gbx1
 #MFLAGS = -DGM8136S -DDDR_1333 -DMODE_6 -DMODE_CPU -DDDR_SZ_8136_1Gbx1
 
+#============================================
+# One nsboot for all three packages: package.c is built once per package
+# with that package's flags -- the default setting of each list above --
+# and entry.c picks the one matching the chip at run time. MFLAGS is left
+# for the debug options (MEM_TEST, USE_SCP, ...).
+MFLAGS =
+MFLAGS_gm8136 = -DSYSTEM_EVB -DGM8136 -DDDR_1180 -DMODE_3 -DDDR_SZ_8136_2Gbx1
+MFLAGS_gm8136s = -DGM8136S -DDDR_1180 -DMODE_4 -DDDR_SZ_8136_1Gbx1
+MFLAGS_gm8135s = -DGM8135S -DDDR_950 -DMODE_4 -DDDR_SZ_8135_512Mbx1
+PKGOBJS = package_gm8136.o package_gm8136s.o package_gm8135s.o
+
 CFLAGS += $(INCLUDE_PATH) $(PREDEFINE) $(MFLAGS)
 ASFLAGS = $(CFLAGS) -D__ASSEMBLY__ $(MFLAGS)
 
 GCCLIB = $(shell $(CC) $(CFLAGS) --print-libgcc-file-name)
 
-OBJS = $(SOBJS) $(COBJS)
+OBJS = $(SOBJS) $(COBJS) $(PKGOBJS)
 LIBS = $(GCCLIB)
 
 all: $(TARGET)
@@ -155,6 +166,10 @@ clean:
 
 $(SOBJS): %.o : %.S
 	$(CC) $(ASFLAGS) -c $< -o $@
+
+$(PKGOBJS): package_%.o : package.c
+	$(CC) $(CFLAGS) $(MFLAGS_$*) -DPACKAGE=$*_package \
+		-DDDR_arg=$*_ddr_arg -DDDR_arg_AR=$*_ddr_arg_ar -c $< -o $@
 
 $(COBJS): %.o : %.c
 	$(CC) $(CFLAGS) -c $< -o $@

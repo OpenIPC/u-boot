@@ -13,21 +13,7 @@
 #include "kprint.h"
 #include "ahb_dma.h"
 
-#include "ddr_1400.h"
-#include "ddr_1333.h"
-#include "ddr_1240.h"
-#include "ddr_1180.h" 
-#include "ddr_1140.h"
-#include "ddr_1080.h"
-#include "ddr_1000.h"
-#include "ddr_950.h"
-#include "ddr_850.h"
-#include "ddr_800.h"
-#include "ddr_790.h"
-#include "ddr_700.h"
-#include "ddr_666.h"
-#include "ddr_590.h"
-#include "ddr_450.h"
+#include "package.h"
 
 //#define DO_DEBUG
 
@@ -295,10 +281,29 @@ int memtest(void)
 }
 #endif
 
+/*
+ * The package, as the kernel's pmu_get_chip() reads it from PMU ID bits
+ * 6:2: 0 is the GM8136 (external DDR), 0x14 and 0x1C the GM8136S, the
+ * rest GM8135S. This used to be fixed at build time (MFLAGS).
+ */
+const struct gm_package *get_package(void)
+{
+    switch ((read_reg(REG_PMU_BASE) >> 2) & 0x1F) {
+    case 0x0:
+        return &gm8136_package;
+    case 0x14: case 0x1C:
+        return &gm8136s_package;
+    default:
+        return &gm8135s_package;
+    }
+}
+
 #ifndef USE_SCP
-void set_ddr(void)
+void set_ddr(const struct gm_package *pkg)
 {
     volatile int i, reg;
+    const unsigned int (*arg)[2] = pkg->ddr_arg;
+    int len = pkg->ddr_len;
 
     //KPrint("set ddr arg\n");
 #ifdef MODE_SPECIAL
@@ -307,17 +312,12 @@ void set_ddr(void)
     reg = read_reg(REG_PMU_BASE);
 #endif
 
-#ifdef GM8135S
-	if(reg == 0x8136108) {
-	    for(i = 0; i < sizeof(DDR_arg_AR) / 8; i++)
-	        write_reg(REG_DDR0_BASE + DDR_arg_AR[i][0], DDR_arg_AR[i][1]);
-    } 
-    else
-#endif
-    {
-	    for(i = 0; i < sizeof(DDR_arg) / 8; i++)
-	        write_reg(REG_DDR0_BASE + DDR_arg[i][0], DDR_arg[i][1]);
-    }
+	if (pkg->ddr_arg_ar && reg == 0x8136108) {
+	    arg = pkg->ddr_arg_ar;
+	    len = pkg->ddr_ar_len;
+	}
+	for(i = 0; i < len; i++)
+	    write_reg(REG_DDR0_BASE + arg[i][0], arg[i][1]);
     
     write_reg(REG_DDR0_BASE + 0x04, 0x00000001);
     while(!(read_reg(REG_DDR0_BASE + 0x04) & 0x100));
@@ -347,188 +347,27 @@ void entry(void)
     struct spi_flash *spi_chip = NULL;
     unsigned int reg;
     void (*image_entry) (void) = (void *)LOAD_ADDR;
+    const struct gm_package *pkg;
 
     platform_setup();
+    pkg = get_package();
 
 #ifndef USE_SCP
-    set_ddr();
+    set_ddr(pkg);
 #endif    
     FCS_irq_data();
 
 #ifndef CONFIG_FPGA
-#ifdef SOCKET_EVB
-    KPrint("SOCKET ");
-#endif
-#ifdef SYSTEM_EVB
-    KPrint("SYSTEM ");
-#endif
-
 #ifdef MEM_TEST
     KPrint("memtest before FCS\n");
     memtest();
     write_reg(0x18, 0xE59FF020);
     write_reg(0x40, 0x92000040);
 #endif
-/* ================= GM8136 ================ */
-#ifdef GM8136
-    KPrint("GM8136 ");
-
-#ifdef NORMAL
-    set_fcs(0x6216, 81, 3);
-    //set_fcs(0x6256, 86, 3);//audio
-    KPrint("normal\n");     
-#endif 
-#ifdef MODE_0
-    set_fcs(0x5014, 50, 3);
-    KPrint("mode 0\n");    
-#endif    
-#ifdef MODE_1
-    set_fcs(0x4202, 60, 3); //CPU600
-    //set_fcs(0x4000, 40, 3); //CPU400
-    KPrint("mode 1\n");    
-#endif
-#ifdef MODE_2
-    set_fcs(0x6256, 100, 3);
-    KPrint("mode 2\n");    
-#endif
-#ifdef MODE_3
-    set_fcs(0x6216, 118, 4);
-    KPrint("mode 3\n");    
-#endif
-#ifdef MODE_4
-    set_fcs(0x4202, 95, 4);
-    KPrint("mode 4\n");    
-#endif
-#ifdef MODE_5
-    set_fcs(0x6216, 86, 3);
-    KPrint("mode 5\n");    
-#endif
-#ifdef MODE_6
-    set_fcs(0x6216, 127, 5);
-    KPrint("mode 6\n");    
-#endif
-#ifdef USE_JUMP
-    KPrint("debug\n");    
-#endif
-
-#endif  //GM8136
-/* ================= GM8136S ================ */
-#ifdef GM8136S
-    KPrint("GM8136S ");
-
-#ifdef NORMAL
-    set_fcs(0x6216, 81, 3);
-    //set_fcs(0x6216, 90, 3);//1200
-    //set_fcs(0x6054, 59, 3);//1180
-    KPrint("normal\n");     
-#endif 
-#ifdef MODE_0
-    set_fcs(0x5216, 127, 5);
-    KPrint("mode 0\n");    
-#endif    
-#ifdef MODE_1
-    set_fcs(0x4202, 60, 3); //CPU600
-    //set_fcs(0x4000, 40, 3); //CPU400
-    KPrint("mode 1\n");    
-#endif
-#ifdef MODE_2
-    set_fcs(0x3216, 59, 3);
-    KPrint("mode 2\n");    
-#endif
-#ifdef MODE_3
-    set_fcs(0x6216, 86, 3);
-    KPrint("mode 3\n");    
-#endif
-#ifdef MODE_4
-    set_fcs(0x6216, 118, 4);
-    KPrint("mode 4\n");    
-#endif
-#ifdef MODE_5
-    set_fcs(0x5216, 93, 3);
-    KPrint("mode 5\n");    
-#endif
-#ifdef MODE_6
-    set_fcs(0x7156, 100, 3);
-    KPrint("mode 6\n");    
-#endif
-#ifdef MODE_7
-    set_fcs(0x5216, 95, 4);
-    KPrint("mode 7\n");    
-#endif
-#ifdef MODE_8
-    set_fcs(0x1002, 59, 4);
-    //set_fcs(0x1016, 59, 4);
-    KPrint("mode 8\n");
-#endif
-#ifdef MODE_9
-    set_fcs(0x6256, 105, 3);
-    KPrint("mode 9\n");    
-#endif
-#ifdef USE_JUMP
-    KPrint("debug\n");    
-#endif
-#endif  //GM8136S
-/* ================= GM8135S ================ */
-#ifdef GM8135S
-    KPrint("GM8135S ");
-
-#ifdef NORMAL
-    set_fcs(0x6216, 81, 3);
-    KPrint("normal\n");
-#endif 
-#ifdef MODE_0
-    set_fcs(0x5014, 50, 3);
-    KPrint("mode 0\n");
-#endif    
-#ifdef MODE_1
-    set_fcs(0x3216, 59, 3);
-    //set_fcs(0x4000, 40, 3); //CPU400
-    KPrint("mode 1\n");
-#endif
-#ifdef MODE_2
-	set_fcs(0x5216, 127, 5);
-	KPrint("mode 2\n");
-#endif
-#ifdef MODE_3
-    set_fcs(0x6216, 86, 3);
-    KPrint("mode 3\n");    
-#endif
-#ifdef MODE_CPU
-    set_fcs(0x4201, 81, 3); //CPU810/800
-    KPrint("mode cpu\n");
-#endif
-#ifdef MODE_4
-	set_fcs(0x5216, 95, 4);
-    KPrint("mode 4\n");
-#endif
-#ifdef MODE_5
-    set_fcs(0x1016, 59, 4);	//AXI 200
-    //set_fcs(0x1002, 59, 4);	//AXI 147
-    KPrint("mode 5\n");
-#endif
-#ifdef MODE_6
-    set_fcs(0x1016, 50, 4);
-    KPrint("mode 6\n");
-#endif
-#ifdef MODE_7
-    set_fcs(0x1016, 45, 4);
-    KPrint("mode 7\n");
-#endif
-#ifdef MODE_8
-    //set_fcs(0x1016, 40, 4);	//AXI 200
-    set_fcs(0x1002, 40, 4);	//AXI 100
-    KPrint("mode 8\n");
-#endif
-#ifdef MODE_9
-    //set_fcs(0x1016, 35, 4);	//AXI 200
-    set_fcs(0x1002, 35, 4);	//AXI 87
-    KPrint("mode 9\n");
-#endif
-#ifdef USE_JUMP
-    KPrint("debug\n");
-#endif
-#endif  //GM8135S
-/* ======================================== */
+    KPrint("%s ", pkg->name);
+    if (pkg->fcs_mul)
+        set_fcs(pkg->fcs_value, pkg->fcs_mul, pkg->fcs_div);
+    KPrint("%s\n", pkg->mode);
 #endif  //CONFIG_FPGA
 
 #ifdef MEM_TEST
