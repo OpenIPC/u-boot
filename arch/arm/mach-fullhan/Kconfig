@@ -6,89 +6,107 @@ choice
 
 config TARGET_FH8852V200
 	bool "FH8852V200 / FH8852V210"
-	select FH885XV200
+	select FULLHAN_V200
 	help
 	  FH8852V200: ARM1176 with 64 MiB of DDR2 in the package.
 
 config TARGET_FH8856V200
 	bool "FH8856V200 / FH8856V210"
-	select FH885XV200
+	select FULLHAN_V200
 	help
 	  FH8856V200: the FH8852V200 die with 128 MiB of DDR in the package.
 
 config TARGET_FH8858V200
 	bool "FH8858V200 / FH8858V210"
-	select FH885XV200
+	select FULLHAN_V200
 	help
 	  FH8858V200: the FH8852V200 die with 256 MiB of DDR.
 
 config TARGET_FH8652
 	bool "FH8652"
-	select FH865X
+	select FULLHAN_865X
 	help
 	  FH8652: Cortex-A7 with 64 MiB of DDR in the package.
 
 config TARGET_FH8656
 	bool "FH8656"
-	select FH865X
+	select FULLHAN_865X
 	help
 	  FH8656: the FH8652 die with 128 MiB of DDR in the package.
 
 config TARGET_FH8658
 	bool "FH8658"
-	select FH865X
+	select FULLHAN_865X
 	help
 	  FH8658: the FH8652 die with external DDR3.
 
 config TARGET_FH8852V100
 	bool "FH8852 (V100)"
-	select FH885XV100
+	select FULLHAN_V100
 	help
 	  FH8852: ARM1176 with 64 MiB of DDR2 in the package.
 
 config TARGET_FH8856V100
 	bool "FH8856 (V100)"
-	select FH885XV100
+	select FULLHAN_V100
 	help
 	  FH8856: the FH8852 die with 128 MiB of DDR in the package.
 
 config TARGET_FH8626V100
 	bool "FH8626V100"
-	select FH8626V100
+	select FULLHAN_8626
 	help
 	  FH8626V100: ARM1176 with 64 MiB of DDR2 in the package.
 
 config TARGET_FH8632
 	bool "FH8632 / FH8632v2 (FH8833)"
-	select FH8632
+	select FULLHAN_8632
 	help
 	  FH8632: ARM1176 with 64 MiB of DDR2 in the package. Its kernels
 	  call the die FH8833.
 
 endchoice
 
-config FH885XV200
+# Generations: what the parts of one die family share. Each target above
+# selects one; the code tests these, not the targets.
+
+config FULLHAN_V200
 	bool
 	select CPU_ARM1176
+	help
+	  The FH885xV200 generation (FH8852/56/58 V200 and V210), selected by
+	  its targets: the register map and set-up its parts share.
 
-config FH865X
+config FULLHAN_865X
 	bool
 	select CPU_V7A
+	help
+	  The FH865x generation (FH8652/56/58, Cortex-A7), selected by
+	  its targets: the register map and set-up its parts share.
 
-config FH885XV100
+config FULLHAN_V100
 	bool
 	select CPU_ARM1176
 	select FH_ATAG_PHYMODE
+	help
+	  The FH885x V100 generation (FH8852, FH8856), selected by
+	  its targets: the register map and set-up its parts share.
 
-config FH8626V100
+config FULLHAN_8626
 	bool
 	select CPU_ARM1176
 	select FH_ATAG_PHYMODE
+	help
+	  The FH8626V100 generation, selected by
+	  its targets: the register map and set-up its parts share.
 
-config FH8632
+config FULLHAN_8632
 	bool
 	select CPU_ARM1176
 	select FH_ATAG_PHYMODE
+	help
+	  The FH8632 generation (FH8632, FH8632v2; the kernels' FH8833), selected by
+	  its targets: the register map and set-up its parts share.
 
 config FH_ATAG_PHYMODE
 	bool

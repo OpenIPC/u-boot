@@ -26,7 +26,8 @@ CI and user docs live on the `openipc` branch:
 
 Adding or dropping a SoC needs both branches:
 
-- here: `build.sh` (`build_soc`, `ALL_SOCS`) and `openipc/<soc>_config`;
+- here: `build.sh` (`build_soc`, `ALL_SOCS`), `openipc/<soc>_config` and
+  the table in `README.md`;
 - there: `build-fullhan.yml`'s matrices and the README.
 
 ## Targets
@@ -58,7 +59,7 @@ git diff --diff-filter=M v2022.10 HEAD         # the mainline files we patched
 
 | Area | Location |
 | --- | --- |
-| SoC: clocks, timer, watchdog, reset, DRAM size, GPIO, PHY-mode tag | `arch/arm/mach-fullhan/` (`ARCH_FULLHAN`; generation symbols `FH885XV200`, `FH865X`, `FH885XV100`, `FH8626V100`, `FH8632`; register map in `include/mach/fullhan.h`) |
+| SoC: clocks, timer, watchdog, reset, DRAM size, GPIO, PHY-mode tag | `arch/arm/mach-fullhan/` (`ARCH_FULLHAN`; generation symbols `FULLHAN_V200`, `FULLHAN_865X`, `FULLHAN_V100`, `FULLHAN_8626`, `FULLHAN_8632`; register map in `include/mach/fullhan.h`) |
 | Board: pads, Ethernet PHY set-up, SD0, `misc_init_r` → `openipc_helper()` | `board/fullhan/fullhan/` |
 | Memory map, console, timer | `include/configs/fullhan.h`, ending in `#include "openipc-common.h"` |
 | Flash controller (SPI0, a DesignWare SSI with a GPIO chip select), non-DM | `drivers/spi/fh_spi.c` (`FH_SPI`), under the legacy `spi_xfer()` API: the mainline spi-nor layer drives the flash |

@@ -29,7 +29,7 @@
  * 0xA2000000 on V200 and at 0xA1D00000 on V100, and the SDKs recommend the
  * same for the others.
  */
-#if defined(CONFIG_FH885XV200) || defined(CONFIG_FH865X)
+#if defined(CONFIG_FULLHAN_V200) || defined(CONFIG_FULLHAN_865X)
 #define OPENIPC_OSMEM		"32M"
 #else
 #define OPENIPC_OSMEM		"29M"
@@ -99,7 +99,7 @@
  * The flash's MTD name in the vendor kernels: the SPI device under 4.9's
  * spi-nor, the m25p80 platform data's name under 3.0.8
  */
-#if defined(CONFIG_FH885XV200) || defined(CONFIG_FH865X)
+#if defined(CONFIG_FULLHAN_V200) || defined(CONFIG_FULLHAN_865X)
 #define SFC "spi0.0"
 #else
 #define SFC "spi_flash"

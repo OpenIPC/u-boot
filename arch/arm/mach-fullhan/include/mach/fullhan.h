@@ -26,7 +26,7 @@
 #define FH_GMAC_BASE		0xE0600000	/* Synopsys GMAC, DMA at +0x1000 */
 #define FH_SDC0_BASE		0xE2000000	/* DW MMC */
 
-#if defined(CONFIG_FH8626V100)
+#if defined(CONFIG_FULLHAN_8626)
 #define FH_SPI0_BASE		0xF0E00000
 #else
 #define FH_SPI0_BASE		0xF0500000	/* DW SSI */
@@ -50,7 +50,7 @@
  * reads back all ones once the block is out of reset. Clearing bit 31 of
  * the main one resets the whole chip.
  */
-#if defined(CONFIG_FH8626V100)
+#if defined(CONFIG_FULLHAN_8626)
 #define FH_PMU_SWRST_MAIN	(FH_PMU_BASE + 0x04C)
 #define FH_PMU_SWRST_AHB	(FH_PMU_BASE + 0x054)
 #define FH_SWRST_GMAC		BIT(10)
@@ -95,17 +95,17 @@
  * Per generation: the UART and flash controller input clocks, the flash's
  * chip-select GPIO, and the SPIC configuration the vendor drivers set.
  */
-#if defined(CONFIG_FH885XV200) || defined(CONFIG_FH865X)
+#if defined(CONFIG_FULLHAN_V200) || defined(CONFIG_FULLHAN_865X)
 #define FH_UART_CLK		16666667	/* 100 MHz / 6 */
 #define FH_SPI0_CLK		200000000
 #define FH_SPI0_CS_GPIO		6
 #define FH_SPI0_SPIC_CCFGR	(BIT(13) | BIT(15))
-#elif defined(CONFIG_FH885XV100) || defined(CONFIG_FH8626V100)
+#elif defined(CONFIG_FULLHAN_V100) || defined(CONFIG_FULLHAN_8626)
 #define FH_UART_CLK		16666667
 #define FH_SPI0_CLK		100000000
 #define FH_SPI0_CS_GPIO		54
 #define FH_SPI0_SPIC_CCFGR	BIT(13)
-#elif defined(CONFIG_FH8632)
+#elif defined(CONFIG_FULLHAN_8632)
 #define FH_UART_CLK		30000000	/* PLL1 600 MHz / 10 / 2 */
 #define FH_SPI0_CLK		50000000
 #define FH_SPI0_CS_GPIO		54

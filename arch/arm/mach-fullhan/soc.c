@@ -49,13 +49,13 @@ void fh_gpio_output(unsigned int gpio, int value)
 /* The vendor U-Boots' clock_init(): UART0, timer 0, PTS and watchdog */
 static void fh_clock_init(void)
 {
-#if defined(CONFIG_FH885XV200) || defined(CONFIG_FH865X)
+#if defined(CONFIG_FULLHAN_V200) || defined(CONFIG_FULLHAN_865X)
 	fh_pmu_update(FH_PMU_CLK_DIV4, 0x1f, 5);		/* UART0 */
 	fh_pmu_update(FH_PMU_CLK_DIV5, 0xff0000, 0x63 << 16);	/* timer 0 */
 	fh_pmu_update(FH_PMU_CLK_DIV2, 0x1ff, 0x63);		/* PTS */
 	fh_pmu_update(FH_PMU_CLK_DIV5, 0xff00, 0xc7 << 8);	/* WDT */
 	clrbits_le32(FH_PMU_CLK_GATE, FH_GATE_UART0 | FH_GATE_TMR0);
-#elif defined(CONFIG_FH885XV100)
+#elif defined(CONFIG_FULLHAN_V100)
 	setbits_le32(FH_PMU_CLK_GATE, 0x120a2280);
 	fh_pmu_update(FH_PMU_CLK_DIV6, 0xf000000, 1 << 24);	/* GMAC 50 MHz */
 	fh_pmu_update(FH_PMU_CLK_DIV4, 0x1f, 5);
@@ -63,7 +63,7 @@ static void fh_clock_init(void)
 	fh_pmu_update(FH_PMU_CLK_DIV2, 0xff, 0x63);
 	fh_pmu_update(FH_PMU_CLK_DIV5, 0xff00, 0x95 << 8);
 	clrbits_le32(FH_PMU_CLK_GATE, 0x120a2280);
-#elif defined(CONFIG_FH8626V100)
+#elif defined(CONFIG_FULLHAN_8626)
 	setbits_le32(FH_PMU_CLK_GATE, 0x120a2280);
 	setbits_le32(FH_PMU_CLK_GATE1, 0x1c0);
 	fh_pmu_update(FH_PMU_CLK_DIV2, 0xf000000, 1 << 24);	/* GMAC 50 MHz */
@@ -73,7 +73,7 @@ static void fh_clock_init(void)
 	fh_pmu_update(FH_PMU_CLK_DIV5, 0xff00, 0x7f << 8);	/* WDT */
 	clrbits_le32(FH_PMU_CLK_GATE, 0x120a2280);
 	clrbits_le32(FH_PMU_CLK_GATE1, 0x1c0);
-#elif defined(CONFIG_FH8632)
+#elif defined(CONFIG_FULLHAN_8632)
 	/* From PLL1, 600 MHz: UART0 30 MHz, timer 0 and PTS 1 MHz */
 	setbits_le32(FH_PMU_CLK_GATE, 0x720a2080);
 	fh_pmu_update(FH_PMU_CLK_DIV4, 0x1f, 1);
@@ -92,13 +92,13 @@ static void fh_clock_init(void)
 /* The flash controller's clock: SCLK = FH_SPI0_CLK / BAUDR */
 void fh_spi0_setup(void)
 {
-#if defined(CONFIG_FH885XV200) || defined(CONFIG_FH865X)
+#if defined(CONFIG_FULLHAN_V200) || defined(CONFIG_FULLHAN_865X)
 	fh_pmu_update(FH_PMU_CLK_DIV3, 0xff, 5);	/* 1200 MHz / 6 */
-#elif defined(CONFIG_FH885XV100)
+#elif defined(CONFIG_FULLHAN_V100)
 	fh_pmu_update(FH_PMU_CLK_DIV3, 0xff, 0);	/* 100 MHz */
-#elif defined(CONFIG_FH8626V100)
+#elif defined(CONFIG_FULLHAN_8626)
 	fh_pmu_update(FH_PMU_CLK_DIV2, 0xf00, 0);	/* 100 MHz */
-#elif defined(CONFIG_FH8632)
+#elif defined(CONFIG_FULLHAN_8632)
 	fh_pmu_update(FH_PMU_CLK_DIV3, 0xff, 0x0b);	/* 600 MHz / 12 */
 #endif
 	clrbits_le32(FH_PMU_CLK_GATE, FH_GATE_SPI0);

@@ -37,7 +37,7 @@ struct fh_pad {
  * sets output enable, the older ones keep it as it is, and all keep slew
  * (bit 0) and 1.8 V (bit 7).
  */
-#if defined(CONFIG_FH885XV200) || defined(CONFIG_FH865X)
+#if defined(CONFIG_FULLHAN_V200) || defined(CONFIG_FULLHAN_865X)
 #define FH_PAD_FIELDS	0x1f111170
 #else
 #define FH_PAD_FIELDS	0x0f111170
@@ -46,7 +46,7 @@ struct fh_pad {
 #define PAD_FUNC(n, f)	{ n, (f) << 24 | BIT(12), 0x0f000000 | BIT(12) }
 
 static const struct fh_pad fh_pads[] = {
-#if defined(CONFIG_FH885XV200) || defined(CONFIG_FH865X)
+#if defined(CONFIG_FULLHAN_V200) || defined(CONFIG_FULLHAN_865X)
 	PAD(3, 0x10001100), PAD(4, 0x10001100),		/* UART0 TX, RX */
 	PAD(42, 0x10001140),				/* SSI0 CLK */
 	PAD(43, 0x11001120),				/* GPIO6: flash CS */
@@ -57,7 +57,7 @@ static const struct fh_pad fh_pads[] = {
 	PAD(54, 0x10001120), PAD(55, 0x10001120),	/* SD0 CMD, D0 */
 	PAD(56, 0x10001120), PAD(57, 0x10001120),	/* SD0 D1, D2 */
 	PAD(58, 0x10001120),				/* SD0 D3 */
-#elif defined(CONFIG_FH885XV100)
+#elif defined(CONFIG_FULLHAN_V100)
 	PAD(50, 0x00101130), PAD(51, 0x00101130),	/* UART0 RX, TX */
 	PAD(56, 0x00001130), PAD(57, 0x00101130),	/* SSI0 CLK, TXD */
 	PAD(58, 0x01101130),				/* GPIO54: flash CS */
@@ -73,7 +73,7 @@ static const struct fh_pad fh_pads[] = {
 	PAD(64, 0x00101130), PAD(65, 0x00101130),	/* SD0 CMD, D0 */
 	PAD(66, 0x00101130), PAD(67, 0x00101130),	/* SD0 D1, D2 */
 	PAD(68, 0x00101130),				/* SD0 D3 */
-#elif defined(CONFIG_FH8626V100)
+#elif defined(CONFIG_FULLHAN_8626)
 	PAD(50, 0x00011100), PAD(51, 0x00011100),	/* UART0 RX, TX */
 	PAD(56, 0x00001140), PAD(57, 0x00001100),	/* SSI0 CLK, TXD */
 	PAD(58, 0x01011100),				/* GPIO54: flash CS */
@@ -89,7 +89,7 @@ static const struct fh_pad fh_pads[] = {
 	PAD(64, 0x00011100), PAD(65, 0x00011100),	/* SD0 CMD, D0 */
 	PAD(66, 0x00011140), PAD(67, 0x00011100),	/* SD0 D1, D2 */
 	PAD(68, 0x00011100),				/* SD0 D3 */
-#elif defined(CONFIG_FH8632)
+#elif defined(CONFIG_FULLHAN_8632)
 	/* Only the functions: the pulls stay as they are */
 	PAD_FUNC(58, 1),				/* GPIO54: flash CS */
 	PAD_FUNC(37, 1),				/* GPIO2: PHY reset */
@@ -193,7 +193,7 @@ static void fh_ext_phy_init(int addr, u32 id)
 	if ((id & 0xfffffff0) == (PHY_ID_IP101G & 0xfffffff0)) {
 		fh_mdio_write(addr, 20, 16);
 		fh_mdio_write(addr, 16, 0x1006);
-#ifndef CONFIG_FH8632
+#ifndef CONFIG_FULLHAN_8632
 		fh_mdio_write(addr, 26, 0xc5ed);	/* RXD drive */
 #endif
 		fh_mdio_write(addr, 20, 16);
@@ -204,7 +204,7 @@ static void fh_ext_phy_init(int addr, u32 id)
 	}
 }
 
-#if defined(CONFIG_FH885XV200) || defined(CONFIG_FH865X)
+#if defined(CONFIG_FULLHAN_V200) || defined(CONFIG_FULLHAN_865X)
 /*
  * V200 and FH865x boards have either an RMII PHY on the MAC pads (an
  * FH8852V200 camera with a JL1101 is one) or use the SoC's own 10/100 PHY
@@ -343,7 +343,7 @@ static void fh_phy_setup(void)
  * An RMII PHY on the pads: IP101G, or RTL8201. RXDV is a strap, held low
  * through its GPIO while the PHY comes out of reset (fh_gmac_phy_reset()).
  */
-#if defined(CONFIG_FH8632)
+#if defined(CONFIG_FULLHAN_8632)
 #define FH_PHY_RESET_GPIO	2
 #define FH_PAD_RXDV_GPIO	0x01101000
 #define FH_PAD_RXDV		0x00101000
@@ -361,7 +361,7 @@ static void fh_phy_setup(void)
 	u32 id;
 	int addr;
 
-#ifdef CONFIG_FH8632
+#ifdef CONFIG_FULLHAN_8632
 	/* The PHY's 50 MHz reference from AC_MCLK: PLL1 / 12 */
 	writel(0x0b77030b, FH_PMU_CLK_DIV6);
 #endif
@@ -400,23 +400,23 @@ static struct dwmci_host fh_sdc0;
 
 static void fh_sdc0_setup(void)
 {
-#if defined(CONFIG_FH885XV200) || defined(CONFIG_FH865X)
+#if defined(CONFIG_FULLHAN_V200) || defined(CONFIG_FULLHAN_865X)
 	clrbits_le32(FH_PMU_CLK_GATE, FH_GATE_SDC0);
 	clrbits_le32(FH_PMU_CLK_GATE1, BIT(2));
 	fh_pmu_update(FH_PMU_CLK_DIV3, 0xf00, 2 << 8);	/* 1200 / 8 / 3 */
 	/* Drive at 180 degrees, sample at 0 */
 	fh_pmu_update(FH_PMU_CLK_GATE1, 0xff << 16, 8 << 20);
-#elif defined(CONFIG_FH885XV100)
+#elif defined(CONFIG_FULLHAN_V100)
 	clrbits_le32(FH_PMU_CLK_GATE, FH_GATE_SDC0);
 	fh_pmu_update(FH_PMU_CLK_DIV3, 0xf00, 0);		/* 100 / 2 */
 	fh_pmu_update(FH_PMU_CLK_GATE1, 0x33 << 16, 2 << 20);
 	fh_gpio_output(5, 0);
-#elif defined(CONFIG_FH8626V100)
+#elif defined(CONFIG_FULLHAN_8626)
 	clrbits_le32(FH_PMU_CLK_GATE, FH_GATE_SDC0);
 	fh_pmu_update(FH_PMU_CLK_DIV2, 0xf0000, 0);		/* 100 / 2 */
 	fh_pmu_update(FH_PMU_BASE + 0x28, 0x780, 0x100);
 	fh_gpio_output(5, 0);
-#elif defined(CONFIG_FH8632)
+#elif defined(CONFIG_FULLHAN_8632)
 	fh_pmu_update(FH_PMU_CLK_DIV3, 0xf00, 5 << 8);		/* 600 / 2 / 6 */
 	fh_pmu_update(FH_PMU_CLK_GATE1, 0x33 << 16, 2 << 20);
 	fh_gpio_output(5, 0);
@@ -436,7 +436,7 @@ int board_mmc_init(struct bd_info *bis)
 	host->dev_index = 0;
 	host->buswidth = 4;
 	ret = add_dwmci(host, 25000000, 400000);
-#ifdef CONFIG_FH8632
+#ifdef CONFIG_FULLHAN_8632
 	/* D2 and D3 are not bonded out on the FH8632's package */
 	if (!ret)
 		host->cfg.host_caps &= ~MMC_MODE_4BIT;
