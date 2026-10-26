@@ -7,6 +7,7 @@
 [![novatek build](https://github.com/OpenIPC/u-boot/actions/workflows/build-novatek.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-novatek.yml)
 [![allwinner build](https://github.com/OpenIPC/u-boot/actions/workflows/build-allwinner.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-allwinner.yml)
 [![fullhan build](https://github.com/OpenIPC/u-boot/actions/workflows/build-fullhan.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-fullhan.yml)
+[![grainmedia build](https://github.com/OpenIPC/u-boot/actions/workflows/build-grainmedia.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-grainmedia.yml)
 
 Unified repository for the U-Boot bootloaders maintained by
 [OpenIPC](https://openipc.org) for supported SoCs.
@@ -25,6 +26,7 @@ family — not bootloader sources.
 | `openipc-novatek` | U-Boot for Novatek NT98562, NT98566 |
 | `openipc-allwinner` | U-Boot for Allwinner V3s, V831, V833, V851s |
 | `openipc-fullhan` | U-Boot for Fullhan FH8632, FH885x V100, FH8626V100, FH885xV200, FH865x |
+| `openipc-grainmedia` | U-Boot for Grain Media GM8135S, GM8136, GM8136S |
 | `main` | Fork of upstream mainline U-Boot, kept for rebasing |
 
 New families are added here as they are ported, each with its own
@@ -322,6 +324,34 @@ bash build.sh fh8852v200      # a single SoC
 
 Images land in `output/` as `u-boot-<soc>-nor.bin`.
 
+## grainmedia
+
+U-Boot for Grain Media's camera SoCs, on the same mainline release
+(v2022.10) and with the same OpenIPC boot layer as `openipc-hisilicon`.
+
+**NOR:** `gm8136` (GM8136 and GM8136S) and `gm8135` (GM8135S), as
+OpenIPC/firmware names them.
+
+The mask ROM loads nsboot, the SDK's first stage, from the flash into
+SRAM; nsboot sets up DDR and the CPU clock and loads U-Boot to DDR.
+nsboot is built from the SDK's sources in the tree, and one build serves
+every package: it picks the DDR table by the chip's package ID.
+`u-boot-<soc>-nor.bin` holds the flash header, nsboot and U-Boot, to be
+written at flash offset 0 as it is; the environment is at 0x40000.
+
+These images have so far run only on qemu-hisilicon's Grain Media
+machines (which run nsboot), not on a camera.
+
+```sh
+git clone --branch openipc-grainmedia https://github.com/OpenIPC/u-boot.git
+cd u-boot
+
+bash build.sh                 # every SoC above
+bash build.sh gm8136          # a single SoC
+```
+
+Images land in `output/` as `u-boot-<soc>-nor.bin`.
+
 ## CI
 
 The [build-hisilicon](.github/workflows/build-hisilicon.yml) workflow runs
@@ -474,6 +504,25 @@ Its `release` input fills this repository's
 
 ```sh
 gh workflow run build-fullhan.yml -f release=true -f publish=true
+```
+
+### grainmedia
+
+The [build-grainmedia](.github/workflows/build-grainmedia.yml) workflow
+has the same shape. It runs on pull requests to this branch that change
+it, on pushes and pull requests to `openipc-grainmedia` (through that
+branch's `ci.yml`), and manually. Each image is smoke-tested on every
+qemu-hisilicon machine it serves -- `gm8136` on `gm8136` and `gm8136s`,
+`gm8135` on `gm8135s` --: booted from an 8 MiB flash image, then a second
+time, which must load the environment the first boot saved.
+
+Its `release` input fills this repository's
+[`Grain Media` release](../../releases/tag/grainmedia); `publish` uploads
+to `OpenIPC/firmware` `latest`, where no other repository publishes
+`u-boot-gm*` names, and reports to openipc.org.
+
+```sh
+gh workflow run build-grainmedia.yml -f release=true -f publish=true
 ```
 
 ## Adding a SoC family
