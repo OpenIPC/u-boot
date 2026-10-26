@@ -1224,6 +1224,16 @@ config ARCH_U8500
 	imply SYS_THUMB_BUILD
 	imply SYSRESET_SYSCON
 
+config ARCH_GRAINMEDIA
+	bool "Grain Media IP camera SoCs"
+	select CPU_ARM926EJS
+	select CREATE_ARCH_SYMLINK
+	select SUPPORT_PASSING_ATAGS
+	help
+	  Grain Media's GM8135S, GM8136 and GM8136S camera SoCs (a Faraday
+	  FA626TE among Faraday peripherals). The mask ROM runs nsboot from
+	  the flash, which sets up DDR and loads U-Boot to address 0.
+
 config ARCH_VERSAL
 	bool "Support Xilinx Versal Platform"
 	select ARM64
@@ -2283,6 +2293,8 @@ source "arch/arm/mach-zynq/Kconfig"
 source "arch/arm/mach-zynqmp/Kconfig"
 
 source "arch/arm/mach-versal/Kconfig"
+
+source "arch/arm/mach-grainmedia/Kconfig"
 
 source "arch/arm/mach-zynqmp-r5/Kconfig"
 
