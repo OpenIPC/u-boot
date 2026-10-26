@@ -1032,6 +1032,21 @@ void fmc100_global_unlock(struct fmc_host *host)
 {
 	struct fmc_spi *spi = host->spi;
 	unsigned char sr1, sr2, sr3;
+	unsigned int reg;
+
+	/*
+	 * The controller can drive WP# itself, and the GSL that a production
+	 * Hi3516CV610 boots from (image_tool/input/gsl-20250416.bin) leaves
+	 * that on. With WP# low, a part whose SRWD/SRP is set ignores every
+	 * status register write: the unlocks below do nothing, and Linux's
+	 * bsp-sfc, which never clears it either, fails its status register
+	 * read-back in spi_nor_scan() and gives up on the flash ("spi nor
+	 * register fail!", -EIO), so there is no root to mount. Release it
+	 * first; erase and write go through the same protection.
+	 */
+	reg = fmc_read(host, FMC_GLOBAL_CFG);
+	if (reg & FMC_GLOBAL_CFG_WP_ENABLE)
+		fmc_write(host, FMC_GLOBAL_CFG, reg & ~FMC_GLOBAL_CFG_WP_ENABLE);
 
 	/* FMC_STATUS carries more than the flash status byte, so read the
 	 * registers through the plain command path. */
