@@ -525,6 +525,13 @@ config FSL_ESPI
 	  access the SPI interface and SPI NOR flash on platforms embedding
 	  this Freescale eSPI IP core.
 
+config FH_SPI
+	bool "Fullhan SPI0 flash controller"
+	depends on ARCH_FULLHAN && !DM_SPI
+	help
+	  The DesignWare SSI that Fullhan camera SoCs boot from, with its
+	  GPIO chip select, under the legacy (non-DM) SPI API.
+
 config SH_QSPI
 	bool "Renesas Quad SPI driver"
 	help
