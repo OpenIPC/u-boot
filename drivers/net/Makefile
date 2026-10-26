@@ -42,6 +42,7 @@ obj-$(CONFIG_FSL_MC_ENET) += ldpaa_eth/
 obj-$(CONFIG_FSL_MEMAC) += fm/memac_phy.o
 obj-$(CONFIG_FSL_PFE) += pfe_eth/
 obj-$(CONFIG_FTGMAC100) += ftgmac100.o
+obj-$(CONFIG_FTGMAC100_NODM) += ftgmac100_nodm.o
 obj-$(CONFIG_FTMAC100) += ftmac100.o
 obj-$(CONFIG_GMAC_ROCKCHIP) += gmac_rockchip.o
 obj-$(CONFIG_HIGMACV300_ETH) += higmacv300.o

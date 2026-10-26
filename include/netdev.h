@@ -45,6 +45,7 @@ int ethoc_initialize(u8 dev_num, int base_addr);
 int fecmxc_initialize(struct bd_info *bis);
 int fecmxc_initialize_multi(struct bd_info *bis, int dev_id, int phy_id,
 			    uint32_t addr);
+int ftgmac100_initialize(ulong base_addr);
 int ftmac100_initialize(struct bd_info *bits);
 int ftmac110_initialize(struct bd_info *bits);
 void gt6426x_eth_initialize(struct bd_info *bis);
