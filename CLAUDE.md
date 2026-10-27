@@ -49,9 +49,11 @@ git diff --diff-filter=M v2022.10 HEAD         # the mainline files we patched
 | Area | Location |
 | --- | --- |
 | SoC: timer, reset, DRAM size, MIU flush | `arch/arm/mach-sigmastar/` (`ARCH_SIGMASTAR`; `TARGET_MSC313E/MSC316DC/MSC316DM`, `SS_INFINITY3`; register map in `include/mach/sigmastar.h`) |
-| Board: `misc_init_r` → `openipc_helper()`, `board_eth_init` | `board/sigmastar/infinity3/` |
+| Board: `misc_init_r` → `openipc_helper()`, `board_eth_init`, `board_mmc_init` | `board/sigmastar/infinity3/` |
 | SPI NOR on the FSP, non-DM | `drivers/mtd/spi/ms_sflash.c` (`MS_SFLASH`). It provides `spi_flash_probe()` and fills `mtd->_read/_write/_erase`, as `ak_sflash` does on `openipc-anyka` |
 | Ethernet, non-DM | `drivers/net/ms_emac.c` (`MS_EMAC`) |
+| SD card on SDIO0, non-DM | `drivers/mmc/ms_sdmmc.c` (`MMC_MS_SDMMC`), registered from `board_mmc_init()` |
+| xz decompression | `lib/xz/` (xz-embedded, 0BSD, with CRC64; `XZ`), `include/linux/xz.h`, `unxz()` in `include/unxz.h` |
 | Memory map, console, timer | `include/configs/sigmastar.h`, ending in `#include "openipc-common.h"` |
 | OpenIPC boot layer | `common/openipc.c`, `include/openipc.h` (as on `openipc-anyka`), `include/configs/openipc-common.h` (SigmaStar rewrite, NOR only, same env commands) |
 | Kconfig fragments, vendor boot stages, the image packer, the build | `openipc/`, `build.sh` |
@@ -62,6 +64,10 @@ git diff --diff-filter=M v2022.10 HEAD         # the mainline files we patched
 - `common/{Kconfig,Makefile}`: `OPENIPC`, `PRODUCT_SOC`, `PRODUCT_SOCMODEL`.
 - `drivers/mtd/spi/{Kconfig,Makefile}`, `cmd/Kconfig` (`CMD_SF`) and
   `env/Kconfig` (`ENV_IS_IN_SPI_FLASH`): accept `MS_SFLASH`.
+- `drivers/mmc/{Kconfig,Makefile}`: `MMC_MS_SDMMC`.
+- `lib/{Kconfig,Makefile}`: `XZ`.
+- `boot/image.c`: `image_decomp()` decodes xz data in an "lzma" uImage
+  with `unxz()` (see "Hand-off to the kernel").
 - `drivers/net/{Kconfig,Makefile}`, `include/netdev.h`: `MS_EMAC`;
   `NETDEVICES` selects `DM_ETH` only when `DM` is on, as on `openipc-xm`.
 - `.gitattributes`: `openipc/*.bin` are binary (the tree's
@@ -112,10 +118,15 @@ The vendor boot chain is kept; only the MXP partition `UBOOT` is ours.
   vendor U-Boot passes.
 - Kernel uImages load at `0x20008000`; `baseaddr` is `0x21000000`, where
   the vendor U-Boot reads them.
-- Vendor kernel partitions hold a uImage of type "lzma" with **xz** data,
-  which the vendor U-Boot unpacks with its own xz code. Mainline U-Boot
-  has no xz in `bootm`: such a kernel has to be repacked (uncompressed,
-  or as OpenIPC builds it, a zImage in a plain uImage).
+- Vendor kernel partitions hold a uImage of type "lzma" with **xz** data
+  (CRC64 check), which the vendor U-Boot unpacks with its own xz code.
+  `image_decomp()` looks at the data of an "lzma" uImage: the xz magic
+  goes to `unxz()` (`lib/xz`, xz-embedded with CRC64), anything else to
+  the LZMA decoder as before. So vendor kernels boot as they are, and so
+  do OpenIPC's (a zImage in a plain uImage) and real LZMA uImages.
+  `lib/xz` is upstream's Linux tree except one line in `xz_private.h`
+  (the standalone branch when `__UBOOT__`) and U-Boot's own
+  `xz_config.h`; no BCJ filters.
 - `mem=` is the whole DDR (`osmem` 64M/128M), as the vendor passes it; the
   media drivers take CMA from the kernel. The MTD name is `NOR_FLASH`
   (`SFC`), the console `ttyS0`.
@@ -157,8 +168,29 @@ a register by its byte address `0xBBBB00 + R * 2`.
   TAR/TCR, MDIO through MAN (registered as the MDIO bus `ms_emac`, for
   `mii`), auto-negotiation as the vendor runs it (up to
   8 s without a link, at every network command).
-- **SD:** not supported. The FCIE (`drivers/mstar/sdmmc`) is not ported, so
-  `CONFIG_MMC` is off and `common/openipc.c` has no card to recover from.
+- **SD:** SDIO0, the FCIE5 host at bank `0x1410` (`drivers/mmc/ms_sdmmc.c`),
+  after the vendor's `hal_sdmmc_v5.c`, `hal_card_platform_iNF3.c` and
+  `ms_sdmmc_ub.c` (the vendor's own glue to U-Boot's mmc core):
+  - a job sends the command through the CMD/RSP FIFO (registers `0x20`-,
+    byte 0 = `0x40 | index`, argument MSB first; the response comes back
+    in the same bytes, byte 0 the index or `0x3F`) and, with `DTRX_EN`,
+    moves the data by DMA (MIU addresses, `BLK_SIZE` x `JOB_BLK_CNT`);
+    a write runs its data as a second job with `JOB_DIR`; `MIE_EVENT`
+    gives the ends, `SD_STS` the errors (R3's CRC error is bogus and
+    ignored); a job that never ends resets the IP (`FCIE_RST`);
+  - 4-bit, the clock from CLKGEN `0x45` (select 0-7: 48, 43.2, 40, 36,
+    32, 20, 12 MHz, 300 kHz; the fastest not above the one asked), bypass
+    timing, the vendor's Nrc wait before each command;
+  - card detect: PM GPIO `0x47` bit 2, low with a card in; card power:
+    PADTOP `0x17` bit 4, low on; at each init the pads go to SDIO0 with
+    pull-ups after the vendor's power-off, power-up, clock-on sequence
+    (about 105 ms). No card: `mmc_init` fails at once.
+  - `common/openipc.c` recovers from the card at every boot, as on
+    `openipc-anyka`: `script.txt` (which then takes precedence), else
+    `uImage.<soc>.img` and `rootfs.squashfs.<soc>.img`, uImages flashed
+    where their load address says, without the header
+    (`mkimage -T firmware -a 0x50000 -d uImage.<soc> uImage.<soc>.img`,
+    `-a 0x250000` for the rootfs); an image already in flash is skipped.
 
 ## Build
 
@@ -171,8 +203,8 @@ bash build.sh msc313e       # one or more SoCs (CROSS_COMPILE defaults to arm-li
   partition, built out of tree in `output/build-<soc>-nor/`.
 - `.config` is `openipc/openipc_config`, then `openipc/<soc>_config`, then
   `olddefconfig`. There are no `configs/*_defconfig` for these targets.
-- Thumb-2 (`SYS_THUMB_BUILD`): `u-boot.bin` is about 140 KiB, 73 KiB in
-  the uImage; the `UBOOT` partition holds 128 KiB. The image packer fails
+- Thumb-2 (`SYS_THUMB_BUILD`): `u-boot.bin` is about 180 KiB, 96 KiB in
+  the uImage (SD, FAT, LZMA and xz included); the `UBOOT` partition holds 128 KiB. The image packer fails
   the build past that.
 - Python 3 with `lzma` is needed for the image.
 
@@ -197,13 +229,23 @@ included. There is no MSC316 machine; the MSC316 images boot on `msc313e`
     rootfs to `0x250000`, the kernel to `0x50000`, a reset, and `bootflash`
     boots the kernel from flash.
   - The boot limit: two `reset`s, then `altbootcmd` boots with `failsafe`.
-  - The retail camera's 3.18.30 kernel, repacked uncompressed and booted
-    by TFTP with its own `mtdparts`, mounts its squashfs from flash and
-    reaches its shell.
+  - The retail camera's kernel partition as it is (xz in an "lzma"
+    uImage), `sf read` + `bootm` with its own `mtdparts`: the 3.18.30
+    kernel mounts its squashfs from flash and reaches its shell. The same
+    kernel as a real LZMA uImage, and uncompressed, by TFTP: the same.
+  - SD (`-drive if=sd,format=raw,file=<card>`, qemu-hisilicon's SDIO0
+    model; a power-of-two card with an MBR and a FAT partition):
+    `mmc info` (4-bit), `fatls`, `fatload` with the right CRC, 256 blocks
+    of `mmc write` read back identical; `script.txt` at boot; recovery
+    of kernel and rootfs from an empty flash, the kernel's checksum
+    good from flash, nothing rewritten on the next boot with the card
+    still in; no card: "MMC: no card present". The model was checked
+    against the vendor U-Boot's SD driver first.
 - **Not checked:** an OpenIPC firmware (no msc313e release is published),
   `fw_printenv` from Linux, and anything on silicon.
 - **What qemu does not check:** the DDR training (the IPLs are the
-  vendor's), the PHY's analog set-up, the FSP's and BDMA's real timing,
+  vendor's), the PHY's analog set-up, the FSP's, BDMA's and SD host's
+  real timing, the SD pads and card power,
   whether the bootcount word in DDR survives the IPL after a real reset.
 
 ## Things to keep
