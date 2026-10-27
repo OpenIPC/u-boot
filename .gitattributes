@@ -4,3 +4,5 @@
 *.bmp binary
 *.ttf binary
 *.gz binary
+# The vendor boot stages the OpenIPC images carry
+openipc/*.bin binary
