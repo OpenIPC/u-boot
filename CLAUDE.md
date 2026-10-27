@@ -43,6 +43,12 @@ own branch:
   plus the SDK's nsboot, built from source in the tree. CI:
   `build-grainmedia.yml`, called from that branch's `ci.yml`. Its own
   `CLAUDE.md` covers nsboot, the image layout and the kernel hand-off.
+- `openipc-sigmastar`: U-Boot for SigmaStar MSC313E, MSC316DC and
+  MSC316DM (infinity3), on the same mainline release with the same
+  OpenIPC layer, behind the vendor's IPL and IPL_CUST, carried as
+  binaries. CI: `build-sigmastar.yml`, called from that branch's
+  `ci.yml`. Its own `CLAUDE.md` covers the boot chain, the image layout
+  and the kernel hand-off.
 - `main`: a fork of upstream mainline U-Boot, kept for rebasing.
 
 To change bootloader code, check out `openipc-hisilicon`, or read it with
@@ -232,6 +238,29 @@ The build logic lives here. Other branches call it:
   - openipc.org accepts the report only from workflows it allowlists
     (OpenIPC/website `service/internal/builds/verify.go`).
     `build-grainmedia.yml` has to be added there before the first
+    `publish`.
+
+## `build-sigmastar.yml`
+
+- It is `build-anyka.yml` for `openipc-sigmastar`: the same job graph and
+  `resolve`/`ref` rules, NOR only (256 KiB boot partition: MXP table,
+  the vendor IPL and IPL_CUST, U-Boot in the 128 KiB MXP partition
+  `UBOOT`).
+- **Images are not machines:** qemu-hisilicon has an `msc313e` machine
+  only (#213 or later). Every leg, the MSC316 ones too, boots on
+  `-M msc313e`; the MSC316 IPL sizes its 64 MiB. Keep the build matrix,
+  the smoke matrix and the README's list in step.
+- **Smoke test:** two boots of an 8 MiB flash image holding only the
+  image; the machine's mask ROM loads the IPL from 0x4000. It passes on
+  `Hit Ctrl-C`, and fails if the second boot reports a bad environment CRC.
+- **Release and publish:**
+  - `release` uploads to the `sigmastar` tag.
+  - `publish` shares the `publish-firmware-latest` concurrency group and
+    reports a `uboot-sigmastar-…` build id. No other repository
+    publishes `u-boot-msc31*` names to `latest`.
+  - openipc.org accepts the report only from workflows it allowlists
+    (OpenIPC/website `service/internal/builds/verify.go`).
+    `build-sigmastar.yml` has to be added there before the first
     `publish`.
 
 ## Invariants to keep when editing `build-hisilicon.yml`
