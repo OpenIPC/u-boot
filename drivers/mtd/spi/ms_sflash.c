@@ -83,6 +83,7 @@
 #define CMD_WRSR		0x01
 #define CMD_PP			0x02
 #define CMD_RDSR		0x05
+#define CMD_RDSR2		0x35
 #define CMD_WREN		0x06
 #define CMD_RDID		0x9F
 #define CMD_SE_64K		0xD8
@@ -253,19 +254,33 @@ static int ms_sf_erase(struct mtd_info *mtd, struct erase_info *instr)
 	return 0;
 }
 
+#define MFR_GIGADEVICE		0xc8
+#define MFR_WINBOND		0xef
+
 /*
- * Block protection left on by a vendor loader: cleared, status register 1
- * only. Not written when clear, so status register 2 (the quad enable bit
- * the IPL's read mode may rely on) is left alone.
+ * Block protection left on by a vendor loader: the BP and SRWD bits
+ * cleared, every other status bit kept (Macronix's quad enable is in
+ * status register 1). Winbond and GigaDevice parts get status register 2
+ * written back with it: on some of them a one-byte WRSR clears it, and
+ * with it the quad enable the IPL's read mode may need. Nothing is
+ * written when no protection is set.
  */
-static void sf_unprotect(void)
+static void sf_unprotect(u8 mfr)
 {
-	u8 wbuf[4] = { CMD_WREN, CMD_WRSR, 0, CMD_RDSR };
-	u8 sr;
+	u8 wbuf[5] = { CMD_WREN, CMD_WRSR, 0, 0, CMD_RDSR };
+	unsigned int n = 1;
+	u8 sr, sr2;
 
 	if (sf_read_cmd(CMD_RDSR, &sr, 1) || !(sr & (SR_BP | SR_SRWD)))
 		return;
-	if (fsp_run(wbuf, 4, FSP_SIZES(1, 2, 1), FSP_SIZES(0, 0, 1),
+	wbuf[2] = sr & ~(SR_BP | SR_SRWD);
+	if ((mfr == MFR_WINBOND || mfr == MFR_GIGADEVICE) &&
+	    !sf_read_cmd(CMD_RDSR2, &sr2, 1)) {
+		wbuf[3] = sr2;
+		n = 2;
+	}
+	wbuf[2 + n] = CMD_RDSR;
+	if (fsp_run(wbuf, 3 + n, FSP_SIZES(1, 1 + n, 1), FSP_SIZES(0, 0, 1),
 		    CTRL_CMD2 | CTRL_CMD3 | CTRL_RDSR(2) | CTRL_FSCHK, NULL, 0) ||
 	    sf_wait_ready())
 		printf("SF: could not clear the block protection (SR %02x)\n",
@@ -298,7 +313,7 @@ struct spi_flash *spi_flash_probe(unsigned int bus, unsigned int cs,
 	 */
 	size = id[2] >= 0x14 && id[2] <= 0x18 ? 1 << id[2] : SZ_8M;
 
-	sf_unprotect();
+	sf_unprotect(id[0]);
 
 	memset(flash, 0, sizeof(*flash));
 	flash->name = "ms-sflash";
