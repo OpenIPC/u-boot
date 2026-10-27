@@ -154,7 +154,8 @@ a register by its byte address `0xBBBB00 + R * 2`.
   on): the internal PHY's clocks and analog set-up (the vendor's table,
   verbatim), RX descriptor mode 1, a ring of 128 descriptors with a
   0x600-byte buffer each (16 KiB aligned, as the vendor's), TX through
-  TAR/TCR, MDIO through MAN, auto-negotiation as the vendor runs it (up to
+  TAR/TCR, MDIO through MAN (registered as the MDIO bus `ms_emac`, for
+  `mii`), auto-negotiation as the vendor runs it (up to
   8 s without a link, at every network command).
 - **SD:** not supported. The FCIE (`drivers/mstar/sdmmc`) is not ported, so
   `CONFIG_MMC` is off and `common/openipc.c` has no card to recover from.
@@ -187,7 +188,8 @@ included. There is no MSC316 machine; the MSC316 images boot on `msc313e`
   must load the environment the first saved.
 - **Checks run by hand** (all passed under qemu-hisilicon `msc313e`):
   - `saveenv` + `reset`; the variable is there after the reset.
-  - `ping` to the qemu host; TFTP of 300000 bytes with the right CRC.
+  - `ping` to the qemu host; TFTP of 300000 bytes with the right CRC;
+    `mii read 0 1` reads the PHY.
   - `sf erase` + `sf write` of 300000 bytes at `0x700123` + `sf read` +
     `cmp.b`; the bytes before the write read 0xff.
   - TFTP recovery from a flash holding only U-Boot
