@@ -1,4 +1,6 @@
-# OpenIPC U-Boot
+![OpenIPC logo][logo]
+
+# U-Boot
 
 [![hisilicon build](https://github.com/OpenIPC/u-boot/actions/workflows/build-hisilicon.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-hisilicon.yml)
 [![xiongmai build](https://github.com/OpenIPC/u-boot/actions/workflows/build-xm.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-xm.yml)
@@ -596,3 +598,12 @@ gh workflow run build-sigmastar.yml -f release=true -f publish=true
 
 U-Boot is licensed under the GPL-2.0+; see the `Licenses/` directory and
 the per-file SPDX tags on the corresponding branch.
+
+## Support
+
+- Questions and bug reports: [GitHub Issues](https://github.com/OpenIPC/u-boot/issues)
+- Documentation: [openipc.org](https://openipc.org)
+
+[![Telegram](https://openipc.org/images/telegram_button.svg)](https://openipc.org/our-channels)
+
+[logo]: https://raw.githubusercontent.com/OpenIPC/.github/refs/heads/main/assets/openipc-logo-black.svg
