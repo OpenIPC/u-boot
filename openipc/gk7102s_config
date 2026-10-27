@@ -1,2 +1,6 @@
 CONFIG_TARGET_GK7102S=y
 CONFIG_PRODUCT_SOC="gk7102s"
+
+# The split NOR layout: the kernel (OpenIPC/linux goke-gk710x) registers
+# its partitions from the images in the firmware area, no device tree.
+CONFIG_OPENIPC_NOR_SPLIT=y

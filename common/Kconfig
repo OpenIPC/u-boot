@@ -1027,3 +1027,15 @@ config PRODUCT_SOCMODEL
 	help
 	  Optional board/binning model exposed as 'socmodel=' in the default
 	  environment.
+
+config OPENIPC_NOR_SPLIT
+	bool "OpenIPC: recognise the split NOR layout (uImage + squashfs in one partition)"
+	help
+	  A uImage at the NOR kernel offset with the root squashfs at the next
+	  64 KiB block after it is taken for the split layout: one "firmware"
+	  partition the kernel divides at boot. The
+	  kernel is told nothing about it: the fixed-slot mtdparts and root=
+	  of a saved environment are dropped, and bootm checks the uImage CRC.
+	  Only for boards whose kernel knows the layout: on this branch the
+	  GK710x, whose kernel (goke-gk710x) registers it from the images
+	  themselves, without a device tree.
