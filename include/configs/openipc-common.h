@@ -111,12 +111,14 @@
 #ifdef CONFIG_OPENIPC_NOR_SPLIT
 /*
  * The split layout (kernel goke-gk710x): the whole firmware file, written
- * where the firmware starts, when the server has one; else the fixed-slot
- * pair as before. common/openipc.c turns a saved fwupd of exactly the
+ * where the firmware starts, when the server has one that fits the firmware
+ * area; else -- none, an empty one, or one too big for the chip -- the
+ * fixed-slot pair as before. common/openipc.c turns a saved fwupd of exactly the
  * legacy form into this one.
  */
 #define OPENIPC_FWUPD_SPLIT_CMD \
-	"if ${source} ${baseaddr} ${fwfile}; then run fwwrite; else run mtdslite; run ur; run uk; fi"
+	"if ${source} ${baseaddr} ${fwfile} && itest ${filesize} -gt 0 && itest ${filesize} -le ${fwsize}; " \
+	"then run fwwrite; else run mtdslite; run ur; run uk; fi"
 #define OPENIPC_FWUPD_LEGACY_CMD "run mtdslite; run ur; run uk"
 /*
  * The whole firmware area (the scan sets fwsize to the end of the chip), and
