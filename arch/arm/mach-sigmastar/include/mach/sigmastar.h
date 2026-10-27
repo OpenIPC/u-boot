@@ -21,18 +21,14 @@
 #define SS_XIU_FLASH_BASE	0x14000000
 
 /* Banks */
-#define SS_BANK_ISP		0x0008	/* the serial flash's ISP block */
 #define SS_BANK_PMSLEEP		0x000E
 #define SS_BANK_FSP		0x0016
-#define SS_BANK_QSPI		0x0017
 #define SS_BANK_PMTOP		0x001E
-#define SS_BANK_EFUSE		0x0020
 #define SS_BANK_TIMER0		0x0030	/* the PIU timers, timer 0 at reg 0x10 */
 #define SS_BANK_ALBANY0		0x0031	/* the internal Ethernet PHY */
 #define SS_BANK_ALBANY1		0x0032
 #define SS_BANK_ALBANY2		0x0033
 #define SS_BANK_BDMA		0x1002	/* channel 0 */
-#define SS_BANK_MIU		0x1012
 #define SS_BANK_CHIPTOP		0x101E
 #define SS_BANK_L3BRIDGE	0x1022
 #define SS_BANK_CLKGEN0		0x1038
@@ -43,7 +39,6 @@
 
 /* PMTOP reg 0: the die's ID, 0xC2 on infinity3 */
 #define SS_CHIP_ID		SS_REG(SS_BANK_PMTOP, 0x00)
-#define SS_CHIP_ID_INFINITY3	0xC2
 
 /* PM sleep reg 0x2E: 0x79 resets the chip */
 #define SS_PM_RESET		SS_REG(SS_BANK_PMSLEEP, 0x2E)

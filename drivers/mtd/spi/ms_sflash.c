@@ -25,6 +25,7 @@
 #include <common.h>
 #include <spi_flash.h>
 #include <time.h>
+#include <wait_bit.h>
 #include <watchdog.h>
 #include <asm/io.h>
 #include <asm/arch/sigmastar.h>
@@ -95,15 +96,9 @@
 
 static int fsp_wait(void)
 {
-	ulong start = get_timer(0);
-	int ret = 0;
+	int ret = wait_for_bit_le16((void *)FSP_DONE, BIT(0), true,
+				    SF_TIMEOUT_MS, false);
 
-	while (!(readw(FSP_DONE) & BIT(0))) {
-		if (get_timer(start) > SF_TIMEOUT_MS) {
-			ret = -ETIMEDOUT;
-			break;
-		}
-	}
 	writew(BIT(0), FSP_DONE_CLR);
 	return ret;
 }
@@ -184,8 +179,7 @@ static u8 sf_page[SZ_PAGE] __aligned(64);
 
 static int sf_program_page(u32 to, const u8 *buf, unsigned int len)
 {
-	ulong start;
-	int ret;
+	int ret, bdma;
 
 	memcpy(sf_page, buf, len);
 	ss_miu_flush();
@@ -204,17 +198,12 @@ static int sf_program_page(u32 to, const u8 *buf, unsigned int len)
 	writew(OUT_REPLACE(5) | OUT_MODE_BDMA | OUT_EN, FSP_OUT);
 	ret = sf_wren_cmd(CMD_PP, to, true);
 
-	start = get_timer(0);
-	while (!(readw(BDMA_STATUS) & BDMA_DONE)) {
-		if (get_timer(start) > SF_TIMEOUT_MS) {
-			ret = -ETIMEDOUT;
-			break;
-		}
-	}
+	bdma = wait_for_bit_le16((void *)BDMA_STATUS, BDMA_DONE, true,
+				 SF_TIMEOUT_MS, false);
 	writew(BDMA_DONE, BDMA_STATUS);
 	writew(0, FSP_OUT_SIZE);
 	writew(0, FSP_OUT);
-	return ret ? ret : sf_wait_ready();
+	return ret ? ret : bdma ? bdma : sf_wait_ready();
 }
 
 static int ms_sf_write(struct mtd_info *mtd, loff_t to, size_t len,
