@@ -1083,6 +1083,16 @@ config ARCH_RMOBILE
 	imply SYS_THUMB_BUILD
 	imply ARCH_MISC_INIT if DISPLAY_CPUINFO
 
+config ARCH_SIGMASTAR
+	bool "SigmaStar (MStar) IP camera SoCs"
+	select CPU_V7A
+	select CREATE_ARCH_SYMLINK
+	select SUPPORT_PASSING_ATAGS
+	help
+	  SigmaStar's infinity3 camera SoCs: MSC313E, MSC316DC and MSC316DM.
+	  The vendor's IPL and IPL_CUST, kept in the boot partition, train
+	  the DDR and load U-Boot into it from the MXP partition UBOOT.
+
 config ARCH_SNAPDRAGON
 	bool "Qualcomm Snapdragon SoCs"
 	select ARM64
@@ -2257,6 +2267,8 @@ source "arch/arm/mach-qemu/Kconfig"
 source "arch/arm/mach-rockchip/Kconfig"
 
 source "arch/arm/mach-s5pc1xx/Kconfig"
+
+source "arch/arm/mach-sigmastar/Kconfig"
 
 source "arch/arm/mach-snapdragon/Kconfig"
 
