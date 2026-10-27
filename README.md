@@ -377,11 +377,12 @@ U-Boot from the MXP partition `UBOOT`. `u-boot-<soc>-nor.bin` is the whole
 | `0x20000` | U-Boot, xz-compressed in a uImage (MXP `UBOOT`, 128 KiB) |
 
 That is the layout of retail MSC313E cameras, with the environment at
-0x40000. Vendor kernel partitions hold xz-compressed uImages, which only
-the vendor U-Boot unpacks; this U-Boot boots OpenIPC images.
+0x40000. Vendor kernels (xz data in "lzma" uImages) boot as they are, as
+do OpenIPC's. SD card recovery works as on the other targets
+(`script.txt`, `uImage.<soc>.img`, `rootfs.squashfs.<soc>.img`).
 
 These images have so far run only on qemu-hisilicon's `msc313e` machine,
-not on a camera. There is no SD card support.
+not on a camera.
 
 ```sh
 git clone --branch openipc-sigmastar https://github.com/OpenIPC/u-boot.git
