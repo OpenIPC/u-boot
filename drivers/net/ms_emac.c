@@ -110,7 +110,12 @@ struct ms_emac {
 	int phy;
 };
 
-static u8 ms_tx_buf[PKTSIZE_ALIGN] __aligned(32);
+/*
+ * Two TX buffers, used in turn: TSR's BNQ says only that the queue slot is
+ * free, while the frame queued before may still be read from its buffer
+ */
+static u8 ms_tx_buf[2][PKTSIZE_ALIGN] __aligned(32);
+static unsigned int ms_tx_next;
 
 static u32 emac_readl(unsigned int reg)
 {
@@ -387,6 +392,7 @@ static int ms_emac_send(struct eth_device *dev, void *packet, int length)
 {
 	ulong start = get_timer(0);
 	u32 tsr;
+	u8 *buf;
 
 	/* A free TX slot */
 	do {
@@ -397,13 +403,15 @@ static int ms_emac_send(struct eth_device *dev, void *packet, int length)
 		}
 	} while (!(tsr & (TSR_IDLE | TSR_BNQ)));
 
-	memcpy(ms_tx_buf, packet, length);
+	buf = ms_tx_buf[ms_tx_next];
+	ms_tx_next ^= 1;
+	memcpy(buf, packet, length);
 	if (length < 60) {
-		memset(ms_tx_buf + length, 0, 60 - length);
+		memset(buf + length, 0, 60 - length);
 		length = 60;
 	}
 	ss_miu_flush();
-	emac_writel(SS_MIU_ADDR(ms_tx_buf), EMAC_TAR);
+	emac_writel(SS_MIU_ADDR(buf), EMAC_TAR);
 	emac_writel(length, EMAC_TCR);
 	return 0;
 }
