@@ -22,6 +22,7 @@
 
 /* Banks */
 #define SS_BANK_PMSLEEP		0x000E
+#define SS_BANK_PMGPIO		0x000F
 #define SS_BANK_FSP		0x0016
 #define SS_BANK_PMTOP		0x001E
 #define SS_BANK_TIMER0		0x0030	/* the PIU timers, timer 0 at reg 0x10 */
@@ -32,8 +33,10 @@
 #define SS_BANK_CHIPTOP		0x101E
 #define SS_BANK_L3BRIDGE	0x1022
 #define SS_BANK_CLKGEN0		0x1038
+#define SS_BANK_PADTOP		0x103C
 #define SS_BANK_UART0		0x1108
 #define SS_BANK_SCGPCTRL	0x1133
+#define SS_BANK_SDIO0		0x1410	/* the SD host (FCIE5) */
 #define SS_BANK_EMAC0		0x1510
 #define SS_BANK_EMAC1		0x1511
 
@@ -67,6 +70,7 @@
 
 #ifndef __ASSEMBLY__
 void ss_miu_flush(void);
+int ms_sdmmc_initialize(void);
 #endif
 
 #endif

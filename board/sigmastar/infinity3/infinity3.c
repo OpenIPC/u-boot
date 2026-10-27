@@ -25,6 +25,13 @@ int misc_init_r(void)
 	return openipc_helper();
 }
 
+#ifdef CONFIG_MMC_MS_SDMMC
+int board_mmc_init(struct bd_info *bis)
+{
+	return ms_sdmmc_initialize();
+}
+#endif
+
 #ifdef CONFIG_MS_EMAC
 int board_eth_init(struct bd_info *bis)
 {
