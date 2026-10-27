@@ -104,3 +104,8 @@ __pycache__
 # pylint files
 /pylint.cur
 /pylint.out/
+
+# OpenIPC build outputs
+/output/
+# The vendor boot stages build.sh packs
+!/openipc/*.bin

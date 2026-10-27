@@ -604,6 +604,14 @@ config LZMA
 	  ratio and fairly fast decompression speed. See also
 	  CONFIG_CMD_LZMADEC which provides a decode command.
 
+config XZ
+	bool "Enable xz decompression support"
+	help
+	  xz decompression (xz-embedded, CRC32 and CRC64 checks, no BCJ
+	  filters). A legacy uImage of compression type lzma whose data is
+	  an xz stream, as SigmaStar's vendor tools make kernels, is
+	  decompressed with it.
+
 config LZO
 	bool "Enable LZO decompression support"
 	help

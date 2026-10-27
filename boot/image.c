@@ -66,6 +66,7 @@ DECLARE_GLOBAL_DATA_PTR;
 #include <lzma/LzmaTypes.h>
 #include <lzma/LzmaDec.h>
 #include <lzma/LzmaTools.h>
+#include <unxz.h>
 #include <u-boot/crc.h>
 #include <u-boot/lz4.h>
 
@@ -473,7 +474,15 @@ int image_decomp(int comp, ulong load, ulong image_start, int type,
 		}
 		break;
 	case IH_COMP_LZMA:
-		if (!tools_build() && CONFIG_IS_ENABLED(LZMA)) {
+		/* SigmaStar's vendor tools put xz data in "lzma" uImages */
+		if (!tools_build() && CONFIG_IS_ENABLED(XZ) &&
+		    image_len >= XZ_MAGIC_SIZE &&
+		    !memcmp(image_buf, XZ_MAGIC, XZ_MAGIC_SIZE)) {
+			size_t size = unc_len;
+
+			ret = unxz(image_buf, image_len, load_buf, &size);
+			image_len = size;
+		} else if (!tools_build() && CONFIG_IS_ENABLED(LZMA)) {
 			SizeT lzma_len = unc_len;
 
 			ret = lzmaBuffToBuffDecompress(load_buf, &lzma_len,

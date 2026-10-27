@@ -1,0 +1,44 @@
+if ARCH_SIGMASTAR
+
+choice
+	prompt "SigmaStar SoC"
+	default TARGET_MSC313E
+
+config TARGET_MSC313E
+	bool "MSC313E"
+	select SS_INFINITY3
+	help
+	  infinity3, QFN, 64 MiB of DDR2 in the package.
+
+config TARGET_MSC316DC
+	bool "MSC316DC"
+	select SS_INFINITY3
+	help
+	  infinity3, QFN, 128 MiB of DDR in the package (the SDK's
+	  QFN128MDC board).
+
+config TARGET_MSC316DM
+	bool "MSC316DM"
+	select SS_INFINITY3
+	help
+	  infinity3, QFN, 128 MiB of DDR in the package (the SDK's QFN128M
+	  board).
+
+endchoice
+
+config SS_INFINITY3
+	bool
+
+config SYS_SOC
+	default "sigmastar"
+
+config SYS_VENDOR
+	default "sigmastar"
+
+config SYS_BOARD
+	default "infinity3"
+
+config SYS_CONFIG_NAME
+	default "sigmastar"
+
+endif

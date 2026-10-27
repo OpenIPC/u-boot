@@ -94,7 +94,7 @@ config DSA_SANDBOX
 menuconfig NETDEVICES
 	bool "Network device support"
 	depends on NET
-	select DM_ETH
+	select DM_ETH if DM
 	help
 	  You must select Y to enable any network device support
 	  Generally if you have any networking support this is a given
@@ -437,6 +437,13 @@ config KSZ9477
 	help
 	  This driver implements a DSA switch driver for the KSZ9477 family
 	  of GbE switches using the I2C interface.
+
+config MS_EMAC
+	bool "SigmaStar infinity3 EMAC"
+	depends on ARCH_SIGMASTAR && !DM_ETH
+	help
+	  The 10/100 MAC of the SigmaStar infinity3 SoCs with their internal
+	  PHY, an Atmel AT91RM9200-style EMAC behind the RIU.
 
 config MVGBE
 	bool "Marvell Orion5x/Kirkwood network interface support"
