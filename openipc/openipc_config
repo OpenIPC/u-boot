@@ -50,6 +50,9 @@ CONFIG_SYS_BOOTCOUNT_SINGLEWORD=y
 # DRAM + 0x1f20000, as on the HiSilicon and Xiongmai targets
 CONFIG_SYS_BOOTCOUNT_ADDR=0x21F20000
 CONFIG_LEGACY_IMAGE_FORMAT=y
+# Kernels in "lzma" uImages, and the vendor's, which hold xz data
+CONFIG_LZMA=y
+CONFIG_XZ=y
 CONFIG_OF_LIBFDT=y
 
 # SPI NOR, and the environment in it
