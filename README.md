@@ -8,6 +8,7 @@
 [![allwinner build](https://github.com/OpenIPC/u-boot/actions/workflows/build-allwinner.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-allwinner.yml)
 [![fullhan build](https://github.com/OpenIPC/u-boot/actions/workflows/build-fullhan.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-fullhan.yml)
 [![grainmedia build](https://github.com/OpenIPC/u-boot/actions/workflows/build-grainmedia.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-grainmedia.yml)
+[![sigmastar build](https://github.com/OpenIPC/u-boot/actions/workflows/build-sigmastar.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-sigmastar.yml)
 
 Unified repository for the U-Boot bootloaders maintained by
 [OpenIPC](https://openipc.org) for supported SoCs.
@@ -27,6 +28,7 @@ family — not bootloader sources.
 | `openipc-allwinner` | U-Boot for Allwinner V3s, V831, V833, V851s |
 | `openipc-fullhan` | U-Boot for Fullhan FH8632, FH885x V100, FH8626V100, FH885xV200, FH865x |
 | `openipc-grainmedia` | U-Boot for Grain Media GM8135S, GM8136, GM8136S |
+| `openipc-sigmastar` | U-Boot for SigmaStar MSC313E, MSC316DC, MSC316DM |
 | `main` | Fork of upstream mainline U-Boot, kept for rebasing |
 
 New families are added here as they are ported, each with its own
@@ -352,6 +354,45 @@ bash build.sh gm8136          # a single SoC
 
 Images land in `output/` as `u-boot-<soc>-nor.bin`.
 
+## sigmastar
+
+U-Boot for SigmaStar's (MStar's) infinity3 camera SoCs, on the same
+mainline release (v2022.10) and with the same OpenIPC boot layer as
+`openipc-hisilicon`.
+
+**NOR:** `msc313e` (64 MiB of DDR in the package), `msc316dc`, `msc316dm`
+(128 MiB).
+
+The vendor's boot chain is kept: the mask ROM starts the IPL at flash
+offset 0x4000, which trains the DDR and loads IPL_CUST, which unpacks
+U-Boot from the MXP partition `UBOOT`. `u-boot-<soc>-nor.bin` is the whole
+256 KiB boot partition, to be written at flash offset 0 as it is:
+
+| Offset | Contents |
+| --- | --- |
+| `0x00000` | zeros |
+| `0x03000` | MXP partition table |
+| `0x04000` | IPL, the vendor SDK's (MSC313E or MSC316) |
+| `0x10000` | IPL_CUST, the vendor SDK's |
+| `0x20000` | U-Boot, xz-compressed in a uImage (MXP `UBOOT`, 128 KiB) |
+
+That is the layout of retail MSC313E cameras, with the environment at
+0x40000. Vendor kernel partitions hold xz-compressed uImages, which only
+the vendor U-Boot unpacks; this U-Boot boots OpenIPC images.
+
+These images have so far run only on qemu-hisilicon's `msc313e` machine,
+not on a camera. There is no SD card support.
+
+```sh
+git clone --branch openipc-sigmastar https://github.com/OpenIPC/u-boot.git
+cd u-boot
+
+bash build.sh               # msc313e msc316dc msc316dm
+bash build.sh msc313e       # a single SoC
+```
+
+Images land in `output/` as `u-boot-<soc>-nor.bin`.
+
 ## CI
 
 The [build-hisilicon](.github/workflows/build-hisilicon.yml) workflow runs
@@ -523,6 +564,25 @@ to `OpenIPC/firmware` `latest`, where no other repository publishes
 
 ```sh
 gh workflow run build-grainmedia.yml -f release=true -f publish=true
+```
+
+### sigmastar
+
+The [build-sigmastar](.github/workflows/build-sigmastar.yml) workflow has
+the same shape. It runs on pull requests to this branch that change it, on
+pushes and pull requests to `openipc-sigmastar` (through that branch's
+`ci.yml`), and manually. Every image is smoke-tested on qemu-hisilicon's
+`msc313e` machine (the MSC316 images too: there is no MSC316 machine, and
+their IPL sizes its 64 MiB): booted from an 8 MiB flash image, then a
+second time, which must load the environment the first boot saved.
+
+Its `release` input fills this repository's
+[`SigmaStar` release](../../releases/tag/sigmastar); `publish` uploads to
+`OpenIPC/firmware` `latest`, where no other repository publishes
+`u-boot-msc31*` names, and reports to openipc.org.
+
+```sh
+gh workflow run build-sigmastar.yml -f release=true -f publish=true
 ```
 
 ## Adding a SoC family
