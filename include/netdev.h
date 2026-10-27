@@ -54,6 +54,7 @@ int lpc32xx_eth_initialize(struct bd_info *bis);
 int macb_eth_initialize(int id, void *regs, unsigned int phy_addr);
 int mcdmafec_initialize(struct bd_info *bis);
 int mcffec_initialize(struct bd_info *bis);
+int ms_emac_initialize(void);
 int mvgbe_initialize(struct bd_info *bis);
 int mvneta_initialize(struct bd_info *bis, int base_addr, int devnum,
 		      int phy_addr);

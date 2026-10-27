@@ -438,6 +438,13 @@ config KSZ9477
 	  This driver implements a DSA switch driver for the KSZ9477 family
 	  of GbE switches using the I2C interface.
 
+config MS_EMAC
+	bool "SigmaStar infinity3 EMAC"
+	depends on ARCH_SIGMASTAR && !DM_ETH
+	help
+	  The 10/100 MAC of the SigmaStar infinity3 SoCs with their internal
+	  PHY, an Atmel AT91RM9200-style EMAC behind the RIU.
+
 config MVGBE
 	bool "Marvell Orion5x/Kirkwood network interface support"
 	depends on ARCH_KIRKWOOD || ARCH_ORION5X
