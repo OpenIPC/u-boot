@@ -10,7 +10,8 @@
  * - Receive: in "software descriptor" mode, a ring of 8-byte descriptors
  *   at RBQP, each pointing at its own buffer: { addr | WRAP on the last,
  *   DONE set by the MAC; length in size[10:0] }.
- * - The PHY is reached over MDIO through MAN.
+ * - The PHY is reached over MDIO through MAN, registered as the MDIO bus
+ *   "ms_emac" for the mii command.
  *
  * After the vendor U-Boot 2015.01 (drivers/mstar/emac, mhal_emac.c of
  * infinity3, CONFIG_ETHERNET_ALBANY and SOFTWARE_DESCRIPTOR as its
@@ -20,9 +21,11 @@
 #include <common.h>
 #include <log.h>
 #include <malloc.h>
+#include <miiphy.h>
 #include <net.h>
 #include <netdev.h>
 #include <time.h>
+#include <wait_bit.h>
 #include <asm/io.h>
 #include <asm/arch/sigmastar.h>
 #include <linux/delay.h>
@@ -39,7 +42,6 @@
 #define EMAC_TSR		0x14
 #define EMAC_RBQP		0x18
 #define EMAC_RBCFG		0x1C
-#define EMAC_IDR		0x2C
 #define EMAC_MAN		0x34
 #define EMAC_RBRP		0x38
 #define EMAC_RBWP		0x3C
@@ -138,42 +140,46 @@ static u8 riu_readb(unsigned int bank, unsigned int r)
 	return readb(SS_BANK(bank) + (r << 1) - (r & 1));
 }
 
-static int ms_mdio_wait(void)
-{
-	ulong start = get_timer(0);
-
-	while (!(emac_readl(EMAC_SR) & SR_IDLE))
-		if (get_timer(start) > MDIO_TIMEOUT_MS)
-			return -ETIMEDOUT;
-	return 0;
-}
-
-static int ms_mdio_read(int phy, int reg)
+/*
+ * One MDIO frame through MAN, with the management port on meanwhile;
+ * SR's IDLE bit is in the register's low half
+ */
+static int ms_mdio_xfer(u32 man)
 {
 	u32 ctl = emac_readl(EMAC_CTL);
 	int ret;
 
 	emac_writel(ctl | CTL_MPE, EMAC_CTL);
-	emac_writel(MAN_HIGH | MAN_CODE | MAN_RW_R | MAN_PHYA(phy) |
-		    MAN_REGA(reg), EMAC_MAN);
-	ret = ms_mdio_wait();
+	emac_writel(MAN_HIGH | MAN_CODE | man, EMAC_MAN);
+	ret = wait_for_bit_le32((void *)(EMAC_BASE + EMAC_SR * 2), SR_IDLE,
+				true, MDIO_TIMEOUT_MS, false);
 	if (!ret)
 		ret = emac_readl(EMAC_MAN) & 0xffff;
 	emac_writel(ctl, EMAC_CTL);
 	return ret;
 }
 
+static int ms_mdio_read(int phy, int reg)
+{
+	return ms_mdio_xfer(MAN_RW_R | MAN_PHYA(phy) | MAN_REGA(reg));
+}
+
 static int ms_mdio_write(int phy, int reg, u16 val)
 {
-	u32 ctl = emac_readl(EMAC_CTL);
-	int ret;
+	int ret = ms_mdio_xfer(MAN_RW_W | MAN_PHYA(phy) | MAN_REGA(reg) | val);
 
-	emac_writel(ctl | CTL_MPE, EMAC_CTL);
-	emac_writel(MAN_HIGH | MAN_CODE | MAN_RW_W | MAN_PHYA(phy) |
-		    MAN_REGA(reg) | val, EMAC_MAN);
-	ret = ms_mdio_wait();
-	emac_writel(ctl, EMAC_CTL);
-	return ret;
+	return ret < 0 ? ret : 0;
+}
+
+static int ms_mdio_bus_read(struct mii_dev *bus, int phy, int devad, int reg)
+{
+	return ms_mdio_read(phy, reg);
+}
+
+static int ms_mdio_bus_write(struct mii_dev *bus, int phy, int devad, int reg,
+			     u16 val)
+{
+	return ms_mdio_write(phy, reg, val);
 }
 
 /*
@@ -274,6 +280,23 @@ static int ms_emac_find_phy(void)
 }
 
 /*
+ * CFG's speed and duplex bits for what both ends offer: BMSR 15:11 against
+ * the partner's LPA 8:5, the best common mode as the vendor picks it
+ */
+static u32 ms_emac_cfg_mode(u16 bmsr, u16 lpa)
+{
+	unsigned int common = (bmsr >> 11) & (lpa >> 5) & 0xf;
+
+	if (common & 0x8)
+		return CFG_SPD | CFG_FD;
+	if (common & 0x4)
+		return CFG_SPD;
+	if (common & 0x2)
+		return CFG_FD;
+	return 0;
+}
+
+/*
  * Auto-negotiation as the vendor runs it: enabled (not restarted), then up
  * to 4 s each for it to complete and for the link. Returns CFG's speed and
  * duplex bits, 10 Mbit/s half duplex when it fails.
@@ -281,7 +304,7 @@ static int ms_emac_find_phy(void)
 static u32 ms_emac_negotiate(int phy)
 {
 	ulong start;
-	int bmsr, lpa, common;
+	int bmsr;
 
 	ms_mdio_write(phy, MII_BMCR, BMCR_ANENABLE);
 	start = get_timer(0);
@@ -296,16 +319,7 @@ static u32 ms_emac_negotiate(int phy)
 		}
 		mdelay(10);
 	}
-	lpa = ms_mdio_read(phy, MII_LPA);
-	/* BMSR 15:11 abilities against the partner's LPA 8:5 */
-	common = (bmsr >> 11) & (lpa >> 5) & 0xf;
-	if (common & 0x8)
-		return CFG_SPD | CFG_FD;
-	if (common & 0x4)
-		return CFG_SPD;
-	if (common & 0x2)
-		return CFG_FD;
-	return 0;
+	return ms_emac_cfg_mode(bmsr, max(ms_mdio_read(phy, MII_LPA), 0));
 }
 
 static void ms_emac_set_mac(const u8 *mac)
@@ -426,10 +440,23 @@ static void ms_emac_halt(struct eth_device *dev)
 	emac_writel(emac_readl(EMAC_CTL) & ~(CTL_TE | CTL_RE), EMAC_CTL);
 }
 
+static int ms_emac_mdio_register(void)
+{
+	struct mii_dev *bus = mdio_alloc();
+
+	if (!bus)
+		return -ENOMEM;
+	strlcpy(bus->name, "ms_emac", MDIO_NAME_LEN);
+	bus->read = ms_mdio_bus_read;
+	bus->write = ms_mdio_bus_write;
+	return mdio_register(bus);
+}
+
 int ms_emac_initialize(void)
 {
 	struct ms_emac *priv;
 	u8 *mem;
+	int ret;
 
 	priv = calloc(1, sizeof(*priv));
 	mem = memalign(RX_ALIGN, RX_MEM_SIZE);
@@ -452,5 +479,6 @@ int ms_emac_initialize(void)
 	priv->dev.send = ms_emac_send;
 	priv->dev.recv = ms_emac_recv;
 	priv->dev.write_hwaddr = ms_emac_write_hwaddr;
-	return eth_register(&priv->dev);
+	ret = eth_register(&priv->dev);
+	return ret ? ret : ms_emac_mdio_register();
 }
