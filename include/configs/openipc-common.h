@@ -268,13 +268,19 @@ void hi_gpio_status(void);
 #define SFC "nand"
 #endif
 
-/* Environment lives in the NAND 'env' partition */
+/* Environment lives in the NAND 'env' partition. env/nand.c erases, writes
+ * and reads only within CONFIG_ENV_RANGE, which Kconfig derives from its
+ * own 64 KiB ENV_SIZE: it has to follow the size given here, or saveenv
+ * stops after one block and fails, and every boot falls back to the default
+ * environment. */
 #undef CONFIG_ENV_OFFSET
 #undef CONFIG_ENV_SIZE
 #undef CONFIG_ENV_SECT_SIZE
+#undef CONFIG_ENV_RANGE
 #define CONFIG_ENV_OFFSET 0xc0000
 #define CONFIG_ENV_SIZE 0x40000
 #define CONFIG_ENV_SECT_SIZE 0x20000
+#define CONFIG_ENV_RANGE CONFIG_ENV_SIZE
 
 #define CONFIG_BOOTARGS "mem=\\${osmem} " OPENIPC_EARLYCON "console=ttyAMA0,115200 panic=20 init=/init root=ubi0:rootfs rootfstype=ubifs ubi.mtd=2,2048 mtdparts=\\${mtdparts} \\${extras}"
 
