@@ -568,18 +568,18 @@ static const struct ddr_step ddr_program[] = {
  * the start of DRAM, and reset the SoC if either does not stick. Done here
  * for all three: a failed bring-up then retries rather than hangs later.
  */
+static bool ddr_holds(u32 a, u32 b)
+{
+	writel(a, XM_DDR_BASE);
+	writel(b, XM_DDR_BASE + 4);
+	return readl(XM_DDR_BASE) == a && readl(XM_DDR_BASE + 4) == b;
+}
+
+/* writel/readl, so every compare is a bus read the compiler cannot fold */
 static void ddr_check(void)
 {
-	u32 *p = (u32 *)XM_DDR_BASE;
-
-	p[0] = 0xaaaa5555;
-	p[1] = 0x74de0ee3;
-	if (p[0] == 0xaaaa5555 && p[1] == 0x74de0ee3) {
-		p[0] = 0x5555aaaa;
-		p[1] = 0x8b21f11c;
-		if (p[0] == 0x5555aaaa && p[1] == 0x8b21f11c)
-			return;
-	}
+	if (ddr_holds(0xaaaa5555, 0x74de0ee3) && ddr_holds(0x5555aaaa, 0x8b21f11c))
+		return;
 	xm_soc_reset();
 }
 
