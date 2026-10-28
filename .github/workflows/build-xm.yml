@@ -27,7 +27,8 @@ on:
         default: false
 
 # The shape of build-hisilicon.yml:
-#   build (matrix, every SoC) -> qemu (prep) -> qemu_smoke (hard gate) ->
+#   build (matrix, every SoC) -> qemu (prep) -> qemu_smoke (hard gate, the
+#   SoCs qemu-hisilicon has a machine for) ->
 #   release (own, `release` input) + publish (OpenIPC/firmware latest +
 #   openipc.org report, `publish` input).
 # build.sh takes SoCs as arguments; the matrix calls it with one SoC per leg.
@@ -172,7 +173,8 @@ jobs:
   # QEMU smoke test -- boots each freshly-built NOR U-Boot in place from the
   # flash, as the boot ROM does (the qemu-hisilicon xiongmai machines start
   # at the flash window), and asserts it reaches the autoboot prompt. Every
-  # SoC has a machine model, so every SoC is a hard gate on release.
+  # SoC with a qemu-hisilicon machine model (xm510, xm530, xm550) is a hard
+  # gate on release; the V200 series has none there yet.
   #
   # The part powers up with SR3.WPS set (xm-sfc.wps), as Xiongmai
   # bootloaders leave it: the first boot then also proves that the

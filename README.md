@@ -23,7 +23,7 @@ family — not bootloader sources.
 | --- | --- |
 | `openipc` (this branch) | Unified documentation and CI workflows |
 | `openipc-hisilicon` | U-Boot for HiSilicon/Goke IP-camera SoCs |
-| `openipc-xm` | U-Boot for Xiongmai XM510/XM530/XM550 |
+| `openipc-xm` | U-Boot for Xiongmai XM510/XM530/XM550 and the V200 series (XM530V200, XM533, XM535D1/D2/W1) |
 | `openipc-gk710x` | U-Boot for Goke GK7101/GK7102 |
 | `openipc-anyka` | U-Boot for Anyka AK3918EV200, AK391xEV300, AK391xEV330 |
 | `openipc-novatek` | U-Boot for Novatek NT98562, NT98566 |
@@ -82,7 +82,8 @@ The toolchain is `arm-linux-gnueabi-` (Debian/Ubuntu package
 U-Boot for Xiongmai's own camera SoCs, on the same mainline release
 (v2022.10) and with the same OpenIPC boot layer as `openipc-hisilicon`.
 
-**NOR:** `xm510`, `xm530`, `xm550`
+**NOR:** `xm510`, `xm530`, `xm550`; the V200 series: `xm530v200`, `xm533`,
+`xm535d1`, `xm535d2`, `xm535w1`
 
 The boot ROM runs U-Boot in place from SPI NOR, and U-Boot brings up DDR
 itself, so the image is `u-boot.bin` as linked: `u-boot-<soc>-nor.bin`,
@@ -94,7 +95,7 @@ vendor U-Boot's `sf erase`/`sf write` report success and change nothing.
 git clone --branch openipc-xm https://github.com/OpenIPC/u-boot.git
 cd u-boot
 
-bash build.sh               # xm510 xm530 xm550
+bash build.sh               # every SoC above
 bash build.sh xm530         # a single SoC
 ```
 
@@ -437,13 +438,16 @@ gh workflow run build-hisilicon.yml -f release=true -f publish=true   # ... and 
 The [build-xm](.github/workflows/build-xm.yml) workflow has the same
 shape. It runs on pull requests to this branch that change it, on pushes
 and pull requests to `openipc-xm` (through that branch's `ci.yml`), and
-manually. Every SoC has a qemu-hisilicon machine model, so every image is
-smoke-tested:
+manually. Every image is built; the ones with a qemu-hisilicon machine
+model (xm510, xm530, xm550) are also smoke-tested:
 
 - booted in place from an 8 MiB flash image whose part powers up with the
   Xiongmai per-block protection on;
 - booted a second time, which must load the environment the first boot
   saved.
+
+The V200 series' machines are in qemu-bench, not yet in qemu-hisilicon, so
+its images are only built and size-checked here.
 
 Its `release` input fills this repository's
 [`Xiongmai` release](../../releases/tag/xiongmai); `publish` uploads to
@@ -478,8 +482,8 @@ gh workflow run build-gk710x.yml -f release=true -f publish=true
 The [build-anyka](.github/workflows/build-anyka.yml) workflow has the same
 shape. It runs on pull requests to this branch that change it, on pushes
 and pull requests to `openipc-anyka` (through that branch's `ci.yml`), and
-manually. Every SoC has a qemu-hisilicon machine model, so every image is
-smoke-tested: booted from an 8 MiB flash image, then a second time, which
+manually. Every image is built; the ones with a qemu-hisilicon machine
+model (xm510, xm530, xm550) are also smoke-tested: booted from an 8 MiB flash image, then a second time, which
 must load the environment the first boot saved.
 
 Its `release` input fills this repository's
