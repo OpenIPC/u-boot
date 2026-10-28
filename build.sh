@@ -43,7 +43,7 @@ build_xm() {
 build_soc() {
     soc=$1
     case "${soc}" in
-        xm510|xm530|xm550)
+        xm510|xm530|xm550|xm530v200|xm533|xm535d1|xm535d2|xm535w1)
             build_xm "${soc}" nor ;;
         *)
             echo "unsupported SoC: ${soc}" >&2
@@ -51,7 +51,7 @@ build_soc() {
     esac
 }
 
-ALL_SOCS="xm510 xm530 xm550"
+ALL_SOCS="xm510 xm530 xm550 xm530v200 xm533 xm535d1 xm535d2 xm535w1"
 
 SOCS="$@"
 [ -z "${SOCS}" ] && SOCS="${ALL_SOCS}"

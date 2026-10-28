@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Xiongmai XM510 / XM530 / XM550 register map, from the vendor U-Boot
- * 2014.04 trees (arch/arm/include/asm/arch-xm/xm5x0.h).
+ * 2014.04 trees (arch/arm/include/asm/arch-xm/xm5x0.h); the V200
+ * series' (XM530V200, XM533, XM535) differences from their U-Boots.
  */
 
 #ifndef __MACH_XM_H
@@ -18,7 +19,11 @@
 #define XM_DDRC_BASE		0x100B0000
 #define XM_GPIO_BASE		0x10020000
 #define XM_SYS_BASE		0x20000000
+#ifdef CONFIG_TARGET_XM533
+#define XM_SDIO0_BASE		0x50200000	/* the card slot; 0x50000000 is Wi-Fi */
+#else
 #define XM_SDIO0_BASE		0x50000000
+#endif
 
 #define XM_TIMER_LOAD		(XM_TIMER_BASE + 0x00)
 #define XM_TIMER_VALUE		(XM_TIMER_BASE + 0x04)
@@ -56,15 +61,26 @@
 #define XM_GPIO8_OUT_EN		(XM_GPIO_BASE + 0xC4)
 #define XM_GPIO8_OUT_REG	(XM_GPIO_BASE + 0xC8)
 
-#else /* XM530, XM550 */
+#else /* XM530, XM550 and the V200 series */
 
+#ifdef CONFIG_XM_V200
+/* The UART (IBRD 13, FBRD 1 at 115200) and the SP804 run from 24 MHz */
+#define XM_XCLK			24000000
+#else
 #define XM_XCLK			12000000
+#endif
 #define XM_SFC_BASE		0x100F4000	/* xmsfc v2 */
 #define XM_SFC_RAM		0x100F6000
 #define XM_FLASH_BASE		0x60000000	/* v2 read window */
 #define XM_GMAC_BASE		0x10010000
 #define XM_GMAC_GLUE		0x10014000
+#if defined(CONFIG_TARGET_XM530V200)
+#define XM_DDR_MAX		0x8000000	/* the vendor's get_ram_size() bound */
+#elif defined(CONFIG_XM_V200)
+#define XM_DDR_MAX		0x10000000
+#else
 #define XM_DDR_MAX		(IS_ENABLED(CONFIG_XM_DDR3) ? 0x8000000 : 0x4000000)
+#endif
 
 #define XM_SC_LOCK		(XM_SYS_BASE + 0x00)
 #define XM_SC_CTRL		(XM_SYS_BASE + 0x04)

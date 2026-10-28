@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this branch is
 
 `openipc-xm` is OpenIPC's U-Boot for Xiongmai's own camera SoCs: XM510, XM530
-and XM550. It is **mainline U-Boot v2022.10**, the same release as
+and XM550, and the V200 series (XM530V200, XM533, XM535). It is **mainline U-Boot v2022.10**, the same release as
 `openipc-hisilicon`, with:
 
 - the OpenIPC boot layer, carried over from `openipc-hisilicon`;
@@ -73,6 +73,8 @@ controller's read window until it relocates:
 - **XM510:** `SYS_TEXT_BASE=0x0`, the v1 window.
 - **XM530/550:** `SYS_TEXT_BASE=0x08000000`, an alias of the v2 window at
   0x60000000.
+- **V200 series:** `SYS_TEXT_BASE=0x60000000`, the window itself, as their
+  vendor U-Boots are linked; qemu starts them there.
 
 The link address must equal the run address, because `relocate.S` does no
 position-independent fixups. The only RAM before DDR is a 4 KiB SRAM at
@@ -93,6 +95,33 @@ position-independent fixups. The only RAM before DDR is a 4 KiB SRAM at
 - **xmsfc register operations take the window out of bus-read mode.** The
   driver restores it (`xmsfc_bus_mode()`) after every v2 operation, and only
   ever runs after relocation, from DDR.
+
+## The V200 series
+
+XM530V200, XM533 and XM535 (`TARGET_XM530V200`/`XM533`/`XM535`, all
+`XM_V200`) share the XM530's flash controller, UART, timer and board file,
+and differ in:
+
+- **DDR:** a DesignWare uMCTL2 at 0x20050000 (PHY 0x20058000, glue
+  0x2005C000), not the uPCTL. `arch/arm/mach-xm/v200.c` keeps each vendor
+  build's bring-up as a register program (writes, polls, read-modify-writes,
+  delays), taken from the vendor U-Boot running in qemu-bench and checked
+  against its disassembly. The vendor routine branches only on its
+  arguments (DDR rate, density), so the program is the routine.
+  - XM530V200: DDR3-1866, 128 MiB (`xm530v200`).
+  - XM533: DDR2-1066, 64 MiB (`xm533`).
+  - XM535D1: DDR2-1333, 64 MiB (`xm535d1`).
+  - XM535D2: DDR3-1866, 128 MiB (`xm535d2`).
+  - XM535W1: DDR2-1066, 64 MiB (`xm535w1`): the D1's program at its own PLL C,
+    less four writes the W1's older (2024) routine does not make.
+  The XM535 chips are distinct (`XM535D1`/`D2`/`W1` under `TARGET_XM535`), as
+  the vendor's U-Boots and firmware are, and `soc` names the chip; nothing
+  probes which one is fitted.
+- **Clocks:** a 24 MHz reference (UART and SP804), not 12 MHz; the XM535's
+  PLLs are programmed differently from the other two.
+- **Ethernet:** an external RMII PHY, pads 0x200-0x220 and 0xC48, reset on
+  pad 0x224; no MAC glue at 0x10014000.
+- **SD:** the XM533's card slot is the second controller, 0x50200000.
 
 ## No SPI NAND
 
