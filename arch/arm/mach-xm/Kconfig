@@ -26,13 +26,53 @@ config TARGET_XM550
 	  It uses the XM530 board and flash controller, so one U-Boot
 	  board serves both.
 
+config TARGET_XM530V200
+	bool "XM530V200"
+	select XM_SFC_V2
+	select XM_V200
+	select XM_DDR3
+	help
+	  XM530V200 (its U-Boot says XM550V200WX2): two cores, 128 MiB of
+	  DDR3 on a DesignWare uMCTL2. U-Boot runs in place from the v2
+	  read window at 0x60000000.
+
+config TARGET_XM533
+	bool "XM533"
+	select XM_SFC_V2
+	select XM_V200
+	help
+	  XM533 ("qiandaohu", xm530v300 in its modules): 64 MiB of DDR2 on
+	  a DesignWare uMCTL2, its SD slot on the second SDIO controller.
+
+config TARGET_XM535
+	bool "XM535"
+	select XM_SFC_V2
+	select XM_V200
+	help
+	  XM535 (D1, D2, W1): DDR2 on the 64 MiB parts, DDR3 on the 128 MiB
+	  D2 (XM535_DDR3), on a DesignWare uMCTL2.
+
 endchoice
 
 config XM_SFC_V2
 	bool
 
+config XM_V200
+	bool
+	help
+	  The V200 series (XM530V200, XM533, XM535): a DesignWare uMCTL2 for DDR, a
+	  24 MHz reference clock, and U-Boot linked at the flash window.
+
 config XM_DDR3
 	bool
+
+config XM535_DDR3
+	bool "128 MiB DDR3 (XM535D2)"
+	depends on TARGET_XM535
+	select XM_DDR3
+	help
+	  The XM535D2's DDR3-1866 instead of the D1/W1's DDR2-1333. The
+	  vendor builds one U-Boot for each; nothing probes which is fitted.
 
 config XM_DDR_64M
 	bool "64 MiB DDR2 (XM510)"
