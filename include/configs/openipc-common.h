@@ -32,7 +32,7 @@
 #define OPENIPC_OSMEM		"18M"
 #elif defined(CONFIG_TARGET_XM550)
 #define OPENIPC_OSMEM		"80M"
-#elif defined(CONFIG_TARGET_XM530V200) || defined(CONFIG_XM535_DDR3)
+#elif defined(CONFIG_TARGET_XM530V200) || defined(CONFIG_XM535D2)
 #define OPENIPC_OSMEM		"64M"	/* of 128 MiB */
 #else
 #define OPENIPC_OSMEM		"32M"

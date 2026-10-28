@@ -60,8 +60,10 @@ void xm_pll_init(void)
 	writel(1, SYS(0x00));
 	pll_set(SYS(0x08), 0x10032);		/* PLL A */
 	pll_set(SYS(0x10), 0x20063);		/* PLL B */
-#ifdef CONFIG_XM_DDR3
-	pll_set(SYS(0x18), 0x1004b);		/* PLL C: DDR3-1866 (XM535D2) */
+#if defined(CONFIG_XM535D2)
+	pll_set(SYS(0x18), 0x1004b);		/* PLL C: DDR3-1866 */
+#elif defined(CONFIG_XM535W1)
+	pll_set(SYS(0x18), 0x1002c);		/* PLL C: DDR2-1066 */
 #else
 	pll_set(SYS(0x18), 0x2006f);		/* PLL C: DDR2-1333 (XM535D1) */
 #endif
@@ -371,7 +373,7 @@ static const struct ddr_step ddr_program[] = {
 	DDR_POLL_EQ(0x200000dc, 0x00000005),
 	DDR_W(0x20000080, 0x00000000),
 #elif defined(CONFIG_TARGET_XM535)
-	/* XM535D1 / W1: vendor (D1, 2025) ddr_init(1333, 0, 64) */
+	/* XM535D1: vendor (D1, 2025) ddr_init(1333, 0, 64); XM535W1: its 2024 routine, the same less four writes (below), with PLL C at 1066 */
 	DDR_W(0x20000080, 0x00000001),
 	DDR_W(0x200000dc, 0x00000000),
 	DDR_DELAY(1),
@@ -448,17 +450,27 @@ static const struct ddr_step ddr_program[] = {
 	DDR_BIC(0x20050250, 0x00000004),
 	DDR_W(0x20050320, 0x00000001),
 	DDR_POLL_SET(0x20050324, 0x00000001),
+#ifndef CONFIG_XM535W1
+	/*
+	 * The D1's 2025 routine holds refresh off and cycles self-refresh
+	 * around this PHY step; the W1's 2024 one does neither.
+	 */
 	DDR_W(0x20050060, 0x00000001),
 	DDR_W(0x20050030, 0x00000020),
+#endif
 	DDR_DELAY(1),
+#ifndef CONFIG_XM535W1
 	DDR_W(0x20050030, 0x00000000),
+#endif
 	DDR_DELAY(1),
 	DDR_W(0x20058004, 0x00004688),
 	DDR_W(0x20058004, 0x00004689),
 	DDR_POLL_EQ(0x20058174, 0x00000403),
 	DDR_W(0x20058004, 0x00004688),
 	DDR_W(0x20058004, 0x00004680),
+#ifndef CONFIG_XM535W1
 	DDR_W(0x20050060, 0x00000000),
+#endif
 	DDR_DELAY(1),
 	DDR_POLL_SET(0x20050004, 0x00000001),
 	DDR_W(0x20050490, 0x00000001),

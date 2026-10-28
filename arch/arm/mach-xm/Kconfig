@@ -49,8 +49,9 @@ config TARGET_XM535
 	select XM_SFC_V2
 	select XM_V200
 	help
-	  XM535 (D1, D2, W1): DDR2 on the 64 MiB parts, DDR3 on the 128 MiB
-	  D2 (XM535_DDR3), on a DesignWare uMCTL2.
+	  XM535D1, XM535D2 and XM535W1 (pick one under "XM535 chip"): DDR2
+	  on the 64 MiB D1 and W1, DDR3 on the 128 MiB D2, on a DesignWare
+	  uMCTL2.
 
 endchoice
 
@@ -66,13 +67,25 @@ config XM_V200
 config XM_DDR3
 	bool
 
-config XM535_DDR3
-	bool "128 MiB DDR3 (XM535D2)"
+choice
+	prompt "XM535 chip"
 	depends on TARGET_XM535
-	select XM_DDR3
+	default XM535D1
 	help
-	  The XM535D2's DDR3-1866 instead of the D1/W1's DDR2-1333. The
-	  vendor builds one U-Boot for each; nothing probes which is fitted.
+	  Xiongmai ships one U-Boot per XM535 chip; nothing probes which
+	  one, or which DDR, is fitted.
+
+config XM535D1
+	bool "XM535D1: 64 MiB DDR2-1333"
+
+config XM535D2
+	bool "XM535D2: 128 MiB DDR3-1866"
+	select XM_DDR3
+
+config XM535W1
+	bool "XM535W1: 64 MiB DDR2-1066"
+
+endchoice
 
 config XM_DDR_64M
 	bool "64 MiB DDR2 (XM510)"

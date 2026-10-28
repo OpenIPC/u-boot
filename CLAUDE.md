@@ -110,9 +110,13 @@ and differ in:
   arguments (DDR rate, density), so the program is the routine.
   - XM530V200: DDR3-1866, 128 MiB (`xm530v200`).
   - XM533: DDR2-1066, 64 MiB (`xm533`).
-  - XM535: DDR2-1333, 64 MiB on D1/W1 (`xm535`); DDR3-1866, 128 MiB on D2
-    (`xm535d2`, `XM535_DDR3`). The vendor builds one U-Boot for each; nothing
-    probes which DDR is fitted.
+  - XM535D1: DDR2-1333, 64 MiB (`xm535d1`).
+  - XM535D2: DDR3-1866, 128 MiB (`xm535d2`).
+  - XM535W1: DDR2-1066, 64 MiB (`xm535w1`): the D1's program at its own PLL C,
+    less four writes the W1's older (2024) routine does not make.
+  The XM535 chips are distinct (`XM535D1`/`D2`/`W1` under `TARGET_XM535`), as
+  the vendor's U-Boots and firmware are, and `soc` names the chip; nothing
+  probes which one is fitted.
 - **Clocks:** a 24 MHz reference (UART and SP804), not 12 MHz; the XM535's
   PLLs are programmed differently from the other two.
 - **Ethernet:** an external RMII PHY, pads 0x200-0x220 and 0xC48, reset on
