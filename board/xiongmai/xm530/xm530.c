@@ -29,6 +29,33 @@ int misc_init_r(void)
 }
 
 #ifdef CONFIG_ETH_DESIGNWARE
+#ifdef CONFIG_XM_V200
+/*
+ * The V200 series has an external RMII PHY: its pads, then its reset
+ * on pad 0x224 (output low, then high), as the vendor U-Boots set them.
+ */
+int board_eth_init(struct bd_info *bis)
+{
+#ifdef CONFIG_TARGET_XM535
+	static const u32 pads[] = { 0x82, 0x32, 0x32, 0x72, 0x42, 0x42, 0x42, 0x42, 0x32 };
+	const u32 rmii = 0x18;
+#else
+	static const u32 pads[] = { 0x82, 0x82, 0x82, 0x82, 0x82, 0x82, 0x82, 0x82, 0x82 };
+	const u32 rmii = 0x20;
+#endif
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(pads); i++)
+		writel(pads[i], XM_GPIO_BASE + 0x200 + i * 4);
+	writel(rmii, XM_GPIO_BASE + 0xC48);
+	writel(0x400, XM_GPIO_BASE + 0x224);
+	mdelay(100);
+	writel(0xC00, XM_GPIO_BASE + 0x224);
+	mdelay(100);
+
+	return designware_initialize(XM_GMAC_BASE, PHY_INTERFACE_MODE_RMII);
+}
+#else
 int board_eth_init(struct bd_info *bis)
 {
 	/* MAC glue: RMII, clocks, then the internal PHY out of reset */
@@ -52,4 +79,5 @@ int board_eth_init(struct bd_info *bis)
 
 	return designware_initialize(XM_GMAC_BASE, PHY_INTERFACE_MODE_RMII);
 }
+#endif
 #endif
