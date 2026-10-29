@@ -106,7 +106,6 @@
 	"osmem=" OPENIPC_OSMEM "\0" \
 	"rmem=" OPENIPC_RMEM "\0" \
 	OPENIPC_ENV_NMEM \
-	"bsbsize=" __stringify(GK_BSB_MIB) "M\0" \
 	"board_name\0" \
 	"board=" CONFIG_PRODUCT_SOC "\0" \
 	"vendor=" VENDOR "\0" \
@@ -147,7 +146,7 @@
  */
 #ifdef CONFIG_OPENIPC_NOR_SPLIT
 /*
- * The split layout (kernel goke-gk710x): the whole firmware file, written
+ * The split layout: the whole firmware file, written
  * where the firmware starts, when the server has one that fits the firmware
  * area; else -- none, an empty one, or one too big for the chip -- the
  * fixed-slot pair as before. common/openipc.c turns a saved fwupd of exactly the
