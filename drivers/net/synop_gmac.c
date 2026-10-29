@@ -410,6 +410,274 @@ s32 synopGMAC_search_phy (synopGMACdevice * gmacdev) {
 	return phy_id;
 }
 
+#ifdef CONFIG_T41
+/*
+ * The T41 SDK's: the PHY found by its OUI in phy_lists[], whose
+ * check_init reads link, speed and duplex its own way. Without a match
+ * phy_list is left at the last entry, and that one runs, as in the SDK.
+ */
+static int check_phy_init_ds008(synopGMACdevice *gmacdev)
+{
+    u16 data;
+    s32 status = -ESYNOPGMACNOERR;
+
+    printf("########### check_phy_init_ds008 #############\n");
+
+    status = synopGMAC_read_phy_reg((u32 *)gmacdev->MacBase,gmacdev->PhyBase,PHY_STATUS_REG, &data);
+    if(status)
+        return status;
+    if((data & Mii_Link) == 0){
+        printf("No Link\n");
+        gmacdev->LinkState = LINKDOWN;
+        return -ESYNOPGMACPHYERR;
+    }
+    else{
+        gmacdev->LinkState = LINKUP;
+        printf("Link UP\n");
+    }
+
+    status = synopGMAC_read_phy_reg((u32 *)gmacdev->MacBase,gmacdev->PhyBase,PHY_CONTROL_REG, &data);
+	if(status)
+		return status;
+
+	if(data & 0x2000)
+		gmacdev->Speed      =   SPEED100;
+	else
+		gmacdev->Speed      =   SPEED10;
+	if(data & 0x0100)
+		gmacdev->DuplexMode = FULLDUPLEX;
+	else
+		gmacdev->DuplexMode = HALFDUPLEX;
+
+	return status;
+}
+static int check_phy_init_ip101g(synopGMACdevice *gmacdev)
+{
+    u16 data;
+    s32 status = -ESYNOPGMACNOERR;
+    int speed_bit;
+
+    printf("########### check_phy_init_ip101g #############\n");
+
+    status = synopGMAC_read_phy_reg((u32 *)gmacdev->MacBase,gmacdev->PhyBase,PHY_STATUS_REG, &data);
+    if(status)
+        return status;
+    if((data & Mii_Link) == 0){
+        printf("No Link\n");
+        gmacdev->LinkState = LINKDOWN;
+        return -ESYNOPGMACPHYERR;
+    }
+    else{
+        gmacdev->LinkState = LINKUP;
+        printf("Link UP\n");
+    }
+
+    status = synopGMAC_read_phy_reg((u32 *)gmacdev->MacBase,gmacdev->PhyBase,PHY_SPECIFIC_STATUS_REG, &data);
+    if(status)
+        return status;
+    speed_bit = (data & (0xf<<5)) >> 5;
+
+	switch(speed_bit) {
+        case 0x8:
+            gmacdev->Speed = SPEED100;
+            gmacdev->DuplexMode = FULLDUPLEX;
+            break;
+        case 0x4:
+            gmacdev->Speed = SPEED100;
+            gmacdev->DuplexMode = HALFDUPLEX;
+            break;
+        case 0x2:
+            gmacdev->Speed = SPEED10;
+            gmacdev->DuplexMode = FULLDUPLEX;
+            break;
+        case 0x1:
+            gmacdev->Speed = SPEED10;
+            gmacdev->DuplexMode = HALFDUPLEX;
+            break;
+    }
+    return status;
+}
+
+static int check_phy_init_8720a(synopGMACdevice *gmacdev)
+{
+    u16 data;
+    s32 status = -ESYNOPGMACNOERR;
+
+    printf("######### check_phy_init_8720a #############\n");
+
+    status = synopGMAC_read_phy_reg((u32 *)gmacdev->MacBase,gmacdev->PhyBase,PHY_STATUS_REG, &data);
+    if(status)
+        return status;
+    if((data & Mii_Link) == 0){
+        TR("No Link\n");
+        gmacdev->LinkState = LINKDOWN;
+        return -ESYNOPGMACPHYERR;
+    }
+    else{
+        gmacdev->LinkState = LINKUP;
+        TR("Link UP\n");
+    }
+    //status = synopGMAC_read_phy_reg((u32 *)gmacdev->MacBase,gmacdev->PhyBase,PHY_SPECIFIC_STATUS_REG, &data);
+    status = synopGMAC_read_phy_reg((u32 *)gmacdev->MacBase,gmacdev->PhyBase, 31, &data);
+    if(status)
+        return status;
+    switch((data >> 2) & 0x7) {
+        case 0x1:
+            gmacdev->DuplexMode = HALFDUPLEX;
+            gmacdev->Speed      =   SPEED10;
+            break;
+        case 0x5:
+            gmacdev->DuplexMode = FULLDUPLEX;
+            gmacdev->Speed      =   SPEED10;
+            break;
+        case 0x2:
+            gmacdev->DuplexMode = HALFDUPLEX;
+            gmacdev->Speed      =   SPEED100;
+            break;
+        case 0x6:
+            gmacdev->DuplexMode = FULLDUPLEX;
+            gmacdev->Speed = SPEED100;
+            break;
+        default:
+            printf("unsupported speed Mode!, trying default speed Mode, data: %x\n", data);
+            gmacdev->DuplexMode = FULLDUPLEX;
+            gmacdev->Speed      =   SPEED100;
+            break;
+
+    }
+
+    return status;
+}
+
+
+struct phy_list {
+    unsigned int oui_id;
+    int (*check_init)(synopGMACdevice *gmacdev);
+};
+
+struct phy_list phy_lists[] = {
+/* add supported phy here, and rewrite check_init in need */
+    [0] = {
+        .oui_id = 0x300007,
+        .check_init = check_phy_init_8720a,
+    },
+    [1] = {
+        .oui_id = 0x30243,
+        .check_init = check_phy_init_ip101g,
+    },
+	[2] = {
+        .oui_id = 0x10937c,
+        .check_init = check_phy_init_ds008,
+    },
+
+};
+
+
+static int check_phy_negotiation_status(synopGMACdevice *gmacdev)
+{
+    int i;
+    struct phy_list * phy_list;
+    int status = 0;
+    unsigned int phy_id_hi = 0, phy_id_low = 0, phy_id = 0;
+    u16 data = 0;;
+
+    status = synopGMAC_read_phy_reg((u32 *)gmacdev->MacBase,gmacdev->PhyBase,PHY_ID_HI_REG, &data);
+    phy_id_low = data; /* OUI 3 to 18 bit */
+    status = synopGMAC_read_phy_reg((u32 *)gmacdev->MacBase,gmacdev->PhyBase,PHY_ID_LOW_REG, &data);
+    phy_id_hi = ((data >> 10) & 0x3f); /* OUI 19 to 24 bit */
+    phy_id = phy_id_hi << 16 | phy_id_low;
+
+    printf("mac phy_id is: %x\n", phy_id);
+
+    for(i = 0; i < ARRAY_SIZE(phy_lists); i++) {
+        phy_list = &phy_lists[i];
+        if(phy_list->oui_id == phy_id) {
+            break;
+        }
+    }
+
+    if((phy_list != NULL) && (phy_list->check_init != NULL)) {
+        status = phy_list->check_init(gmacdev);
+    } else {
+        printf("#### ERROR ###, need phy check_init.        \n  \
+            please implement phy check_init function .  \n  \
+            or check wheter your phy_type is in phy_lists[]\n");
+    }
+
+    return status;
+
+}
+
+
+s32 synopGMAC_check_phy_init(synopGMACdevice * gmacdev) {
+
+    u16 data;
+    s32 status = -ESYNOPGMACNOERR;
+    s32 loop_count;
+
+    status = synopGMAC_read_phy_reg((u32 *)gmacdev->MacBase,gmacdev->PhyBase,PHY_CONTROL_REG, &data);
+    if(status)
+        return status;
+    if (data & 0x1000) {//Autonegotiation
+        //loop_count = DEFAULT_LOOP_VARIABLE;
+        /* delay 2 second */
+        loop_count = 20000;
+        while(loop_count-- > 0){
+            udelay(100);
+            status = synopGMAC_read_phy_reg((u32 *)gmacdev->MacBase,gmacdev->PhyBase,PHY_STATUS_REG, &data);
+            if(status)
+                return status;
+
+            if((data & Mii_AutoNegCmplt) != 0){
+                TR("Autonegotiation Complete\n");
+                break;
+            }
+        }
+
+        status = check_phy_negotiation_status(gmacdev);
+        if(status) {
+            printf("Falied to check negotiation status!\n");
+        }
+        printf("====>PHY Autonegotiation Complete!\n");
+
+    } else {
+        status = synopGMAC_read_phy_reg((u32 *)gmacdev->MacBase,gmacdev->PhyBase,PHY_STATUS_REG, &data);
+        if(status)
+            return status;
+        if((data & 1) == 0){
+            TR("No Link\n");
+            gmacdev->LinkState = LINKDOWN;
+            return -ESYNOPGMACPHYERR;
+        }
+        else{
+            gmacdev->LinkState = LINKUP;
+            TR("Link UP\n");
+        }
+        status = synopGMAC_read_phy_reg((u32 *)gmacdev->MacBase,gmacdev->PhyBase,PHY_CONTROL_REG, &data);
+        if(status)
+            return status;
+		if(data & 0x2000)
+            gmacdev->Speed      =   SPEED100;
+        else
+            gmacdev->Speed      =   SPEED10;
+        if(data & 0x0100)
+            gmacdev->DuplexMode = FULLDUPLEX;
+        else
+            gmacdev->DuplexMode = HALFDUPLEX;
+    }
+
+    printf("Link is up in %s mode\n",(gmacdev->DuplexMode == FULLDUPLEX) ? "FULL DUPLEX": "HALF DUPLEX");
+    if(gmacdev->Speed == SPEED1000)
+        printf("Link is with 1000M Speed \n");
+    if(gmacdev->Speed == SPEED100)
+        printf("Link is with 100M Speed \n");
+    if(gmacdev->Speed == SPEED10)
+        printf("Link is with 10M Speed \n");
+
+    return -ESYNOPGMACNOERR;
+
+}
+#else
 s32 synopGMAC_check_phy_init(synopGMACdevice * gmacdev) {
 
     u16 data;
@@ -547,6 +815,7 @@ s32 synopGMAC_check_phy_init(synopGMACdevice * gmacdev) {
     return -ESYNOPGMACNOERR;
 
 }
+#endif
 
 s32 synopGMAC_set_mac_addr(synopGMACdevice *gmacdev, u32 MacHigh, u32 MacLow, u8 *MacAddr)
 {

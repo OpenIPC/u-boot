@@ -244,9 +244,9 @@ static int jz_init(struct eth_device *dev, struct bd_info *bd)
 	tx_desc = (DmaDesc *)((unsigned long)_tx_desc | 0xa0000000);
 	rx_desc = (DmaDesc *)((unsigned long)_rx_desc | 0xa0000000);
 
-#ifdef CONFIG_T40
+#if defined(CONFIG_T40) || defined(CONFIG_T41)
 	/*
-	 * The T40 sets the PHY interface here, before the reset, and clears
+	 * The T40 and T41 set the PHY interface here, before the reset, and clears
 	 * bit 23 for a PHY outside the SoC
 	 */
 	{
@@ -277,7 +277,7 @@ static int jz_init(struct eth_device *dev, struct bd_info *bd)
 	synopGMAC_set_mac_addr(gmacdev, GmacAddr0High, GmacAddr0Low,
 			       dev->enetaddr);
 
-#ifdef CONFIG_T40
+#if defined(CONFIG_T40) || defined(CONFIG_T41)
 	synopGMAC_set_mdc_clk_div(gmacdev, GmiiCsrClk2);
 #else
 	synopGMAC_set_mdc_clk_div(gmacdev, GmiiCsrClk4);
@@ -389,14 +389,37 @@ int jz_net_initialize(struct bd_info *bis)
 	u32 __maybe_unused cpm_mphyc = 0;
 	int phy_id;
 
+#ifdef CONFIG_T41
+	/*
+	 * The T41 SDK's: 50 MHz on the T41N/T41L (or an unmarked chip) without
+	 * eFuse 0x2c bit 15, 25 MHz otherwise
+	 */
+	{
+	unsigned int freq_diff, chip_version;
+
+	freq_diff = readl((void __iomem *)0xb354022c);
+	chip_version = (freq_diff >> 16) & 0xffff;
+	freq_diff = (freq_diff >> 15) & 0x1;
+	if (chip_version == 0x0000 || chip_version == 0x1111 ||
+	    chip_version == 0x3333) {
+		if (freq_diff)
+			clk_set_rate(MACPHY, 25000000);
+		else
+			clk_set_rate(MACPHY, 50000000);
+	} else {
+		clk_set_rate(MACPHY, 25000000);
+	}
+	}
+#else
 	clk_set_rate(MACPHY, 50000000);
-#ifndef CONFIG_T40
+#endif
+#if !defined(CONFIG_T40) && !defined(CONFIG_T41)
 	udelay(50000);
 #endif
 
 #if defined(CONFIG_T10) || defined(CONFIG_T20) || defined(CONFIG_T23) || \
 	defined(CONFIG_T30) || defined(CONFIG_T21) || defined(CONFIG_T31) || \
-	defined(CONFIG_T40)
+	defined(CONFIG_T40) || defined(CONFIG_T41)
 	/* initialize gmac gpio */
 	gpio_set_func(GPIO_PORT_B, GPIO_FUNC_0, 0x1EFC0);
 #endif
@@ -404,6 +427,16 @@ int jz_net_initialize(struct bd_info *bis)
 	gmacdev = &_gmacdev;
 	gmacdev->DmaBase = JZ_GMAC_BASE + DMABASE;
 	gmacdev->MacBase = JZ_GMAC_BASE + MACBASE;
+
+#ifdef CONFIG_GPIO_PHY_RESET
+	/* gpio reset PHY: the T41 SDK's, for any PHY */
+	gpio_direction_output(CONFIG_GPIO_PHY_RESET, !CONFIG_GPIO_PHY_RESET_ENLEVEL);
+	mdelay(2);
+	gpio_direction_output(CONFIG_GPIO_PHY_RESET, CONFIG_GPIO_PHY_RESET_ENLEVEL);
+	mdelay(10);
+	gpio_direction_output(CONFIG_GPIO_PHY_RESET, !CONFIG_GPIO_PHY_RESET_ENLEVEL);
+	mdelay(2);
+#endif /* CONFIG_GPIO_PHY_RESET */
 
 #if (CONFIG_NET_PHY_TYPE == PHY_TYPE_IP101G)
 	/* gpio reset IP101G */
@@ -515,7 +548,7 @@ int jz_net_initialize(struct bd_info *bis)
 	jz_mdio_register(dev->name);
 #endif
 
-#ifndef CONFIG_T40	/* the T40 sets it in jz_init() */
+#if !defined(CONFIG_T40) && !defined(CONFIG_T41)	/* they set it in jz_init() */
 #if (CONFIG_NET_GMAC_PHY_MODE == GMAC_PHY_RMII)
 	cpm_mphyc = read_cpm_mphyc();
 	cpm_mphyc &= ~0x7;
