@@ -12,6 +12,7 @@
 */
 #include <common.h>
 #include <cpu_func.h>
+#include <time.h>
 
 /* arch/mips/mach-ingenic/xburst2/cpu.c: L1 and L2 */
 void flush_cache_all(void);
@@ -416,10 +417,18 @@ static void sfc_set_mem_addr(struct sfc *sfc,unsigned int addr )
 	sfc_writel(sfc, SFC_MEM_ADDR, addr);
 }
 
+/*
+ * How long one transfer may take: a page at the slowest SFC clock is
+ * well under a millisecond. The vendor loop had no limit.
+ */
+#define SFC_TRANSFER_TIMEOUT_MS	1000
+
 static int sfc_sr_handle(struct sfc *sfc)
 {
 	unsigned int reg_sr = 0;
 	unsigned int tmp = 0;
+	ulong start = get_timer(0);
+	int ret = 0;
 
 	while (1) {
 		reg_sr = sfc_readl(sfc,SFC_SR);
@@ -439,22 +448,33 @@ static int sfc_sr_handle(struct sfc *sfc)
 			break;
 		}
 
+		/*
+		 * The vendor printed these and returned success, so a read
+		 * or a program that lost data in the FIFO looked complete
+		 */
 		if(reg_sr & CLR_UNDR){
 			tmp = CLR_UNDR;
 			printf("underun");
+			ret = -EIO;
 			break;
 		}
 
 		if(reg_sr & CLR_OVER){
 			tmp = CLR_OVER;
 			printf("overrun");
+			ret = -EIO;
 			break;
+		}
+
+		if (get_timer(start) > SFC_TRANSFER_TIMEOUT_MS) {
+			printf("sfc: transfer timed out, SR 0x%x\n", reg_sr);
+			return -ETIMEDOUT;
 		}
 	}
 	if (tmp)
 		sfc_writel(sfc, SFC_SCR, tmp);
 
-	return 0;
+	return ret;
 }
 
 static int sfc_start_transfer(struct sfc *sfc)

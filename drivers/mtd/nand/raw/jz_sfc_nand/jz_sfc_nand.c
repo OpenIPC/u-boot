@@ -249,6 +249,11 @@ static int jz_sfcnand_read(struct mtd_info *mtd, loff_t from, size_t len,
 		columnaddr = (uint32_t)from % pagesize;
 		rlen = min_t(uint32_t, len, pagesize - columnaddr);
 		ret = jz_sfc_nand_read(flash, pageaddr, columnaddr, buf, rlen);
+		/* as the MTD core's other NAND drivers count them */
+		if (ret == -EBADMSG)
+			mtd->ecc_stats.failed++;
+		else if (ret > 0)
+			mtd->ecc_stats.corrected += ret;
 		if (ret < 0) {
 			printf("%s: page %u read error %d\n", __func__, pageaddr,
 			       ret);
@@ -304,15 +309,17 @@ static int jz_sfcnand_read_oob(struct mtd_info *mtd, loff_t from,
 
 	ops->retlen = 0;
 	ops->oobretlen = 0;
-	if (ops->datbuf) {
-		ret = jz_sfc_nand_read(flash, pageaddr, 0, ops->datbuf,
-				       mtd->writesize);
+	/* ops->len of the page's data, not more: the buffer may be shorter */
+	if (ops->datbuf && ops->len) {
+		uint32_t len = min_t(uint32_t, ops->len, mtd->writesize);
+
+		ret = jz_sfc_nand_read(flash, pageaddr, 0, ops->datbuf, len);
 		if (ret < 0) {
 			printf("spi nand read error %s %d, ret = %d\n",
 			       __func__, __LINE__, ret);
 			return ret;
 		}
-		ops->retlen = mtd->writesize;
+		ops->retlen = len;
 	}
 	if (ops->oobbuf && ops->ooblen) {
 		ret = jz_sfc_nand_read(flash, pageaddr,
@@ -334,6 +341,18 @@ static int jz_sfcnand_write_oob(struct mtd_info *mtd, loff_t addr,
 	uint32_t oob_addr = (uint32_t)addr;
 	int32_t ret;
 
+	ops->retlen = 0;
+	ops->oobretlen = 0;
+	/*
+	 * Spare area only: the vendor code programmed ops->oobbuf and
+	 * ignored ops->datbuf, so a data and OOB write reported success
+	 * having written only the spare bytes. Data goes through _write.
+	 */
+	if (ops->datbuf && ops->len)
+		return -EOPNOTSUPP;
+	if (!ops->oobbuf || !ops->ooblen)
+		return 0;
+
 	ret = jz_sfc_nand_write(flash, (const u_char *)ops->oobbuf,
 				oob_addr / mtd->writesize,
 				mtd->writesize + ops->ooboffs, ops->ooblen);
@@ -351,9 +370,9 @@ static int jz_sfc_nand_erase(struct mtd_info *mtd, struct erase_info *instr)
 	uint32_t end;
 	int32_t ret = 0;
 
-	if (addr % mtd->erasesize) {
-		printf("ERROR:%s line %d eraseaddr no align\n", __func__,
-		       __LINE__);
+	if (addr % mtd->erasesize || (uint32_t)instr->len % mtd->erasesize) {
+		printf("ERROR:%s line %d erase addr or len not aligned\n",
+		       __func__, __LINE__);
 		return -EINVAL;
 	}
 	end = addr + instr->len;
@@ -379,6 +398,9 @@ static int jz_sfcnand_erase(struct mtd_info *mtd, struct erase_info *instr)
 	int ret;
 
 	ret = jz_sfc_nand_erase(mtd, instr);
+	/* A request refused before erasing has no failed block to mark */
+	if (ret && instr->state != MTD_ERASE_FAILED)
+		return ret;
 	if (ret) {
 		printf("WARNING: block %d erase fail !\n",
 		       (uint32_t)instr->fail_addr / mtd->erasesize);

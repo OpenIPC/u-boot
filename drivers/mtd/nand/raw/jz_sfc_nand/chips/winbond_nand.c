@@ -166,7 +166,13 @@ static void winbond_pageread_to_cache(struct sfc_transfer *transfer, struct cmd_
 	cmd->cmd = SPINAND_CMD_PARD;
 	transfer->sfc_mode = TM_STD_SPI;
 
+	/*
+	 * The page within the die, as program and erase below send it: the
+	 * vendor sent the chip-wide number to the upper die of the W25M02GV
+	 */
 	transfer->addr = op_info->pageaddr;
+	if (device_id == 0xAB && transfer->addr > 65535)
+		transfer->addr -= 65536;
 	transfer->addr_len = 3;
 
 	cmd->dataen = DISABLE;
