@@ -8,6 +8,9 @@
 #define __ASM_GBL_DATA_H
 
 #include <asm/regdef.h>
+#ifdef CONFIG_ARCH_INGENIC
+#include <mach/global_info.h>
+#endif
 #include <asm/types.h>
 
 struct octeon_eeprom_mac_addr {
@@ -35,6 +38,10 @@ struct arch_global_data {
 #endif
 #ifdef CONFIG_ARCH_MTMIPS
 	unsigned long timer_freq;
+#endif
+#ifdef CONFIG_ARCH_INGENIC
+	/* The SPL's clock set-up, as the vendor SPL keeps it */
+	struct global_info *gi;
 #endif
 #ifdef CONFIG_ARCH_OCTEON
 	struct octeon_eeprom_mac_addr mac_desc;

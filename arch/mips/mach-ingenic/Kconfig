@@ -1,0 +1,158 @@
+menu "Ingenic T-series camera SoCs"
+	depends on ARCH_INGENIC
+
+config SYS_SOC
+	default "t10" if T10
+	default "t20" if T20
+	default "t21" if T21
+	default "t23" if T23
+	default "t30" if T30
+	default "t31" if T31
+
+config SYS_VENDOR
+	default "ingenic"
+
+config SYS_BOARD
+	default "isvp"
+
+config SYS_CONFIG_NAME
+	default "ingenic-isvp"
+
+choice
+	prompt "SoC"
+
+config T10
+	bool "T10"
+	help
+	  Ingenic T10 (XBurst, DWC DDR PHY).
+
+config T20
+	bool "T20"
+	help
+	  Ingenic T20 (XBurst, DWC DDR PHY).
+
+config T21
+	bool "T21"
+	help
+	  Ingenic T21 (XBurst, Innophy DDR PHY, internal Ethernet PHY).
+
+config T23
+	bool "T23"
+	help
+	  Ingenic T23 (XBurst, Innophy DDR PHY).
+
+config T30
+	bool "T30"
+	help
+	  Ingenic T30 (XBurst, Innophy DDR PHY).
+
+config T31
+	bool "T31"
+	help
+	  Ingenic T31 (XBurst, Innophy DDR PHY).
+
+endchoice
+
+# The package variants. Each selects what the vendor's boards.cfg option
+# of the same name selected: the PLL and DDR frequencies and the DDR chip.
+
+config LITE_VERSION
+	bool "Lite package (lower CPU and DDR clocks)"
+	depends on T10 || T20 || T30 || T31
+
+config DDR2_128M
+	bool "128 MiB DDR2 in the package"
+	depends on T20 || T21 || T30 || T31
+
+config DDR3_128M
+	bool "128 MiB DDR3 in the package"
+	depends on T30 || T31
+
+config T23N
+	bool "T23N"
+	depends on T23
+
+config T30A
+	bool "T30A"
+	depends on T30
+
+config T31A
+	bool "T31A"
+	depends on T31
+
+config T31AL
+	bool "T31AL"
+	depends on T31
+
+config T31LC
+	bool "T31LC"
+	depends on T31
+
+# What the vendor's per-SoC headers hard-code
+
+config CPU_XBURST
+	def_bool y
+	help
+	  An XBurst CPU core, as the vendor code names it.
+
+config DDR_PARAMS_CREATOR
+	def_bool y
+	help
+	  The DDR register values come from ddr_params_creator.
+
+config DDR_HOST_CC
+	def_bool y
+	help
+	  ddr_params_creator runs on the build host, not in the SPL.
+
+config DDR_INNOPHY
+	def_bool y if T21 || T23 || T30 || T31
+	help
+	  The Innosilicon DDR PHY; the T10 and T20 have the DesignWare one.
+
+config SPL_DDR_SOFT_TRAINING
+	def_bool y if !T23
+	help
+	  The software DQS training of the vendor SPL (ddr_dqs_training.c).
+
+config DDR_TYPE_DDR2
+	def_bool y if !DDR_TYPE_DDR3
+
+config DDR_TYPE_DDR3
+	def_bool y if DDR3_128M || (T23 && !T23N)
+
+config DDR2_M14D5121632A
+	def_bool y if DDR_TYPE_DDR2 && !DDR2_128M && !(T23 && !T23N)
+
+config DDR2_M14D1G1664A
+	def_bool y if DDR2_128M
+
+config DDR3_M15T1G1664A_2C
+	def_bool y if DDR3_128M
+
+config DDR3_TSD34096M1333C9_E
+	def_bool y if T23 && !T23N
+
+config JZ_MMC_MSC0
+	def_bool y
+	help
+	  MSC0 on port B: the SD card slot of the cameras.
+
+config SFC_NOR
+	def_bool y
+	help
+	  Boot from SPI NOR on the SFC.
+
+config NET_GMAC
+	def_bool y
+	help
+	  The SoC GMAC: its clock is ungated in the SPL, as the vendor does.
+
+config INGENIC_SPL_PAD_TO
+	hex
+	default 0x6800
+	help
+	  The SPL slot at the start of the flash; the LZO-packed U-Boot
+	  follows it.
+
+endmenu

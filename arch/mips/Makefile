@@ -3,6 +3,7 @@
 head-y := arch/mips/cpu/start.o
 
 ifeq ($(CONFIG_SPL_BUILD),y)
+head-$(CONFIG_ARCH_INGENIC) := arch/mips/mach-ingenic/start.o
 head-$(CONFIG_ARCH_JZ47XX) := arch/mips/mach-jz47xx/start.o
 head-$(CONFIG_SOC_MT7621) := arch/mips/mach-mtmips/mt7621/spl/start.o
 endif
@@ -16,6 +17,7 @@ libs-y += arch/mips/lib/
 
 machine-$(CONFIG_ARCH_ATH79) += ath79
 machine-$(CONFIG_ARCH_BMIPS) += bmips
+machine-$(CONFIG_ARCH_INGENIC) += ingenic
 machine-$(CONFIG_ARCH_JZ47XX) += jz47xx
 machine-$(CONFIG_MACH_PIC32) += pic32
 machine-$(CONFIG_ARCH_MTMIPS) += mtmips
