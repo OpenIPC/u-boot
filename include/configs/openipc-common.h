@@ -27,9 +27,22 @@
  * Kernel memory (mem=) from the start of the DDR, and above it the media
  * drivers' reserved memory (rmem=), as u-boot-ingenic set them up; on the
  * T40 also the NPU's (nmem), as u-boot-t40 set them up, which left the
- * T40A at the 64 MiB defaults.
+ * T40A at the 64 MiB defaults; on the T41 as the T41 SDK's bootargs have
+ * them, but for the T41A: the SDK gives it the 256 MiB parts' split, which
+ * reaches past its 128 MiB (W631GU6NG, as the T41N), so it has the T41N's.
  */
-#if defined(CONFIG_T40N)
+#if defined(CONFIG_T41L) || defined(CONFIG_T41LQ)
+#define OPENIPC_OSMEM		"32M"
+#define OPENIPC_RMEM		"32M@0x2000000"
+#elif defined(CONFIG_T41N) || defined(CONFIG_T41NQ) || defined(CONFIG_T41A)
+#define OPENIPC_OSMEM		"48M"
+#define OPENIPC_RMEM		"64M@0x3000000"
+#define OPENIPC_NMEM		"16M@0x7000000"
+#elif defined(CONFIG_T41ZX) || defined(CONFIG_T41XQ)
+#define OPENIPC_OSMEM		"100M"
+#define OPENIPC_RMEM		"128M@0x6400000"
+#define OPENIPC_NMEM		"28M@0xE400000"
+#elif defined(CONFIG_T40N)
 #define OPENIPC_OSMEM		"48M"
 #define OPENIPC_RMEM		"64M@0x3000000"
 #define OPENIPC_NMEM		"16M@0x7000000"
@@ -116,7 +129,12 @@
 	"bootflash=run fwrecovery; setenv setargs setenv bootargs ${bootargs}; run setargs; run loadkernel; bootm ${baseaddr}; reset\0"
 
 /* The flash's MTD name in the vendor kernel (drivers/mtd/devices/jz_sfc) */
+#ifdef CONFIG_T41
+/* the T41 kernels' (drivers/mtd/devices/jz_sfc_v1, flash on SFC0) */
+#define SFC "sfc0_nor"
+#else
 #define SFC "jz_sfc"
+#endif
 
 #define CONFIG_BOOTARGS "mem=\\${osmem} rmem=\\${rmem} console=ttyS1,115200 panic=20 root=/dev/mtdblock3 rootfstype=squashfs init=/init mtdparts=\\${mtdparts} \\${extras}"
 
