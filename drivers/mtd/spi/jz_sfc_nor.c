@@ -430,9 +430,10 @@ static int jz_sfc_erase(struct mtd_info *mtd, struct erase_info *instr)
 {
 	struct spi_flash *flash = mtd->priv;
 	u32 offset = instr->addr, len = instr->len;
-	u32 erase_size = flash->sector_size;
+	u32 erase_size;
 	u8 op;
 
+	/* CONFIG_SFC_MIN_ALIGN is a multiple of 4 KiB, the smallest erase */
 	if (offset % CONFIG_SFC_MIN_ALIGN || len % CONFIG_SFC_MIN_ALIGN) {
 		printf("SF: erase must be aligned to 0x%x\n",
 		       CONFIG_SFC_MIN_ALIGN);
@@ -453,19 +454,27 @@ static int jz_sfc_erase(struct mtd_info *mtd, struct erase_info *instr)
 	}
 
 	sfc_address_mode(flash, 1);
-	if (len < SZ_32K)
-		erase_size = SZ_4K;
 	while (len) {
-		switch (erase_size) {
-		case SZ_4K:
-			op = CMD_ERASE_4K;
-			break;
-		case SZ_32K:
-			op = CMD_ERASE_32K;
-			break;
-		default:
+		/*
+		 * The largest block the chip has (its table's sector size,
+		 * 64 or 32 KiB) where the offset is aligned to it and at
+		 * least that much is left, else 4 KiB. The vendor took the
+		 * sector size for anything from 32 KiB on, whatever the
+		 * alignment: with the T41's 4 KiB minimum a request at a 4K
+		 * offset erased the 64K block around it, and a 48 KiB one
+		 * wrapped len and erased on past the end.
+		 */
+		if (flash->sector_size >= SZ_64K && IS_ALIGNED(offset, SZ_64K) &&
+		    len >= SZ_64K) {
+			erase_size = SZ_64K;
 			op = CMD_ERASE_64K;
-			break;
+		} else if (flash->sector_size >= SZ_32K &&
+			   IS_ALIGNED(offset, SZ_32K) && len >= SZ_32K) {
+			erase_size = SZ_32K;
+			op = CMD_ERASE_32K;
+		} else {
+			erase_size = SZ_4K;
+			op = CMD_ERASE_4K;
 		}
 		sfc_send_cmd(CMD_WREN, 0, 0, 0, 0, 1);
 		sfc_send_cmd(op, 0, offset, flash->addr_width, 0, 1);
@@ -473,8 +482,6 @@ static int jz_sfc_erase(struct mtd_info *mtd, struct erase_info *instr)
 
 		offset += erase_size;
 		len -= erase_size;
-		if (erase_size != SZ_4K && len < erase_size)
-			erase_size = SZ_4K;
 	}
 	sfc_address_mode(flash, 0);
 	return 0;
@@ -515,7 +522,8 @@ struct spi_flash *spi_flash_probe(unsigned int bus, unsigned int cs,
 		/*
 		 * Not in the table. The vendor driver then kept the last
 		 * entry's geometry (16 MiB); take the size from the JEDEC
-		 * capacity byte instead.
+		 * capacity byte instead, 1 MiB (0x14) to 2 GiB (0x1f), the most
+		 * the 32-bit size fields hold.
 		 */
 		u8 cap = id & 0xff;
 
@@ -523,7 +531,7 @@ struct spi_flash *spi_flash_probe(unsigned int bus, unsigned int cs,
 		unknown.id = id;
 		unknown.page_size = 256;
 		unknown.sector_size = SZ_64K;
-		unknown.size = cap >= 0x14 && cap <= 0x1a ? 1 << cap : SZ_8M;
+		unknown.size = cap >= 0x14 && cap <= 0x1f ? 1U << cap : SZ_8M;
 		unknown.addr_size = unknown.size > SZ_16M ? 4 : 3;
 		info = &unknown;
 	}
