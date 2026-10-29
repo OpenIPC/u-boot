@@ -54,6 +54,7 @@ obj-$(CONFIG_STM32_SDMMC2) += stm32_sdmmc2.o
 obj-$(CONFIG_JZ47XX_MMC) += jz_mmc.o
 ifndef CONFIG_SPL_BUILD
 obj-$(CONFIG_JZ_MMC) += jz_mmc_legacy.o
+obj-$(CONFIG_JZ_SDHCI) += jz_sdhci.o
 endif
 obj-$(CONFIG_NEXELL_DWMMC) += nexell_dw_mmc.o
 

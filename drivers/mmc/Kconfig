@@ -432,11 +432,18 @@ config JZ47XX_MMC
 
 config JZ_MMC
 	bool "Ingenic T-series SD/MMC (MSC) controller"
-	depends on ARCH_INGENIC && MMC && !DM_MMC
+	depends on ARCH_INGENIC && !CPU_XBURST2 && MMC && !DM_MMC
 	help
 	  Legacy (non-DM) driver for the MSC SD/MMC controller of the Ingenic
 	  T10/T20/T21/T23/T30/T31 SoCs, ported from the Ingenic SDK U-Boot.
 	  The board registers it from board_mmc_init() via jz_mmc_init().
+
+config JZ_SDHCI
+	bool "Ingenic T40 SD/MMC (SDHCI MSC) controller"
+	depends on ARCH_INGENIC && CPU_XBURST2 && MMC && !DM_MMC
+	select MMC_SDHCI
+	help
+	  The SDHCI MSC of the Ingenic T40, on the generic SDHCI core.
 
 config MMC_SANDBOX
 	bool "Sandbox MMC support"
