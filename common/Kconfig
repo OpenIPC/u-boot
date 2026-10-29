@@ -1006,3 +1006,34 @@ config FDT_SIMPLEFB
 	  These functions can be used by board to indicate to the OS
 	  the presence of the simple frame buffer with associated reserved
 	  memory
+
+config OPENIPC
+	bool "OpenIPC boot layer"
+	help
+	  The OpenIPC firmware scan, SD/USB recovery and boot-limit failsafe
+	  (common/openipc.c), driven from the board's misc_init_r(), with the
+	  default environment in include/configs/openipc-common.h.
+
+config PRODUCT_SOC
+	string "Product SoC name"
+	default SYS_CONFIG_NAME
+	help
+	  Target SoC name exposed as 'soc=' (and 'board=') in the default
+	  environment. Set per target by the build system.
+
+config PRODUCT_SOCMODEL
+	string "Product SoC model"
+	default ""
+	help
+	  Optional board/binning model exposed as 'socmodel=' in the default
+	  environment.
+
+config OPENIPC_NOR_SPLIT
+	bool "OpenIPC: recognise the split NOR layout (uImage + squashfs in one partition)"
+	help
+	  A uImage at the NOR kernel offset with the root squashfs at the next
+	  64 KiB block after it is taken for the split layout: one "firmware"
+	  partition the kernel divides at boot. The
+	  kernel is told nothing about it: the fixed-slot mtdparts and root=
+	  of a saved environment are dropped, and bootm checks the uImage CRC.
+	  Only for boards whose kernel knows the layout.
