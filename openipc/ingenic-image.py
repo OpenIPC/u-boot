@@ -10,7 +10,14 @@ writes at offset 0 and `sf write` takes as it is.
 
 The image must end before the environment, at 0x40000.
 
-usage: ingenic-image.py <u-boot-spl.bin> <u-boot-lzo.img> <out>
+The XBurst2 (T40) SPL goes through two more vendor tools first:
+spl_pad_to_block (--pad-block: 0xff up to a multiple of 64 bytes) and, on
+the targets whose boards.cfg line has SPL_PARAMS_FIXER, spl_params_fixer
+(--params: the boot ROM's parameter block at offset 256, the CPM set-up it
+runs before reading the rest of the SPL).
+
+usage: ingenic-image.py [--pad-block] [--params] <u-boot-spl.bin>
+                        <u-boot-lzo.img> <out>
 """
 
 import struct
@@ -67,9 +74,50 @@ def crc7(data):
     return crc
 
 
+# spl_params_fixer.c of u-boot-t40 (FPGA defined there: pll_freq and
+# cpccr 0), the descriptors as {set_addr, poll_addr, value, poll_h_mask,
+# poll_l_mask}
+PARAMS_OFFSET = 256
+PARAMS_LENGTH = 256
+PARAMS_DESCS = [
+    # APLL 600 MHz (M=50, N=1, OD1=2, OD0=1)
+    (0xb0000010, 0xb0000010, 0x03205101, 0x8, 0),
+    # MPLL 1200 MHz (M=100, N=1, OD1=2, OD0=1)
+    (0xb0000014, 0xb0000014, 0x06405101, 0x8, 0),
+    # CPCCR: dividers, then the clock selection
+    (0xb0000000, 0xb00000d4, 0x557b5510, 0, 0x7),
+    (0xb0000000, 0xffffffff, 0x9a0b5510, 0, 0),
+    # SFC SSICDR[7:0]: 24 MHz (0x18)
+    (0xb0000060, 0xb0000060, 0x60000018, 0, 0x10000000),
+    (0xffffffff, 0xffffffff, 0, 0, 0),
+]
+PARAMS_NDESCS = 11
+
+
+def spl_params(spl_length):
+    length = spl_length if spl_length & 0x1ff == 0 \
+        else (spl_length & ~0x1ff) + 0x200
+    block = bytearray(PARAMS_LENGTH)
+    struct.pack_into('<4sIII', block, 0, b'INGE', length, 0, 0)
+    # nand_timing[4] stay 0
+    for i, d in enumerate(PARAMS_DESCS):
+        struct.pack_into('<5I', block, 32 + 20 * i, *d)
+    assert 32 + 20 * PARAMS_NDESCS <= PARAMS_LENGTH
+    return block
+
+
 def main():
-    spl_path, uboot_path, out_path = sys.argv[1:4]
+    args = sys.argv[1:]
+    pad_block = '--pad-block' in args
+    params = '--params' in args
+    args = [a for a in args if not a.startswith('--')]
+    spl_path, uboot_path, out_path = args[:3]
     spl = bytearray(open(spl_path, 'rb').read())
+
+    if pad_block and len(spl) % 64:
+        spl += b'\xff' * (64 - len(spl) % 64)
+    if params:
+        spl[PARAMS_OFFSET:PARAMS_OFFSET + PARAMS_LENGTH] = spl_params(len(spl))
     uboot = open(uboot_path, 'rb').read()
 
     if spl[:12] != bytes.fromhex('060504030255aa55aa000000'):

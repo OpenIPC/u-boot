@@ -46,11 +46,16 @@ build_soc() {
         -a "${text_base}" -e "${text_base}" -n "u-boot-lzo.img" \
         -d "${builddir}/u-boot-lzo.bin" "${builddir}/u-boot-lzo.img" \
         >/dev/null && \
-    python3 openipc/ingenic-image.py "${builddir}/spl/u-boot-spl.bin" \
+    case "${soc}" in
+        t40n|t40xp) image_opts="--pad-block --params" ;;
+        t40*) image_opts="--pad-block" ;;
+        *) image_opts="" ;;
+    esac
+    python3 openipc/ingenic-image.py ${image_opts} "${builddir}/spl/u-boot-spl.bin" \
         "${builddir}/u-boot-lzo.img" "output/u-boot-${soc}-nor.bin"
 }
 
-ALL_SOCS="t10 t10l t20 t20l t20x t21n t23n t23zn t23x t30n t30l t30x t30a t30a1 t31n t31l t31x t31a t31al t31lc"
+ALL_SOCS="t10 t10l t20 t20l t20x t21n t23n t23zn t23x t30n t30l t30x t30a t30a1 t31n t31l t31x t31a t31al t31lc t40n t40xp t40a"
 
 SOCS="$@"
 [ -z "${SOCS}" ] && SOCS="${ALL_SOCS}"

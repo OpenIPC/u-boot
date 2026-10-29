@@ -25,14 +25,30 @@
 
 /*
  * Kernel memory (mem=) from the start of the DDR, and above it the media
- * drivers' reserved memory (rmem=), as u-boot-ingenic set them up.
+ * drivers' reserved memory (rmem=), as u-boot-ingenic set them up; on the
+ * T40 also the NPU's (nmem), as u-boot-t40 set them up, which left the
+ * T40A at the 64 MiB defaults.
  */
-#if PHYS_SDRAM_1_SIZE == 0x08000000
+#if defined(CONFIG_T40N)
+#define OPENIPC_OSMEM		"48M"
+#define OPENIPC_RMEM		"64M@0x3000000"
+#define OPENIPC_NMEM		"16M@0x7000000"
+#elif defined(CONFIG_T40XP)
+#define OPENIPC_OSMEM		"100M"
+#define OPENIPC_RMEM		"128M@0x6400000"
+#define OPENIPC_NMEM		"28M@0xE400000"
+#elif PHYS_SDRAM_1_SIZE == 0x08000000
 #define OPENIPC_OSMEM		"64M"
 #define OPENIPC_RMEM		"64M@0x4000000"
 #else
 #define OPENIPC_OSMEM		"40M"
 #define OPENIPC_RMEM		"24M@0x2800000"
+#endif
+
+#ifdef OPENIPC_NMEM
+#define OPENIPC_ENV_NMEM	"nmem=" OPENIPC_NMEM "\0"
+#else
+#define OPENIPC_ENV_NMEM
 #endif
 
 #define OPENIPC_BASEADDR	0x80600000
@@ -76,6 +92,7 @@
 	"baseaddr=" __stringify(OPENIPC_BASEADDR) "\0" \
 	"osmem=" OPENIPC_OSMEM "\0" \
 	"rmem=" OPENIPC_RMEM "\0" \
+	OPENIPC_ENV_NMEM \
 	"bsbsize=" __stringify(GK_BSB_MIB) "M\0" \
 	"board_name\0" \
 	"board=" CONFIG_PRODUCT_SOC "\0" \
