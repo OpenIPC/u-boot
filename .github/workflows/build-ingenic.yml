@@ -81,6 +81,13 @@ jobs:
           - { soc: t40n, files: "output/u-boot-t40n-nor.bin" }
           - { soc: t40xp, files: "output/u-boot-t40xp-nor.bin" }
           - { soc: t40a, files: "output/u-boot-t40a-nor.bin" }
+          - { soc: t41l, files: "output/u-boot-t41l-nor.bin" }
+          - { soc: t41lq, files: "output/u-boot-t41lq-nor.bin" }
+          - { soc: t41n, files: "output/u-boot-t41n-nor.bin" }
+          - { soc: t41nq, files: "output/u-boot-t41nq-nor.bin" }
+          - { soc: t41a, files: "output/u-boot-t41a-nor.bin" }
+          - { soc: t41zx, files: "output/u-boot-t41zx-nor.bin" }
+          - { soc: t41xq, files: "output/u-boot-t41xq-nor.bin" }
 
     steps:
       - name: Checkout
