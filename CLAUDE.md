@@ -272,9 +272,11 @@ The build logic lives here. Other branches call it:
 
 - `resolve` -> `build` (matrix, one target per leg) -> `release`; no
   `qemu`/`qemu_smoke`, since qemu-hisilicon has no Ingenic (MIPS) machine.
-- NOR only, 256 KiB boot partition (the SPL in its 26 KiB slot, then the
-  lzop-packed U-Boot); the build legs install `gcc-mipsel-linux-gnu` and
-  `lzop`.
+- NOR on every leg: 256 KiB boot partition (the SPL in its 26 KiB slot,
+  then the lzop-packed U-Boot), env at 0x40000. The T40 legs (`kinds:
+  "nor nand"`) also build `-nand.bin`: 768 KiB boot partition (the SPL in
+  its 27 KiB slot, U-Boot at 0x6c00), env at 0xc0000, openipc-hisilicon's
+  UBI layout. The build legs install `gcc-mipsel-linux-gnu` and `lzop`.
 - **No `publish`:** the `u-boot-t*-nor.bin` names in OpenIPC/firmware
   `latest` are OpenIPC/u-boot-ingenic's, which cameras run, and these
   images have not booted on one. Add the job (and the openipc.org

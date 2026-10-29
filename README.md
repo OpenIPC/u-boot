@@ -426,10 +426,10 @@ and unpacks U-Boot. `u-boot-<soc>-nor.bin` is both, for flash offset 0:
 | `0x0000` | SPL, behind the boot ROM's SFC header (26 KiB slot) |
 | `0x6800` | U-Boot, lzop-packed in a uImage |
 
-On NAND the SPL slot is 27 KiB and U-Boot starts at `0x6c00`; the
-environment is at `0xc0000`.
+On NAND the SPL slot is 27 KiB and U-Boot starts at `0x6c00`.
 
-The environment is at 0x40000, as with u-boot-ingenic. These images have
+The environment is at 0x40000 on NOR, as with u-boot-ingenic, and at
+0xc0000 on NAND, as on `openipc-hisilicon`. These images have
 not run on a camera yet, and qemu-hisilicon has no Ingenic machine:
 CI builds them, and they are not published to OpenIPC/firmware.
 
