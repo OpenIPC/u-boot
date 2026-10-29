@@ -18,6 +18,9 @@
 #include <asm/regdef.h>
 #include <asm/mipsregs.h>
 #include <asm/addrspace.h>
+#ifdef CONFIG_INGENIC_SPI_NAND
+#include <mach/ingenic.h>
+#endif
 
 #define RESERVED_FOR_SC(x) .space 1536, x
 
@@ -28,7 +31,12 @@
 _start:
 	.word 0x03040506
 	.word 0x55aa5502
+#ifdef CONFIG_INGENIC_SPI_NAND
+	/* SPI NAND: pages per block / 32 and bytes per page / 1024 */
+	.word ((CONFIG_SPI_NAND_PPB / 32) << 16) | ((CONFIG_SPI_NAND_BPP / 1024) << 24)
+#else
 	.word 0x000000aa
+#endif
 	.space 500, 0
 	RESERVED_FOR_SC(0)
 

@@ -61,12 +61,21 @@ void t41_sdram_init(void);
 #else
 void sdram_init(void);
 #endif
+#ifdef CONFIG_INGENIC_SPI_NAND
+/* xburst2/spl_sfc_nand.c: the bad blocks skipped */
+int sfc_nand_init(void);
+int sfc_nand_load(unsigned int src_addr, unsigned int count,
+		  unsigned int dst_addr);
+#define spl_flash_load	sfc_nand_load
+#else
 void sfc_nor_load(unsigned int src_addr, unsigned int count,
 		  unsigned int dst_addr);
 void sfc_init(void);
+#define spl_flash_load	sfc_nor_load
+#endif
 void flush_cache_all(void);
 
-static void __noreturn ingenic_spl_boot_nor(void)
+static void __noreturn ingenic_spl_boot_flash(void)
 {
 	struct image_header *hdr = (void *)INGENIC_DECMP_BUFFER;
 	typedef void __noreturn (*entry_t)(void);
@@ -74,11 +83,17 @@ static void __noreturn ingenic_spl_boot_nor(void)
 	ulong size, load, ep;
 	int ret;
 
-#ifdef CONFIG_CPU_XBURST2
+#if defined(CONFIG_INGENIC_SPI_NAND)
+	/* The SFC and the chip, as the vendor SPL sets them up */
+	if (sfc_nand_init()) {
+		printf("No SPI NAND this SPL knows\n");
+		hang();
+	}
+#elif defined(CONFIG_CPU_XBURST2)
 	/* The T40 vendor SPL sets the SFC up once, before reading */
 	sfc_init();
 #endif
-	sfc_nor_load(CONFIG_INGENIC_SPL_PAD_TO, sizeof(*hdr), (ulong)hdr);
+	spl_flash_load(CONFIG_INGENIC_SPL_PAD_TO, sizeof(*hdr), (ulong)hdr);
 	if (image_get_magic(hdr) != IH_MAGIC) {
 		printf("No U-Boot image at 0x%x\n", CONFIG_INGENIC_SPL_PAD_TO);
 		hang();
@@ -87,7 +102,7 @@ static void __noreturn ingenic_spl_boot_nor(void)
 	load = image_get_load(hdr);
 	ep = image_get_ep(hdr);
 
-	sfc_nor_load(CONFIG_INGENIC_SPL_PAD_TO, size + sizeof(*hdr), (ulong)hdr);
+	spl_flash_load(CONFIG_INGENIC_SPL_PAD_TO, size + sizeof(*hdr), (ulong)hdr);
 	ret = lzop_decompress((void *)image_get_data(hdr), size, (void *)load,
 			      &len);
 	if (ret) {
@@ -249,5 +264,5 @@ void board_init_f(ulong dummy)
 	/* The vendor board_init_r() starts the timer over */
 	timer_init();
 
-	ingenic_spl_boot_nor();
+	ingenic_spl_boot_flash();
 }

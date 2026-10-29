@@ -11,13 +11,35 @@ endif
 obj-y += jz_serial.o
 
 ifdef CONFIG_SPL_BUILD
+ifdef CONFIG_INGENIC_SPI_NAND
+obj-y += spl_sfc_nand.o
+
+# The SFC timing and the SPL's SPI NAND chip table, made on the build host
+# by the vendor's tools/ingenic-tools sfc_timing_params and sfc_nand_params
+hostprogs-y += sfc_timing_params sfc_nand_params
+sfc_nand_params-objs := spinand/sfc_params.o \
+	$(patsubst $(srctree)/$(src)/%.c,%.o,$(wildcard $(srctree)/$(src)/spinand/*_nand.c))
+HOSTCFLAGS_sfc_params.o += -std=gnu99
+
+quiet_cmd_sfc_gen = GEN     $@
+      cmd_sfc_gen = $< > $@
+
+$(obj)/sfc_timing_val.h: $(obj)/sfc_timing_params FORCE
+	$(call if_changed,sfc_gen)
+$(obj)/sfc_nand_params.h: $(obj)/sfc_nand_params FORCE
+	$(call if_changed,sfc_gen)
+
+targets += sfc_timing_val.h sfc_nand_params.h
+$(obj)/spl_sfc_nand.o: $(obj)/sfc_timing_val.h $(obj)/sfc_nand_params.h
+else
 obj-y += spl_sfc_nor.o
+endif
 ifndef CONFIG_T41
 obj-y += ddr_innophy.o
 
 # The DDR controller and PHY register values, computed on the build host
 # from the DDR chip's timings by the XBurst2 vendor tools/ingenic-tools
-hostprogs-y := ddr_params_creator
+hostprogs-y += ddr_params_creator
 ddr_params_creator-objs := ddr_params_creator.o
 ddr_params_creator-objs-$(CONFIG_DDR_TYPE_DDR2) += ddr2_params.o
 ddr_params_creator-objs-$(CONFIG_DDR_TYPE_DDR3) += ddr3_params.o

@@ -409,6 +409,15 @@
 #define CONFIG_JZ_SFC_PA
 #define CONFIG_SFC_MIN_ALIGN 0x10000
 
+#ifdef CONFIG_INGENIC_SPI_NAND
+/* SPI NAND on the SFC, as isvp_t40.h has it for the SFC_NAND targets */
+#define CONFIG_SFC_NAND_RATE	50000000
+#define CONFIG_SPI_NAND_BPP	(2048 + 64)	/* Bytes Per Page */
+#define CONFIG_SPI_NAND_PPB	(64)		/* Page Per Block */
+/* single-bit reads and loads, the chips' need_quad off */
+#define CONFIG_SPI_STANDARD
+#endif
+
 /* GMAC, as isvp_t40.h has it: PHY_TYPE_IP101G is named but not defined */
 #define GMAC_PHY_MII	1
 #define GMAC_PHY_RMII	2

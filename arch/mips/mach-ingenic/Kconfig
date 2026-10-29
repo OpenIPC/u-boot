@@ -245,10 +245,22 @@ config JZ_MMC_MSC0
 	help
 	  MSC0 on port B: the SD card slot of the cameras.
 
-config SFC_NOR
-	def_bool y
+config INGENIC_SPI_NAND
+	bool "Boot from SPI NAND on the SFC"
+	depends on T40
 	help
-	  Boot from SPI NOR on the SFC.
+	  The SPL loads U-Boot from SPI NAND, and U-Boot keeps its
+	  environment there: the vendor's SFC_NAND targets.
+
+config SFC_NOR
+	def_bool y if !INGENIC_SPI_NAND
+	help
+	  Boot from SPI NOR on the SFC. The vendor's SFC_NAND targets leave
+	  it out, and so the SFC clock gate, which clk_init() opens only for
+	  NOR, as the boot ROM left it.
+
+config SFC_NAND
+	def_bool y if INGENIC_SPI_NAND
 
 config NET_GMAC
 	def_bool y
@@ -257,6 +269,7 @@ config NET_GMAC
 
 config INGENIC_SPL_PAD_TO
 	hex
+	default 0x6c00 if INGENIC_SPI_NAND
 	default 0x6800
 	help
 	  The SPL slot at the start of the flash; the LZO-packed U-Boot
