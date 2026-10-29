@@ -6,7 +6,8 @@
  * cycles and data, the data through a 32-bit FIFO. The sequences are the
  * vendor U-Boot's (drivers/spi/jz_sfc_nor.c of OpenIPC/u-boot-ingenic and,
  * for the T40's SFC, drivers/mtd/devices/jz_sfc_v1/jz_sfc_nor.c of
- * OpenIPC/u-boot-t40, both built without CONFIG_SPI_QUAD): the controller at 50 MHz, single-bit
+ * OpenIPC/u-boot-t40 and of the T41 SDK, all built without
+ * CONFIG_SPI_QUAD): the controller at 50 MHz, single-bit
  * READ (0x03) and PP (0x02), WREN before and RDSR polled after every
  * program and erase, 4-byte addressing switched on around each operation
  * on parts that need it, a whole-chip erase as CHIP ERASE, and the chip
@@ -39,7 +40,12 @@
  * TRAN_CONF1 and the fields renamed (drivers/mtd/devices/jz_sfc_v1 of
  * OpenIPC/u-boot-t40)
  */
+#ifdef CONFIG_T41
+/* The T41's flash is on SFC0 (drivers/mtd/devices/jz_sfc_v1 of the T41 SDK) */
+#define SFC_BASE		SFC0_BASE
+#else
 #define SFC_CLK_ID		SFC_CLK
+#endif
 #define SFC_DATA		SFC_RM_DR
 #define G_TRAN_DIR		GLB_TRAN_DIR
 #define G_OP_MODE		GLB_OP_MODE
@@ -141,6 +147,11 @@ static const struct jz_nor_info jz_nor_table[] = {
 	{ "GM25Q64A",          0x1c4017, 256, (64*1024), 3, (8*1024*1024) },
 	{ "GM25Q128A",         0x1c4018, 256, (64*1024), 3, (16*1024*1024) },
 	{ "PY25Q128HA",        0x852018, 256, (64*1024), 3, (16*1024*1024) },
+#ifdef CONFIG_T41
+	/* the T41 SDK's table has these two more */
+	{ "XT25Q128D",         0x0b6018, 256, (32*1024), 3, (16*1024*1024) },
+	{ "NM25Q64EVD",        0x522217, 256, (32*1024), 3, (8*1024*1024) },
+#endif
 #else
 	{ "MX25L128**E",       0xc22018, 256, (64*1024), 3, (16*1024*1024) },
 	{ "MX25L64**E",        0xc22017, 256, (64*1024), 3, (8*1024*1024) },
@@ -288,7 +299,13 @@ static void sfc_init(void)
 {
 	int i;
 
+#ifdef CONFIG_T41
+	/* both SFCs, as the T41 SDK with SFC0_NOR and SFC1_NOR */
+	clk_set_rate(SFC0, JZ_SFC_RATE);
+	clk_set_rate(SFC1, JZ_SFC_RATE);
+#else
 	clk_set_rate(SFC_CLK_ID, JZ_SFC_RATE);
+#endif
 
 #ifdef CONFIG_CPU_XBURST2
 	/* The T40's: write protect off, no sample delay, no burst mode */
