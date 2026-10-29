@@ -25,6 +25,7 @@
 #include <timestamp.h>
 #include <version.h>
 #include <asm/global_data.h>
+#include <asm/io.h>
 #include <asm/sections.h>
 #include <asm/gpio.h>
 #include <asm/arch/clk.h>
@@ -109,6 +110,20 @@ void board_init_f(ulong dummy)
 	gd->have_console = 1;
 	puts("\nU-Boot SPL " PLAIN_VERSION " (" U_BOOT_DATE " - "
 	     U_BOOT_TIME ")\n");
+#ifdef CONFIG_T23
+	/* The chip ID in the eFuse, as the T23 vendor SPL prints it */
+	switch (readl((void __iomem *)0xb3540238) >> 16) {
+	case 0x1111:
+		puts("Board info: T23N\n");
+		break;
+	case 0x6666:
+		puts("Board info: T23ZN\n");
+		break;
+	default:
+		puts("Board info: No SOC Info\n");
+		break;
+	}
+#endif
 
 	debug("Timer init\n");
 	timer_init();

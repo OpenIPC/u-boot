@@ -71,6 +71,22 @@ config DDR3_128M
 config T23N
 	bool "T23N"
 	depends on T23
+	help
+	  64 MiB DDR2 in the package.
+
+config T23ZN
+	bool "T23ZN"
+	depends on T23
+	select T23N
+	help
+	  Set up as the T23N, as the vendor SDK does; its SPL tells the
+	  two apart only by the chip ID it prints.
+
+config T23X
+	bool "T23X"
+	depends on T23 && !T23N
+	help
+	  128 MiB DDR2 in the package.
 
 config T30A
 	bool "T30A"
@@ -119,19 +135,19 @@ config DDR_TYPE_DDR2
 	def_bool y if !DDR_TYPE_DDR3
 
 config DDR_TYPE_DDR3
-	def_bool y if DDR3_128M || (T23 && !T23N)
+	def_bool y if DDR3_128M || (T23 && !T23N && !T23X)
 
 config DDR2_M14D5121632A
-	def_bool y if DDR_TYPE_DDR2 && !DDR2_128M && !(T23 && !T23N)
+	def_bool y if DDR_TYPE_DDR2 && !DDR2_128M && !T23X
 
 config DDR2_M14D1G1664A
-	def_bool y if DDR2_128M
+	def_bool y if DDR2_128M || T23X
 
 config DDR3_M15T1G1664A_2C
 	def_bool y if DDR3_128M
 
 config DDR3_TSD34096M1333C9_E
-	def_bool y if T23 && !T23N
+	def_bool y if T23 && !T23N && !T23X
 
 config JZ_MMC_MSC0
 	def_bool y

@@ -13,7 +13,8 @@
 #define CONFIG_SYS_INIT_SP_OFFSET	0x400000
 
 /* The DDR in the package */
-#if defined(CONFIG_DDR2_128M) || defined(CONFIG_DDR3_128M)
+#if defined(CONFIG_DDR2_128M) || defined(CONFIG_DDR3_128M) || \
+    defined(CONFIG_T23X)
 #define PHYS_SDRAM_1_SIZE		0x08000000
 #else
 #define PHYS_SDRAM_1_SIZE		0x04000000
