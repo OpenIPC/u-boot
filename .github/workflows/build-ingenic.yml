@@ -52,7 +52,9 @@ jobs:
 
   build:
     needs: resolve
-    runs-on: ubuntu-latest
+    # Not ubuntu-latest: Ubuntu 26.04 has no gcc-mipsel-linux-gnu (Debian
+    # and Ubuntu dropped the MIPS cross compilers); 24.04 still ships it.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
