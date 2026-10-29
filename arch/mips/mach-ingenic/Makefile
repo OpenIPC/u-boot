@@ -10,6 +10,10 @@ ifdef CONFIG_CPU_XBURST2
 # XBurst2: the generation's own CPU, timer, GPIO, SFC and DDR code
 obj-y += xburst2/
 obj-$(CONFIG_SPL_BUILD) += spl.o $(SOC)/pll.o $(SOC)/ddr_set_dll.o
+ifdef CONFIG_T41
+obj-y += t41/gpio.o
+obj-$(CONFIG_SPL_BUILD) += t41/ddr/ t41/epc_debug.o t41/ddr_check.o
+endif
 else
 obj-y += cpu.o timer.o gpio.o jz_serial.o
 

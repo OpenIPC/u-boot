@@ -78,6 +78,18 @@ struct cgu_clk_src cgu_clk_src[] = {
 	{CIM2, APLL},
 	{ISP, MPLL},
 	{I2S, APLL},
+#elif defined(CONFIG_T41)
+	{EL200, APLL},
+	{MACPHY, MPLL},
+	{MSC, APLL},
+	{MSC1, MPLL},
+	{SFC0, MPLL},
+	{SFC1, MPLL},
+	{CIM0, APLL},
+	{ISPA, MPLL},
+	{ISPS, MPLL},
+	{ISPM, MPLL},
+	{I2S, APLL},
 #endif
 	{SRC_EOF, SRC_EOF}
 };
@@ -104,6 +116,8 @@ int board_early_init_f(void)
 #elif defined(CONFIG_T40)
 	/* GPIO port A PA00-PA22 at 1.8 V, as the T40 vendor board does */
 	writel(0x1, GPIO_BASE + PXGPDCRS);
+#elif defined(CONFIG_T41)
+	/* The T41 vendor board leaves PA06-PA19 at their default, 1.8 V */
 #elif defined(CONFIG_T31) && !defined(CONFIG_T31A) && !defined(CONFIG_T31AL)
 	/* PA25/PA26 (flash IO2/IO3) inputs without pulls, except on the
 	 * quad-capable T31A/T31AL */

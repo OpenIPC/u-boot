@@ -23,6 +23,8 @@
 #include <mach/t31-hw.h>
 #elif defined(CONFIG_T40)
 #include <mach/t40-hw.h>
+#elif defined(CONFIG_T41)
+#include <mach/t41-hw.h>
 #endif
 
 #if defined(CONFIG_CPU_XBURST2) && !defined(USE_HOSTCC) && \

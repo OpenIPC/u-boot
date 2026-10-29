@@ -3,10 +3,16 @@
 # Ingenic XBurst2 (T40): the vendor arch/mips/cpu/xburst2 of
 # OpenIPC/u-boot-t40.
 
-obj-y += cpu.o gost_timer.o gpio.o jz_serial.o
+obj-y += cpu.o gost_timer.o
+# The T41 has the SDK's GPIO layer and DDR code (t41/), not u-boot-t40's
+ifndef CONFIG_T41
+obj-y += gpio.o
+endif
+obj-y += jz_serial.o
 
 ifdef CONFIG_SPL_BUILD
 obj-y += spl_sfc_nor.o
+ifndef CONFIG_T41
 obj-y += ddr_innophy.o
 
 # The DDR controller and PHY register values, computed on the build host
@@ -31,4 +37,5 @@ $(obj)/ddr_reg_values.h: $(obj)/ddr_params_creator FORCE
 targets += ddr_reg_values.h
 ccflags-y += -I$(obj)
 $(obj)/ddr_innophy.o: $(obj)/ddr_reg_values.h
+endif
 endif

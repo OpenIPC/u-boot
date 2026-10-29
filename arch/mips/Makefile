@@ -32,6 +32,11 @@ PLATFORM_CPPFLAGS += $(patsubst %,-I$(srctree)/%include,$(machdirs))
 # Ingenic: the DDR headers of the CPU generation, which the vendor changed
 # between XBurst and XBurst2 under the same names
 ifdef CONFIG_ARCH_INGENIC
+# The T41 changes them again, in the vendor's second DDR generation: its
+# own ahead of the XBurst2 ones
+ifdef CONFIG_T41
+PLATFORM_CPPFLAGS += -I$(srctree)/arch/mips/mach-ingenic/t41/include
+endif
 PLATFORM_CPPFLAGS += -I$(srctree)/arch/mips/mach-ingenic/$(if $(CONFIG_CPU_XBURST2),xburst2,xburst)/include
 endif
 

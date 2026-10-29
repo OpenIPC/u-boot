@@ -15,10 +15,11 @@
 /* The DDR in the package */
 #if defined(CONFIG_T40A)
 #define PHYS_SDRAM_1_SIZE		0x40000000
-#elif defined(CONFIG_T40XP)
+#elif defined(CONFIG_T40XP) || defined(CONFIG_T41ZX) || defined(CONFIG_T41XQ)
 #define PHYS_SDRAM_1_SIZE		0x10000000
 #elif defined(CONFIG_DDR2_128M) || defined(CONFIG_DDR3_128M) || \
-    defined(CONFIG_T23X) || defined(CONFIG_T40N)
+    defined(CONFIG_T23X) || defined(CONFIG_T40N) || defined(CONFIG_T41N) || \
+    defined(CONFIG_T41NQ) || defined(CONFIG_T41A)
 #define PHYS_SDRAM_1_SIZE		0x08000000
 #else
 #define PHYS_SDRAM_1_SIZE		0x04000000

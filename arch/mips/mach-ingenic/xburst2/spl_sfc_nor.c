@@ -13,6 +13,11 @@
 
 //#define TEST
 
+/* The T41 boots from SFC0 (the T41 SDK's spl_sfc_nor.c) */
+#ifdef CONFIG_T41
+#define SFC_BASE	SFC0_BASE
+#endif
+
 static uint32_t jz_sfc_readl(unsigned int offset)
 {
 	return readl(SFC_BASE + offset);
@@ -130,7 +135,13 @@ void sfc_init(void)
 {
 	unsigned int tmp;
 #ifndef CONFIG_FPGA
+#ifdef CONFIG_T41
+	/* both SFCs, as the T41 SDK sets them with SFC0_NOR and SFC1_NOR */
+	clk_set_rate(SFC0, 50000000);
+	clk_set_rate(SFC1, 50000000);
+#else
 	clk_set_rate(SFC_CLK, 50000000);
+#endif
 #endif
 	tmp = jz_sfc_readl(SFC_GLB);
 	tmp &= ~GLB_THRESHOLD_MSK;
@@ -144,16 +155,65 @@ void sfc_init(void)
 	jz_sfc_writel(0, SFC_CGE);
 }
 
+#ifdef CONFIG_T41
+/*
+ * The T41 SDK's: the flash's address length from the boot header. Read
+ * with six address bytes, a part with N-byte addresses shifts the header
+ * by 6 - N, so the first byte read is N (the header is 06 05 04 03 02 55 aa
+ * 55 aa) and 55 aa 55 aa follows N - 1 bytes on.
+ */
+static int sfc_nor_addrlen(void)
+{
+	unsigned int ret, retry_count = 0;
+	unsigned int addr_len, spi_sig[4];
+	unsigned char *sig;
+
+	sig = (unsigned char *)spi_sig;
+
+	addr_len = 6;
+retry:
+	if (retry_count > 3)
+		return -1;
+
+	ret = sfc_read(0x0, 0x0, addr_len, spi_sig, 4);
+	if (ret) {
+		printf("sfc read head info error,ret = %d\n", ret);
+	}
+
+	addr_len = sig[0];
+	if ((addr_len == 0x6) || (addr_len == 0x5) || (addr_len == 0x4) ||
+			(addr_len == 0x3) || (addr_len == 0x2)) {
+		if ((sig[addr_len - 1] == 0x55) && (sig[addr_len] == 0xaa) && (sig[addr_len + 1] == 0x55) && (sig[addr_len + 2] == 0xaa))
+			return addr_len;
+		else {
+			retry_count++;
+			goto retry;
+		}
+	} else {
+		retry_count++;
+		goto retry;
+	}
+
+	return -1;
+}
+#endif
+
 void sfc_nor_load(unsigned int src_addr, unsigned int count, unsigned int dst_addr)
 {
 	unsigned int ret, addr_len, words_of_spl;
 
+#ifdef CONFIG_T41
+	addr_len = sfc_nor_addrlen();
+	if (addr_len < 0)
+		printf("sfc get falsh addrlen error,addr_len=%d\n", addr_len);
+#else
 #ifdef CONFIG_EXIT_4BYTE_MODE
 	sfc_set_read_reg(CONFIG_EXIT_4BYTE_MODE, 0, 0, 0, 0);
 	udelay(50);
 #endif
 	/* spi norflash addr len */
 	addr_len = 3;
+#endif
 
 	/* count word align */
 	words_of_spl = (count + 3) / 4;

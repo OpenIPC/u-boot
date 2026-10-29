@@ -2,7 +2,8 @@
 /*
  * SPL start for the Ingenic T-series, from the vendor
  * arch/mips/cpu/xburst/<soc>/start.S (OpenIPC/u-boot-ingenic) and
- * arch/mips/cpu/xburst2/t40/start.S (OpenIPC/u-boot-t40), the SFC NOR boot.
+ * arch/mips/cpu/xburst2/t40/start.S (OpenIPC/u-boot-t40) and t41/start.S
+ * (Ingenic T41 SDK 1.2.0), the SFC NOR boot.
  *
  * The first 2 KiB are the boot ROM's: the SFC boot header (the ROM checks
  * a CRC7 of the SPL from 2 KiB on, which openipc/ingenic-image.py writes
@@ -83,6 +84,15 @@ _start:
 	nop
 #endif
 
+#ifdef CONFIG_T41
+	/* force the RISC-V core into soft reset, as the T41 vendor SPL */
+	la	t8, 0xb2200fe0
+	lw	t0, 0(t8)
+	lui	t1, 0x8000
+	or	t0, t0, t1
+	sw	t0, 0(t8)
+#endif
+
 	/*
 	 * CU0=UM=EXL=IE=0, BEV=ERL=1, IP2~7=1
 	 */
@@ -100,6 +110,45 @@ _start:
 #else
 	li	t1, 0x00800000
 	mtc0	t1, CP0_CAUSE
+#endif
+
+#ifdef CONFIG_T41
+	/* GPIO A, B and C pin set-up, as the T41 vendor SPL writes it */
+	/* PA06~PA19 */
+	la	t8, 0xf7fc0
+	la	t9, 0xb0010134
+	sw	t8, 0(t9)
+
+	la	t8, 0xf7fc0
+	la	t9, 0xb0010144
+	sw	t8, 0(t9)
+
+	/* PA15 */
+	la	t8, 0x8000
+	la	t9, 0xb0010138
+	sw	t8, 0(t9)
+
+	la	t8, 0x8000
+	la	t9, 0xb00101a4
+	sw	t8, 0(t9)
+
+	/* PB00~PB31 */
+	la	t8, 0xffffffff
+	la	t9, 0xb0011134
+	sw	t8, 0(t9)
+
+	la	t8, 0xffffffff
+	la	t9, 0xb0011148
+	sw	t8, 0(t9)
+
+	/* PC00~PC31 */
+	la	t8, 0xffffffff
+	la	t9, 0xb0012134
+	sw	t8, 0(t9)
+
+	la	t8, 0xffffffff
+	la	t9, 0xb0012148
+	sw	t8, 0(t9)
 #endif
 
 	/* The stack is the boot ROM's */

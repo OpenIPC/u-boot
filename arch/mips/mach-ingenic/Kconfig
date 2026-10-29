@@ -9,6 +9,7 @@ config SYS_SOC
 	default "t30" if T30
 	default "t31" if T31
 	default "t40" if T40
+	default "t41" if T41
 
 config SYS_VENDOR
 	default "ingenic"
@@ -58,6 +59,13 @@ config T40
 	help
 	  Ingenic T40 (XBurst2 with L2 cache, Innophy DDR PHY, SDHCI, the
 	  SFC of the second generation).
+
+config T41
+	bool "T41"
+	select CPU_XBURST2
+	help
+	  Ingenic T41 (XBurst2 with L2 cache, Innophy DDR PHY of the second
+	  DDR generation, SDHCI, two SFCs).
 
 endchoice
 
@@ -130,6 +138,48 @@ config T40A
 	help
 	  DDR3 in the package (M15T4G16256A).
 
+config T41L
+	bool "T41L"
+	depends on T41
+	help
+	  64 MiB DDR2 in the package (M14D5121632A).
+
+config T41LQ
+	bool "T41LQ"
+	depends on T41
+	help
+	  The T41L's DDR (64 MiB DDR2) and clocks.
+
+config T41N
+	bool "T41N"
+	depends on T41
+	help
+	  128 MiB DDR3 in the package (W631GU6NG).
+
+config T41NQ
+	bool "T41NQ"
+	depends on T41
+	help
+	  128 MiB DDR3 (W631GU6NG), DDR at 700 MHz.
+
+config T41A
+	bool "T41A"
+	depends on T41
+	help
+	  DDR3 W631GU6NG, CPU at 1300 MHz and DDR at 800 MHz.
+
+config T41ZX
+	bool "T41ZX"
+	depends on T41
+	help
+	  256 MiB DDR3 in the package (W632GU6NG).
+
+config T41XQ
+	bool "T41XQ"
+	depends on T41
+	help
+	  256 MiB DDR3 in the package (W632GU6NG).
+
 # What the vendor's per-SoC headers hard-code
 
 config CPU_XBURST2
@@ -153,7 +203,7 @@ config DDR_HOST_CC
 	  ddr_params_creator runs on the build host, not in the SPL.
 
 config DDR_INNOPHY
-	def_bool y if T21 || T23 || T30 || T31 || T40
+	def_bool y if T21 || T23 || T30 || T31 || T40 || T41
 	help
 	  The Innosilicon DDR PHY; the T10 and T20 have the DesignWare one.
 
@@ -166,7 +216,8 @@ config DDR_TYPE_DDR2
 	def_bool y if !DDR_TYPE_DDR3
 
 config DDR_TYPE_DDR3
-	def_bool y if DDR3_128M || (T23 && !T23N && !T23X) || T40XP || T40A
+	def_bool y if DDR3_128M || (T23 && !T23N && !T23X) || T40XP || T40A || \
+		     (T41 && !T41L && !T41LQ)
 
 config DDR2_M14D5121632A
 	def_bool y if DDR_TYPE_DDR2 && !DDR2_128M && !T23X
@@ -179,6 +230,12 @@ config DDR3_M15T1G1664A_2C
 
 config DDR3_M15T4G16256A_2S
 	def_bool y if T40A
+
+config DDR3_W631GU6NG
+	def_bool y if T41N || T41NQ || T41A
+
+config DDR3_W632GU6NG
+	def_bool y if T41ZX || T41XQ
 
 config DDR3_TSD34096M1333C9_E
 	def_bool y if T23 && !T23N && !T23X

@@ -56,7 +56,11 @@ void pll_init(void);
 void clk_prepare(void);
 void clk_init(void);
 void enable_uart_clk(void);
+#ifdef CONFIG_T41
+void t41_sdram_init(void);
+#else
 void sdram_init(void);
+#endif
 void sfc_nor_load(unsigned int src_addr, unsigned int count,
 		  unsigned int dst_addr);
 void sfc_init(void);
@@ -105,7 +109,13 @@ static void __noreturn ingenic_spl_boot_nor(void)
 			"lw $0,0(%0)   \n\t"
 			".set pop      \n\t"
 			::"r" (0xa0000000));
+#ifdef CONFIG_T41
+	/* the T41 vendor SPL changes those bits only */
+	writel((readl((void __iomem *)0xb2200060) & ~(0x7 << 10)) | (0x1 << 10),
+	       (void __iomem *)0xb2200060);
+#else
 	writel(0x00000400, (void __iomem *)0xb2200060);
+#endif
 	__asm__ volatile(
 			".set push     \n\t"
 			".set mips32r2 \n\t"
@@ -146,9 +156,15 @@ void board_init_f(ulong dummy)
 	gd = &gdata;
 
 #ifdef CONFIG_CPU_XBURST2
-	/* close the CCU IFU simple loop, as the T40 vendor SPL */
+	/* close the CCU IFU simple loop, as the T40 vendor SPL; the T41's
+	 * sets bits 6:5 too */
+#ifdef CONFIG_T41
+	writel(readl((void __iomem *)0xb2200fe0) | 0x00000078,
+	       (void __iomem *)0xb2200fe0);
+#else
 	writel(readl((void __iomem *)0xb2200fe0) | 0x00000018,
 	       (void __iomem *)0xb2200fe0);
+#endif
 #endif
 
 	gd->arch.gi = &ginfo;
@@ -177,6 +193,38 @@ void board_init_f(ulong dummy)
 		break;
 	}
 #endif
+#ifdef CONFIG_T41
+	/* The chip ID in the eFuse, as the T41 SDK's SPL prints it */
+	switch (readl((void __iomem *)0xb3540250) >> 16) {
+	case 0x1111:
+		puts("Board info: T41N\n");
+		break;
+	case 0x3333:
+		puts("Board info: T41L\n");
+		break;
+	case 0x5555:
+		puts("Board info: T41ZL\n");
+		break;
+	case 0x7777:
+		puts("Board info: T41ZN\n");
+		break;
+	case 0x6666:
+		puts("Board info: T41ZX\n");
+		break;
+	case 0x4444:
+		puts("Board info: T41A\n");
+		break;
+	case 0x9999:
+		puts("Board info: T41LQ\n");
+		break;
+	case 0xAAAA:
+		puts("Board info: T41NQ\n");
+		break;
+	default:
+		puts("Board info: not support\n");
+		break;
+	}
+#endif
 
 	debug("Timer init\n");
 	timer_init();
@@ -191,7 +239,11 @@ void board_init_f(ulong dummy)
 	clk_init();
 
 	debug("SDRAM init\n");
+#ifdef CONFIG_T41
+	t41_sdram_init();
+#else
 	sdram_init();
+#endif
 	debug("SDRAM init ok\n");
 
 	/* The vendor board_init_r() starts the timer over */
