@@ -2,7 +2,8 @@
 /*
  * Ingenic ISVP boards (the T-series camera reference design and the
  * cameras built on it): board/ingenic/isvp{,_t20,_t21,_t23,_t30,_t31}/board.c of
- * OpenIPC/u-boot-ingenic, one file for every SoC.
+ * OpenIPC/u-boot-ingenic and board/ingenic/isvp_t40/board.c of
+ * OpenIPC/u-boot-t40, one file for every SoC.
  *
  * The board-specific parts are what OpenIPC added there for cameras that
  * differ from the reference board: SD card power switches on GPIOs and,
@@ -67,6 +68,16 @@ struct cgu_clk_src cgu_clk_src[] = {
 	{ISP, MPLL},
 	{I2S_SPK, APLL},
 	{I2S_MIC, APLL},
+#elif defined(CONFIG_T40)
+	{EL150, APLL},
+	{MACPHY, MPLL},
+	{MSC, MPLL},
+	{SFC_CLK, MPLL},
+	{CIM0, APLL},
+	{CIM1, APLL},
+	{CIM2, APLL},
+	{ISP, MPLL},
+	{I2S, APLL},
 #endif
 	{SRC_EOF, SRC_EOF}
 };
@@ -90,6 +101,9 @@ int board_early_init_f(void)
 	writel(0x3f, 0xb0011024);
 	writel(0x3f, 0xb0011038);
 	writel(0x3f, 0xb0011048);
+#elif defined(CONFIG_T40)
+	/* GPIO port A PA00-PA22 at 1.8 V, as the T40 vendor board does */
+	writel(0x1, GPIO_BASE + PXGPDCRS);
 #elif defined(CONFIG_T31) && !defined(CONFIG_T31A) && !defined(CONFIG_T31AL)
 	/* PA25/PA26 (flash IO2/IO3) inputs without pulls, except on the
 	 * quad-capable T31A/T31AL */
@@ -128,7 +142,7 @@ int last_stage_init(void)
 	return 0;
 }
 
-#ifdef CONFIG_JZ_MMC
+#if defined(CONFIG_JZ_MMC) || defined(CONFIG_JZ_SDHCI)
 int board_mmc_init(struct bd_info *bd)
 {
 	jz_mmc_init();

@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 /*
- * SPL start for the Ingenic XBurst T-series, from the vendor
- * arch/mips/cpu/xburst/<soc>/start.S (OpenIPC/u-boot-ingenic), the SFC NOR
- * boot.
+ * SPL start for the Ingenic T-series, from the vendor
+ * arch/mips/cpu/xburst/<soc>/start.S (OpenIPC/u-boot-ingenic) and
+ * arch/mips/cpu/xburst2/t40/start.S (OpenIPC/u-boot-t40), the SFC NOR boot.
  *
  * The first 2 KiB are the boot ROM's: the SFC boot header (the ROM checks
  * a CRC7 of the SPL from 2 KiB on, which openipc/ingenic-image.py writes
@@ -66,6 +66,7 @@ _start:
 	sw	t8, 0(t9)
 #endif
 
+#ifndef CONFIG_CPU_XBURST2
 	/* Invalidate BTB */
 	mfc0	v0, CP0_CONFIG, 7
 	nop
@@ -80,6 +81,7 @@ _start:
 	and	v0, v0, v1
 	mtc0	v0, $12, 2
 	nop
+#endif
 
 	/*
 	 * CU0=UM=EXL=IE=0, BEV=ERL=1, IP2~7=1
@@ -89,8 +91,16 @@ _start:
 
 	/* CAUSE register */
 	/* IV=1, use the specical interrupt vector (0x200) */
+#ifdef CONFIG_CPU_XBURST2
+	/* the T40 vendor SPL sets IV and keeps the rest */
+	mfc0	t0, CP0_CAUSE
+	li	t1, 0x00800000
+	or	t0, t0, t1
+	mtc0	t0, CP0_CAUSE
+#else
 	li	t1, 0x00800000
 	mtc0	t1, CP0_CAUSE
+#endif
 
 	/* The stack is the boot ROM's */
 	j	board_init_f

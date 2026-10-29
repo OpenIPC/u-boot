@@ -21,6 +21,14 @@
 #include <mach/t30-hw.h>
 #elif defined(CONFIG_T31)
 #include <mach/t31-hw.h>
+#elif defined(CONFIG_T40)
+#include <mach/t40-hw.h>
+#endif
+
+#if defined(CONFIG_CPU_XBURST2) && !defined(USE_HOSTCC) && \
+    !defined(__ASSEMBLY__) && !defined(flush_l2cache_all)
+/* XBurst2: write the L2 cache back and invalidate it (xburst2/cpu.c) */
+void flush_l2cache_all(void);
 #endif
 
 #ifndef USE_HOSTCC
@@ -30,6 +38,9 @@
 		##args, __FILE__, __LINE__, __func__);		\
 } while (0)
 #endif
+
+#ifndef CONFIG_CPU_XBURST2
+/* XBurst: what the isvp headers share; the XBurst2 SoCs carry theirs */
 
 /* MSC0 on port B, the SD card slot */
 #define CONFIG_JZ_MMC_SPLMSC		0
@@ -76,5 +87,7 @@
 #define CONFIG_GPIO_IP101G_RESET	GPIO_PB(28)
 #define CONFIG_GPIO_IP101G_RESET_ENLEVEL	0
 #endif
+
+#endif /* !CONFIG_CPU_XBURST2 */
 
 #endif /* __MACH_INGENIC_H */

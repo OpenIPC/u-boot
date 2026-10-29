@@ -29,6 +29,9 @@
 #include <asm/sections.h>
 #include <asm/gpio.h>
 #include <asm/arch/clk.h>
+#ifdef CONFIG_CPU_XBURST2
+#include <asm/arch/tcu.h>
+#endif
 #include <mach/ingenic.h>
 #include <mach/global_info.h>
 
@@ -56,6 +59,7 @@ void enable_uart_clk(void);
 void sdram_init(void);
 void sfc_nor_load(unsigned int src_addr, unsigned int count,
 		  unsigned int dst_addr);
+void sfc_init(void);
 void flush_cache_all(void);
 
 static void __noreturn ingenic_spl_boot_nor(void)
@@ -66,6 +70,10 @@ static void __noreturn ingenic_spl_boot_nor(void)
 	ulong size, load, ep;
 	int ret;
 
+#ifdef CONFIG_CPU_XBURST2
+	/* The T40 vendor SPL sets the SFC up once, before reading */
+	sfc_init();
+#endif
 	sfc_nor_load(CONFIG_INGENIC_SPL_PAD_TO, sizeof(*hdr), (ulong)hdr);
 	if (image_get_magic(hdr) != IH_MAGIC) {
 		printf("No U-Boot image at 0x%x\n", CONFIG_INGENIC_SPL_PAD_TO);
@@ -84,12 +92,50 @@ static void __noreturn ingenic_spl_boot_nor(void)
 	}
 
 	flush_cache_all();
+#ifdef CONFIG_CPU_XBURST2
+	/*
+	 * The L2 cache size, as the T40 vendor SPL sets it before the jump
+	 * (0xb2200060 bits 12:10: 1 = 128 KiB), behind a sync and an
+	 * uncached load on both sides
+	 */
+	__asm__ volatile(
+			".set push     \n\t"
+			".set mips32r2 \n\t"
+			"sync          \n\t"
+			"lw $0,0(%0)   \n\t"
+			".set pop      \n\t"
+			::"r" (0xa0000000));
+	writel(0x00000400, (void __iomem *)0xb2200060);
+	__asm__ volatile(
+			".set push     \n\t"
+			".set mips32r2 \n\t"
+			"sync          \n\t"
+			"lw $0,0(%0)   \n\t"
+			".set pop      \n\t"
+			::"r" (0xa0000000));
+#endif
 	printf("image entry point: 0x%lX\n", ep);
 	((entry_t)ep)();
 }
 
+#ifdef CONFIG_CPU_XBURST2
+/* TCU timer 3 counts from here, for the vendor's boot-time stamps */
+static void init_bootuptime_timer(void)
+{
+	writel(TCU_TCSR_PRESCALE16 | TCU_TCSR_RTC_EN, TCU_TCSR(3));
+	writel(0xffff, TCU_TDFR(3));
+	writel(0, TCU_TCNT(3));
+	writel(TCU_TER_TCEN3, TCU_TESR);
+}
+#endif
+
 void board_init_f(ulong dummy)
 {
+#ifdef CONFIG_CPU_XBURST2
+	/* As early as possible, as the T40 vendor SPL */
+	init_bootuptime_timer();
+#endif
+
 	/*
 	 * The vendor SPL cleared the BSS only after the DDR, but the serial
 	 * core reads its state there from serial_init() on. It is cache RAM
@@ -98,6 +144,13 @@ void board_init_f(ulong dummy)
 	memset(__bss_start, 0, (char *)&__bss_end - __bss_start);
 
 	gd = &gdata;
+
+#ifdef CONFIG_CPU_XBURST2
+	/* close the CCU IFU simple loop, as the T40 vendor SPL */
+	writel(readl((void __iomem *)0xb2200fe0) | 0x00000018,
+	       (void __iomem *)0xb2200fe0);
+#endif
+
 	gd->arch.gi = &ginfo;
 
 	gpio_init();

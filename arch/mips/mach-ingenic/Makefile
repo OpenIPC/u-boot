@@ -3,10 +3,15 @@
 extra-$(CONFIG_SPL_BUILD) := start.o
 
 SOC := $(CONFIG_SYS_SOC:"%"=%)
-INGENIC_GEN := $(if $(CONFIG_CPU_XBURST2),xburst2,xburst)
 
-obj-y += cpu.o timer.o gpio.o jz_serial.o
 obj-y += $(SOC)/clk.o
+
+ifdef CONFIG_CPU_XBURST2
+# XBurst2: the generation's own CPU, timer, GPIO, SFC and DDR code
+obj-y += xburst2/
+obj-$(CONFIG_SPL_BUILD) += spl.o $(SOC)/pll.o $(SOC)/ddr_set_dll.o
+else
+obj-y += cpu.o timer.o gpio.o jz_serial.o
 
 ifdef CONFIG_SPL_BUILD
 obj-y += spl.o spl_sfc_nor.o
@@ -28,7 +33,7 @@ ddr_params_creator-objs += $(ddr_params_creator-objs-y)
 HOST_EXTRACFLAGS += -idirafter $(srctree)/include -idirafter $(objtree)/include \
 	-idirafter $(srctree)/arch/mips/include \
 	-idirafter $(srctree)/arch/mips/mach-ingenic/include \
-	-idirafter $(srctree)/arch/mips/mach-ingenic/$(INGENIC_GEN)/include -DUSE_HOSTCC
+	-idirafter $(srctree)/arch/mips/mach-ingenic/xburst/include -DUSE_HOSTCC
 
 quiet_cmd_ddr_values = GEN     $@
       cmd_ddr_values = $(obj)/ddr_params_creator > $@
@@ -40,4 +45,5 @@ targets += ddr_reg_values.h
 ccflags-y += -I$(obj)
 $(obj)/ddr_innophy.o $(obj)/ddr_dwc.o $(obj)/ddr_dqs_training.o: \
 	$(obj)/ddr_reg_values.h
+endif
 endif

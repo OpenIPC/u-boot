@@ -8,6 +8,7 @@ config SYS_SOC
 	default "t23" if T23
 	default "t30" if T30
 	default "t31" if T31
+	default "t40" if T40
 
 config SYS_VENDOR
 	default "ingenic"
@@ -50,6 +51,13 @@ config T31
 	bool "T31"
 	help
 	  Ingenic T31 (XBurst, Innophy DDR PHY).
+
+config T40
+	bool "T40"
+	select CPU_XBURST2
+	help
+	  Ingenic T40 (XBurst2 with L2 cache, Innophy DDR PHY, SDHCI, the
+	  SFC of the second generation).
 
 endchoice
 
@@ -104,10 +112,33 @@ config T31LC
 	bool "T31LC"
 	depends on T31
 
+config T40N
+	bool "T40N"
+	depends on T40
+	help
+	  128 MiB DDR2 in the package.
+
+config T40XP
+	bool "T40XP"
+	depends on T40
+	help
+	  DDR3 in the package (M15T1G1664A).
+
+config T40A
+	bool "T40A"
+	depends on T40
+	help
+	  DDR3 in the package (M15T4G16256A).
+
 # What the vendor's per-SoC headers hard-code
 
+config CPU_XBURST2
+	bool
+	help
+	  An XBurst2 CPU core: the T40 and T41, with an L2 cache.
+
 config CPU_XBURST
-	def_bool y
+	def_bool y if !CPU_XBURST2
 	help
 	  An XBurst CPU core, as the vendor code names it.
 
@@ -122,12 +153,12 @@ config DDR_HOST_CC
 	  ddr_params_creator runs on the build host, not in the SPL.
 
 config DDR_INNOPHY
-	def_bool y if T21 || T23 || T30 || T31
+	def_bool y if T21 || T23 || T30 || T31 || T40
 	help
 	  The Innosilicon DDR PHY; the T10 and T20 have the DesignWare one.
 
 config SPL_DDR_SOFT_TRAINING
-	def_bool y if !T23
+	def_bool y if !T23 && !CPU_XBURST2
 	help
 	  The software DQS training of the vendor SPL (ddr_dqs_training.c).
 
@@ -135,7 +166,7 @@ config DDR_TYPE_DDR2
 	def_bool y if !DDR_TYPE_DDR3
 
 config DDR_TYPE_DDR3
-	def_bool y if DDR3_128M || (T23 && !T23N && !T23X)
+	def_bool y if DDR3_128M || (T23 && !T23N && !T23X) || T40XP || T40A
 
 config DDR2_M14D5121632A
 	def_bool y if DDR_TYPE_DDR2 && !DDR2_128M && !T23X
@@ -144,7 +175,10 @@ config DDR2_M14D1G1664A
 	def_bool y if DDR2_128M || T23X
 
 config DDR3_M15T1G1664A_2C
-	def_bool y if DDR3_128M
+	def_bool y if DDR3_128M || T40XP
+
+config DDR3_M15T4G16256A_2S
+	def_bool y if T40A
 
 config DDR3_TSD34096M1333C9_E
 	def_bool y if T23 && !T23N && !T23X
