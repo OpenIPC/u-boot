@@ -1,0 +1,188 @@
+name: Build ingenic
+
+on:
+  # Pull requests against this branch change the workflow itself; they
+  # build the current openipc-ingenic.  Code changes reach it through
+  # workflow_call from the caller on openipc-ingenic, which passes the revision
+  # to build.  Only workflow_dispatch can release.
+  pull_request:
+    branches: [openipc]
+    paths:
+      - .github/workflows/build-ingenic.yml
+  workflow_call:
+    inputs:
+      ref:
+        description: openipc-ingenic revision to build
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Publish to this repo's Ingenic release
+        type: boolean
+        default: false
+
+# The shape of build-hisilicon.yml, without its qemu legs and publish:
+#   build (matrix, every target) -> release (own, `release` input).
+# qemu-hisilicon has no Ingenic (MIPS) machine, so nothing is smoke-tested,
+# and these images are not published to OpenIPC/firmware `latest`: the
+# u-boot-<target>-nor.bin there are OpenIPC/u-boot-ingenic's, which cameras
+# run. Add a publish job only once these have booted on cameras.
+# build.sh takes targets as arguments; the matrix calls it with one per leg.
+
+jobs:
+  # Resolve the openipc-ingenic revision this run builds from. The workflow
+  # lives on the openipc branch, so github.sha is the openipc commit, not
+  # the revision being built; release provenance must name the commit that
+  # build.sh actually compiled.
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.rev.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || 'openipc-ingenic' }}
+          path: src
+
+      - name: Resolve revision
+        id: rev
+        run: echo "sha=$(git -C src rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { soc: t10, kinds: "nor", files: "output/u-boot-t10-nor.bin" }
+          - { soc: t10l, kinds: "nor", files: "output/u-boot-t10l-nor.bin" }
+          - { soc: t20, kinds: "nor", files: "output/u-boot-t20-nor.bin" }
+          - { soc: t20l, kinds: "nor", files: "output/u-boot-t20l-nor.bin" }
+          - { soc: t20x, kinds: "nor", files: "output/u-boot-t20x-nor.bin" }
+          - { soc: t21n, kinds: "nor", files: "output/u-boot-t21n-nor.bin" }
+          - { soc: t23n, kinds: "nor", files: "output/u-boot-t23n-nor.bin" }
+          - { soc: t23zn, kinds: "nor", files: "output/u-boot-t23zn-nor.bin" }
+          - { soc: t23x, kinds: "nor", files: "output/u-boot-t23x-nor.bin" }
+          - { soc: t30n, kinds: "nor", files: "output/u-boot-t30n-nor.bin" }
+          - { soc: t30l, kinds: "nor", files: "output/u-boot-t30l-nor.bin" }
+          - { soc: t30x, kinds: "nor", files: "output/u-boot-t30x-nor.bin" }
+          - { soc: t30a, kinds: "nor", files: "output/u-boot-t30a-nor.bin" }
+          - { soc: t30a1, kinds: "nor", files: "output/u-boot-t30a1-nor.bin" }
+          - { soc: t31n, kinds: "nor", files: "output/u-boot-t31n-nor.bin" }
+          - { soc: t31l, kinds: "nor", files: "output/u-boot-t31l-nor.bin" }
+          - { soc: t31x, kinds: "nor", files: "output/u-boot-t31x-nor.bin" }
+          - { soc: t31a, kinds: "nor", files: "output/u-boot-t31a-nor.bin" }
+          - { soc: t31al, kinds: "nor", files: "output/u-boot-t31al-nor.bin" }
+          - { soc: t31lc, kinds: "nor", files: "output/u-boot-t31lc-nor.bin" }
+          - { soc: t40n, kinds: "nor nand", files: "output/u-boot-t40n-*.bin" }
+          - { soc: t40xp, kinds: "nor nand", files: "output/u-boot-t40xp-*.bin" }
+          - { soc: t40a, kinds: "nor nand", files: "output/u-boot-t40a-*.bin" }
+          - { soc: t41l, kinds: "nor", files: "output/u-boot-t41l-nor.bin" }
+          - { soc: t41lq, kinds: "nor", files: "output/u-boot-t41lq-nor.bin" }
+          - { soc: t41n, kinds: "nor", files: "output/u-boot-t41n-nor.bin" }
+          - { soc: t41nq, kinds: "nor", files: "output/u-boot-t41nq-nor.bin" }
+          - { soc: t41a, kinds: "nor", files: "output/u-boot-t41a-nor.bin" }
+          - { soc: t41zx, kinds: "nor", files: "output/u-boot-t41zx-nor.bin" }
+          - { soc: t41xq, kinds: "nor", files: "output/u-boot-t41xq-nor.bin" }
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # The commit resolve recorded, not the ref again: every leg then
+          # builds the revision the release and openipc.org report name,
+          # even if the branch moves while the matrix runs.
+          ref: ${{ needs.resolve.outputs.sha }}
+
+      - name: Install dependencies
+        timeout-minutes: 15
+        run: |
+          # apt mirrors on hosted runners intermittently HANG on the
+          # mirrorlist fetch (not just fail). Bound each attempt with its own
+          # `timeout` so a hang is killed fast and the retry actually fires.
+          install() {
+            sudo timeout 180 apt-get update && \
+            sudo timeout 240 apt-get install -y --no-install-recommends \
+              build-essential gcc-mipsel-linux-gnu device-tree-compiler \
+              bison flex bc libssl-dev python3 lzop
+          }
+          for i in 1 2 3 4; do
+            install && break
+            [ "$i" = 4 ] && { echo "apt failed after 4 attempts" >&2; exit 1; }
+            echo "apt attempt $i failed/timed out; retrying in $((i*10))s" >&2
+            sleep $((i*10))
+          done
+
+      - name: Build ${{ matrix.soc }}
+        run: bash build.sh ${{ matrix.soc }}
+
+      - name: Check partition fit
+        run: |
+          # The boot partition from this tree's mtdparts: NOR boot = 256 KiB
+          # (env at 0x40000), NAND/UBI boot = 768 KiB (env at 0xc0000). An
+          # image larger than it overflows into env and bricks the device on
+          # upgrade. The image is the whole boot partition: the SPL in its
+          # slot (26 KiB NOR, 27 KiB NAND) and the lzop-packed U-Boot
+          # (openipc/ingenic-image.py checks that fit too).
+          soc='${{ matrix.soc }}'
+          rc=0
+          check_kind() {
+            kind=$1
+            limit_kb=$2
+            pattern=$3
+            found=0
+            for f in $pattern; do
+              [ -f "$f" ] || continue
+              found=1
+              # Compare bytes: rounding down to KiB would pass an image up
+              # to 1023 bytes into the environment.
+              size=$(stat -c %s "$f")
+              limit=$((limit_kb * 1024))
+              echo "- $f: [${size}/${limit} bytes]"
+              if [ "$size" -gt "$limit" ]; then
+                echo "-- size exceeded by: $((size - limit)) bytes" >&2
+                rc=1
+              fi
+            done
+            [ "$found" = 1 ] || { echo "missing ${kind} image for ${soc} (${pattern})" >&2; rc=1; }
+          }
+          check_kind nor 256 "output/*${soc}*-nor.bin"
+          kinds='${{ matrix.kinds }}'
+          case "$kinds" in *nand*) check_kind nand 768 "output/*${soc}*-nand.bin" ;; esac
+          exit $rc
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: u-boot-${{ matrix.soc }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+
+  # Mirror every built image to this repository's own Ingenic release.
+  release:
+    needs: [resolve, build]
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: u-boot-*
+
+      - name: Upload to releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ingenic
+          name: Ingenic
+          target_commitish: ${{ needs.resolve.outputs.sha }}
+          prerelease: true
+          files: artifacts/**/*.bin
+          fail_on_unmatched_files: true
