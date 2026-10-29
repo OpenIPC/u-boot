@@ -29,6 +29,12 @@ libs-y += $(machdirs)
 
 PLATFORM_CPPFLAGS += $(patsubst %,-I$(srctree)/%include,$(machdirs))
 
+# Ingenic: the DDR headers of the CPU generation, which the vendor changed
+# between XBurst and XBurst2 under the same names
+ifdef CONFIG_ARCH_INGENIC
+PLATFORM_CPPFLAGS += -I$(srctree)/arch/mips/mach-ingenic/$(if $(CONFIG_CPU_XBURST2),xburst2,xburst)/include
+endif
+
 # Optimize for MIPS architectures
 arch-$(CONFIG_CPU_MIPS32_R1) += -march=mips32 -Wa,-mips32
 arch-$(CONFIG_CPU_MIPS32_R2) += -march=mips32r2 -Wa,-mips32r2

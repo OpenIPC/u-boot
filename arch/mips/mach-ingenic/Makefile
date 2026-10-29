@@ -3,6 +3,7 @@
 extra-$(CONFIG_SPL_BUILD) := start.o
 
 SOC := $(CONFIG_SYS_SOC:"%"=%)
+INGENIC_GEN := $(if $(CONFIG_CPU_XBURST2),xburst2,xburst)
 
 obj-y += cpu.o timer.o gpio.o jz_serial.o
 obj-y += $(SOC)/clk.o
@@ -26,7 +27,8 @@ ddr_params_creator-objs += $(ddr_params_creator-objs-y)
 # The target's headers after the host's, so <stdio.h> is the host's
 HOST_EXTRACFLAGS += -idirafter $(srctree)/include -idirafter $(objtree)/include \
 	-idirafter $(srctree)/arch/mips/include \
-	-idirafter $(srctree)/arch/mips/mach-ingenic/include -DUSE_HOSTCC
+	-idirafter $(srctree)/arch/mips/mach-ingenic/include \
+	-idirafter $(srctree)/arch/mips/mach-ingenic/$(INGENIC_GEN)/include -DUSE_HOSTCC
 
 quiet_cmd_ddr_values = GEN     $@
       cmd_ddr_values = $(obj)/ddr_params_creator > $@
