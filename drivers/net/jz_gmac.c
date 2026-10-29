@@ -48,6 +48,15 @@ static int next_rx;
 static unsigned char tx_buff[NUM_TX_DESCS * TX_BUF_LEN] __aligned(ARCH_DMA_MINALIGN);
 
 /* read cpm's mac phy control register */
+/* The T40 driver writes the L2 back as well around each DMA buffer */
+static void jz_gmac_flush(void)
+{
+	flush_dcache_all();
+#ifdef CONFIG_CPU_XBURST2
+	flush_l2cache_all();
+#endif
+}
+
 static __maybe_unused u32 read_cpm_mphyc(void)
 {
 	return *(volatile unsigned int *)(CPM_MPHYC);
@@ -151,9 +160,13 @@ static int jz_send(struct eth_device *dev, void *packet, int length)
 
 	memset(&tx_buff[next_tx * TX_BUF_LEN], 0, TX_BUF_LEN);
 	memcpy((void *)&tx_buff[next_tx * TX_BUF_LEN], packet, length);
-	flush_dcache_all();
+	jz_gmac_flush();
 
-	/* prepare DMA data */
+	/*
+	 * prepare DMA data. The T40 vendor driver ORed the sizes in, so a
+	 * descriptor kept the largest frame it ever sent; with the enhanced
+	 * descriptors TDES1 holds only the sizes, and they are set here.
+	 */
 	desc->length = (((length << DescSize1Shift) & DescSize1Mask)
 			| ((0 << DescSize2Shift) & DescSize2Mask));
 
@@ -205,7 +218,7 @@ static int jz_recv(struct eth_device *dev)
 
 		synopGMAC_resume_dma_rx(gmacdev);
 
-		flush_dcache_all();
+		jz_gmac_flush();
 
 		next_rx++;
 		if (next_rx >= NUM_RX_DESCS)
@@ -231,6 +244,30 @@ static int jz_init(struct eth_device *dev, struct bd_info *bd)
 	tx_desc = (DmaDesc *)((unsigned long)_tx_desc | 0xa0000000);
 	rx_desc = (DmaDesc *)((unsigned long)_rx_desc | 0xa0000000);
 
+#ifdef CONFIG_T40
+	/*
+	 * The T40 sets the PHY interface here, before the reset, and clears
+	 * bit 23 for a PHY outside the SoC
+	 */
+	{
+	u32 __maybe_unused cpm_mphyc;
+#if (CONFIG_NET_GMAC_PHY_MODE == GMAC_PHY_RMII)
+	cpm_mphyc = read_cpm_mphyc();
+	cpm_mphyc &= ~0x7;
+	cpm_mphyc |= 0x4;
+	cpm_mphyc &= ~(1 << 23);
+	write_cpm_mphyc(cpm_mphyc);
+#elif (CONFIG_NET_GMAC_PHY_MODE == GMAC_PHY_RGMII)
+	cpm_mphyc = read_cpm_mphyc();
+	cpm_mphyc |= 0x1 << 31;
+	cpm_mphyc &= ~0x7;
+	cpm_mphyc |= 0x1;
+	cpm_mphyc &= ~(1 << 23);
+	write_cpm_mphyc(cpm_mphyc);
+#endif /* CONFIG_NET_GMAC_PHY_MODE */
+	}
+#endif
+
 	/* reset GMAC, prepare to search phy */
 	synopGMAC_reset(gmacdev);
 
@@ -240,7 +277,11 @@ static int jz_init(struct eth_device *dev, struct bd_info *bd)
 	synopGMAC_set_mac_addr(gmacdev, GmacAddr0High, GmacAddr0Low,
 			       dev->enetaddr);
 
+#ifdef CONFIG_T40
+	synopGMAC_set_mdc_clk_div(gmacdev, GmiiCsrClk2);
+#else
 	synopGMAC_set_mdc_clk_div(gmacdev, GmiiCsrClk4);
+#endif
 	gmacdev->ClockDivMdc = synopGMAC_get_mdc_clk_div(gmacdev);
 
 	phy_id = synopGMAC_search_phy(gmacdev);
@@ -283,7 +324,7 @@ static int jz_init(struct eth_device *dev, struct bd_info *bd)
 	synopGMACWriteReg((u32 *)gmacdev->DmaBase, DmaRxBaseAddr,
 			  virt_to_phys(_rx_desc));
 
-	flush_dcache_all();
+	jz_gmac_flush();
 
 	/* we only enable rx here */
 	synopGMAC_enable_dma_rx(gmacdev);
@@ -349,10 +390,13 @@ int jz_net_initialize(struct bd_info *bis)
 	int phy_id;
 
 	clk_set_rate(MACPHY, 50000000);
+#ifndef CONFIG_T40
 	udelay(50000);
+#endif
 
 #if defined(CONFIG_T10) || defined(CONFIG_T20) || defined(CONFIG_T23) || \
-	defined(CONFIG_T30) || defined(CONFIG_T21) || defined(CONFIG_T31)
+	defined(CONFIG_T30) || defined(CONFIG_T21) || defined(CONFIG_T31) || \
+	defined(CONFIG_T40)
 	/* initialize gmac gpio */
 	gpio_set_func(GPIO_PORT_B, GPIO_FUNC_0, 0x1EFC0);
 #endif
@@ -364,12 +408,22 @@ int jz_net_initialize(struct bd_info *bis)
 #if (CONFIG_NET_PHY_TYPE == PHY_TYPE_IP101G)
 	/* gpio reset IP101G */
 #ifdef CONFIG_GPIO_IP101G_RESET
+#ifdef CONFIG_T40
+	/* the T40 vendor driver's shorter pulse */
+	gpio_direction_output(CONFIG_GPIO_IP101G_RESET, !CONFIG_GPIO_IP101G_RESET_ENLEVEL);
+	mdelay(2);
+	gpio_direction_output(CONFIG_GPIO_IP101G_RESET, CONFIG_GPIO_IP101G_RESET_ENLEVEL);
+	mdelay(5);
+	gpio_direction_output(CONFIG_GPIO_IP101G_RESET, !CONFIG_GPIO_IP101G_RESET_ENLEVEL);
+	mdelay(2);
+#else
 	gpio_direction_output(CONFIG_GPIO_IP101G_RESET, !CONFIG_GPIO_IP101G_RESET_ENLEVEL);
 	mdelay(10);
 	gpio_direction_output(CONFIG_GPIO_IP101G_RESET, CONFIG_GPIO_IP101G_RESET_ENLEVEL);
 	mdelay(50);
 	gpio_direction_output(CONFIG_GPIO_IP101G_RESET, !CONFIG_GPIO_IP101G_RESET_ENLEVEL);
 	mdelay(10);
+#endif
 #endif /* CONFIG_GPIO_IP101G_RESET */
 #elif (CONFIG_NET_PHY_TYPE == PHY_TYPE_8710A)
 	/* reset 8710A */
@@ -461,6 +515,7 @@ int jz_net_initialize(struct bd_info *bis)
 	jz_mdio_register(dev->name);
 #endif
 
+#ifndef CONFIG_T40	/* the T40 sets it in jz_init() */
 #if (CONFIG_NET_GMAC_PHY_MODE == GMAC_PHY_RMII)
 	cpm_mphyc = read_cpm_mphyc();
 	cpm_mphyc &= ~0x7;
@@ -473,6 +528,7 @@ int jz_net_initialize(struct bd_info *bis)
 	cpm_mphyc |= 0x1;
 	write_cpm_mphyc(cpm_mphyc);
 #endif /* CONFIG_NET_GMAC_PHY_MODE */
+#endif
 
 	return phy_id;
 }
