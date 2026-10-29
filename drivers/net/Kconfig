@@ -833,6 +833,15 @@ config HIGMACV300_ETH
 	  This driver supports HIGMACV300 Ethernet controller found on
 	  HiSilicon SoCs.
 
+config JZ_GMAC
+	bool "Ingenic T-series GMAC"
+	depends on ARCH_INGENIC && NETDEVICES && !DM_ETH
+	help
+	  The Synopsys DesignWare GMAC of the Ingenic T10, T20, T21, T23,
+	  T30 and T31, with an external IP101G PHY on RMII or the T21's
+	  internal PHY on MII; legacy (non-DM) Ethernet driver from the
+	  vendor U-Boot.
+
 config FSL_ENETC
 	bool "NXP ENETC Ethernet controller"
 	depends on DM_MDIO
