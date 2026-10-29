@@ -13,6 +13,7 @@
  */
 
 #include <common.h>
+#include <hang.h>
 #include <linux/delay.h>
 #include <linux/errno.h>
 #include <mach/ingenic.h>
@@ -316,6 +317,14 @@ int sfc_nand_load(unsigned int src_addr, unsigned int count,
 			(pagesize - columnaddr) : count;
 		ret = spinand_read_page(pageaddr, columnaddr, buf, rlen,
 					pagesize);
+		/*
+		 * Uncorrectable ECC: the vendor SPL went on with the page as
+		 * read, and U-Boot would have run from corrupt data.
+		 */
+		if (ret < 0) {
+			printf("ECC error at page %u, not booting\n", pageaddr);
+			hang();
+		}
 		if (ret > 0) {
 			printf("bad block %d\n", pageaddr / CONFIG_SPI_NAND_PPB);
 			src_addr += CONFIG_SPI_NAND_PPB * pagesize;
