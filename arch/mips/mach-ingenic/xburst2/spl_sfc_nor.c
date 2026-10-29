@@ -1,4 +1,5 @@
 #include <common.h>
+#include <hang.h>
 #include <linux/delay.h>
 #include <mach/ingenic.h>
 #include <config.h>
@@ -200,12 +201,19 @@ retry:
 
 void sfc_nor_load(unsigned int src_addr, unsigned int count, unsigned int dst_addr)
 {
-	unsigned int ret, addr_len, words_of_spl;
+	unsigned int ret, words_of_spl;
+	int addr_len;
 
 #ifdef CONFIG_T41
+	/*
+	 * The vendor kept addr_len unsigned, so its check never fired and an
+	 * unrecognised flash header went on as a 0xffffffff-byte address.
+	 */
 	addr_len = sfc_nor_addrlen();
-	if (addr_len < 0)
+	if (addr_len < 0) {
 		printf("sfc get falsh addrlen error,addr_len=%d\n", addr_len);
+		hang();
+	}
 #else
 #ifdef CONFIG_EXIT_4BYTE_MODE
 	sfc_set_read_reg(CONFIG_EXIT_4BYTE_MODE, 0, 0, 0, 0);
