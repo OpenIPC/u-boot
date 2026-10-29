@@ -4,8 +4,9 @@
  *
  * The SFC runs one flash command per transfer: opcode, address, dummy
  * cycles and data, the data through a 32-bit FIFO. The sequences are the
- * vendor U-Boot's (drivers/spi/jz_sfc_nor.c of OpenIPC/u-boot-ingenic, which
- * builds without CONFIG_SPI_QUAD): the controller at 50 MHz, single-bit
+ * vendor U-Boot's (drivers/spi/jz_sfc_nor.c of OpenIPC/u-boot-ingenic and,
+ * for the T40's SFC, drivers/mtd/devices/jz_sfc_v1/jz_sfc_nor.c of
+ * OpenIPC/u-boot-t40, both built without CONFIG_SPI_QUAD): the controller at 50 MHz, single-bit
  * READ (0x03) and PP (0x02), WREN before and RDSR polled after every
  * program and erase, 4-byte addressing switched on around each operation
  * on parts that need it, a whole-chip erase as CHIP ERASE, and the chip
@@ -32,6 +33,55 @@
 /* The vendor's clock for the SFC in U-Boot */
 #define JZ_SFC_RATE		50000000
 
+#ifdef CONFIG_CPU_XBURST2
+/*
+ * The T40's SFC: the same controller with the transfer mode moved to
+ * TRAN_CONF1 and the fields renamed (drivers/mtd/devices/jz_sfc_v1 of
+ * OpenIPC/u-boot-t40)
+ */
+#define SFC_CLK_ID		SFC_CLK
+#define SFC_DATA		SFC_RM_DR
+#define G_TRAN_DIR		GLB_TRAN_DIR
+#define G_OP_MODE		GLB_OP_MODE
+#define G_THRESHOLD_MSK		GLB_THRESHOLD_MSK
+#define G_THRESHOLD_OFFSET	GLB_THRESHOLD_OFFSET
+#define C_ADDR_WIDTH_MSK	TRAN_CONF0_ADDR_WIDTH_MSK
+#define C_ADDR_WIDTH_OFFSET	TRAN_CONF0_ADDR_WIDTH_OFFSET
+#define C_CMD_EN		TRAN_CONF0_CMD_EN
+#define C_DATEEN		TRAN_CONF0_DATEEN
+#define C_CMD_MSK		TRAN_CONF0_CMD_MSK
+#define C_DMYBITS_MSK		TRAN_CONF0_DMYBITS_MSK
+#define C_PHASE_FORMAT		TRAN_CONF0_PHASE_FORMAT
+#define SFC_MODE_REG(n)		SFC_TRAN_CONF1(n)
+#define M_TRAN_MODE_MSK		TRAN_CONF1_TRAN_MODE_MSK
+#define M_TRAN_MODE_OFFSET	TRAN_CONF1_TRAN_MODE_OFFSET
+#define M_SPI_STANDARD		TRAN_CONF1_SPI_STANDARD
+#define T_FLUSH			TRIG_FLUSH
+#define T_START			TRIG_START
+#define T_STOP			TRIG_STOP
+#else
+#define SFC_CLK_ID		SSI
+#define SFC_DATA		SFC_DR
+#define G_TRAN_DIR		TRAN_DIR
+#define G_OP_MODE		OP_MODE
+#define G_THRESHOLD_MSK		THRESHOLD_MSK
+#define G_THRESHOLD_OFFSET	THRESHOLD_OFFSET
+#define C_ADDR_WIDTH_MSK	ADDR_WIDTH_MSK
+#define C_ADDR_WIDTH_OFFSET	ADDR_WIDTH_OFFSET
+#define C_CMD_EN		CMD_EN
+#define C_DATEEN		DATEEN
+#define C_CMD_MSK		CMD_MSK
+#define C_DMYBITS_MSK		TRAN_CONF_DMYBITS_MSK
+#define C_PHASE_FORMAT		PHASE_FORMAT
+#define SFC_MODE_REG(n)		SFC_TRAN_CONF(n)
+#define M_TRAN_MODE_MSK		TRAN_MODE_MSK
+#define M_TRAN_MODE_OFFSET	TRAN_MODE_OFFSET
+#define M_SPI_STANDARD		TRAN_SPI_STANDARD
+#define T_FLUSH			FLUSH
+#define T_START			START
+#define T_STOP			STOP
+#endif
+
 struct jz_nor_info {
 	const char *name;
 	u32 id;
@@ -41,8 +91,57 @@ struct jz_nor_info {
 	u32 size;
 };
 
-/* jz_spi_support_table of the vendor's drivers/spi/jz_spi.h */
+/*
+ * jz_spi_support_table of the vendor's drivers/spi/jz_spi.h: the XBurst
+ * one (u-boot-ingenic) or the XBurst2 one (u-boot-t40), which differ
+ */
 static const struct jz_nor_info jz_nor_table[] = {
+#ifdef CONFIG_CPU_XBURST2
+	{ "MX25L128**E",       0xc22018, 256, (64*1024), 3, (16*1024*1024) },
+	{ "MX25L64**E",        0xc22017, 256, (64*1024), 3, (8*1024*1024) },
+	{ "MX25L25645G/35F",   0xc22019, 256, (32*1024), 4, (32*1024*1024) },
+	{ "MX25L51245G",       0xc2201a, 256, (32*1024), 4, (64*1024*1024) },
+	{ "GD25Q64C",          0xc84017, 256, (64*1024), 3, (8*1024*1024) },
+	{ "GD25Q128C",         0xc84018, 256, (64*1024), 3, (16*1024*1024) },
+	{ "GD25Q256D/E",       0xc84019, 256, (64*1024), 4, (32*1024*1024) },
+	{ "W25Q64",            0xef4017, 256, (64*1024), 3, (8*1024*1024) },
+	{ "W25Q128",           0xef4018, 256, (64*1024), 3, (16*1024*1024) },
+	{ "W25Q256JV",         0xef4019, 256, (32*1024), 4, (32*1024*1024) },
+	{ "W25Q512JV",         0xef4020, 256, (32*1024), 4, (64*1024*1024) },
+	{ "XM25QH128A",        0x207018, 256, (64*1024), 3, (16*1024*1024) },
+	{ "XM25QH64A",         0x207017, 256, (64*1024), 3, (8*1024*1024) },
+	{ "XM25QH128B",        0x206018, 256, (64*1024), 3, (16*1024*1024) },
+	{ "XM25QH64B",         0x206017, 256, (64*1024), 3, (8*1024*1024) },
+	{ "XM25QH64C",         0x204017, 256, (32*1024), 3, (8*1024*1024) },
+	{ "XM25QH128C",        0x204018, 256, (32*1024), 3, (16*1024*1024) },
+	{ "XM25QH256C",        0x204019, 256, (32*1024), 4, (32*1024*1024) },
+	{ "XM25QU128C",        0x204118, 256, (32*1024), 3, (16*1024*1024) },
+	{ "XM25QU256C",        0x204119, 256, (32*1024), 4, (32*1024*1024) },
+	{ "EN25QH64",          0x1c7017, 256, (32*1024), 3, (8*1024*1024) },
+	{ "EN25QH128A",        0x1c7018, 256, (32*1024), 3, (16*1024*1024) },
+	{ "EN25QH256A",        0x1c7019, 256, (32*1024), 4, (32*1024*1024) },
+	{ "EN25QX128A",        0x1c7118, 256, (32*1024), 3, (16*1024*1024) },
+	{ "FM25Q64",           0xf83217, 256, (64*1024), 3, (8*1024*1024) },
+	{ "FM25W128",          0xa12818, 256, (64*1024), 3, (16*1024*1024) },
+	{ "BY25Q64AS",         0x684017, 256, (64*1024), 3, (8*1024*1024) },
+	{ "BY25Q128AS",        0x684018, 256, (64*1024), 3, (16*1024*1024) },
+	{ "ZB25VQ64",          0x5e4017, 256, (64*1024), 3, (8*1024*1024) },
+	{ "ZB25VQ128",         0x5e4018, 256, (64*1024), 3, (16*1024*1024) },
+	{ "XT25F64B",          0x0b4017, 256, (32*1024), 3, (8*1024*1024) },
+	{ "XT25F128B",         0x0b4018, 256, (32*1024), 3, (16*1024*1024) },
+	{ "FS25Q064F2TFI1",    0xa14017, 256, (32*1024), 3, (8*1024*1024) },
+	{ "FS25Q128F2TFI",     0xa14018, 256, (64*1024), 3, (16*1024*1024) },
+	{ "P25Q64H",           0x856017, 256, (32*1024), 3, (8*1024*1024) },
+	{ "P25Q128H",          0x856018, 256, (64*1024), 3, (16*1024*1024) },
+	{ "ZD25Q64B",          0xba3217, 256, (32*1024), 3, (8*1024*1024) },
+	{ "IS25LP064D",        0x9d6017, 256, (32*1024), 3, (8*1024*1024) },
+	{ "IS25LP128F",        0x9d6018, 256, (64*1024), 3, (16*1024*1024) },
+	{ "SK25P128",          0x256018, 256, (64*1024), 3, (16*1024*1024) },
+	{ "NM25Q128EVB",       0x522118, 256, (64*1024), 3, (16*1024*1024) },
+	{ "GM25Q64A",          0x1c4017, 256, (64*1024), 3, (8*1024*1024) },
+	{ "GM25Q128A",         0x1c4018, 256, (64*1024), 3, (16*1024*1024) },
+	{ "PY25Q128HA",        0x852018, 256, (64*1024), 3, (16*1024*1024) },
+#else
 	{ "MX25L128**E",       0xc22018, 256, (64*1024), 3, (16*1024*1024) },
 	{ "MX25L64**E",        0xc22017, 256, (64*1024), 3, (8*1024*1024) },
 	{ "MX25L25645G/35F",   0xc22019, 256, (32*1024), 4, (32*1024*1024) },
@@ -86,7 +185,9 @@ static const struct jz_nor_info jz_nor_table[] = {
 	{ "DQ25Q128AL",        0x546018, 256, (32*1024), 3, (16*1024*1024) },
 	{ "XM25QH64C",         0x204017, 256, (64*1024), 3, (8*1024*1024) },
 	{ "XD25Q128C",         0xd84018, 256, (32*1024), 3, (16*1024*1024) },
-	{ "PY25Q128HA",        0x852018, 256, (64*1024), 3, (16*1024*1024) },};
+	{ "PY25Q128HA",        0x852018, 256, (64*1024), 3, (16*1024*1024) },
+#endif
+};
 
 static u32 jz_sfc_readl(unsigned int offset)
 {
@@ -108,23 +209,23 @@ static void sfc_send_cmd(u8 cmd, unsigned int len, u32 addr,
 			 unsigned int addr_len, unsigned int daten, int write)
 {
 	if (write)
-		jz_sfc_clrsetbits(SFC_GLB, 0, TRAN_DIR);
+		jz_sfc_clrsetbits(SFC_GLB, 0, G_TRAN_DIR);
 	else
-		jz_sfc_clrsetbits(SFC_GLB, TRAN_DIR, 0);
+		jz_sfc_clrsetbits(SFC_GLB, G_TRAN_DIR, 0);
 	jz_sfc_writel(len, SFC_TRAN_LEN);
-	jz_sfc_clrsetbits(SFC_TRAN_CONF(0), ADDR_WIDTH_MSK,
-			  addr_len << ADDR_WIDTH_OFFSET);
-	jz_sfc_clrsetbits(SFC_TRAN_CONF(0), 0, CMD_EN);
-	jz_sfc_clrsetbits(SFC_TRAN_CONF(0), DATEEN, daten ? DATEEN : 0);
-	jz_sfc_clrsetbits(SFC_TRAN_CONF(0), CMD_MSK, cmd);
+	jz_sfc_clrsetbits(SFC_TRAN_CONF(0), C_ADDR_WIDTH_MSK,
+			  addr_len << C_ADDR_WIDTH_OFFSET);
+	jz_sfc_clrsetbits(SFC_TRAN_CONF(0), 0, C_CMD_EN);
+	jz_sfc_clrsetbits(SFC_TRAN_CONF(0), C_DATEEN, daten ? C_DATEEN : 0);
+	jz_sfc_clrsetbits(SFC_TRAN_CONF(0), C_CMD_MSK, cmd);
 	jz_sfc_writel(addr, SFC_DEV_ADDR(0));
 	jz_sfc_writel(0, SFC_DEV_ADDR_PLUS(0));
-	jz_sfc_clrsetbits(SFC_TRAN_CONF(0), TRAN_CONF_DMYBITS_MSK, 0);
-	jz_sfc_clrsetbits(SFC_TRAN_CONF(0), TRAN_MODE_MSK,
-			  TRAN_SPI_STANDARD << TRAN_MODE_OFFSET);
+	jz_sfc_clrsetbits(SFC_TRAN_CONF(0), C_DMYBITS_MSK, 0);
+	jz_sfc_clrsetbits(SFC_MODE_REG(0), M_TRAN_MODE_MSK,
+			  M_SPI_STANDARD << M_TRAN_MODE_OFFSET);
 
-	jz_sfc_writel(FLUSH, SFC_TRIG);
-	jz_sfc_writel(START, SFC_TRIG);
+	jz_sfc_writel(T_FLUSH, SFC_TRIG);
+	jz_sfc_writel(T_START, SFC_TRIG);
 
 	/* Without data the transfer is over at END */
 	if (!daten) {
@@ -152,7 +253,7 @@ static void sfc_read_data(u32 *buf, unsigned int words)
 		jz_sfc_writel(CLR_RREQ, SFC_SCR);
 		n = min(words - done, (unsigned int)THRESHOLD);
 		for (i = 0; i < n; i++)
-			buf[done++] = jz_sfc_readl(SFC_DR);
+			buf[done++] = jz_sfc_readl(SFC_DATA);
 	}
 	sfc_wait_end();
 }
@@ -167,7 +268,7 @@ static void sfc_write_data(const u32 *buf, unsigned int words)
 		jz_sfc_writel(CLR_TREQ, SFC_SCR);
 		n = min(words - done, (unsigned int)THRESHOLD);
 		for (i = 0; i < n; i++)
-			jz_sfc_writel(buf[done++], SFC_DR);
+			jz_sfc_writel(buf[done++], SFC_DATA);
 	}
 	sfc_wait_end();
 }
@@ -187,8 +288,26 @@ static void sfc_init(void)
 {
 	int i;
 
-	clk_set_rate(SSI, JZ_SFC_RATE);
+	clk_set_rate(SFC_CLK_ID, JZ_SFC_RATE);
 
+#ifdef CONFIG_CPU_XBURST2
+	/* The T40's: write protect off, no sample delay, no burst mode */
+	jz_sfc_clrsetbits(SFC_GLB, G_TRAN_DIR | G_OP_MODE | GLB_WP_EN, 0);
+	jz_sfc_clrsetbits(SFC_DEV_CONF, DEV_CONF_CMD_TYPE | DEV_CONF_CPHA |
+			  DEV_CONF_CPOL | DEV_CONF_SMP_DELAY_MSK |
+			  DEV_CONF_THOLD_MSK | DEV_CONF_TSETUP_MSK |
+			  DEV_CONF_TSH_MSK,
+			  DEV_CONF_CEDL | DEV_CONF_HOLDDL | DEV_CONF_WPDL);
+	for (i = 0; i < 6; i++) {
+		jz_sfc_clrsetbits(SFC_TRAN_CONF(i), C_PHASE_FORMAT, 0);
+		jz_sfc_clrsetbits(SFC_TRAN_CONF1(i), M_TRAN_MODE_MSK, 0);
+	}
+	jz_sfc_writel(CLR_END | CLR_TREQ | CLR_RREQ | CLR_OVER | CLR_UNDR,
+		      SFC_INTC);
+	jz_sfc_writel(0, SFC_CGE);
+	jz_sfc_clrsetbits(SFC_GLB, G_THRESHOLD_MSK | GLB_BURST_MD_MSK,
+			  THRESHOLD << G_THRESHOLD_OFFSET);
+#else
 	jz_sfc_clrsetbits(SFC_GLB, TRAN_DIR | OP_MODE, WP_EN);
 	jz_sfc_clrsetbits(SFC_DEV_CONF, CMD_TYPE | CPHA | CPOL |
 			  SMP_DELAY_MSK | THOLD_MSK | TSETUP_MSK | TSH_MSK,
@@ -200,6 +319,7 @@ static void sfc_init(void)
 		      SFC_INTC);
 	jz_sfc_writel(0, SFC_CGE);
 	jz_sfc_clrsetbits(SFC_GLB, THRESHOLD_MSK, THRESHOLD << THRESHOLD_OFFSET);
+#endif
 }
 
 /* 4-byte addressing on, or off, around each operation on 32 MiB parts */
@@ -236,7 +356,7 @@ static int jz_sfc_read(struct mtd_info *mtd, loff_t from, size_t len,
 	if (from + len > flash->size)
 		return -EINVAL;
 
-	jz_sfc_writel(FLUSH, SFC_TRIG);
+	jz_sfc_writel(T_FLUSH, SFC_TRIG);
 	sfc_address_mode(flash, 1);
 
 	whole = IS_ALIGNED((ulong)buf, 4) ? len & ~3 : 0;
@@ -265,7 +385,7 @@ static int jz_sfc_write(struct mtd_info *mtd, loff_t to, size_t len,
 		return -EINVAL;
 	}
 
-	jz_sfc_writel(FLUSH, SFC_TRIG);
+	jz_sfc_writel(T_FLUSH, SFC_TRIG);
 	sfc_address_mode(flash, 1);
 
 	*retlen = 0;
@@ -306,7 +426,7 @@ static int jz_sfc_erase(struct mtd_info *mtd, struct erase_info *instr)
 		return -EINVAL;
 	}
 
-	jz_sfc_writel(FLUSH, SFC_TRIG);
+	jz_sfc_writel(T_FLUSH, SFC_TRIG);
 
 	if (len == flash->size) {
 		sfc_send_cmd(CMD_WREN, 0, 0, 0, 0, 1);
@@ -358,8 +478,8 @@ struct spi_flash *spi_flash_probe(unsigned int bus, unsigned int cs,
 
 	sfc_init();
 
-	jz_sfc_writel(STOP, SFC_TRIG);
-	jz_sfc_writel(FLUSH, SFC_TRIG);
+	jz_sfc_writel(T_STOP, SFC_TRIG);
+	jz_sfc_writel(T_FLUSH, SFC_TRIG);
 	sfc_send_cmd(CMD_RDID, 3, 0, 0, 1, 0);
 	sfc_read_data(&id, 1);
 	/* the FIFO word holds the ID bytes as they came, first in bits 7:0 */
