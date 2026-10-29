@@ -58,36 +58,36 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { soc: t10, files: "output/u-boot-t10-nor.bin" }
-          - { soc: t10l, files: "output/u-boot-t10l-nor.bin" }
-          - { soc: t20, files: "output/u-boot-t20-nor.bin" }
-          - { soc: t20l, files: "output/u-boot-t20l-nor.bin" }
-          - { soc: t20x, files: "output/u-boot-t20x-nor.bin" }
-          - { soc: t21n, files: "output/u-boot-t21n-nor.bin" }
-          - { soc: t23n, files: "output/u-boot-t23n-nor.bin" }
-          - { soc: t23zn, files: "output/u-boot-t23zn-nor.bin" }
-          - { soc: t23x, files: "output/u-boot-t23x-nor.bin" }
-          - { soc: t30n, files: "output/u-boot-t30n-nor.bin" }
-          - { soc: t30l, files: "output/u-boot-t30l-nor.bin" }
-          - { soc: t30x, files: "output/u-boot-t30x-nor.bin" }
-          - { soc: t30a, files: "output/u-boot-t30a-nor.bin" }
-          - { soc: t30a1, files: "output/u-boot-t30a1-nor.bin" }
-          - { soc: t31n, files: "output/u-boot-t31n-nor.bin" }
-          - { soc: t31l, files: "output/u-boot-t31l-nor.bin" }
-          - { soc: t31x, files: "output/u-boot-t31x-nor.bin" }
-          - { soc: t31a, files: "output/u-boot-t31a-nor.bin" }
-          - { soc: t31al, files: "output/u-boot-t31al-nor.bin" }
-          - { soc: t31lc, files: "output/u-boot-t31lc-nor.bin" }
-          - { soc: t40n, files: "output/u-boot-t40n-nor.bin" }
-          - { soc: t40xp, files: "output/u-boot-t40xp-nor.bin" }
-          - { soc: t40a, files: "output/u-boot-t40a-nor.bin" }
-          - { soc: t41l, files: "output/u-boot-t41l-nor.bin" }
-          - { soc: t41lq, files: "output/u-boot-t41lq-nor.bin" }
-          - { soc: t41n, files: "output/u-boot-t41n-nor.bin" }
-          - { soc: t41nq, files: "output/u-boot-t41nq-nor.bin" }
-          - { soc: t41a, files: "output/u-boot-t41a-nor.bin" }
-          - { soc: t41zx, files: "output/u-boot-t41zx-nor.bin" }
-          - { soc: t41xq, files: "output/u-boot-t41xq-nor.bin" }
+          - { soc: t10, kinds: "nor", files: "output/u-boot-t10-nor.bin" }
+          - { soc: t10l, kinds: "nor", files: "output/u-boot-t10l-nor.bin" }
+          - { soc: t20, kinds: "nor", files: "output/u-boot-t20-nor.bin" }
+          - { soc: t20l, kinds: "nor", files: "output/u-boot-t20l-nor.bin" }
+          - { soc: t20x, kinds: "nor", files: "output/u-boot-t20x-nor.bin" }
+          - { soc: t21n, kinds: "nor", files: "output/u-boot-t21n-nor.bin" }
+          - { soc: t23n, kinds: "nor", files: "output/u-boot-t23n-nor.bin" }
+          - { soc: t23zn, kinds: "nor", files: "output/u-boot-t23zn-nor.bin" }
+          - { soc: t23x, kinds: "nor", files: "output/u-boot-t23x-nor.bin" }
+          - { soc: t30n, kinds: "nor", files: "output/u-boot-t30n-nor.bin" }
+          - { soc: t30l, kinds: "nor", files: "output/u-boot-t30l-nor.bin" }
+          - { soc: t30x, kinds: "nor", files: "output/u-boot-t30x-nor.bin" }
+          - { soc: t30a, kinds: "nor", files: "output/u-boot-t30a-nor.bin" }
+          - { soc: t30a1, kinds: "nor", files: "output/u-boot-t30a1-nor.bin" }
+          - { soc: t31n, kinds: "nor", files: "output/u-boot-t31n-nor.bin" }
+          - { soc: t31l, kinds: "nor", files: "output/u-boot-t31l-nor.bin" }
+          - { soc: t31x, kinds: "nor", files: "output/u-boot-t31x-nor.bin" }
+          - { soc: t31a, kinds: "nor", files: "output/u-boot-t31a-nor.bin" }
+          - { soc: t31al, kinds: "nor", files: "output/u-boot-t31al-nor.bin" }
+          - { soc: t31lc, kinds: "nor", files: "output/u-boot-t31lc-nor.bin" }
+          - { soc: t40n, kinds: "nor nand", files: "output/u-boot-t40n-*.bin" }
+          - { soc: t40xp, kinds: "nor nand", files: "output/u-boot-t40xp-*.bin" }
+          - { soc: t40a, kinds: "nor nand", files: "output/u-boot-t40a-*.bin" }
+          - { soc: t41l, kinds: "nor", files: "output/u-boot-t41l-nor.bin" }
+          - { soc: t41lq, kinds: "nor", files: "output/u-boot-t41lq-nor.bin" }
+          - { soc: t41n, kinds: "nor", files: "output/u-boot-t41n-nor.bin" }
+          - { soc: t41nq, kinds: "nor", files: "output/u-boot-t41nq-nor.bin" }
+          - { soc: t41a, kinds: "nor", files: "output/u-boot-t41a-nor.bin" }
+          - { soc: t41zx, kinds: "nor", files: "output/u-boot-t41zx-nor.bin" }
+          - { soc: t41xq, kinds: "nor", files: "output/u-boot-t41xq-nor.bin" }
 
     steps:
       - name: Checkout
@@ -123,9 +123,10 @@ jobs:
       - name: Check partition fit
         run: |
           # The boot partition from this tree's mtdparts: NOR boot = 256 KiB
-          # (env at 0x40000). An image larger than it overflows into env and
-          # bricks the device on upgrade. The image is the whole boot
-          # partition: the SPL in its 26 KiB slot and the lzop-packed U-Boot
+          # (env at 0x40000), NAND/UBI boot = 768 KiB (env at 0xc0000). An
+          # image larger than it overflows into env and bricks the device on
+          # upgrade. The image is the whole boot partition: the SPL in its
+          # slot (26 KiB NOR, 27 KiB NAND) and the lzop-packed U-Boot
           # (openipc/ingenic-image.py checks that fit too).
           soc='${{ matrix.soc }}'
           rc=0
@@ -150,6 +151,8 @@ jobs:
             [ "$found" = 1 ] || { echo "missing ${kind} image for ${soc} (${pattern})" >&2; rc=1; }
           }
           check_kind nor 256 "output/*${soc}*-nor.bin"
+          kinds='${{ matrix.kinds }}'
+          case "$kinds" in *nand*) check_kind nand 768 "output/*${soc}*-nand.bin" ;; esac
           exit $rc
 
       - name: Upload artifact

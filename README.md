@@ -409,6 +409,9 @@ ported from [OpenIPC/u-boot-ingenic](https://github.com/OpenIPC/u-boot-ingenic)
 `t31a`, `t31al`, `t31lc`, `t40n`, `t40xp`, `t40a`, `t41l`, `t41lq`,
 `t41n`, `t41nq`, `t41a`, `t41zx`, `t41xq`
 
+**NAND:** `t40n`, `t40xp`, `t40a`, with the `openipc-hisilicon` layout:
+`768k(boot),256k(env),-(ubi)`, the kernel in the UBIFS rootfs.
+
 The suffix is the package: `l` lite (lower clocks), `x` and `a`/`a1`/`al`
 128 MiB of DDR, `lc` the T31LC; `t23zn` and `t23x` are new here. The T40 images
 were `u-boot-t40*-universal.bin` from OpenIPC/u-boot-t40. The T41 is new,
@@ -422,6 +425,9 @@ and unpacks U-Boot. `u-boot-<soc>-nor.bin` is both, for flash offset 0:
 | --- | --- |
 | `0x0000` | SPL, behind the boot ROM's SFC header (26 KiB slot) |
 | `0x6800` | U-Boot, lzop-packed in a uImage |
+
+On NAND the SPL slot is 27 KiB and U-Boot starts at `0x6c00`; the
+environment is at `0xc0000`.
 
 The environment is at 0x40000, as with u-boot-ingenic. These images have
 not run on a camera yet, and qemu-hisilicon has no Ingenic machine:
@@ -437,7 +443,7 @@ bash build.sh t31n          # a single target
 
 The toolchain is `mipsel-linux-gnu-` (Debian/Ubuntu package
 `gcc-mipsel-linux-gnu`), plus `lzop`. Images land in `output/` as
-`u-boot-<soc>-nor.bin`.
+`u-boot-<soc>-nor.bin` and `u-boot-<soc>-nand.bin`.
 
 ## CI
 
