@@ -43,7 +43,7 @@
 #define UBI_MAGIC_ASCII "UBI#"
 #define FDT_MAGIC 0xd00dfeed
 
-#define SQSH_SIZE_OFF 0x58
+#define SQSH_SIZE_OFF 0x28	/* bytes_used; 0x58 is the export table */
 #define SQSH_MAGIC_BE 0x73717368
 #define SQSH_MAGIC_LE 0x68737173
 
