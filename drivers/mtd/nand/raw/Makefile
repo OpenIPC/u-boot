@@ -82,6 +82,8 @@ obj-$(CONFIG_CORTINA_NAND) += cortina_nand.o
 obj-$(CONFIG_ROCKCHIP_NAND) += rockchip_nfc.o
 obj-$(CONFIG_NAND_MT7621) += mt7621_nand.o
 
+obj-$(CONFIG_JZ_SFC_NAND) += jz_sfc_nand/
+
 else  # minimal SPL drivers
 
 obj-$(CONFIG_NAND_FSL_ELBC) += fsl_elbc_spl.o
@@ -92,3 +94,4 @@ obj-$(CONFIG_NAND_SUNXI) += sunxi_nand_spl.o
 obj-$(CONFIG_NAND_MT7621) += mt7621_nand_spl.o mt7621_nand.o
 
 endif # drivers
+

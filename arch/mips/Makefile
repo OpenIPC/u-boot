@@ -3,6 +3,7 @@
 head-y := arch/mips/cpu/start.o
 
 ifeq ($(CONFIG_SPL_BUILD),y)
+head-$(CONFIG_ARCH_INGENIC) := arch/mips/mach-ingenic/start.o
 head-$(CONFIG_ARCH_JZ47XX) := arch/mips/mach-jz47xx/start.o
 head-$(CONFIG_SOC_MT7621) := arch/mips/mach-mtmips/mt7621/spl/start.o
 endif
@@ -16,6 +17,7 @@ libs-y += arch/mips/lib/
 
 machine-$(CONFIG_ARCH_ATH79) += ath79
 machine-$(CONFIG_ARCH_BMIPS) += bmips
+machine-$(CONFIG_ARCH_INGENIC) += ingenic
 machine-$(CONFIG_ARCH_JZ47XX) += jz47xx
 machine-$(CONFIG_MACH_PIC32) += pic32
 machine-$(CONFIG_ARCH_MTMIPS) += mtmips
@@ -26,6 +28,17 @@ machdirs := $(patsubst %,arch/mips/mach-%/,$(machine-y))
 libs-y += $(machdirs)
 
 PLATFORM_CPPFLAGS += $(patsubst %,-I$(srctree)/%include,$(machdirs))
+
+# Ingenic: the DDR headers of the CPU generation, which the vendor changed
+# between XBurst and XBurst2 under the same names
+ifdef CONFIG_ARCH_INGENIC
+# The T41 changes them again, in the vendor's second DDR generation: its
+# own ahead of the XBurst2 ones
+ifdef CONFIG_T41
+PLATFORM_CPPFLAGS += -I$(srctree)/arch/mips/mach-ingenic/t41/include
+endif
+PLATFORM_CPPFLAGS += -I$(srctree)/arch/mips/mach-ingenic/$(if $(CONFIG_CPU_XBURST2),xburst2,xburst)/include
+endif
 
 # Optimize for MIPS architectures
 arch-$(CONFIG_CPU_MIPS32_R1) += -march=mips32 -Wa,-mips32

@@ -1,0 +1,278 @@
+menu "Ingenic T-series camera SoCs"
+	depends on ARCH_INGENIC
+
+config SYS_SOC
+	default "t10" if T10
+	default "t20" if T20
+	default "t21" if T21
+	default "t23" if T23
+	default "t30" if T30
+	default "t31" if T31
+	default "t40" if T40
+	default "t41" if T41
+
+config SYS_VENDOR
+	default "ingenic"
+
+config SYS_BOARD
+	default "isvp"
+
+config SYS_CONFIG_NAME
+	default "ingenic-isvp"
+
+choice
+	prompt "SoC"
+
+config T10
+	bool "T10"
+	help
+	  Ingenic T10 (XBurst, DWC DDR PHY).
+
+config T20
+	bool "T20"
+	help
+	  Ingenic T20 (XBurst, DWC DDR PHY).
+
+config T21
+	bool "T21"
+	help
+	  Ingenic T21 (XBurst, Innophy DDR PHY, internal Ethernet PHY).
+
+config T23
+	bool "T23"
+	help
+	  Ingenic T23 (XBurst, Innophy DDR PHY).
+
+config T30
+	bool "T30"
+	help
+	  Ingenic T30 (XBurst, Innophy DDR PHY).
+
+config T31
+	bool "T31"
+	help
+	  Ingenic T31 (XBurst, Innophy DDR PHY).
+
+config T40
+	bool "T40"
+	select CPU_XBURST2
+	help
+	  Ingenic T40 (XBurst2 with L2 cache, Innophy DDR PHY, SDHCI, the
+	  SFC of the second generation).
+
+config T41
+	bool "T41"
+	select CPU_XBURST2
+	help
+	  Ingenic T41 (XBurst2 with L2 cache, Innophy DDR PHY of the second
+	  DDR generation, SDHCI, two SFCs).
+
+endchoice
+
+# The package variants. Each selects what the vendor's boards.cfg option
+# of the same name selected: the PLL and DDR frequencies and the DDR chip.
+
+config LITE_VERSION
+	bool "Lite package (lower CPU and DDR clocks)"
+	depends on T10 || T20 || T30 || T31
+
+config DDR2_128M
+	bool "128 MiB DDR2 in the package"
+	depends on T20 || T21 || T30 || T31
+
+config DDR3_128M
+	bool "128 MiB DDR3 in the package"
+	depends on T30 || T31
+
+config T23N
+	bool "T23N"
+	depends on T23
+	help
+	  64 MiB DDR2 in the package.
+
+config T23ZN
+	bool "T23ZN"
+	depends on T23
+	select T23N
+	help
+	  Set up as the T23N, as the vendor SDK does; its SPL tells the
+	  two apart only by the chip ID it prints.
+
+config T23X
+	bool "T23X"
+	depends on T23 && !T23N
+	help
+	  128 MiB DDR2 in the package.
+
+config T30A
+	bool "T30A"
+	depends on T30
+
+config T31A
+	bool "T31A"
+	depends on T31
+
+config T31AL
+	bool "T31AL"
+	depends on T31
+
+config T31LC
+	bool "T31LC"
+	depends on T31
+
+config T40N
+	bool "T40N"
+	depends on T40
+	help
+	  128 MiB DDR2 in the package.
+
+config T40XP
+	bool "T40XP"
+	depends on T40
+	help
+	  DDR3 in the package (M15T1G1664A).
+
+config T40A
+	bool "T40A"
+	depends on T40
+	help
+	  DDR3 in the package (M15T4G16256A).
+
+config T41L
+	bool "T41L"
+	depends on T41
+	help
+	  64 MiB DDR2 in the package (M14D5121632A).
+
+config T41LQ
+	bool "T41LQ"
+	depends on T41
+	help
+	  The T41L's DDR (64 MiB DDR2) and clocks.
+
+config T41N
+	bool "T41N"
+	depends on T41
+	help
+	  128 MiB DDR3 in the package (W631GU6NG).
+
+config T41NQ
+	bool "T41NQ"
+	depends on T41
+	help
+	  128 MiB DDR3 (W631GU6NG), DDR at 700 MHz.
+
+config T41A
+	bool "T41A"
+	depends on T41
+	help
+	  DDR3 W631GU6NG, CPU at 1300 MHz and DDR at 800 MHz.
+
+config T41ZX
+	bool "T41ZX"
+	depends on T41
+	help
+	  256 MiB DDR3 in the package (W632GU6NG).
+
+config T41XQ
+	bool "T41XQ"
+	depends on T41
+	help
+	  256 MiB DDR3 in the package (W632GU6NG).
+
+# What the vendor's per-SoC headers hard-code
+
+config CPU_XBURST2
+	bool
+	help
+	  An XBurst2 CPU core: the T40 and T41, with an L2 cache.
+
+config CPU_XBURST
+	def_bool y if !CPU_XBURST2
+	help
+	  An XBurst CPU core, as the vendor code names it.
+
+config DDR_PARAMS_CREATOR
+	def_bool y
+	help
+	  The DDR register values come from ddr_params_creator.
+
+config DDR_HOST_CC
+	def_bool y
+	help
+	  ddr_params_creator runs on the build host, not in the SPL.
+
+config DDR_INNOPHY
+	def_bool y if T21 || T23 || T30 || T31 || T40 || T41
+	help
+	  The Innosilicon DDR PHY; the T10 and T20 have the DesignWare one.
+
+config SPL_DDR_SOFT_TRAINING
+	def_bool y if !T23 && !CPU_XBURST2
+	help
+	  The software DQS training of the vendor SPL (ddr_dqs_training.c).
+
+config DDR_TYPE_DDR2
+	def_bool y if !DDR_TYPE_DDR3
+
+config DDR_TYPE_DDR3
+	def_bool y if DDR3_128M || (T23 && !T23N && !T23X) || T40XP || T40A || \
+		     (T41 && !T41L && !T41LQ)
+
+config DDR2_M14D5121632A
+	def_bool y if DDR_TYPE_DDR2 && !DDR2_128M && !T23X
+
+config DDR2_M14D1G1664A
+	def_bool y if DDR2_128M || T23X
+
+config DDR3_M15T1G1664A_2C
+	def_bool y if DDR3_128M || T40XP
+
+config DDR3_M15T4G16256A_2S
+	def_bool y if T40A
+
+config DDR3_W631GU6NG
+	def_bool y if T41N || T41NQ || T41A
+
+config DDR3_W632GU6NG
+	def_bool y if T41ZX || T41XQ
+
+config DDR3_TSD34096M1333C9_E
+	def_bool y if T23 && !T23N && !T23X
+
+config JZ_MMC_MSC0
+	def_bool y
+	help
+	  MSC0 on port B: the SD card slot of the cameras.
+
+config INGENIC_SPI_NAND
+	bool "Boot from SPI NAND on the SFC"
+	depends on T40
+	help
+	  The SPL loads U-Boot from SPI NAND, and U-Boot keeps its
+	  environment there: the vendor's SFC_NAND targets.
+
+config SFC_NOR
+	def_bool y if !INGENIC_SPI_NAND
+	help
+	  Boot from SPI NOR on the SFC. The vendor's SFC_NAND targets leave
+	  it out, and so the SFC clock gate, which clk_init() opens only for
+	  NOR, as the boot ROM left it.
+
+config SFC_NAND
+	def_bool y if INGENIC_SPI_NAND
+
+config NET_GMAC
+	def_bool y
+	help
+	  The SoC GMAC: its clock is ungated in the SPL, as the vendor does.
+
+config INGENIC_SPL_PAD_TO
+	hex
+	default 0x6c00 if INGENIC_SPI_NAND
+	default 0x6800
+	help
+	  The SPL slot at the start of the flash; the LZO-packed U-Boot
+	  follows it.
+
+endmenu

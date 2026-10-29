@@ -93,6 +93,18 @@ config ARCH_MTMIPS
 	select SUPPORTS_LITTLE_ENDIAN
 	select SUPPORT_SPL
 
+config ARCH_INGENIC
+	bool "Support Ingenic T-series camera SoCs"
+	select CREATE_ARCH_SYMLINK
+	select SUPPORT_SPL
+	select SUPPORTS_LITTLE_ENDIAN
+	select SUPPORTS_CPU_MIPS32_R1
+	select SUPPORTS_CPU_MIPS32_R2
+	help
+	  The Ingenic XBurst T10, T20, T21, T23, T30 and T31: the vendor SPL
+	  (PLL, DDR) runs from the cache the boot ROM fills from SPI NOR and
+	  loads an LZO-packed U-Boot.
+
 config ARCH_JZ47XX
 	bool "Support Ingenic JZ47xx"
 	select SUPPORT_SPL
@@ -173,6 +185,7 @@ source "board/imgtec/xilfpga/Kconfig"
 source "arch/mips/mach-ath79/Kconfig"
 source "arch/mips/mach-mscc/Kconfig"
 source "arch/mips/mach-bmips/Kconfig"
+source "arch/mips/mach-ingenic/Kconfig"
 source "arch/mips/mach-jz47xx/Kconfig"
 source "arch/mips/mach-pic32/Kconfig"
 source "arch/mips/mach-mtmips/Kconfig"
@@ -502,24 +515,30 @@ config DMA_ADDR_T_64BIT
 
 config SYS_DCACHE_SIZE
 	int
+	default 16384 if T21
+	default 32768 if ARCH_INGENIC
 	default 0
 	help
 	  The total size of the L1 Dcache, if known at compile time.
 
 config SYS_DCACHE_LINE_SIZE
 	int
+	default 32 if ARCH_INGENIC
 	default 0
 	help
 	  The size of L1 Dcache lines, if known at compile time.
 
 config SYS_ICACHE_SIZE
 	int
+	default 16384 if T21
+	default 32768 if ARCH_INGENIC
 	default 0
 	help
 	  The total size of the L1 ICache, if known at compile time.
 
 config SYS_ICACHE_LINE_SIZE
 	int
+	default 32 if ARCH_INGENIC
 	default 0
 	help
 	  The size of L1 Icache lines, if known at compile time.

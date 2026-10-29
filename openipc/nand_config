@@ -1,0 +1,33 @@
+# SPI NAND on the SFC, appended to a NOR target's fragments for its NAND
+# image, as openipc-hisilicon's nand_config: the SPL loads U-Boot from the
+# NAND, the environment is in the NAND 'env' partition and the firmware
+# is one UBI device (768k(boot),256k(env),-(ubi)) with the kernel inside
+# the UBIFS rootfs.
+CONFIG_INGENIC_SPI_NAND=y
+# The vendor's SFC_NAND SPL slot: 27 KiB
+CONFIG_SPL_MAX_SIZE=0x6c00
+# CONFIG_JZ_SFC_NOR is not set
+# CONFIG_CMD_SF is not set
+# CONFIG_ENV_IS_IN_SPI_FLASH is not set
+CONFIG_MTD=y
+CONFIG_MTD_RAW_NAND=y
+CONFIG_SYS_NAND_SELF_INIT=y
+CONFIG_JZ_SFC_NAND=y
+CONFIG_CMD_NAND=y
+CONFIG_CMD_NAND_TRIMFFS=y
+# CONFIG_CMD_NAND_TORTURE is not set
+CONFIG_ENV_IS_IN_NAND=y
+CONFIG_ENV_OFFSET=0xc0000
+CONFIG_ENV_SIZE=0x40000
+CONFIG_ENV_RANGE=0x40000
+CONFIG_MTD_PARTITIONS=y
+CONFIG_CMD_MTDPARTS=y
+CONFIG_CMD_UBI=y
+CONFIG_CMD_UBIFS=y
+CONFIG_MTD_UBI=y
+CONFIG_MTD_UBI_WL_THRESHOLD=4096
+CONFIG_MTD_UBI_BEB_LIMIT=20
+# CONFIG_MTD_UBI_FASTMAP is not set
+CONFIG_RBTREE=y
+CONFIG_FIT=y
+CONFIG_SHA1=y
