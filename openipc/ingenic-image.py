@@ -16,7 +16,12 @@ the targets whose boards.cfg line has SPL_PARAMS_FIXER, spl_params_fixer
 (--params: the boot ROM's parameter block at offset 256, the CPM set-up it
 runs before reading the rest of the SPL).
 
-usage: ingenic-image.py [--pad-block] [--params] <u-boot-spl.bin>
+The SPI NAND image (--nand, the T40's SFC_NAND targets) has the vendor's
+27 KiB SPL slot, 0x6c00, padded with 0xff as the vendor's u-boot-with-spl,
+and must end before the NAND environment, at 0xc0000: the 768 KiB boot
+partition of the openipc-hisilicon NAND layout.
+
+usage: ingenic-image.py [--pad-block] [--params] [--nand] <u-boot-spl.bin>
                         <u-boot-lzo.img> <out>
 """
 
@@ -25,6 +30,8 @@ import sys
 
 SPL_SLOT = 0x6800
 ENV_OFFSET = 0x40000
+NAND_SPL_SLOT = 0x6c00
+NAND_ENV_OFFSET = 0xc0000
 SKIP_SIZE = 2048
 CRC_POSITION = 9
 SPL_LENGTH_POSITION = 12
@@ -110,6 +117,9 @@ def main():
     args = sys.argv[1:]
     pad_block = '--pad-block' in args
     params = '--params' in args
+    nand = '--nand' in args
+    slot, env, pad = (NAND_SPL_SLOT, NAND_ENV_OFFSET, b'\xff') if nand \
+        else (SPL_SLOT, ENV_OFFSET, b'\x00')
     args = [a for a in args if not a.startswith('--')]
     spl_path, uboot_path, out_path = args[:3]
     spl = bytearray(open(spl_path, 'rb').read())
@@ -120,19 +130,24 @@ def main():
         spl[PARAMS_OFFSET:PARAMS_OFFSET + PARAMS_LENGTH] = spl_params(len(spl))
     uboot = open(uboot_path, 'rb').read()
 
-    if spl[:12] != bytes.fromhex('060504030255aa55aa000000'):
+    if nand:
+        # bytes 8..11: CRC7 (0 here), 0, pages per block / 32, bytes per
+        # page / 1024
+        if spl[:10] != bytes.fromhex('060504030255aa550000'):
+            sys.exit('%s: no SFC NAND boot header' % spl_path)
+    elif spl[:12] != bytes.fromhex('060504030255aa55aa000000'):
         sys.exit('%s: no SFC NOR boot header' % spl_path)
-    if len(spl) > SPL_SLOT:
-        sys.exit('SPL is %d bytes, the slot %d' % (len(spl), SPL_SLOT))
+    if len(spl) > slot:
+        sys.exit('SPL is %d bytes, the slot %d' % (len(spl), slot))
 
     # spi_checksum read 4-byte chunks and skipped the first SKIP_SIZE bytes
     spl[CRC_POSITION] = crc7(spl[SKIP_SIZE:])
     struct.pack_into('<I', spl, SPL_LENGTH_POSITION, len(spl))
 
-    image = bytes(spl) + bytes(SPL_SLOT - len(spl)) + uboot
-    if len(image) > ENV_OFFSET:
+    image = bytes(spl) + pad * (slot - len(spl)) + uboot
+    if len(image) > env:
         sys.exit('image is %d bytes, it would overwrite the environment at '
-                 '0x%x' % (len(image), ENV_OFFSET))
+                 '0x%x' % (len(image), env))
     open(out_path, 'wb').write(image)
 
 

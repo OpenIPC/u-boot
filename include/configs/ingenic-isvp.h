@@ -27,6 +27,10 @@
 
 #define CONFIG_SYS_MONITOR_LEN		(512 * 1024)
 
+#ifdef CONFIG_JZ_SFC_NAND
+#define CONFIG_SYS_MAX_NAND_DEVICE	1
+#endif
+
 #include "openipc-common.h"
 
 #endif

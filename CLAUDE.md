@@ -51,7 +51,9 @@ and the README.
 The names are u-boot-ingenic's (`u-boot-<target>-nor.bin` in
 OpenIPC/firmware `latest`), and each target selects what its boards.cfg
 line selected there. u-boot-t40 published its T40 images as
-`u-boot-<target>-universal.bin`; here they are `-nor.bin` like the rest. The clocks and the DDR chip follow from the Kconfig
+`u-boot-<target>-universal.bin`; here they are `-nor.bin` like the rest,
+and the T40s have SPI NAND images too, `u-boot-<target>-nand.bin` (from
+u-boot-t40's isvp_t40*_sfcnand; see "T40 SPI NAND"). The clocks and the DDR chip follow from the Kconfig
 options in `arch/mips/mach-ingenic/include/mach/<soc>-hw.h`, the vendor
 header's hardware section.
 
@@ -162,6 +164,39 @@ The T40's flow, with what the T41 SDK's SPL changes (`arch/mips/cpu/xburst2/t41`
 - The kernels' MTD id is `sfc0_nor`. The `_lp` SDK builds (lower clocks)
   are a clock profile of the same chips and are not built.
 
+### T40 SPI NAND
+
+`build.sh t40n` (and t40xp, t40a) builds a second image with
+`openipc/nand_config` after the target's fragments, as openipc-hisilicon
+builds its NAND images; `NAND_SOCS` in build.sh names the targets.
+
+- SPL: the boot header's third word is SFC_NAND's (pages per block / 32
+  and bytes per page / 1024: 0x02020000 for 2048+64-byte pages, 64 per
+  block), the slot is the vendor's 27 KiB (0x6c00, `SPL_MAX_SIZE`), the
+  0xff padding up to it the vendor's; no params block (no SPL_PARAMS_FIXER
+  on these lines). `xburst2/spl_sfc_nand.c` is the vendor's
+  common/spl/spl_sfc_nand.c: the SFC at 50 MHz with the DEV_CONF timing
+  `sfc_timing_params` computes, the chip probed by ID (sample delay moved on
+  after every miss, up to 10), write protection off, QE|ECC|BUF on, pages
+  read through the cache, the ECC status read, a block skipped when its
+  first page's spare starts with anything but 0xff. The chip table
+  (`sfc_nand_params.h`) and the timing are made on the build host from
+  the vendor's tools/ingenic-tools/nand_device, both byte-identical to the
+  vendor build's.
+- `SFC_NOR` is off on these, as in the vendor's NAND builds: clk_init()
+  leaves the SFC clock gate as the boot ROM set it.
+- U-Boot: `drivers/mtd/nand/raw/jz_sfc_nand/` (`JZ_SFC_NAND`), the vendor's
+  jz_sfc_v1 NAND driver, its transfer layer (`jz_sfc_common.c`) and chip
+  drivers, registered as nand0 from `board_nand_init()`
+  (SYS_NAND_SELF_INIT) with its own mtd operations, so nand, mtdparts and
+  ubi work; the partitions from mtdparts, not the vendor's burner table.
+- Layout and environment: openipc-hisilicon's, `768k(boot),256k(env),-(ubi)`
+  on `sfc_nand` (the vendor kernels' ingenic_sfc_v1/v2 NAND MTD name), the
+  kernel in the UBIFS rootfs, the environment at 0xc0000 (256 KiB,
+  ENV_RANGE too), `urfile=rootfs.ubifs.<soc>`; the image must end before
+  0xc0000. common/openipc.c's NAND paths are on for `JZ_SFC_NAND`
+  (`OPENIPC_SPI_NAND`, the FMC's or the SFC's).
+
 ## Hand-off to the kernel
 
 Mainline MIPS `bootm` (argc/argv/envp in a0-a2), as the vendor U-Boot did.
@@ -209,7 +244,8 @@ bash build.sh t31n       # one
 ```
 
 Toolchain `mipsel-linux-gnu-` (Debian/Ubuntu `gcc-mipsel-linux-gnu`), plus
-`lzop` and `python3`. Images land in `output/` as `u-boot-<target>-nor.bin`.
+`lzop` and `python3`. Images land in `output/` as `u-boot-<target>-nor.bin`,
+and `u-boot-<target>-nand.bin` for the T40s.
 
 ## How it was verified
 
@@ -234,5 +270,11 @@ built for every target:
   and length bytes, and the CRC7 of the vendor SPLs is reproduced; adding
   the T41 left the XBurst and T40 images byte-identical but for the build
   time.
+
+- the T40 NAND images: the DDR tables, the SPL's chip table and SFC
+  timing byte-identical, 100 macros equal (the 94 plus SFC_NAND/SFC_NOR,
+  the NAND rate, page and block size, SPI_STANDARD, SPL_MAX_SIZE), the first
+  2 KiB of the SPL equal but for the CRC and length bytes; adding them
+  left all 30 NOR images byte-identical (built with one SOURCE_DATE_EPOCH).
 
 None of it has run on a camera yet.

@@ -127,6 +127,10 @@
 	"fwrecovery=if env exists bootfail; then run fwupd; sleep 5; reset; fi\0" \
 	"bootflash=run fwrecovery; setenv setargs setenv bootargs ${bootargs}; run setargs; run loadkernel; bootm ${baseaddr}; reset\0"
 
+#ifndef CONFIG_JZ_SFC_NAND
+
+/* ---------- SPI NOR ---------- */
+
 /* The flash's MTD name in the vendor kernel (drivers/mtd/devices/jz_sfc) */
 #ifdef CONFIG_T41
 /* the T41 kernels' (drivers/mtd/devices/jz_sfc_v1, flash on SFC0) */
@@ -195,6 +199,51 @@
 	"mtds=" OPENIPC_MTDPARTS "\0" \
 	"mtdparts=" SFC ":" OPENIPC_MTDPARTS "\0" \
 	"bootargs=" CONFIG_BOOTARGS
+
+#else /* CONFIG_JZ_SFC_NAND */
+
+/* ---------- SPI NAND ---------- */
+
+/* The flash's MTD name in the vendor kernels (ingenic_sfc_v1/v2 nand) */
+#define SFC "sfc_nand"
+
+/* NAND partition list; composed the same way. */
+#define OPENIPC_NAND_MTDPARTS "768k(boot),256k(env),-(ubi)"
+
+/* Environment lives in the NAND 'env' partition: CONFIG_ENV_OFFSET 0xc0000,
+ * CONFIG_ENV_SIZE and CONFIG_ENV_RANGE 0x40000 (openipc/nand_config), as
+ * on openipc-hisilicon. */
+
+#define CONFIG_BOOTARGS "mem=\\${osmem} rmem=\\${rmem} console=ttyS1,115200 panic=20 init=/init root=ubi0:rootfs rootfstype=ubifs ubi.mtd=2,2048 mtdparts=\\${mtdparts} \\${extras}"
+
+/*
+ * The NAND layout is one UBI device after boot and env, holding the UBIFS
+ * rootfs with the kernel inside it -- /boot/fitImage, or /boot/uImage on a
+ * build without a FIT -- and rootfs_data on the rest. No flash is set aside
+ * for a kernel: the rootfs volume is sized to its image. This is the layout
+ * of openipc-hisilicon's NAND images.
+ *
+ * Recovery rewrites the rootfs volume only, sized to the image, with
+ * rootfs_data taking the rest. Only a rootfs that grew beyond what the old
+ * volume could give costs the data volume, as U-Boot cannot resize UBI
+ * volumes; else rootfs_data is preserved.
+ */
+#define OPENIPC_FWUPD "fwupd=run ur\0"
+
+#define OPENIPC_LOADKERNEL "ubi part ubi; ubifsmount ubi0:rootfs; ubifsload ${baseaddr} /boot/fitImage || ubifsload ${baseaddr} /boot/uImage"
+#define OPENIPC_ENV_MEDIUM \
+	"ubfile=u-boot-" CONFIG_PRODUCT_SOC "-nand.bin\0" \
+	"urfile=rootfs.ubifs." CONFIG_PRODUCT_SOC "\0" \
+	"ubwrite=nand erase 0x0 0xc0000; nand write ${baseaddr} 0x0 ${filesize}\0" \
+	"urwrite=ubi part ubi; ubi check rootfs && ubi remove rootfs; if ubi create rootfs ${filesize} d; then ubi check rootfs; else ubi remove rootfs_data; ubi create rootfs ${filesize} d; fi; ubi check rootfs_data || ubi create rootfs_data 0 d; ubi write ${baseaddr} rootfs ${filesize}\0" \
+	"loadkernel=" OPENIPC_LOADKERNEL "\0" \
+	"bootm_size=0x2000000\0" \
+	"mtdids=nand0=" SFC "\0" \
+	"mtds=" OPENIPC_NAND_MTDPARTS "\0" \
+	"mtdparts=" SFC ":" OPENIPC_NAND_MTDPARTS "\0" \
+	"bootargs=" CONFIG_BOOTARGS
+
+#endif /* CONFIG_JZ_SFC_NAND */
 
 #define CONFIG_BOOTCOMMAND "run bootflash"
 
