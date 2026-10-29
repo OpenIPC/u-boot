@@ -19,10 +19,14 @@
 #ifdef CONFIG_MMC
 #include <mmc.h>
 #endif
+/* The SPI-NAND paths: the HiSilicon FMC's, or the Ingenic SFC's */
+#if defined(CONFIG_FMC_SPI_NAND) || defined(CONFIG_JZ_SFC_NAND)
+#define OPENIPC_SPI_NAND
+#endif
 #ifdef CONFIG_ENV_IS_IN_NAND
 #include <nand.h>
 #endif
-#ifdef CONFIG_FMC_SPI_NAND
+#ifdef OPENIPC_SPI_NAND
 #include <linux/err.h>
 #include <linux/mtd/ubi.h>
 #include <ubifs_uboot.h>
@@ -50,7 +54,7 @@ static int __maybe_unused check_squashfs(void *buf) {
   return 0;
 }
 
-#ifdef CONFIG_FMC_SPI_NAND
+#ifdef OPENIPC_SPI_NAND
 #define UBIFS_SB_MAGIC 0x06101831
 
 static int check_ubifs(void *buf) {
@@ -94,7 +98,7 @@ static int __maybe_unused check_kernel(void *buf) {
   return 0;
 }
 
-#ifndef CONFIG_FMC_SPI_NAND
+#ifndef OPENIPC_SPI_NAND
 
 static uint64_t get_squashfs_size(void *buf) {
   uint32_t magic = get_unaligned_be32(buf);
@@ -208,7 +212,7 @@ static int scan_spi_device(struct spi_flash *flash, ulong *kernel_off, ulong *ro
   return 0;
 }
 
-#endif /* !CONFIG_FMC_SPI_NAND */
+#endif /* !OPENIPC_SPI_NAND */
 
 #if (defined(CONFIG_MMC) || defined(CONFIG_USB_STORAGE)) && defined(CONFIG_FS_FAT)
 #define RECOVERY_KERNEL 0
@@ -260,7 +264,7 @@ static ulong recovery_ram_room(void) {
   return gd->start_addr_sp - SZ_1M - CONFIG_SYS_LOAD_ADDR;
 }
 
-#ifdef CONFIG_FMC_SPI_NAND
+#ifdef OPENIPC_SPI_NAND
 static int recovery_ensure_volume(const char *name, const char *size) {
   struct ubi_volume_desc *desc;
   char cmd[64];
@@ -574,7 +578,7 @@ static int recovery_run_script(const char *name) {
 }
 
 static int recovery_try(void) {
-#ifdef CONFIG_FMC_SPI_NAND
+#ifdef OPENIPC_SPI_NAND
   char name[64];
 #endif
 
@@ -582,7 +586,7 @@ static int recovery_try(void) {
   if (recovery_run_script("script.txt"))
     return 1;
 
-#ifdef CONFIG_FMC_SPI_NAND
+#ifdef OPENIPC_SPI_NAND
   /* Rootfs. On NAND it carries the kernel (/boot), its volume is sized
    * to the image and rootfs_data takes the rest. */
   sprintf(name, "rootfs.ubifs.%s.img", CONFIG_PRODUCT_SOC);
@@ -595,7 +599,7 @@ static int recovery_try(void) {
 int firmware_recovery(void) {
   int found = 0;
 
-#ifndef CONFIG_FMC_SPI_NAND
+#ifndef OPENIPC_SPI_NAND
   recovery_flash = spi_flash_probe(CONFIG_SF_DEFAULT_BUS, CONFIG_SF_DEFAULT_CS,
                                    CONFIG_SF_DEFAULT_SPEED,
                                    CONFIG_SF_DEFAULT_MODE);
@@ -618,7 +622,7 @@ int firmware_recovery(void) {
 #endif
 
   fs_close();
-#ifndef CONFIG_FMC_SPI_NAND
+#ifndef OPENIPC_SPI_NAND
   spi_flash_free(recovery_flash);
 #endif
 
@@ -630,7 +634,7 @@ int firmware_recovery(void) {
 }
 #endif
 
-#if !defined(CONFIG_FMC_SPI_NAND) && defined(CONFIG_OPENIPC_NOR_SPLIT)
+#if !defined(OPENIPC_SPI_NAND) && defined(CONFIG_OPENIPC_NOR_SPLIT)
 /*
  * The split layout needs nothing from bootargs: the kernel's device tree has
  * the partitions and the kernel takes the root its firmware split finds. A
@@ -752,7 +756,7 @@ static int nor_split_header_bad(struct spi_flash *flash, ulong kernel_off)
 #endif
 
 int firmware_scan(void) {
-#ifdef CONFIG_FMC_SPI_NAND
+#ifdef OPENIPC_SPI_NAND
   u8 buf[64];
   int ret;
 
@@ -1081,7 +1085,7 @@ static void altbootcmd_migrate(void) {
   env_save();
 }
 
-#if !defined(CONFIG_FMC_SPI_NAND) && defined(CONFIG_OPENIPC_NOR_SPLIT)
+#if !defined(OPENIPC_SPI_NAND) && defined(CONFIG_OPENIPC_NOR_SPLIT)
 /*
  * fwwrite writes only a file that fits fwsize, the firmware area from
  * kernaddr to the end of the chip, and the layout scan sets it. Recovery
@@ -1113,7 +1117,7 @@ int openipc_helper(void) {
   sprintf(msize, "%ldM", gd->ram_size / 1024 / 1024);
   env_set("totalmem", msize);
 
-#if !defined(CONFIG_FMC_SPI_NAND) && defined(CONFIG_OPENIPC_NOR_SPLIT)
+#if !defined(OPENIPC_SPI_NAND) && defined(CONFIG_OPENIPC_NOR_SPLIT)
   nor_split_fwsize();
 #endif
 
