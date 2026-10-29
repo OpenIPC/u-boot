@@ -25,11 +25,13 @@ usage: ingenic-image.py [--pad-block] [--params] [--nand] <u-boot-spl.bin>
                         <u-boot-lzo.img> <out>
 """
 
+import os
 import struct
 import sys
 
 SPL_SLOT = 0x6800
 ENV_OFFSET = 0x40000
+UNPACK_MAX = 0x80200000 - 0x80100000
 NAND_SPL_SLOT = 0x6c00
 NAND_ENV_OFFSET = 0xc0000
 SKIP_SIZE = 2048
@@ -118,6 +120,7 @@ def main():
     pad_block = '--pad-block' in args
     params = '--params' in args
     nand = '--nand' in args
+    unpacked = [a.split('=', 1)[1] for a in args if a.startswith('--unpacked=')]
     slot, env, pad = (NAND_SPL_SLOT, NAND_ENV_OFFSET, b'\xff') if nand \
         else (SPL_SLOT, ENV_OFFSET, b'\x00')
     args = [a for a in args if not a.startswith('--')]
@@ -129,6 +132,12 @@ def main():
     if params:
         spl[PARAMS_OFFSET:PARAMS_OFFSET + PARAMS_LENGTH] = spl_params(len(spl))
     uboot = open(uboot_path, 'rb').read()
+    # The SPL unpacks U-Boot from its link address (0x80100000) up to the
+    # packed copy it reads to 0x80200000 (spl.c INGENIC_UNPACK_MAX)
+    for u in unpacked:
+        if os.path.getsize(u) > UNPACK_MAX:
+            sys.exit('%s is %d bytes, more than the SPL unpacks (%d)' %
+                     (u, os.path.getsize(u), UNPACK_MAX))
 
     if nand:
         # bytes 8..11: CRC7 (0 here), 0, pages per block / 32, bytes per

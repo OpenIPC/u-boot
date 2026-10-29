@@ -58,7 +58,8 @@ build_soc() {
     esac
     # The vendor's SFC_NAND SPLs have no boot ROM parameter block
     [ "${flash}" = nand ] && image_opts="--pad-block --nand"
-    python3 openipc/ingenic-image.py ${image_opts} "${builddir}/spl/u-boot-spl.bin" \
+    python3 openipc/ingenic-image.py ${image_opts} \
+        --unpacked="${builddir}/u-boot.bin" "${builddir}/spl/u-boot-spl.bin" \
         "${builddir}/u-boot-lzo.img" "output/u-boot-${soc}-${flash}.bin"
 }
 

@@ -50,7 +50,7 @@ static struct global_info ginfo __section(".data") = {
 /* Where the vendor SPL reads the packed image to, below U-Boot's unpacked
  * end, and where U-Boot is unpacked */
 #define INGENIC_DECMP_BUFFER	0x80200000
-#define INGENIC_UNPACK_MAX	0x00100000
+#define INGENIC_UNPACK_MAX	(INGENIC_DECMP_BUFFER - CONFIG_SYS_TEXT_BASE)
 
 void pll_init(void);
 void clk_prepare(void);
@@ -101,6 +101,16 @@ static void __noreturn ingenic_spl_boot_flash(void)
 	size = image_get_data_size(hdr);
 	load = image_get_load(hdr);
 	ep = image_get_ep(hdr);
+	/*
+	 * U-Boot unpacks below the packed copy: the window from its link
+	 * address to INGENIC_DECMP_BUFFER (ingenic-image.py checks that
+	 * u-boot.bin fits it)
+	 */
+	if (load != CONFIG_SYS_TEXT_BASE) {
+		printf("U-Boot image loads at 0x%lx, not 0x%x\n", load,
+		       CONFIG_SYS_TEXT_BASE);
+		hang();
+	}
 
 	spl_flash_load(CONFIG_INGENIC_SPL_PAD_TO, size + sizeof(*hdr), (ulong)hdr);
 	ret = lzop_decompress((void *)image_get_data(hdr), size, (void *)load,
