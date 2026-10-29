@@ -423,7 +423,7 @@ void dump_gpio_func( unsigned int gpio)
 	unsigned group = gpio / 32;
 	unsigned pin = gpio % 32;
 	int d = 0;
-	unsigned int base = GPIO_BASE + 0x100 * group;
+	unsigned int base = GPIO_BASE + 0x1000 * group;	/* the T41 port stride */
 	d = d | ((readl(base + PXINT) >> pin) & 1) << 3;
 	d = d | ((readl(base + PXMSK) >> pin) & 1) << 2;
 	d = d | ((readl(base + PXPAT1) >> pin) & 1) << 1;
