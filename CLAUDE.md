@@ -49,6 +49,11 @@ own branch:
   binaries. CI: `build-sigmastar.yml`, called from that branch's
   `ci.yml`. Its own `CLAUDE.md` covers the boot chain, the image layout
   and the kernel hand-off.
+- `openipc-ingenic`: U-Boot for Ingenic T10/T20/T21/T23/T30/T31 (XBurst,
+  MIPS), on the same mainline release with the same OpenIPC layer, plus
+  the vendor SPL built from source in the tree. CI: `build-ingenic.yml`,
+  called from that branch's `ci.yml`. Its own `CLAUDE.md` covers the
+  SPL, the DDR tables and the vendor quirks.
 - `main`: a fork of upstream mainline U-Boot, kept for rebasing.
 
 To change bootloader code, check out `openipc-hisilicon`, or read it with
@@ -262,6 +267,20 @@ The build logic lives here. Other branches call it:
     (OpenIPC/website `service/internal/builds/verify.go`).
     `build-sigmastar.yml` has to be added there before the first
     `publish`.
+
+## `build-ingenic.yml`
+
+- `resolve` -> `build` (matrix, one target per leg) -> `release`; no
+  `qemu`/`qemu_smoke`, since qemu-hisilicon has no Ingenic (MIPS) machine.
+- NOR only, 256 KiB boot partition (the SPL in its 26 KiB slot, then the
+  lzop-packed U-Boot); the build legs install `gcc-mipsel-linux-gnu` and
+  `lzop`.
+- **No `publish`:** the `u-boot-t*-nor.bin` names in OpenIPC/firmware
+  `latest` are OpenIPC/u-boot-ingenic's, which cameras run, and these
+  images have not booted on one. Add the job (and the openipc.org
+  allowlist entry) only after they have.
+- Keep the build matrix and the README's list in step with the branch's
+  `build.sh` `ALL_SOCS`.
 
 ## Invariants to keep when editing `build-hisilicon.yml`
 

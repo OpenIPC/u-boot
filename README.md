@@ -11,6 +11,7 @@
 [![fullhan build](https://github.com/OpenIPC/u-boot/actions/workflows/build-fullhan.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-fullhan.yml)
 [![grainmedia build](https://github.com/OpenIPC/u-boot/actions/workflows/build-grainmedia.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-grainmedia.yml)
 [![sigmastar build](https://github.com/OpenIPC/u-boot/actions/workflows/build-sigmastar.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-sigmastar.yml)
+[![ingenic build](https://github.com/OpenIPC/u-boot/actions/workflows/build-ingenic.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-ingenic.yml)
 
 Unified repository for the U-Boot bootloaders maintained by
 [OpenIPC](https://openipc.org) for supported SoCs.
@@ -31,6 +32,7 @@ family — not bootloader sources.
 | `openipc-fullhan` | U-Boot for Fullhan FH8632, FH885x V100, FH8626V100, FH885xV200, FH865x |
 | `openipc-grainmedia` | U-Boot for Grain Media GM8135S, GM8136, GM8136S |
 | `openipc-sigmastar` | U-Boot for SigmaStar MSC313E, MSC316DC, MSC316DM |
+| `openipc-ingenic` | U-Boot for Ingenic T10, T20, T21, T23, T30, T31 |
 | `main` | Fork of upstream mainline U-Boot, kept for rebasing |
 
 New families are added here as they are ported, each with its own
@@ -395,6 +397,45 @@ bash build.sh msc313e       # a single SoC
 
 Images land in `output/` as `u-boot-<soc>-nor.bin`.
 
+## ingenic
+
+U-Boot for Ingenic's XBurst camera SoCs, on the same mainline release
+(v2022.10) and with the same OpenIPC boot layer as `openipc-hisilicon`,
+ported from [OpenIPC/u-boot-ingenic](https://github.com/OpenIPC/u-boot-ingenic)
+(the vendor U-Boot 2013.07), whose target names it keeps.
+
+**NOR:** `t10`, `t10l`, `t20`, `t20l`, `t20x`, `t21n`, `t23n`, `t23zn`,
+`t23x`, `t30n`, `t30l`, `t30x`, `t30a`, `t30a1`, `t31n`, `t31l`, `t31x`,
+`t31a`, `t31al`, `t31lc`
+
+The suffix is the package: `l` lite (lower clocks), `x` and `a`/`a1`/`al`
+128 MiB of DDR, `lc` the T31LC; `t23zn` and `t23x` are new here.
+
+The boot ROM loads the SPL from the start of the flash into the cache;
+the SPL, built from the vendor's source, brings up the PLLs and the DDR
+and unpacks U-Boot. `u-boot-<soc>-nor.bin` is both, for flash offset 0:
+
+| Offset | Contents |
+| --- | --- |
+| `0x0000` | SPL, behind the boot ROM's SFC header (26 KiB slot) |
+| `0x6800` | U-Boot, lzop-packed in a uImage |
+
+The environment is at 0x40000, as with u-boot-ingenic. These images have
+not run on a camera yet, and qemu-hisilicon has no Ingenic machine:
+CI builds them, and they are not published to OpenIPC/firmware.
+
+```sh
+git clone --branch openipc-ingenic https://github.com/OpenIPC/u-boot.git
+cd u-boot
+
+bash build.sh               # every target
+bash build.sh t31n          # a single target
+```
+
+The toolchain is `mipsel-linux-gnu-` (Debian/Ubuntu package
+`gcc-mipsel-linux-gnu`), plus `lzop`. Images land in `output/` as
+`u-boot-<soc>-nor.bin`.
+
 ## CI
 
 The [build-hisilicon](.github/workflows/build-hisilicon.yml) workflow runs
@@ -585,6 +626,21 @@ Its `release` input fills this repository's
 
 ```sh
 gh workflow run build-sigmastar.yml -f release=true -f publish=true
+```
+
+### ingenic
+
+The [build-ingenic](.github/workflows/build-ingenic.yml) workflow builds
+every target on pull requests to this branch that change it, on pushes
+and pull requests to `openipc-ingenic` (through that branch's `ci.yml`),
+and manually. There is no smoke test: qemu-hisilicon has no Ingenic
+machine. Its `release` input fills this repository's
+[`Ingenic` release](../../releases/tag/ingenic). It has no `publish`:
+the `u-boot-t*-nor.bin` in `OpenIPC/firmware` `latest` are
+u-boot-ingenic's, which cameras run.
+
+```sh
+gh workflow run build-ingenic.yml -f release=true
 ```
 
 ## Adding a SoC family
