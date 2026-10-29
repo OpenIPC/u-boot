@@ -32,7 +32,7 @@ family — not bootloader sources.
 | `openipc-fullhan` | U-Boot for Fullhan FH8632, FH885x V100, FH8626V100, FH885xV200, FH865x |
 | `openipc-grainmedia` | U-Boot for Grain Media GM8135S, GM8136, GM8136S |
 | `openipc-sigmastar` | U-Boot for SigmaStar MSC313E, MSC316DC, MSC316DM |
-| `openipc-ingenic` | U-Boot for Ingenic T10, T20, T21, T23, T30, T31 |
+| `openipc-ingenic` | U-Boot for Ingenic T10, T20, T21, T23, T30, T31, T40 |
 | `main` | Fork of upstream mainline U-Boot, kept for rebasing |
 
 New families are added here as they are ported, each with its own
@@ -399,17 +399,18 @@ Images land in `output/` as `u-boot-<soc>-nor.bin`.
 
 ## ingenic
 
-U-Boot for Ingenic's XBurst camera SoCs, on the same mainline release
-(v2022.10) and with the same OpenIPC boot layer as `openipc-hisilicon`,
+U-Boot for Ingenic's XBurst and XBurst2 camera SoCs, on the same
+mainline release (v2022.10) and with the same OpenIPC boot layer as `openipc-hisilicon`,
 ported from [OpenIPC/u-boot-ingenic](https://github.com/OpenIPC/u-boot-ingenic)
 (the vendor U-Boot 2013.07), whose target names it keeps.
 
 **NOR:** `t10`, `t10l`, `t20`, `t20l`, `t20x`, `t21n`, `t23n`, `t23zn`,
 `t23x`, `t30n`, `t30l`, `t30x`, `t30a`, `t30a1`, `t31n`, `t31l`, `t31x`,
-`t31a`, `t31al`, `t31lc`
+`t31a`, `t31al`, `t31lc`, `t40n`, `t40xp`, `t40a`
 
 The suffix is the package: `l` lite (lower clocks), `x` and `a`/`a1`/`al`
-128 MiB of DDR, `lc` the T31LC; `t23zn` and `t23x` are new here.
+128 MiB of DDR, `lc` the T31LC; `t23zn` and `t23x` are new here. The T40 images
+were `u-boot-t40*-universal.bin` from OpenIPC/u-boot-t40.
 
 The boot ROM loads the SPL from the start of the flash into the cache;
 the SPL, built from the vendor's source, brings up the PLLs and the DDR

@@ -78,6 +78,9 @@ jobs:
           - { soc: t31a, files: "output/u-boot-t31a-nor.bin" }
           - { soc: t31al, files: "output/u-boot-t31al-nor.bin" }
           - { soc: t31lc, files: "output/u-boot-t31lc-nor.bin" }
+          - { soc: t40n, files: "output/u-boot-t40n-nor.bin" }
+          - { soc: t40xp, files: "output/u-boot-t40xp-nor.bin" }
+          - { soc: t40a, files: "output/u-boot-t40a-nor.bin" }
 
     steps:
       - name: Checkout

@@ -49,8 +49,8 @@ own branch:
   binaries. CI: `build-sigmastar.yml`, called from that branch's
   `ci.yml`. Its own `CLAUDE.md` covers the boot chain, the image layout
   and the kernel hand-off.
-- `openipc-ingenic`: U-Boot for Ingenic T10/T20/T21/T23/T30/T31 (XBurst,
-  MIPS), on the same mainline release with the same OpenIPC layer, plus
+- `openipc-ingenic`: U-Boot for Ingenic T10/T20/T21/T23/T30/T31 (XBurst) and
+  T40 (XBurst2), MIPS, on the same mainline release with the same OpenIPC layer, plus
   the vendor SPL built from source in the tree. CI: `build-ingenic.yml`,
   called from that branch's `ci.yml`. Its own `CLAUDE.md` covers the
   SPL, the DDR tables and the vendor quirks.
