@@ -113,4 +113,4 @@ obj-$(CONFIG_SCP03) += scp03.o
 
 obj-$(CONFIG_QFW) += qfw.o
 
-obj-$(CONFIG_OPENIPC) += openipc.o
+obj-$(CONFIG_$(SPL_TPL_)OPENIPC) += openipc.o
