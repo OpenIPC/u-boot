@@ -430,6 +430,14 @@ config JZ47XX_MMC
 	help
 	  This selects support for the SD Card Controller on Ingenic JZ47xx SoCs.
 
+config JZ_MMC
+	bool "Ingenic T-series SD/MMC (MSC) controller"
+	depends on ARCH_INGENIC && MMC && !DM_MMC
+	help
+	  Legacy (non-DM) driver for the MSC SD/MMC controller of the Ingenic
+	  T10/T20/T21/T23/T30/T31 SoCs, ported from the Ingenic SDK U-Boot.
+	  The board registers it from board_mmc_init() via jz_mmc_init().
+
 config MMC_SANDBOX
 	bool "Sandbox MMC support"
 	depends on SANDBOX
