@@ -3,6 +3,14 @@ menuconfig MTD_RAW_NAND
 	bool "Raw NAND Device Support"
 if MTD_RAW_NAND
 
+config JZ_SFC_NAND
+	bool "Ingenic T40 SPI NAND on the SFC"
+	depends on ARCH_INGENIC && T40
+	select SYS_NAND_SELF_INIT
+	help
+	  The SPI NAND the Ingenic T40 boots from on its SFC, driven as the
+	  vendor U-Boot drives it, as nand0.
+
 config SYS_NAND_SELF_INIT
 	bool
 	help
