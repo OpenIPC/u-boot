@@ -63,6 +63,18 @@ int misc_init_r(void)
 	return ret;
 }
 
+/*
+ * U-Boot relocates to the top of the loader's region for it, not of the
+ * DDR, as the vendor U-Boot does (its ram_size is that region). On the
+ * NT98566 the top of the DDR is past 64 MiB, and there the MAC's DMA
+ * never took a Tx descriptor (OpenIPC/u-boot#95). On the NT98562 it
+ * also keeps clear of /nvt_memory_cfg/core2entry2, just above.
+ */
+ulong board_get_usable_ram_top(ulong total_size)
+{
+	return NVT_UBOOT_BASE + NVT_UBOOT_SIZE;
+}
+
 /* What Linux gets of the DDR (mem=); the vendor media modules get the rest */
 static ulong nvt_osmem(void)
 {

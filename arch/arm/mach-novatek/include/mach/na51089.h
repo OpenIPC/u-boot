@@ -57,5 +57,8 @@
 #define NVT_SHMINFO		(NVT_DDR_BASE + 0x00200000)
 #define NVT_SHM_LD_NVT		0x00		/* "LD_NVT" */
 #define NVT_SHM_FDT_ADDR	0x2C
+/* /nvt_memory_cfg/uboot: where U-Boot is loaded, and where it stays */
+#define NVT_UBOOT_BASE		(NVT_DDR_BASE + 0x03900000)
+#define NVT_UBOOT_SIZE		0x006C0000
 
 #endif
