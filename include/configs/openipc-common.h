@@ -96,10 +96,13 @@
 	"bootflash=run fwrecovery; setenv setargs setenv bootargs ${bootargs}; run setargs; run loadkernel; bootm ${baseaddr}; reset\0"
 
 /*
- * The flash's MTD name in the vendor kernels: the SPI device under 4.9's
- * spi-nor, the m25p80 platform data's name under 3.0.8
+ * The flash's MTD name in the kernels OpenIPC boots: the SPI device under
+ * 4.9's spi-nor, the m25p80 platform data's name under 3.0.8. FH8626V100
+ * runs 4.9 (OpenIPC/linux fullhan-fh8852v200), whatever the vendor's
+ * 3.0.8 SDK for it used.
  */
-#if defined(CONFIG_FULLHAN_V200) || defined(CONFIG_FULLHAN_865X)
+#if defined(CONFIG_FULLHAN_V200) || defined(CONFIG_FULLHAN_865X) || \
+	defined(CONFIG_FULLHAN_8626)
 #define SFC "spi0.0"
 #else
 #define SFC "spi_flash"

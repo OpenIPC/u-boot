@@ -130,6 +130,23 @@ static ulong kernel_image_size(void *buf) {
   return 0;
 }
 
+#ifdef SFC
+/*
+ * FH8626V100 U-Boots before this one defaulted mtdids to the 3.0.8 kernels'
+ * "spi_flash", but OpenIPC boots FH8626V100 on 4.9, where the flash is
+ * "spi0.0": with the old name saved, the kernel ignores mtdparts and cannot
+ * mount its root. Only that exact value is replaced.
+ */
+static int stale_mtdids(const char *ids)
+{
+#ifdef CONFIG_FULLHAN_8626
+  return !strcmp(ids, "spi_flash");
+#else
+  return 0;
+#endif
+}
+#endif
+
 static int scan_spi_device(struct spi_flash *flash, ulong *kernel_off, ulong *rootfs_off, uint64_t *kernel_size,
                            uint64_t *rootfs_size) {
   u8 *buf;
@@ -842,8 +859,10 @@ int firmware_scan(void) {
     sprintf(str, "0x%lx", root_slot);
     env_set("rootsize", str);
 #ifdef SFC
-    if (!mtdids || !*mtdids)
+    if (!mtdids || !*mtdids || stale_mtdids(mtdids)) {
       mtdids = SFC;
+      env_set("mtdids", mtdids);
+    }
 #endif
     /* U-Boot's own idea of the flash; the kernel is not told. */
     sprintf(mtds, "%dk(u-boot),%dk(env),-(firmware)",
@@ -889,8 +908,10 @@ int firmware_scan(void) {
      * build drives, as its own default environment does.
      */
 #ifdef SFC
-    if (!mtdids || !*mtdids)
+    if (!mtdids || !*mtdids || stale_mtdids(mtdids)) {
       mtdids = SFC;
+      env_set("mtdids", mtdids);
+    }
 #endif
     sprintf(mtds, "%dk(u-boot),%dk(env),%lldk(kernel),%lldk(rootfs),%lldk@0x%lx(firmware),-(rootfs_data)",
             CONFIG_ENV_OFFSET / 1024, CONFIG_ENV_SIZE / 1024, kernel_size / 1024, rootfs_size / 1024,
