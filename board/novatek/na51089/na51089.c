@@ -21,8 +21,136 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
+/*
+ * The rest of the vendor U-Boot's board set-up (nvt-na51089/
+ * na51089_hw_init.c: nvt_ivot_hw_init_early(), nvt_ivot_hw_init()), in
+ * its order. Its PHY reset on D_GPIO(1) is left out: that pin is its
+ * EVB's (nvt-na51089-evb.h), not every board's.
+ */
+#define CG_SYSCLK		(NVT_CG_BASE + 0x10)
+#define SYSCLK_CPU		(3 << 0)	/* 80 MHz, PLL8, 480 MHz */
+#define SYSCLK_CPU_80		0
+#define SYSCLK_CPU_PLL8		1
+#define SYSCLK_CPU_480		2
+#define SYSCLK_APB		(3 << 8)	/* 48, 60, 80, 120 MHz */
+#define CG_PLL_EN		(NVT_CG_BASE + 0x00)
+#define CG_PLL_STAT		(NVT_CG_BASE + 0x04)
+#define CG_PLL8			BIT(8)		/* the CPU's PLL */
+#define CG_CLK_SWITCH		(NVT_CG_BASE + 0xA0)
+#define CG_CLKEN_70		(NVT_CG_BASE + 0x70)
+#define CG_PLL8_RATIO(n)	(NVT_CG_BASE + 0x4420 + 4 * (n))
+#define OTP_TIMING		0xF0660010
+
+/* Wait for (reg & mask) != 0; the vendor waits for ever */
+static void nvt_wait_set(ulong reg, u32 mask)
+{
+	int i;
+
+	for (i = 0; i < 100000 && !(readl(reg) & mask); i++)
+		udelay(1);
+}
+
+/* A new CPU clock source takes effect through this handshake */
+static void nvt_cpu_clk_sel(u32 sel)
+{
+	clrsetbits_le32(CG_SYSCLK, SYSCLK_CPU, sel);
+	writel(0x34, CG_CLK_SWITCH);
+	nvt_wait_set(CG_CLK_SWITCH, BIT(3));
+	writel(0x28, CG_CLK_SWITCH);
+}
+
+/* The vendor's nvt_cpu_freq: 80, 480, or anything else as 960 MHz */
+static void nvt_set_cpu_mhz(u32 mhz)
+{
+	u32 sel = readl(CG_SYSCLK) & SYSCLK_CPU;
+
+	if (mhz == 80 || mhz == 480) {
+		u32 want = mhz == 80 ? SYSCLK_CPU_80 : SYSCLK_CPU_480;
+
+		if (sel == want)
+			return;
+		nvt_cpu_clk_sel(want);
+		clrbits_le32(CG_PLL_EN, CG_PLL8);
+		return;
+	}
+	if (sel != SYSCLK_CPU_PLL8) {
+		if (!(readl(CG_PLL_EN) & CG_PLL8)) {
+			setbits_le32(CG_PLL_EN, CG_PLL8);
+			nvt_wait_set(CG_PLL_STAT, CG_PLL8);
+		}
+		nvt_cpu_clk_sel(SYSCLK_CPU_PLL8);
+	}
+	/* 960 MHz: 12 MHz * 0xA00000 / 2^17 */
+	writel(0x00, CG_PLL8_RATIO(0));
+	writel(0x00, CG_PLL8_RATIO(1));
+	writel(0xA0, CG_PLL8_RATIO(2));
+}
+
+/* The vendor's nvt_apb_freq: 48, 60, 120, or anything else as 80 MHz */
+static void nvt_set_apb_mhz(u32 mhz)
+{
+	u32 sel = mhz == 48 ? 0 : mhz == 60 ? 1 : mhz == 120 ? 3 : 2;
+
+	clrsetbits_le32(CG_SYSCLK, SYSCLK_APB, sel << 8);
+}
+
+/* The clocks the loader's device tree asks for: /cpus/cpu@0 */
+static void nvt_set_clocks(void)
+{
+	const void *shm = (const void *)NVT_SHMINFO;
+	const void *fdt;
+	const fdt32_t *val;
+	int node;
+
+	if (memcmp(shm + NVT_SHM_LD_NVT, "LD_NVT", 6))
+		return;
+	fdt = (const void *)readl(shm + NVT_SHM_FDT_ADDR);
+	if (fdt_check_header(fdt))
+		return;
+	node = fdt_first_subnode(fdt, fdt_path_offset(fdt, "/cpus"));
+	if (node < 0)
+		return;
+	val = fdt_getprop(fdt, node, "clock-frequency", NULL);
+	if (val)
+		nvt_set_cpu_mhz(fdt32_to_cpu(*val) / 1000000);
+	/* Sic, as the vendor spells it */
+	val = fdt_getprop(fdt, node, "apb-frequenccy", NULL);
+	if (val)
+		nvt_set_apb_mhz(fdt32_to_cpu(*val) / 1000000);
+}
+
 int board_init(void)
 {
+	/* The eFuse controller's timing for the APB clock it runs at */
+	static const u32 otp_timing[4] = {
+		0x692618, 0x8B3026, 0xAF4032, 0xFF6050,
+	};
+
+	/* nvt_ivot_hw_init_early() */
+	writel(otp_timing[(readl(CG_SYSCLK) >> 8) & 3], OTP_TIMING);
+	clrbits_le32(CG_CLKEN_70, BIT(16));
+
+	/* nvt_ivot_hw_init() */
+	nvt_set_clocks();
+	/* AXI bridge timeouts */
+	writel(0x7c, 0xF0012018);
+	writel(0x7c, 0xF0013018);
+	/* The USB PHY, by the chip's revision, then powered down */
+	if (readl(NVT_TOP_CHIP_ID) == 0x50210000) {
+		setbits_le32(0xFF600400, BIT(21));
+		setbits_le32(0xFF6001C8, BIT(31));
+	} else {
+		setbits_le32(0xF0600310, BIT(1));
+		setbits_le32(0xF06001C8, BIT(5));
+	}
+	writel(0xFF, 0xF06010D0);
+	writel(0x34, 0xF06010D4);
+	writel(0x14, 0xF0601008);
+	writel(0x88, 0xF0601000);
+	writel(0x35, 0xF0601030);
+	writel(0xFF, 0xF060102C);
+	writel(0x20, 0xF0601028);
+	writel(0x93, 0xF0601024);
 	return 0;
 }
 
@@ -165,7 +293,6 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 #define SRAM_SD_ETH		BIT(18)
 #define PAD_DRV_P		(NVT_PAD_BASE + 0x50)
 #define PAD_DRV_DSI		(NVT_PAD_BASE + 0x98)
-#define CG_PLL_EN		(NVT_CG_BASE + 0x00)
 #define CG_PLL6			BIT(6)
 #define CG_CLKEN2		(NVT_CG_BASE + 0x78)
 #define CG_ETH_PHY_CLK		BIT(24)
