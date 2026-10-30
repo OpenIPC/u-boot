@@ -41,13 +41,17 @@ DECLARE_GLOBAL_DATA_PTR;
 #define CG_PLL8_RATIO(n)	(NVT_CG_BASE + 0x4420 + 4 * (n))
 #define OTP_TIMING		0xF0660010
 
-/* Wait for (reg & mask) != 0; the vendor waits for ever */
-static void nvt_wait_set(ulong reg, u32 mask)
+/* Wait 100 ms for (reg & mask) != 0; the vendor waits for ever */
+static int nvt_wait_set(ulong reg, u32 mask)
 {
 	int i;
 
-	for (i = 0; i < 100000 && !(readl(reg) & mask); i++)
+	for (i = 0; i < 100000; i++) {
+		if (readl(reg) & mask)
+			return 0;
 		udelay(1);
+	}
+	return -ETIMEDOUT;
 }
 
 /* A new CPU clock source takes effect through this handshake */
@@ -55,7 +59,8 @@ static void nvt_cpu_clk_sel(u32 sel)
 {
 	clrsetbits_le32(CG_SYSCLK, SYSCLK_CPU, sel);
 	writel(0x34, CG_CLK_SWITCH);
-	nvt_wait_set(CG_CLK_SWITCH, BIT(3));
+	if (nvt_wait_set(CG_CLK_SWITCH, BIT(3)))
+		printf("CPU clock switch not acknowledged\n");
 	writel(0x28, CG_CLK_SWITCH);
 }
 
@@ -74,9 +79,11 @@ static void nvt_set_cpu_mhz(u32 mhz)
 		return;
 	}
 	if (sel != SYSCLK_CPU_PLL8) {
-		if (!(readl(CG_PLL_EN) & CG_PLL8)) {
-			setbits_le32(CG_PLL_EN, CG_PLL8);
-			nvt_wait_set(CG_PLL_STAT, CG_PLL8);
+		setbits_le32(CG_PLL_EN, CG_PLL8);
+		/* Not onto a PLL that has not locked: stay where it is */
+		if (nvt_wait_set(CG_PLL_STAT, CG_PLL8)) {
+			printf("CPU PLL8 not locked, clock left as is\n");
+			return;
 		}
 		nvt_cpu_clk_sel(SYSCLK_CPU_PLL8);
 	}
@@ -86,12 +93,26 @@ static void nvt_set_cpu_mhz(u32 mhz)
 	writel(0xA0, CG_PLL8_RATIO(2));
 }
 
-/* The vendor's nvt_apb_freq: 48, 60, 120, or anything else as 80 MHz */
+/* The eFuse controller's timing for the APB clock it runs at */
+static void nvt_otp_timing(void)
+{
+	static const u32 timing[4] = {		/* 48, 60, 80, 120 MHz */
+		0x692618, 0x8B3026, 0xAF4032, 0xFF6050,
+	};
+
+	writel(timing[(readl(CG_SYSCLK) & SYSCLK_APB) >> 8], OTP_TIMING);
+}
+
+/*
+ * The vendor's nvt_apb_freq: 48, 60, 120, or anything else as 80 MHz.
+ * The eFuse timing follows, which the vendor leaves at the old clock's.
+ */
 static void nvt_set_apb_mhz(u32 mhz)
 {
 	u32 sel = mhz == 48 ? 0 : mhz == 60 ? 1 : mhz == 120 ? 3 : 2;
 
 	clrsetbits_le32(CG_SYSCLK, SYSCLK_APB, sel << 8);
+	nvt_otp_timing();
 }
 
 /* The clocks the loader's device tree asks for: /cpus/cpu@0 */
@@ -121,13 +142,8 @@ static void nvt_set_clocks(void)
 
 int board_init(void)
 {
-	/* The eFuse controller's timing for the APB clock it runs at */
-	static const u32 otp_timing[4] = {
-		0x692618, 0x8B3026, 0xAF4032, 0xFF6050,
-	};
-
 	/* nvt_ivot_hw_init_early() */
-	writel(otp_timing[(readl(CG_SYSCLK) >> 8) & 3], OTP_TIMING);
+	nvt_otp_timing();
 	clrbits_le32(CG_CLKEN_70, BIT(16));
 
 	/* nvt_ivot_hw_init() */
