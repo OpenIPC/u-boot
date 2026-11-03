@@ -1,0 +1,49 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * NT98522: the NA51055 die with 64 MiB of DDR in the package (the
+ * loader's table: 512 Mbit), no SDK board. The NT98523's tree with the
+ * NT98562's split: Linux 32 MiB, its CMA at its top, the media pool the
+ * rest.
+ */
+/dts-v1/;
+
+/include/ "na51055.dtsi"
+
+/ {
+	top@f0010000 {
+		i2c {
+			pinmux = <0x51>;
+		};
+	};
+
+	nvt_memory_cfg {
+		dram {
+			reg = <0x00 0x4000000>;
+		};
+
+		core2entry2 {
+			reg = <0x3fc0000 0x40000>;
+		};
+	};
+
+	memory {
+		reg = <0x00 0x2000000>;
+	};
+
+	reserved-memory {
+		cma0@0x05000000 {
+			reg = <0x1c00000 0x400000>;
+		};
+	};
+
+	hdal-memory {
+		media {
+			reg = <0x2000000 0x2000000>;
+		};
+	};
+
+	nvt_info {
+		BIN_NAME = "FW98522A";
+		BIN_NAME_T = "FW98522T";
+	};
+};

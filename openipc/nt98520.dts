@@ -1,0 +1,22 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * NT98520: the NA51055 die with one external DDR3 die (the loader's
+ * table has no second), 512 MiB as the loader is built; otherwise the
+ * NT98525's tree.
+ */
+/dts-v1/;
+
+/include/ "na51055.dtsi"
+
+/ {
+	hdal-memory {
+		media {
+			reg = <0x12800000 0xd800000>;
+		};
+	};
+
+	nvt_info {
+		BIN_NAME = "FW98520A";
+		BIN_NAME_T = "FW98520T";
+	};
+};

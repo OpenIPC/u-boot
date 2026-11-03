@@ -13,10 +13,8 @@
 /* The DDR in the package, or on the board */
 #define PHYS_SDRAM_1_SIZE		CONFIG_NVT_DDR_SIZE
 
-/* Linux's share of a 512 MiB part, as on the SDK's boards (mem=) */
-#if CONFIG_NVT_DDR_SIZE >= 0x20000000
-#define OPENIPC_OSMEM			"256M"
-#endif
+/* Linux's share of the DDR by default (mem=) */
+#define OPENIPC_OSMEM			CONFIG_NVT_OSMEM
 
 /* The loader starts U-Boot at its link address */
 #define CONFIG_SYS_UBOOT_BASE		CONFIG_SYS_TEXT_BASE

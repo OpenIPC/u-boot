@@ -26,8 +26,8 @@
 /*
  * Kernel memory (mem=): the rest of the DDR is the media pool, which
  * ft_board_setup() hands to the vendor modules (/hdal-memory/media).
- * What OpenIPC's install guide sets on the vendor U-Boot; a part with
- * more DDR than the 128 MiB packages gives Linux what its SDK board does.
+ * What OpenIPC's install guide sets on the vendor U-Boot, unless the
+ * target says otherwise (NVT_OSMEM).
  */
 #ifndef OPENIPC_OSMEM
 #define OPENIPC_OSMEM		"32M"

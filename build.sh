@@ -20,7 +20,6 @@ if [ -z "${LOADER_CROSS_COMPILE}" ]; then
 fi
 
 BOOT_SRCDIR=$(pwd)
-LOADER_SRCDIR=${BOOT_SRCDIR}/board/novatek/na51089/loader
 
 mkdir -p output
 
@@ -33,33 +32,33 @@ mkconfig() {
     cat "$@" > "${builddir}/.config"
 }
 
-# The SDK's loader, built in a copy: its make system writes into its tree
+# The SDK's loader of a die (board/novatek/<die>/loader), built in a copy:
+# its make system writes into its tree. The rest are its make variables
+# (CHIP=, DRAM1_CLK=, ...).
 build_loader() {
     loaderdir=$1
-    chip=$2
-    dram_clk=$3
-    dram_size=$4
+    die=$2
+    shift 2
 
     rm -rf "${loaderdir}"
-    cp -a "${LOADER_SRCDIR}" "${loaderdir}"
+    cp -a "${BOOT_SRCDIR}/board/novatek/${die}/loader" "${loaderdir}"
     if ! make -C "${loaderdir}/MakeCommon" release \
-            CROSS_COMPILE="${LOADER_CROSS_COMPILE}" \
-            CHIP="${chip}" DRAM1_CLK="${dram_clk}" \
-            ${dram_size:+SDRAM_SIZE="${dram_size}"} \
+            CROSS_COMPILE="${LOADER_CROSS_COMPILE}" "$@" \
             >"${loaderdir}.log" 2>&1 </dev/null; then
         tail -n 30 "${loaderdir}.log" >&2
         return 1
     fi
 }
 
-# Novatek NA51089: the mask ROM starts the loader, which trains the DDR,
-# reads the device tree at 0x10000 and unpacks U-Boot from 0x20000 to its
-# link address.
+# Novatek NA51089, NA51055 / NA51084: the mask ROM starts the loader,
+# which trains the DDR, reads the device tree at 0x10000 and unpacks
+# U-Boot from 0x20000 to its link address.
+#   build_nvt <soc> <loader die> <chip> [loader make variables...]
 build_nvt() {
     soc=$1
-    chip=$2
-    dram_clk=$3
-    dram_size=$4
+    die=$2
+    chip=$3
+    shift 3
     builddir=${BOOT_SRCDIR}/output/build-${soc}-nor
     loaderdir=${BOOT_SRCDIR}/output/build-${soc}-loader
     loader=${loaderdir}/Project/Model/Loader${chip}_Data/Release/LD98${chip}A.bin
@@ -73,8 +72,7 @@ build_nvt() {
 
     "${builddir}/scripts/dtc/dtc" -q -I dts -O dtb \
         -o "${builddir}/${soc}.dtb" "openipc/${soc}.dts" || return 1
-    build_loader "${loaderdir}" "${chip}" "${dram_clk}" "${dram_size}" ||
-        return 1
+    build_loader "${loaderdir}" "${die}" CHIP="${chip}" "$@" || return 1
 
     text=$(sed -n 's/^CONFIG_SYS_TEXT_BASE=//p' "${builddir}/.config")
     python3 openipc/nvt-image.py "${loader}" "${builddir}/${soc}.dtb" \
@@ -94,20 +92,51 @@ build_soc() {
         # is ConfigRam/560/51089A_DRAM1_<clock>_<size in Mbit>.ini, the
         # SDK's 933 MHz, 4 Gbit.
         nt98560)
-            build_nvt "${soc}" 560 933 4096 ;;
+            build_nvt "${soc}" na51089 560 DRAM1_CLK=933 SDRAM_SIZE=4096 ;;
         nt98561)
-            build_nvt "${soc}" 561 522 ;;
+            build_nvt "${soc}" na51089 561 DRAM1_CLK=522 ;;
         nt98562)
-            build_nvt "${soc}" 562 666 ;;
+            build_nvt "${soc}" na51089 562 DRAM1_CLK=666 ;;
         nt98566)
-            build_nvt "${soc}" 566 933 ;;
+            build_nvt "${soc}" na51089 566 DRAM1_CLK=933 ;;
+        # The NT9852x loader (MakeConfig.txt's tables). The NT98522 and
+        # NT98523 have their DDR1 in the package (512 Mbit, 1 Gbit, at
+        # 933 MHz), and no DDR2 here: the SDK board's external one is not
+        # every board's. The others' DDR is on the board: the SDK
+        # boards' 4 Gbit dies, DDR3 at 933 MHz (NT98520: DDR1 only;
+        # NT98525: DDR1 and DDR2) or 1066 MHz (NT98528/529, the 528 model).
+        # The 528 model's loader fills its 64 KiB with the LZMA decoder
+        # only without its own SD card update (FW98528A.bin from a card);
+        # U-Boot's recovery from SD is OpenIPC's.
+        nt98520)
+            build_nvt "${soc}" na51055 520 DRAM1_CLK=933 SDRAM_SIZE=4096 ;;
+        nt98522|nt98523)
+            build_nvt "${soc}" na51055 "${soc#nt98}" DRAM2_CLK=0 \
+                SDRAM2_SIZE=0 ;;
+        nt98525)
+            build_nvt "${soc}" na51055 525 DRAM1_CLK=933 SDRAM_SIZE=4096 \
+                DRAM2_CLK=933 SDRAM2_SIZE=4096 ;;
+        nt98528|nt98529)
+            # A Linux toolchain's build of the 528 flow stops after the
+            # DDR training (arm-linux-gnueabi 12/13 under qemu-hisilicon's
+            # nt98528); a bare-metal one's (arm-none-eabi 13.2, the SDK's
+            # Linaro 6.4 arm-eabi) boots.
+            case "${LOADER_CROSS_COMPILE}" in
+                *-linux-*)
+                    echo "${soc}: its loader needs a bare-metal toolchain" \
+                        "(arm-none-eabi-), not ${LOADER_CROSS_COMPILE}" >&2
+                    return 1 ;;
+            esac
+            build_nvt "${soc}" na51055 "${soc#nt98}" MODEL=EMU_EVB_528 \
+                DRAM1_CLK=1066 SDRAM_SIZE=4096 DRAM2_CLK=1066 \
+                SDRAM2_SIZE=4096 STORAGEEXT=NONE ;;
         *)
             echo "unsupported SoC: ${soc}" >&2
             return 1 ;;
     esac
 }
 
-ALL_SOCS="nt98560 nt98561 nt98562 nt98566"
+ALL_SOCS="nt98560 nt98561 nt98562 nt98566 nt98520 nt98522 nt98523 nt98525 nt98528 nt98529"
 
 SOCS="$@"
 [ -z "${SOCS}" ] && SOCS="${ALL_SOCS}"

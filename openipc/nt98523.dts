@@ -1,0 +1,53 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * NT98523: the NA51055 die with 128 MiB of DDR in the package, as the
+ * SDK's cfg_IPCAM1_523_NOR_EVB: Linux the first 64 MiB, its CMA at
+ * 48 MiB. That board also has an external DDR2 die; the loader here is
+ * built without one, so the media pool is the rest of the package's.
+ */
+/dts-v1/;
+
+/include/ "na51055.dtsi"
+
+/ {
+	top@f0010000 {
+		i2c {
+			pinmux = <0x51>;
+		};
+	};
+
+	nvt_memory_cfg {
+		dram {
+			reg = <0x00 0x8000000>;
+		};
+
+		core2entry2 {
+			reg = <0x7fc0000 0x40000>;
+		};
+	};
+
+	memory {
+		reg = <0x00 0x4000000>;
+	};
+
+	reserved-memory {
+		cma0@0x05000000 {
+			reg = <0x3000000 0x400000>;
+		};
+	};
+
+	hdal-memory {
+		media {
+			reg = <0x4000000 0x4000000>;
+		};
+	};
+
+	hdal-maxpath-cfg {
+		vdoenc_maxpath = <0x08>;
+	};
+
+	nvt_info {
+		BIN_NAME = "FW98523A";
+		BIN_NAME_T = "FW98523T";
+	};
+};
