@@ -67,6 +67,22 @@ config TARGET_NT98529
 	help
 	  NA51084 as the NT98528, its CPU cleared for 1.2 GHz.
 
+config TARGET_NT98332
+	bool "NT98332 (NA51103)"
+	select NVT_NA51103
+	help
+	  NA51103, the NVR die with two Cortex-A53s, 1 GiB of DDR on the
+	  boards. U-Boot runs in AArch64 at EL2, started by the board's
+	  BL31.
+
+config TARGET_NT98633
+	bool "NT98633 (NA51090)"
+	select NVT_NA51090
+	help
+	  NA51090, the NVR die with four Cortex-A53s, 2 GiB of DDR on the
+	  boards. U-Boot runs in AArch64 at EL2, started by the board's
+	  BL31.
+
 endchoice
 
 config NVT_NA51089
@@ -79,8 +95,25 @@ config NVT_NA51055
 	  NA51089's addresses, two Cortex-A9s, their own loader
 	  (board/novatek/na51055/loader). The chip ID tells them apart.
 
+# The NVR dies: the board's loader warm-resets the A53s into AArch64 and
+# its BL31 (TF-A v2.2) enters U-Boot at EL2 with a fixed SPSR (0x3C9), so
+# U-Boot is an AArch64 one.
+config NVT_NA511XX
+	bool
+	select ARM64
+
+config NVT_NA51103
+	bool
+	select NVT_NA511XX
+
+config NVT_NA51090
+	bool
+	select NVT_NA511XX
+
 config NVT_DDR_SIZE
 	hex
+	default 0x80000000 if TARGET_NT98633
+	default 0x40000000 if TARGET_NT98332
 	default 0x20000000 if TARGET_NT98560
 	default 0x08000000 if TARGET_NT98566
 	default 0x20000000 if TARGET_NT98520 || TARGET_NT98525
@@ -94,6 +127,8 @@ config NVT_DDR_SIZE
 
 config NVT_OSMEM
 	string
+	default "0x57600000" if NVT_NA51090
+	default "0x15e00000" if NVT_NA51103
 	default "256M" if NVT_DDR_SIZE >= 0x20000000
 	default "64M" if TARGET_NT98523
 	default "32M"
@@ -102,7 +137,8 @@ config NVT_OSMEM
 	  media modules get the rest. 32M is what OpenIPC's install guide
 	  sets on the NT98562/566's vendor U-Boot; larger parts give Linux
 	  what their SDK board does (the NT98523's tree keeps its CMA at
-	  48 MiB).
+	  48 MiB), the NVRs what their firmware sets (Xiongmai's NT98332
+	  NVR 0x15e00000, the NT98633 NVR's tree 0x57600000).
 
 config SYS_SOC
 	default "novatek"
@@ -111,6 +147,7 @@ config SYS_VENDOR
 	default "novatek"
 
 config SYS_BOARD
+	default "na511xx" if NVT_NA511XX
 	default "na51089"
 
 config SYS_CONFIG_NAME

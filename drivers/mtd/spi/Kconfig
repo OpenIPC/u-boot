@@ -37,12 +37,12 @@ config SPI_FLASH
 	  If unsure, say N
 
 config NVT_SFLASH
-	bool "Novatek NA51089 SPI NOR"
+	bool "Novatek SPI NOR (NA51089, NT9852x, NA51103, NA51090)"
 	depends on ARCH_NOVATEK && !SPI_FLASH && !DM_SPI_FLASH
 	help
-	  The SPI NOR the Novatek NA51089 boots from, on its flash
-	  controller. The driver provides spi_flash_probe() directly,
-	  without the SPI and spi-nor layers.
+	  The SPI NOR the Novatek camera dies and the NA51103 boot from, on
+	  their flash controller (NA51090's too). The driver provides
+	  spi_flash_probe() directly, without the SPI and spi-nor layers.
 
 config SF_DEFAULT_BUS
 	int "SPI Flash default bus identifier"

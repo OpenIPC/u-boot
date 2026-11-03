@@ -1,0 +1,206 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * NT98633 (NA51090) NVR: the part of the board's device tree U-Boot
+ * reads, after the N2032-8HDD NVR (FW98633A). Not flashed to boards:
+ * there the board's own tree stays at 0x40000 (partition_fdt), and the
+ * vendor kernels need all of it. This one is for the emulator's stand-in
+ * loader (qemu-hisilicon nt98633 with -smp 4), which reads the tree from
+ * NAND block 2 (0x40000) and unpacks U-Boot from partition_uboot: CI's
+ * smoke test.
+ */
+
+/dts-v1/;
+
+/ {
+	model = "Novatek NA51090";
+	compatible = "novatek,na51090";
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	cpus {
+		#address-cells = <2>;
+		#size-cells = <0>;
+
+		cpu@0 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53", "arm,armv8";
+			reg = <0x0 0x0>;
+			enable-method = "psci";
+		};
+
+		cpu@1 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53", "arm,armv8";
+			reg = <0x0 0x1>;
+			enable-method = "psci";
+		};
+
+		cpu@2 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53", "arm,armv8";
+			reg = <0x0 0x2>;
+			enable-method = "psci";
+		};
+
+		cpu@3 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53", "arm,armv8";
+			reg = <0x0 0x3>;
+			enable-method = "psci";
+		};
+	};
+
+	psci {
+		compatible = "arm,psci-1.0";
+		method = "smc";
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x0 0x0 0x0 0x57600000>;
+	};
+
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		atf@0x01F00000 {
+			reg = <0x0 0x1f00000 0x0 0x100000>;
+			no-map;
+		};
+	};
+
+	hdal-memory {
+		#address-cells = <4>;
+		#size-cells = <2>;
+
+		media {
+			reg = <0x0 0x0 0x0 0x57600000 0x0 0x28a00000>;
+		};
+	};
+
+	nvt_memory_cfg {
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		dram {
+			reg = <0x00000000 0x80000000>;
+		};
+
+		fdt {
+			reg = <0x00100000 0x00100000>;
+		};
+
+		loader {
+			reg = <0x00200000 0x00800000>;
+		};
+
+		shmem {
+			reg = <0x00a00000 0x00100000>;
+		};
+
+		atf {
+			reg = <0x01f00000 0x00100000>;
+		};
+
+		linuxtmp {
+			reg = <0x02000000 0x3c000000>;
+		};
+
+		uboot {
+			reg = <0x3e000000 0x02000000>;
+		};
+	};
+
+	uart@2,f0280000 {
+		compatible = "ns16550a";
+		reg = <0x2 0xf0280000 0x0 0x1000>;
+		reg-shift = <2>;
+		reg-io-width = <4>;
+		clock-frequency = <48000000>;
+	};
+
+	top@f0010000 {
+		compatible = "nvt,nvt_top";
+		reg = <0x2 0xf0010000 0x0 0x2000>;
+
+		spi {
+			pinmux = <0x11>;
+		};
+
+		eth {
+			pinmux = <0x502501>;
+		};
+	};
+
+	eth0@2,f0210000 {
+		compatible = "nvt,synopsys_eth";
+		reg = <0x2 0xf0210000 0x0 0x10000>;
+		sp-clk = <1>;
+		ref-clk-out = <0>;
+	};
+
+	nand@f0180000 {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		compatible = "nvt,nvt_spinand";
+		reg = <0x2 0xf0180000 0x0 0x1000>;
+		clock-frequency = <24000000>;
+		nvt-devname = "spi_nand.0";
+
+		/* The board's boot area; OpenIPC's env and UBI follow */
+		partition_loader {
+			label = "loader";
+			reg = <0x0 0x0 0x0 0x40000>;
+		};
+
+		partition_fdt {
+			label = "fdt";
+			reg = <0x0 0x40000 0x0 0x40000>;
+		};
+
+		partition_atf {
+			label = "atf";
+			reg = <0x0 0x80000 0x0 0x40000>;
+		};
+
+		partition_uboot {
+			label = "uboot";
+			reg = <0x0 0xc0000 0x0 0xe0000>;
+		};
+
+		nvtpack {
+			ver = "NVTPACK_FW_INI_16072017";
+			method = <1>;
+
+			index {
+				id0 {
+					partition_name = "loader";
+					source_file = "";
+				};
+
+				id1 {
+					partition_name = "fdt";
+					source_file = "";
+				};
+
+				id2 {
+					partition_name = "atf";
+					source_file = "";
+				};
+
+				id3 {
+					partition_name = "uboot";
+					source_file = "u-boot.lz.bin";
+				};
+			};
+		};
+	};
+
+	nvt_info {
+		BIN_NAME = "FW98633A";
+		EMBMEM = "EMBMEM_SPINAND";
+		NVT_LINUX_SMP = "NVT_LINUX_SMP_ON";
+	};
+};

@@ -31,8 +31,10 @@ Adding or dropping a SoC needs both branches:
   `openipc/<soc>.dts`, and `TARGET_*` in `arch/arm/mach-novatek/Kconfig`;
 - there: `build-novatek.yml`'s matrices and the README.
 
-The other dies of the SDKs (NA51055, NA51068, NA51090, NA51102, NA51103,
-the NS02xxx parts) are not supported.
+The NVR dies NA51103 (NT98332) and NA51090 (NT98633) are supported as
+AArch64 targets behind the board's own loader and BL31; see "The NVR
+dies" below. The other dies of the SDKs (NA51055, NA51068, NA51102, the
+NS02xxx parts) are not supported.
 
 ## Relationship to mainline
 
@@ -183,6 +185,11 @@ bash build.sh nt98566       # one or more SoCs (CROSS_COMPILE defaults to arm-li
 - U-Boot is ~233 KiB, ~94 KiB packed, in the 128 KiB slot;
   `nvt-image.py` fails the build if a part does not fit. Check the packed
   size after enabling anything.
+- nt98332 and nt98633 are AArch64: `CROSS_COMPILE_A64`, default
+  `aarch64-linux-gnu-` (Debian/Ubuntu `gcc-aarch64-linux-gnu`; CI must
+  install it). Their outputs are `output/u-boot-nt98332-nor.bin` /
+  `u-boot-nt98633-nand.bin` (U-Boot's slot alone) and
+  `u-boot-<soc>-qemu.bin` (the stand-in's boot area, for CI).
 
 ## Verification
 
@@ -220,6 +227,78 @@ it.
   controller's timing, the PHY's power-on order and MDIO clock, the SD
   host's command and FIFO timing.
 - **On silicon:** nothing yet.
+
+## The NVR dies: NT98332 (NA51103), NT98633 (NA51090)
+
+Two (NA51103) or four (NA51090) Cortex-A53s, 1 / 2 GiB, the blocks at
+`0x2_F000_0000` (`arch/arm/mach-novatek/include/mach/na511xx.h`), board
+code in `board/novatek/na511xx/`, `NVT_NA511XX` selects `ARM64`
+(`ARCH_NOVATEK` selects `CPU_V7A` only without it).
+
+**Boot chain, and why only U-Boot is replaced.** Mask ROM (AArch32) ->
+the board's loader (Xiongmai's FW98332A, the NVR's FW98633A; no source
+for these dies in any SDK) -> DDR training -> RMR warm reset of the A53s
+into AArch64 -> the board's BL31 (TF-A v2.2, TZASC over its own
+megabyte at `0x1F00000`) -> U-Boot -> Linux, which brings the other cores
+up through BL31's PSCI. BL31 enters BL33 at the address in its own
+header (written from `/nvt_memory_cfg/uboot`: `0x1E000000` /
+`0x3E000000`) with a fixed SPSR `0x3C9`, AArch64 EL2h: U-Boot is AArch64
+and runs at EL2. The vendor's `_a32` configs are template copies and
+cannot be entered from it. So the OpenIPC image is U-Boot's slot alone;
+the loader, its tree and BL31 stay as the board has them.
+
+| | NT98332 (Xiongmai NBD80N36RA, 16 MiB NOR) | NT98633 (N2032-8HDD, 128 MiB SPI NAND) |
+| --- | --- | --- |
+| loader / tree / BL31 | `0x0` / `0x10000` (`XMFDT32G` + LZMA) / in the loader | `0x0` / `0x40000` / `0x80000` |
+| U-Boot slot | `0x20000`, 128 KiB, bare LZMA (`5D`, 16 MiB dict, end marker) | `0xC0000`, 896 KiB, BCL1 alg 11 (size field = length twice) |
+| environment | `0x40000` (OpenIPC NOR layout from here: kernel `0x50000`, rootfs `0x250000`) | `0x1A0000`, the board's uenv, 2 blocks |
+| then | | UBI `0x1E0000`..end (rootfs UBIFS with `/boot/uImage`) |
+| mtdparts | `spi_nor.0:` OpenIPC NOR list | `spi_nand.0:1664k(boot),256k(env),-(ubi)` |
+
+`openipc/nvt-nvr-image.py` builds the slot (HEADINFO length and
+checksum as for NA51089, `BinFlag` 2); given a dump of the board's
+flash it also writes a copy with the slot in. `${ubwrite}` writes only
+the slot. Installing from the vendor U-Boot: tftp the slot, then
+`sf erase 0x20000 0x20000; sf write <addr> 0x20000 0x20000` (NOR) or
+`nand erase 0xc0000 0xe0000; nand write <addr> 0xc0000 0xe0000` (NAND).
+
+**Peripherals.**
+- Console UART0 `0x2_F028_0000`, 16550, 48 MHz; the architected timer;
+  reset by the watchdog (NA51103 `0x60000`, NA51090 `0x110000`).
+- MMU on (`mem_map` in `soc.c`): with it off every access is a device one
+  and U-Boot's unaligned accesses fault. Caches on, so the drivers' cache
+  maintenance matters.
+- Flash: the NA51089 controller at `0x2_F018_0000`. NOR through
+  `nvt_sflash.c` (per-die clock/pins/PHY; 128-byte FIFO); SPI NAND
+  through `drivers/mtd/nand/raw/nvt_spinand.c`, the controller run as a
+  plain SPI master (not its NAND mode), the chip's on-die ECC on.
+- Ethernet: `nvt_eqos.c` (MDC divider fixed for the 150 MHz APB). NA51103
+  uses the MAC at `0x440000`, NA51090 the one at `0x210000` (the tree's
+  and Linux's eth0). Pins, clocks and the external PHY's reset GPIO come
+  from the loader's tree (`/top/eth` pinmux), as eth_na51103.c /
+  eth_na51090.c. phylib binds the PHY as MII, as the vendor does (its
+  strapped RGMII delays stay).
+- Memory: U-Boot stays in its 32 MiB region; staging at `0x2000000`
+  (past BL31); the boot counter at `0x1E20000` (`0x1F20000` is BL31's);
+  `mem=` and `/hdal-memory/media` (4-cell addresses) split at `${osmem}`
+  (the boards' firmware: `0x15e00000`, `0x57600000`). The tree's
+  `/reserved-memory` keeps BL31 out of the kernel's and bootm's way.
+- Not supported: SD (no slot on the NVRs), USB/SATA/HDMI in U-Boot, the
+  second MAC, the CPU clock raise the vendor U-Boot does from the tree.
+
+**Verified under qemu-hisilicon** (`nt98332`, `nt98633`, the boards'
+dumps with the slot and env replaced, the real loader and BL31): prompt
+twice with the env kept; `sf`/`nand` erase/write/read + `crc32`
+(unaligned on NOR); `saveenv` + `reset`; `ping`, `dhcp`, `tftpboot` 3 MB
+with the host's crc32; UBI create/write/read across a reset; TFTP
+recovery onto an empty flash then boot from it (NOR: squashfs layout;
+NAND: UBIFS `/boot/uImage`); the boot limit's failsafe; the dumps' own
+4.19 kernels boot (their uImages say "uncompressed" over LZMA data:
+repack them with `-C lzma`). CI smoke: `u-boot-<soc>-qemu.bin` on the
+stand-in loader (`-smp 2` / `-smp 4`). Not checked: the boards' DDR
+contents across a watchdog reset (the boot counter), the controller's
+timing and the NAND's ECC error paths, the PHYs. **On silicon:**
+nothing yet.
 
 ## Things to keep
 

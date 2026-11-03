@@ -412,6 +412,16 @@ config NAND_MXC
 	  This enables the NAND driver for the NAND flash controller on the
 	  i.MX27 / i.MX31 / i.MX5 processors.
 
+config NAND_NVT_SPI
+	bool "Novatek NA51090 SPI NAND"
+	depends on ARCH_NOVATEK
+	select SYS_NAND_SELF_INIT
+	imply CMD_NAND
+	help
+	  The SPI NAND the Novatek NA51090 boots from, on its flash
+	  controller run as a plain SPI master, with the chip's on-die
+	  ECC. Non-DM.
+
 config NAND_MXS
 	bool "MXS NAND support"
 	depends on MX23 || MX28 || MX6 || MX7 || IMX8 || IMX8M

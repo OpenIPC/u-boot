@@ -34,7 +34,9 @@
 #endif
 
 /* Clear of the kernel at 0x8000 as it unpacks, below U-Boot */
+#ifndef OPENIPC_BASEADDR
 #define OPENIPC_BASEADDR	0x01000000
+#endif
 
 /* NOR layout, shared with every OpenIPC NOR camera */
 #define OPENIPC_KERNADDR	0x50000
@@ -93,6 +95,7 @@
 	"fwrecovery=if env exists bootfail; then run fwupd; sleep 5; reset; fi\0" \
 	"bootflash=run fwrecovery; setenv setargs setenv bootargs ${bootargs}; run setargs; run loadkernel; bootm ${baseaddr}; reset\0"
 
+#ifndef CONFIG_ENV_IS_IN_NAND
 /*
  * The flash's MTD name in the vendor kernels: the nor node's
  * nvt-devname in the loader's device tree
@@ -105,6 +108,10 @@
 #define OPENIPC_FWUPD "fwupd=run ur; run uk\0"
 
 #define OPENIPC_LOADKERNEL "sf probe 0; sf read ${baseaddr} ${kernaddr} ${kernsize}"
+/* The boot image goes at 0, unless the SoC's config says otherwise */
+#ifndef OPENIPC_UBWRITE
+#define OPENIPC_UBWRITE "sf probe 0; sf erase 0x0 ${kernaddr}; sf write ${baseaddr} 0x0 ${filesize}"
+#endif
 #define OPENIPC_ENV_MEDIUM \
 	"ubfile=u-boot-" CONFIG_PRODUCT_SOC "-nor.bin\0" \
 	"urfile=rootfs.squashfs." CONFIG_PRODUCT_SOC "\0" \
@@ -114,7 +121,7 @@
 	"rootsize=" __stringify(OPENIPC_ROOTSIZE) "\0" \
 	"mtdslite=setenv kernsize 0x200000; setenv rootaddr 0x250000; setenv rootsize 0x500000\0" \
 	"mtdsultimate=setenv kernsize 0x300000; setenv rootaddr 0x350000; setenv rootsize 0xa00000\0" \
-	"ubwrite=sf probe 0; sf erase 0x0 ${kernaddr}; sf write ${baseaddr} 0x0 ${filesize}\0" \
+	"ubwrite=" OPENIPC_UBWRITE "\0" \
 	"ukwrite=sf probe 0; sf erase ${kernaddr} ${kernsize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0" \
 	"urwrite=sf probe 0; if itest ${filesize} -gt 500000; then run mtdsultimate; fi; sf erase ${rootaddr} ${rootsize}; sf write ${baseaddr} ${rootaddr} ${filesize}\0" \
 	"fwwrite=sf probe 0; sf erase ${kernaddr} ${filesize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0" \
@@ -123,6 +130,35 @@
 	"mtds=" OPENIPC_MTDPARTS "\0" \
 	"mtdparts=" SFC ":" OPENIPC_MTDPARTS "\0" \
 	"bootargs=" CONFIG_BOOTARGS
+
+#else /* CONFIG_ENV_IS_IN_NAND */
+
+/*
+ * SPI NAND, as on openipc-hisilicon: one UBI device after the boot area
+ * and the environment (CONFIG_ENV_OFFSET), holding the UBIFS rootfs with
+ * the kernel inside it (/boot/fitImage or /boot/uImage) and rootfs_data
+ * on the rest. The boot area is the SoC's (OPENIPC_NAND_MTDPARTS), its
+ * MTD name the nand node's nvt-devname.
+ */
+#define SFC "spi_nand.0"
+
+#define CONFIG_BOOTARGS "mem=\\${osmem} console=ttyS0,115200 panic=20 init=/init root=ubi0:rootfs rootfstype=ubifs ubi.mtd=2,2048 mtdparts=\\${mtdparts} \\${extras}"
+
+#define OPENIPC_FWUPD "fwupd=run ur\0"
+
+#define OPENIPC_LOADKERNEL "ubi part ubi; ubifsmount ubi0:rootfs; ubifsload ${baseaddr} /boot/fitImage || ubifsload ${baseaddr} /boot/uImage"
+#define OPENIPC_ENV_MEDIUM \
+	"ubfile=u-boot-" CONFIG_PRODUCT_SOC "-nand.bin\0" \
+	"urfile=rootfs.ubifs." CONFIG_PRODUCT_SOC "\0" \
+	"ubwrite=" OPENIPC_UBWRITE "\0" \
+	"urwrite=ubi part ubi; ubi check rootfs && ubi remove rootfs; if ubi create rootfs ${filesize} d; then ubi check rootfs; else ubi remove rootfs_data; ubi create rootfs ${filesize} d; fi; ubi check rootfs_data || ubi create rootfs_data 0 d; ubi write ${baseaddr} rootfs ${filesize}\0" \
+	"loadkernel=" OPENIPC_LOADKERNEL "\0" \
+	"mtdids=nand0=" SFC "\0" \
+	"mtds=" OPENIPC_NAND_MTDPARTS "\0" \
+	"mtdparts=" SFC ":" OPENIPC_NAND_MTDPARTS "\0" \
+	"bootargs=" CONFIG_BOOTARGS
+
+#endif /* CONFIG_ENV_IS_IN_NAND */
 
 #define CONFIG_BOOTCOMMAND "run bootflash"
 
