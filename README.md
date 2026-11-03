@@ -1,668 +1,468 @@
 ![OpenIPC logo][logo]
 
-# U-Boot
+# OpenIPC U-Boot
 
-[![hisilicon build](https://github.com/OpenIPC/u-boot/actions/workflows/build-hisilicon.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-hisilicon.yml)
-[![xiongmai build](https://github.com/OpenIPC/u-boot/actions/workflows/build-xm.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-xm.yml)
-[![gk710x build](https://github.com/OpenIPC/u-boot/actions/workflows/build-gk710x.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-gk710x.yml)
-[![anyka build](https://github.com/OpenIPC/u-boot/actions/workflows/build-anyka.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-anyka.yml)
-[![novatek build](https://github.com/OpenIPC/u-boot/actions/workflows/build-novatek.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-novatek.yml)
-[![allwinner build](https://github.com/OpenIPC/u-boot/actions/workflows/build-allwinner.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-allwinner.yml)
-[![fullhan build](https://github.com/OpenIPC/u-boot/actions/workflows/build-fullhan.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-fullhan.yml)
-[![grainmedia build](https://github.com/OpenIPC/u-boot/actions/workflows/build-grainmedia.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-grainmedia.yml)
-[![sigmastar build](https://github.com/OpenIPC/u-boot/actions/workflows/build-sigmastar.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-sigmastar.yml)
-[![ingenic build](https://github.com/OpenIPC/u-boot/actions/workflows/build-ingenic.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-ingenic.yml)
+- [Supported vendors](#supported-vendors)
+  - [HiSilicon and Goke](#hisilicon-and-goke)
+  - [Xiongmai](#xiongmai)
+  - [Goke GK710x](#goke-gk710x)
+  - [Anyka](#anyka)
+  - [Novatek](#novatek)
+  - [Allwinner](#allwinner)
+  - [Fullhan](#fullhan)
+  - [Grain Media](#grain-media)
+  - [SigmaStar](#sigmastar)
+  - [Ingenic](#ingenic)
+- [Images](#images)
+- [Flash layout](#flash-layout)
+- [What happens at boot](#what-happens-at-boot)
+- [Commands](#commands)
+- [Recovery](#recovery)
+- [Building](#building)
+- [Branches and CI](#branches-and-ci)
 
-Unified repository for the U-Boot bootloaders maintained by
-[OpenIPC](https://openipc.org) for supported SoCs.
+## Supported vendors
 
-Each SoC family lives on its own branch. This **`openipc`** branch is the
-entry point: it holds the documentation and the CI workflows for every
-family — not bootloader sources.
+| Vendor | Source branch | Releases | CI |
+| --- | --- | --- | --- |
+| [HiSilicon and Goke](#hisilicon-and-goke) | `openipc-hisilicon` | [hisilicon](../../releases/tag/hisilicon), [goke](../../releases/tag/goke) | [![hisilicon](https://github.com/OpenIPC/u-boot/actions/workflows/build-hisilicon.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-hisilicon.yml) |
+| [Xiongmai](#xiongmai) | `openipc-xm` | [xiongmai](../../releases/tag/xiongmai) | [![xm](https://github.com/OpenIPC/u-boot/actions/workflows/build-xm.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-xm.yml) |
+| [Goke GK710x](#goke-gk710x) | `openipc-gk710x` | [goke](../../releases/tag/goke) | [![gk710x](https://github.com/OpenIPC/u-boot/actions/workflows/build-gk710x.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-gk710x.yml) |
+| [Anyka](#anyka) | `openipc-anyka` | [anyka](../../releases/tag/anyka) | [![anyka](https://github.com/OpenIPC/u-boot/actions/workflows/build-anyka.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-anyka.yml) |
+| [Novatek](#novatek) | `openipc-novatek` | [novatek](../../releases/tag/novatek) | [![novatek](https://github.com/OpenIPC/u-boot/actions/workflows/build-novatek.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-novatek.yml) |
+| [Allwinner](#allwinner) | `openipc-allwinner` | [allwinner](../../releases/tag/allwinner) | [![allwinner](https://github.com/OpenIPC/u-boot/actions/workflows/build-allwinner.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-allwinner.yml) |
+| [Fullhan](#fullhan) | `openipc-fullhan` | [fullhan](../../releases/tag/fullhan) | [![fullhan](https://github.com/OpenIPC/u-boot/actions/workflows/build-fullhan.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-fullhan.yml) |
+| [Grain Media](#grain-media) | `openipc-grainmedia` | [grainmedia](../../releases/tag/grainmedia) | [![grainmedia](https://github.com/OpenIPC/u-boot/actions/workflows/build-grainmedia.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-grainmedia.yml) |
+| [SigmaStar](#sigmastar) | `openipc-sigmastar` | [sigmastar](../../releases/tag/sigmastar) | [![sigmastar](https://github.com/OpenIPC/u-boot/actions/workflows/build-sigmastar.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-sigmastar.yml) |
+| [Ingenic](#ingenic) | `openipc-ingenic` | [ingenic](../../releases/tag/ingenic) | [![ingenic](https://github.com/OpenIPC/u-boot/actions/workflows/build-ingenic.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-ingenic.yml) |
 
-| Branch | Contents |
-| --- | --- |
-| `openipc` (this branch) | Unified documentation and CI workflows |
-| `openipc-hisilicon` | U-Boot for HiSilicon/Goke IP-camera SoCs |
-| `openipc-xm` | U-Boot for Xiongmai XM510/XM530/XM550 |
-| `openipc-gk710x` | U-Boot for Goke GK7101/GK7102 |
-| `openipc-anyka` | U-Boot for Anyka AK3918EV200, AK391xEV300, AK391xEV330 |
-| `openipc-novatek` | U-Boot for Novatek NT98562, NT98566 |
-| `openipc-allwinner` | U-Boot for Allwinner V3s, V831, V833, V851s |
-| `openipc-fullhan` | U-Boot for Fullhan FH8632, FH885x V100, FH8626V100, FH885xV200, FH865x |
-| `openipc-grainmedia` | U-Boot for Grain Media GM8135S, GM8136, GM8136S |
-| `openipc-sigmastar` | U-Boot for SigmaStar MSC313E, MSC316DC, MSC316DM |
-| `openipc-ingenic` | U-Boot for Ingenic T10, T20, T21, T23, T30, T31, T40, T41 |
-| `main` | Fork of upstream mainline U-Boot, kept for rebasing |
+### HiSilicon and Goke
 
-New families are added here as they are ported, each with its own
-`.github/workflows/build-<family>.yml`.
+| SoC | CPU | RAM | Flash | Notes |
+| --- | --- | --- | --- | --- |
+| `hi3516cv500` `hi3516dv300` `hi3516av300` | Cortex-A7 ×2 | external | NOR, NAND | |
+| `hi3516ev200` `hi3518ev300` | Cortex-A7 | 64 MiB | NOR, NAND | |
+| `hi3516ev300` | Cortex-A7 | 128 MiB | NOR, NAND | |
+| `hi3516dv200` | Cortex-A7 | — | NOR, NAND | |
+| `gk7205v200` `gk7202v300` | Cortex-A7 | 64 MiB | NOR, NAND | Goke twins of the hi3516ev200 family |
+| `gk7205v300` | Cortex-A7 | 128 MiB | NOR, NAND | Goke twin of the hi3516ev300 |
+| `gk7201v200` `gk7201v300` `gk7605v100` | Cortex-A7 | — | NOR, NAND | Goke, hi3516ev200 family |
+| `gk7205v500` `gk7205v510` `gk7205v530` | Cortex-A7 | — | NOR, NAND | |
+| `gk7206v11a` | Cortex-A7 ×2 | — | NOR, NAND | **held**: built, not released until booted on hardware |
+| `gk7206v12a` | Cortex-A7 ×2 | 256 MiB | NOR, NAND | **held**: built, not released until booted on hardware |
+| `hi3516cv610` `hi3516cv608` | Cortex-A7 ×2 | 64 MiB | NOR | signed boot image, `boot-*.bin` |
+| `hi3519dv500` | Cortex-A55 (arm64) | external | NOR | signed boot image, 512 KiB boot partition |
+| `hi3516cv300` | ARM926 | external | NOR, NAND | |
+| `hi3516ev100` | ARM926 | — | NOR | |
+| `hi3518ev200` | ARM926 | 64 MiB | NOR | |
+| `hi3516cv200` | ARM926 | external | NOR | |
+| `hi3518ev100` | ARM926 | — | NOR | |
+| `hi3516cv100` `hi3518av100` `hi3518cv100` | ARM926 | external | NOR | |
+| `hi3516av100` `hi3516dv100` | Cortex-A7 | external | NOR | |
+| `hi3516av200` `hi3519v101` | Cortex-A17 + A7 | external | NOR | |
+| `hi3515av100` `hi3520av100` `hi3520dv100` `hi3520dv200` | ARMv7 | external | NOR | DVR/NVR |
+| `hi3536cv100` `hi3536dv100` | ARMv7 | external | NOR | NVR |
 
-## hisilicon
+- hi3519dv500: the boot partition is 512 KiB, so env is at `0x80000` and
+  firmware at `0xc0000`. Its images are
+  `boot-hi3519dv500-{dmeb,dmebpro}-nor.bin`. Building it also needs
+  `aarch64-linux-gnu-` (`CROSS_COMPILE64`).
+- Some SoCs can also recover from a USB stick.
+- Publishing replaces the same-named images that OpenIPC/u-boot-xmedia,
+  u-boot-hi3516cv6xx and u-boot-hi3519dv500 used to put in
+  OpenIPC/firmware.
 
-The current port: U-Boot for 38 HiSilicon and Goke camera SoCs.
+### Xiongmai
 
-**NOR + NAND:**
+| SoC | CPU | RAM | Flash | Notes |
+| --- | --- | --- | --- | --- |
+| `xm510` | Cortex-A5 | 32/64 MiB DDR2 | NOR | |
+| `xm530` | Cortex-A5 ×2 | 64 MiB DDR2 | NOR | |
+| `xm550` | Cortex-A5 ×2 | 128 MiB DDR3 | NOR | XM530 die |
+| `xm530v200` | Cortex-A5 ×2 | 128 MiB DDR3 | NOR | |
+| `xm533` | Cortex-A5 | 64 MiB DDR2 | NOR | |
+| `xm535d1` `xm535w1` | Cortex-A5 | 64 MiB DDR2 | NOR | |
+| `xm535d2` | Cortex-A5 | 128 MiB DDR3 | NOR | |
 
-`hi3516cv500`, `hi3516dv300`, `hi3516av300`, `hi3516cv300`, `hi3516dv200`,
-`hi3516ev200`, `hi3516ev300`, `hi3518ev300`, `gk7201v200`, `gk7201v300`,
-`gk7202v300`, `gk7205v200`, `gk7205v300`, `gk7205v500`, `gk7205v510`,
-`gk7205v530`, `gk7605v100`, `gk7206v11a`\*, `gk7206v12a`\*
+- The boot ROM runs U-Boot in place from SPI NOR, and U-Boot brings up
+  DDR itself, so the image is `u-boot.bin` as linked.
+- Xiongmai bootloaders leave per-block write protection on, under which
+  their `sf erase`/`sf write` report success and change nothing. This
+  U-Boot clears it.
 
-\* Goke GK7206V1 (XMedia Lotus "xmorca"), from the vendor SDK's own
-first stage and DDR-init code. Not yet booted on hardware: CI builds the
-images but keeps them out of the release and publish steps.
+### Goke GK710x
 
-**NOR only:**
+| SoC | CPU | RAM | Flash | Notes |
+| --- | --- | --- | --- | --- |
+| `gk7101` | ARM1176 | 128 MiB | NOR | |
+| `gk7102` | ARM1176 | 64 MiB | NOR | |
+| `gk7101s` | ARM1176 | 128 MiB | NOR | |
+| `gk7102s` | ARM1176 | 64 MiB | NOR | also the image for **GK7102C** cameras |
 
-`hi3516cv100`, `hi3516cv200`, `hi3516cv608`, `hi3516cv610`,
-`hi3516av100`, `hi3516av200`, `hi3516dv100`, `hi3516ev100`,
-`hi3518av100`, `hi3518cv100`, `hi3518ev100`, `hi3518ev200`,
-`hi3519v101`, `hi3515av100`, `hi3520av100`, `hi3520dv100`,
-`hi3520dv200`, `hi3536cv100`, `hi3536dv100`, `hi3519dv500`\*\*
-
-\*\* arm64, built with `aarch64-linux-gnu-` (`CROSS_COMPILE64`). Its signed
-boot images, `boot-hi3519dv500-{dmeb,dmebpro}-nor.bin`, go in a 512 KiB
-boot partition: env at `0x80000`, firmware at `0xc0000`.
-
-### Build
-
-```sh
-git clone --branch openipc-hisilicon https://github.com/OpenIPC/u-boot.git
-cd u-boot
-
-bash build.sh               # every supported SoC
-bash build.sh hi3516cv300   # a single SoC
-```
-
-The toolchain is `arm-linux-gnueabi-` (Debian/Ubuntu package
-`gcc-arm-linux-gnueabi`). Images land in `output/` as
-`u-boot-<soc>-nor.bin` / `u-boot-<soc>-nand.bin`.
-
-## xiongmai
-
-U-Boot for Xiongmai's own camera SoCs, on the same mainline release
-(v2022.10) and with the same OpenIPC boot layer as `openipc-hisilicon`.
-
-**NOR:** `xm510`, `xm530`, `xm550`
-
-The boot ROM runs U-Boot in place from SPI NOR, and U-Boot brings up DDR
-itself, so the image is `u-boot.bin` as linked: `u-boot-<soc>-nor.bin`,
-written at flash offset 0. The flash driver clears the per-block write
-protection that Xiongmai bootloaders leave on (SR3.WPS), under which the
-vendor U-Boot's `sf erase`/`sf write` report success and change nothing.
-
-```sh
-git clone --branch openipc-xm https://github.com/OpenIPC/u-boot.git
-cd u-boot
-
-bash build.sh               # xm510 xm530 xm550
-bash build.sh xm530         # a single SoC
-```
-
-Images land in `output/` as `u-boot-<soc>-nor.bin`.
-
-The toolchain is `arm-linux-gnueabi-`, as for hisilicon.
-
-## gk710x
-
-U-Boot for Goke's own ARM1176 camera SoCs, the GK7101 and GK7102 -- not
-the HiSilicon-derived GK7205/GK7605 above -- on the same mainline release
-(v2022.10) and with the same OpenIPC boot layer as `openipc-hisilicon`.
-
-**NOR:** `gk7101`, `gk7102`, and the later GK710xS die: `gk7101s`,
-`gk7102s`. The `gk7102s` image is also the one for GK7102C cameras, the
-same family: it boots the GK7102C's boot header and hands its kernel that
-board's GPIO map by default (`gpiomap=v2` or `v1` for SDK-style GK7102S
-boards).
-
-The boot ROM runs the DDR set-up listed in the image's header and copies
-U-Boot into DDR, so `u-boot-<soc>-nor.bin` is the header and `u-boot.bin`,
-written at flash offset 0. Like OpenIPC's `uImage` and `rootfs` for these
-SoCs it is in the normal (CPU) byte order: load it by tftp, from an SD
-card or a USB stick, and write it with `sf write` (or `run ub`).
-
-**Programmer images.** The flash controller swaps the bytes of every
-32-bit word on the way to the chip and back, so the chip itself holds
-every word reversed: U-Boot, environment, kernel and rootfs alike. A
-programmer writes the chip directly, so it needs the whole flash image in
-that order. Do not write the files with a programmer as they are, and do
-not just concatenate them: lay them out at their offsets, then reverse
-every 32-bit word of the whole image.
+- These are Goke's own chips, not the HiSilicon-derived GK7205 above.
+- GK7102C cameras have no Ethernet: recover them from an SD card.
+- **Programmer images.** The flash controller swaps the bytes of every
+  32-bit word, so the chip stores everything (U-Boot, env, kernel,
+  rootfs) word-reversed. Files written through U-Boot (`sf write`,
+  `run ub`, SD recovery) are fine as they are. For an external
+  programmer, lay the files out at their offsets first, then reverse
+  every word of the whole image:
 
 ```sh
-# U-Boot alone
-objcopy -I binary -O binary --reverse-bytes=4 \
-    u-boot-gk7102-nor.bin u-boot-gk7102-programmer.bin
-
-# a full 8 MiB flash: U-Boot at 0, kernel at 0x50000, rootfs at 0x250000
 tr '\0' '\377' < /dev/zero | head -c 8M > full.bin
 dd if=u-boot-gk7102-nor.bin  of=full.bin conv=notrunc
 dd if=uImage.gk7102          of=full.bin conv=notrunc bs=64k seek=5
 dd if=rootfs.squashfs.gk7102 of=full.bin conv=notrunc bs=64k seek=37
 objcopy -I binary -O binary --reverse-bytes=4 full.bin full-programmer.bin
-
-# a programmer's dump back into the normal order (what sf read shows)
-objcopy -I binary -O binary --reverse-bytes=4 dump.bin dump-normal.bin
 ```
 
-Without binutils, `perl -0777 -pe 's/(.)(.)(.)(.)/$4$3$2$1/gs' in > out`
-does the same. qemu-hisilicon's `flash-file=` takes the programmer image.
-A programmer image written through U-Boot anyway (`sf write` at 0, SD
-recovery) is recognised and swapped back.
+The same `objcopy` turns a programmer dump back into normal order. A
+programmer image written through U-Boot by mistake is recognised and
+swapped back.
 
-The vendor kernel needs what the vendor U-Boot leaves it besides ATAGs:
-its HAL blob, memory layout words and the board's GPIO map, from which it
-configures every pin. This U-Boot provides all three. The GPIO map is the
-vendor reference boards' default layout (rb-sc1035 v2.1, sc1045, imx225,
-ov9750, jxh42 v2.0, gc1024; GK7101 rb-ov2710 v2.2); `setenv gpiomap v1`
-selects the other one (rb-ov9712, ar0130, jxh42 v1.0, GK7101 imx222).
+- The vendor kernel's GPIO map defaults to the reference boards' layout;
+  `setenv gpiomap v1` picks the other one (rb-ov9712, ar0130, jxh42 v1.0,
+  GK7101 imx222).
 
-U-Boot has started on GK7102C cameras; the rest has run only on
-qemu-hisilicon's machines. Without Ethernet (GK7102C cameras), recovery is
-from an SD card: `*.img` files, each a uImage wrapper whose load address is
-the flash offset its payload goes to.
+### Anyka
 
-```sh
-git clone --branch openipc-gk710x https://github.com/OpenIPC/u-boot.git
-cd u-boot
+| SoC | CPU | RAM | Flash | Notes |
+| --- | --- | --- | --- | --- |
+| `ak3918ev200` | ARM926 | 64 MiB | NOR | |
+| `ak3916ev300` | ARM926 | 64 MiB | NOR | also runs the AK3916EV301 |
+| `ak3918ev300` | ARM926 | 64 MiB | NOR | |
+| `ak3919ev300` | ARM926 | 128 MiB | NOR | |
+| `ak3918ev330` | ARM926 | 64 MiB | NOR | vendor first stage leads the image |
+| `ak3919ev330` | ARM926 | 128 MiB | NOR | vendor first stage leads the image |
 
-bash build.sh               # gk7101 gk7102 gk7101s gk7102s
-bash build.sh gk7102        # a single SoC
-```
+- The images for one generation differ only in RAM size and `soc`.
+- Vendor uImages have entry = load + 0x40, which this U-Boot does not
+  run. Repack them with `mkimage -e <load address>`.
+- SD recovery takes only these file names: `uImage.<soc>.img` (or
+  `fitImage.<soc>.img`) and `rootfs.squashfs.<soc>.img`.
 
-Images land in `output/` as `u-boot-<soc>-nor.bin`.
+### Novatek
 
-## anyka
+| SoC | CPU | RAM | Flash | Notes |
+| --- | --- | --- | --- | --- |
+| `nt98562` | Cortex-A9 | 64 MiB | NOR | NA51089 |
+| `nt98566` | Cortex-A9 | 128 MiB | NOR | NA51089 |
 
-U-Boot for Anyka's ARM926 camera SoCs, on the same mainline release
-(v2022.10) and with the same OpenIPC boot layer as `openipc-hisilicon`.
+- The image contains Novatek's loader, built from SDK source. It sits at
+  offset 0, the device tree at `0x10000` and U-Boot (LZMA) at `0x20000`.
+- OpenIPC kernels carry no device tree: U-Boot passes them the loader's.
+- Building needs `arm-none-eabi-` for the loader (`LOADER_CROSS_COMPILE`).
+- SD recovery takes only these file names: `uImage.<soc>.img` (or
+  `fitImage.<soc>.img`) and `rootfs.squashfs.<soc>.img`.
 
-**NOR:** `ak3918ev200`; `ak3916ev300`, `ak3918ev300`, `ak3919ev300`
-(the AK3916EV301 runs the `ak3916ev300` image); `ak3918ev330`,
-`ak3919ev330`. Within a generation the images differ only in the DDR size
-(the AK3919s have 128 MiB, the others 64 MiB) and in `soc`.
+### Allwinner
 
-The mask ROM runs the PLL and DDR script in the image's header and copies
-U-Boot into DDR, so `u-boot-<soc>-nor.bin` is written at flash offset 0
-as it is. On the EV330 the ROM loads a 4 KiB first stage into on-chip
-memory, which loads U-Boot from flash offset 0x1200; that first stage and
-its header are the vendor's, from a camera's flash, and lead the image.
+| SoC | CPU | RAM | Flash | Notes |
+| --- | --- | --- | --- | --- |
+| `v3s` | Cortex-A7 | 64 MiB DDR2 | NOR, SD | |
+| `v831` | Cortex-A7 | 64 MiB DDR2 | NOR, SD | |
+| `v833` | Cortex-A7 | 128 MiB DDR3 | NOR, SD | |
+| `v851s` | Cortex-A7 | 64 MiB DDR2 | NOR, SD | OpenIPC/firmware still ships u-boot-allwinner's camera-tested image |
 
-Vendor uImages are built with the entry point 0x40 past the load address,
-for the vendor U-Boot's way of running them where they were read to; this
-U-Boot boots OpenIPC images (entry = load) and does not do that.
-
-These images have so far run only on qemu-hisilicon's Anyka machines, not
-on a camera. SD card recovery is not enabled.
-
-```sh
-git clone --branch openipc-anyka https://github.com/OpenIPC/u-boot.git
-cd u-boot
-
-bash build.sh               # all six
-bash build.sh ak3918ev300   # a single SoC
-```
-
-Images land in `output/` as `u-boot-<soc>-nor.bin`.
-
-## novatek
-
-U-Boot for Novatek's NA51089 camera SoCs, on the same mainline release
-(v2022.10) and with the same OpenIPC boot layer as `openipc-hisilicon`.
-
-**NOR:** `nt98562` (64 MiB of DDR in the package), `nt98566` (128 MiB).
-
-The mask ROM starts Novatek's loader, which trains the DDR, reads a device
-tree from flash and unpacks U-Boot as that tree says. The loader is built
-from the Novatek SDK's sources, in this tree, and `u-boot-<soc>-nor.bin`
-holds all three, to be written at flash offset 0 as it is:
-
-| Offset | Contents |
-| --- | --- |
-| `0x00000` | the loader |
-| `0x10000` | the device tree, a Xiongmai camera's, which the kernel gets too |
-| `0x20000` | U-Boot, LZMA-packed |
-| `0x40000` | the environment (not in the image) |
-
-OpenIPC kernels for these SoCs carry no device tree: U-Boot boots them with
-the loader's, giving Linux the first `osmem` of the DDR and the vendor
-media modules the rest, as the vendor U-Boot does.
-
-These images have so far run only on qemu-hisilicon's NT9856x machines,
-not on a camera.
-
-```sh
-git clone --branch openipc-novatek https://github.com/OpenIPC/u-boot.git
-cd u-boot
-
-bash build.sh               # nt98562 nt98566
-bash build.sh nt98566       # a single SoC
-```
-
-The loader needs an Arm bare-metal toolchain (`arm-none-eabi-`, else the
-one U-Boot uses; `LOADER_CROSS_COMPILE` overrides). Images land in
-`output/` as `u-boot-<soc>-nor.bin`.
-
-## allwinner
-
-U-Boot for the Allwinner camera SoCs, on the same mainline release
-(v2022.10) and with the same OpenIPC boot layer as `openipc-hisilicon`,
-as mainline sunxi SoCs with their own SPL: no vendor boot0, OP-TEE or
-boot package.
-
-**NOR and SD card:** `v3s` (64 MiB DDR2 in the package), `v831` (64 MiB
-DDR2), `v833` (128 MiB DDR3), `v851s` (64 MiB DDR2).
-
-The boot ROM loads the SPL from flash offset 0 into SRAM. The SPL brings
-up the DDR -- on the V831/V833 the vendor boot0's DRAM library,
-translated to C; on the V3s and V851s mainline's drivers -- and unpacks
-U-Boot, LZMA-packed, from offset 0x8000. `u-boot-<soc>-nor.bin` holds
-both, 160-175 KiB, to be written at flash offset 0 as it is:
-
-| Offset | Contents |
-| --- | --- |
-| `0x00000` | the SPL (eGON.BT0) |
-| `0x08000` | U-Boot, LZMA-packed |
-| `0x40000` | the environment (not in the image) |
-
-**SD card (unbricking):** `u-boot-<soc>-mmc.bin` is the same image with
-an SPL that loads U-Boot from the card. The boot ROM tries the card
-before the flash, so a camera with a broken or empty flash boots from a
-card that has it at 8 KiB, before the first partition:
+- Mainline sunxi SPL, with no vendor boot0, OP-TEE or boot package.
+- **Booting from an SD card.** The boot ROM tries the card before the
+  flash, so a camera with a broken or empty flash boots from a card that
+  has `u-boot-<soc>-mmc.bin` at 8 KiB:
 
 ```sh
 dd if=u-boot-v831-mmc.bin of=/dev/sdX bs=1k seek=8 conv=fsync
 ```
 
-Booted that way, U-Boot reads its update files from the card's FAT
-partition (`source` is `fatload mmc 0`): `run ub` writes
-`u-boot-<soc>-nor.bin` to the flash, `run fwupd` `rootfs.squashfs.<soc>`
-and `uImage.<soc>`. Remove the card and the camera boots from the flash.
+When it boots that way, `source` is the card's FAT partition: `run ub`
+writes `u-boot-<soc>-nor.bin` to the flash, and `run fwupd` writes the
+firmware. Remove the card and the camera boots from flash.
 
-OpenIPC kernels for the V831/V833 carry no device tree: U-Boot boots
-them with the vendor's (the Tina SDK's reference board), built into
-U-Boot, in the normal world with PSCI, as the vendor's OP-TEE and U-Boot
-do. The V3s and V851s kernels carry theirs appended and get ATAGs.
+- V831/V833 OpenIPC kernels carry no device tree. U-Boot passes them the
+  vendor's, which is built in. V3s/V851s kernels carry their own.
+- Building needs `xz`.
+- SD recovery takes only these file names: `uImage.<soc>.img` (or
+  `fitImage.<soc>.img`) and `rootfs.squashfs.<soc>.img`.
 
-These images have so far run only on qemu-hisilicon's machines, not on a
-camera. For the V851s, OpenIPC/u-boot-allwinner's camera-tested
-`u-boot-v851s-nor.bin` stays the one OpenIPC/firmware publishes.
+### Fullhan
 
-```sh
-git clone --branch openipc-allwinner https://github.com/OpenIPC/u-boot.git
-cd u-boot
+| SoC | CPU | RAM | Flash | Notes |
+| --- | --- | --- | --- | --- |
+| `fh8852v200` `fh8852v210` | ARM1176 | 64 MiB | NOR | V210 is a name of the same die |
+| `fh8856v200` `fh8856v210` | ARM1176 | 128 MiB | NOR | |
+| `fh8858v200` `fh8858v210` | ARM1176 | up to 256 MiB | NOR | |
+| `fh8652` | Cortex-A7 | 64 MiB | NOR | vendor ramboot in the image |
+| `fh8656` | Cortex-A7 | 128 MiB | NOR | vendor ramboot in the image |
+| `fh8658` | Cortex-A7 | up to 256 MiB | NOR | vendor ramboot in the image |
+| `fh8852v100` | ARM1176 | 64 MiB | NOR | vendor ramboot in the image |
+| `fh8856v100` | ARM1176 | 128 MiB | NOR | vendor ramboot in the image |
+| `fh8626v100` | ARM1176 | 64 MiB | NOR | vendor ramboot in the image |
+| `fh8833v100` | ARM1176 | 64 MiB | NOR | the FH8632 |
 
-bash build.sh               # v3s v831 v833 v851s
-bash build.sh v831          # a single SoC
-```
+- The image holds the flash header, the vendor's DDR scripts, the ramboot
+  where there is one, and U-Boot.
 
-The toolchain is `arm-linux-gnueabi-`, and `xz` packs U-Boot. Images land
-in `output/` as `u-boot-<soc>-nor.bin` and `u-boot-<soc>-mmc.bin`.
+### Grain Media
 
-## fullhan
+| SoC | CPU | RAM | Flash | Notes |
+| --- | --- | --- | --- | --- |
+| `gm8136` | FA626TE (ARMv5) | 128 MiB | NOR | GM8136S; the same image runs GM8136 with external DDR |
+| `gm8135` | FA626TE (ARMv5) | 64 MiB | NOR | GM8135S |
 
-U-Boot for Fullhan's camera SoCs, on the same mainline release (v2022.10)
-and with the same OpenIPC boot layer as `openipc-hisilicon`.
+- The image holds the SDK's first stage, nsboot, built from source. One
+  build serves every package because nsboot picks the DDR table by the
+  chip's package ID.
 
-**NOR:** `fh8852v200`, `fh8856v200`, `fh8858v200` and their V210 names
-(`fh8852v210`, `fh8856v210`, `fh8858v210`); `fh8652`, `fh8656`, `fh8658`
-(Cortex-A7); `fh8852v100`, `fh8856v100`; `fh8626v100`; `fh8833v100`
-(the FH8632).
+### SigmaStar
 
-The mask ROM runs the DDR script listed in the flash header and loads
-U-Boot -- or, on the FH865x and the V100 parts, the vendor's ramboot,
-which loads U-Boot -- to DDR and starts it. `u-boot-<soc>-nor.bin` holds
-the header, its DDR scripts (the vendor's, as cameras and the SDKs carry
-them), the ramboot where there is one, and U-Boot, to be written at flash
-offset 0 as it is; the environment is at 0x40000.
+| SoC | CPU | RAM | Flash | Notes |
+| --- | --- | --- | --- | --- |
+| `msc313e` | Cortex-A7 | 64 MiB | NOR | infinity3 |
+| `msc316dc` `msc316dm` | Cortex-A7 | 128 MiB | NOR | infinity3 |
 
-These images have so far run only on qemu-hisilicon's Fullhan machines,
-not on a camera. QEMU does not run the ramboots or train DDR.
+- The vendor boot chain is kept. The 256 KiB image holds the MXP
+  partition table at `0x3000`, the vendor IPL at `0x4000`, IPL_CUST at
+  `0x10000`, and U-Boot (xz uImage) at `0x20000`.
+- Vendor kernels are xz-compressed uImages that only the vendor U-Boot
+  unpacks.
+- SD recovery takes only these file names: `uImage.<soc>.img` (or
+  `fitImage.<soc>.img`) and `rootfs.squashfs.<soc>.img`.
 
-```sh
-git clone --branch openipc-fullhan https://github.com/OpenIPC/u-boot.git
-cd u-boot
+### Ingenic
 
-bash build.sh                 # every SoC above
-bash build.sh fh8852v200      # a single SoC
-```
+| SoC | CPU | RAM | Flash | Notes |
+| --- | --- | --- | --- | --- |
+| `t10` `t10l` | XBurst | 64 MiB DDR2 | NOR | |
+| `t20` `t20l` | XBurst | 64 MiB DDR2 | NOR | |
+| `t20x` | XBurst | 128 MiB DDR2 | NOR | |
+| `t21n` | XBurst | 64 MiB DDR2 | NOR | |
+| `t23n` `t23zn` | XBurst | 64 MiB DDR2 | NOR | |
+| `t23x` | XBurst | 128 MiB DDR2 | NOR | |
+| `t30n` `t30l` | XBurst | 64 MiB DDR2 | NOR | |
+| `t30x` | XBurst | 128 MiB DDR2 | NOR | |
+| `t30a` `t30a1` | XBurst | 128 MiB DDR3 | NOR | |
+| `t31n` `t31l` `t31lc` | XBurst | 64 MiB DDR2 | NOR | |
+| `t31x` | XBurst | 128 MiB DDR2 | NOR | |
+| `t31a` `t31al` | XBurst | 128 MiB DDR3 | NOR | |
+| `t40n` | XBurst2 ×2 | 128 MiB DDR2 | NOR, NAND | |
+| `t40xp` | XBurst2 ×2 | 256 MiB DDR3 | NOR, NAND | |
+| `t40a` | XBurst2 ×2 | 1 GiB DDR3 | NOR, NAND | |
+| `t41l` `t41lq` | XBurst2 ×2 | 64 MiB DDR2 | NOR | |
+| `t41n` `t41nq` `t41a` | XBurst2 ×2 | 128 MiB DDR3 | NOR | |
+| `t41zx` `t41xq` | XBurst2 ×2 | 256 MiB DDR3 | NOR | |
 
-Images land in `output/` as `u-boot-<soc>-nor.bin`.
+- The images are not published to OpenIPC/firmware, where cameras keep
+  using [OpenIPC/u-boot-ingenic](https://github.com/OpenIPC/u-boot-ingenic)'s.
+  Its target names are kept here; `l` parts run at lower clocks.
+- The image is the vendor SPL, built from source, followed by U-Boot
+  (lzop). On NOR, U-Boot starts at `0x6800`; on NAND, at `0x6c00`.
+- Building needs `mipsel-linux-gnu-` and `lzop`. For `.img` recovery
+  files, use `mkimage -A mips`.
 
-## grainmedia
+## Images
 
-U-Boot for Grain Media's camera SoCs, on the same mainline release
-(v2022.10) and with the same OpenIPC boot layer as `openipc-hisilicon`.
-
-**NOR:** `gm8136` (GM8136 and GM8136S) and `gm8135` (GM8135S), as
-OpenIPC/firmware names them.
-
-The mask ROM loads nsboot, the SDK's first stage, from the flash into
-SRAM; nsboot sets up DDR and the CPU clock and loads U-Boot to DDR.
-nsboot is built from the SDK's sources in the tree, and one build serves
-every package: it picks the DDR table by the chip's package ID.
-`u-boot-<soc>-nor.bin` holds the flash header, nsboot and U-Boot, to be
-written at flash offset 0 as it is; the environment is at 0x40000.
-
-These images have so far run only on qemu-hisilicon's Grain Media
-machines (which run nsboot), not on a camera.
-
-```sh
-git clone --branch openipc-grainmedia https://github.com/OpenIPC/u-boot.git
-cd u-boot
-
-bash build.sh                 # every SoC above
-bash build.sh gm8136          # a single SoC
-```
-
-Images land in `output/` as `u-boot-<soc>-nor.bin`.
-
-## sigmastar
-
-U-Boot for SigmaStar's (MStar's) infinity3 camera SoCs, on the same
-mainline release (v2022.10) and with the same OpenIPC boot layer as
-`openipc-hisilicon`.
-
-**NOR:** `msc313e` (64 MiB of DDR in the package), `msc316dc`, `msc316dm`
-(128 MiB).
-
-The vendor's boot chain is kept: the mask ROM starts the IPL at flash
-offset 0x4000, which trains the DDR and loads IPL_CUST, which unpacks
-U-Boot from the MXP partition `UBOOT`. `u-boot-<soc>-nor.bin` is the whole
-256 KiB boot partition, to be written at flash offset 0 as it is:
-
-| Offset | Contents |
+| File | What it is |
 | --- | --- |
-| `0x00000` | zeros |
-| `0x03000` | MXP partition table |
-| `0x04000` | IPL, the vendor SDK's (MSC313E or MSC316) |
-| `0x10000` | IPL_CUST, the vendor SDK's |
-| `0x20000` | U-Boot, xz-compressed in a uImage (MXP `UBOOT`, 128 KiB) |
+| `u-boot-<soc>-nor.bin` | the whole boot partition for SPI NOR |
+| `u-boot-<soc>-nand.bin` | the same for SPI NAND |
+| `u-boot-<soc>-mmc.bin` | Allwinner only: boots from an SD card |
+| `boot-<soc>-*.bin` | hi3516cv6xx, hi3519dv500: signed boot image |
 
-That is the layout of retail MSC313E cameras, with the environment at
-0x40000. Vendor kernel partitions hold xz-compressed uImages, which only
-the vendor U-Boot unpacks; this U-Boot boots OpenIPC images.
-
-These images have so far run only on qemu-hisilicon's `msc313e` machine,
-not on a camera. There is no SD card support.
+Each image already holds whatever the boot ROM needs in front of U-Boot
+(DDR scripts, a first stage, a vendor loader). Write it at offset 0 as it
+is. From a running U-Boot, either this one or a vendor one, with a TFTP
+server:
 
 ```sh
-git clone --branch openipc-sigmastar https://github.com/OpenIPC/u-boot.git
-cd u-boot
-
-bash build.sh               # msc313e msc316dc msc316dm
-bash build.sh msc313e       # a single SoC
+setenv serverip 192.168.1.107
+tftpboot 0x42000000 u-boot-hi3516ev300-nor.bin   # a free RAM address on your SoC
+sf probe 0; sf erase 0 0x40000; sf write 0x42000000 0 ${filesize}
 ```
 
-Images land in `output/` as `u-boot-<soc>-nor.bin`.
+Once this U-Boot runs, `run ub` does the same.
 
-## ingenic
+## Flash layout
 
-U-Boot for Ingenic's XBurst and XBurst2 camera SoCs, on the same
-mainline release (v2022.10) and with the same OpenIPC boot layer as `openipc-hisilicon`,
-ported from [OpenIPC/u-boot-ingenic](https://github.com/OpenIPC/u-boot-ingenic)
-(the vendor U-Boot 2013.07), whose target names it keeps.
+### SPI NOR
 
-**NOR:** `t10`, `t10l`, `t20`, `t20l`, `t20x`, `t21n`, `t23n`, `t23zn`,
-`t23x`, `t30n`, `t30l`, `t30x`, `t30a`, `t30a1`, `t31n`, `t31l`, `t31x`,
-`t31a`, `t31al`, `t31lc`, `t40n`, `t40xp`, `t40a`, `t41l`, `t41lq`,
-`t41n`, `t41nq`, `t41a`, `t41zx`, `t41xq`
+| Offset | Size | Partition |
+| --- | --- | --- |
+| `0x000000` | 256 KiB | `boot` (U-Boot) |
+| `0x040000` | 64 KiB | `env` |
+| `0x050000` | 2 MiB (lite) or 3 MiB (ultimate) | `kernel` |
+| `0x250000` / `0x350000` | 5 MiB (lite) or 10 MiB (ultimate) | `rootfs` (squashfs) |
+| after rootfs | rest of the chip | `rootfs_data` |
 
-**NAND:** `t40n`, `t40xp`, `t40a`, with the `openipc-hisilicon` layout:
-`768k(boot),256k(env),-(ubi)`, the kernel in the UBIFS rootfs.
+The rootfs you flash picks the layout: anything over 5 MiB means
+ultimate. On some boards the kernel and rootfs sit back to back in one
+`firmware` partition instead (the *split* layout, `firmware.bin.<soc>`),
+if the kernel supports it. U-Boot detects which layout is on the flash.
 
-The suffix is the package: `l` lite (lower clocks), `x` and `a`/`a1`/`al`
-128 MiB of DDR, `lc` the T31LC; `t23zn` and `t23x` are new here. The T40 images
-were `u-boot-t40*-universal.bin` from OpenIPC/u-boot-t40. The T41 is new,
-from the Ingenic T41 SDK 1.2.0.
+### SPI NAND
 
-The boot ROM loads the SPL from the start of the flash into the cache;
-the SPL, built from the vendor's source, brings up the PLLs and the DDR
-and unpacks U-Boot. `u-boot-<soc>-nor.bin` is both, for flash offset 0:
+| Offset | Size | Partition |
+| --- | --- | --- |
+| `0x000000` | 768 KiB | `boot` |
+| `0x0c0000` | 256 KiB | `env` |
+| `0x100000` | rest | `ubi`: volumes `rootfs` (UBIFS, kernel at `/boot/uImage` or `/boot/fitImage`) and `rootfs_data` |
 
-| Offset | Contents |
+OpenIPC firmware, sysupgrade and openipc.org rely on these layouts, and
+they do not change.
+
+## What happens at boot
+
+1. **Recovery check.** If there is an SD card or USB stick, U-Boot looks
+   for [recovery files](#sd-card-or-usb-stick) on it and flashes them. It
+   skips files that are already on the flash, so a card left in the slot
+   does nothing.
+2. **First start.** If the env partition is blank, U-Boot saves the
+   default environment. It never overwrites an env area that holds
+   something it can't read.
+3. **Firmware scan.** U-Boot finds the kernel and rootfs on the flash and
+   sets `kernaddr`, `kernsize` and `mtdparts` to match. This lets it boot
+   either layout, and firmware flashed by older OpenIPC bootloaders. If it
+   finds nothing bootable, it sets `bootfail`.
+4. **Autoboot** starts after 1 second unless you press **Ctrl-C**.
+   `bootcmd` is `run bootflash`. If `bootfail` is set, it runs `fwupd`
+   from the current `source` (TFTP by default) and resets. Otherwise it
+   loads the kernel and boots it.
+5. **Boot loop guard.** A counter in RAM counts boots that never reached
+   a healthy userspace. After `bootlimit` (2) such boots, `altbootcmd`
+   boots the same kernel with `failsafe` on the command line. OpenIPC's
+   failsafe mode brings up only network and SSH, so the camera stays
+   reachable.
+
+Cameras upgraded from an older OpenIPC bootloader keep their saved
+environment, and it still works.
+
+## Commands
+
+Each update command downloads a file from `source` into RAM and writes
+it to the right place:
+
+| Command | File | Writes |
+| --- | --- | --- |
+| `run ub` | `u-boot-<soc>-nor.bin` / `-nand.bin` | the boot partition |
+| `run uk` | `uImage.<soc>` (or `fitImage.<soc>`) | the kernel slot (NOR) |
+| `run ur` | `rootfs.squashfs.<soc>` / `rootfs.ubifs.<soc>` | the rootfs slot, picking lite or ultimate; on NAND, the `rootfs` UBI volume |
+| `run fwupd` | `firmware.bin.<soc>` if present, else the rootfs then the kernel | the whole firmware |
+| `run bootnfs` | `uImage.<soc>` | nothing: boots the kernel with its root on NFS (`${serverip}:${nfsroot}`) |
+
+These commands pick where the files come from. The choice lasts until
+reset, or for good after `saveenv`:
+
+| Command | Source |
 | --- | --- |
-| `0x0000` | SPL, behind the boot ROM's SFC header (26 KiB slot) |
-| `0x6800` | U-Boot, lzop-packed in a uImage |
+| `run srcnet` | TFTP from `serverip` (default) |
+| `run srcmmc` | FAT on the SD card |
+| `run srcusb` | FAT on a USB stick |
 
-On NAND the SPL slot is 27 KiB and U-Boot starts at `0x6c00`.
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `ipaddr` / `serverip` | `192.168.1.10` / `192.168.1.107` | camera and TFTP server addresses |
+| `soc` | the image's SoC | used in every file name above |
+| `osmem` | depends on the SoC | RAM given to Linux (`mem=`); the rest goes to the media drivers |
+| `extras` | empty | extra kernel arguments, added to `bootargs` |
+| `bootlimit` | `2` | boot-loop threshold for failsafe |
+| `totalmem` | detected | DDR size U-Boot found (read only) |
 
-The environment is at 0x40000 on NOR, as with u-boot-ingenic, and at
-0xc0000 on NAND, as on `openipc-hisilicon`. These images have
-not run on a camera yet, and qemu-hisilicon has no Ingenic machine:
-CI builds them, and they are not published to OpenIPC/firmware.
+Other defaults: autoboot stops on Ctrl-C only, `setenv silent 1`
+silences the console, and `echo` is available.
+
+## Recovery
+
+### Over the network (TFTP)
+
+Put the firmware files for your SoC on a TFTP server, press Ctrl-C to stop
+autoboot, then:
 
 ```sh
-git clone --branch openipc-ingenic https://github.com/OpenIPC/u-boot.git
+setenv ipaddr 192.168.1.10
+setenv serverip 192.168.1.107
+run fwupd          # kernel + rootfs (or firmware.bin.<soc>)
+reset
+```
+
+A camera with no bootable firmware on its flash does this by itself on
+every boot (see step 4 above). So a server at `192.168.1.107` with the
+right files unbricks it without a console.
+
+### SD card or USB stick
+
+On every boot, U-Boot reads the first FAT partition of the card, or the
+whole card if it has no partition table. It acts on what it finds in the
+root directory:
+
+1. **`script.txt`**: if present, U-Boot runs it and does nothing else.
+   It can be plain text with one U-Boot command per line, or a script
+   wrapped with `mkimage -T script`. For example, `run srcmmc; run fwupd`
+   flashes the firmware files on the card with the normal update
+   commands.
+2. **`*.img`**: each one is a uImage wrapper whose **load address is the
+   flash offset** for its payload. U-Boot checks the header and data
+   CRCs, then writes the payload (without the wrapper header) at that
+   offset. This works for anything: U-Boot itself, a kernel, a rootfs, a
+   whole flash dump.
+
+Make an `.img` with `mkimage` (from `u-boot-tools`):
+
+```sh
+# kernel into the kernel slot
+mkimage -A arm -T firmware -C none -a 0x50000  -d uImage.hi3516ev300          kernel.img
+# rootfs into the lite rootfs slot
+mkimage -A arm -T firmware -C none -a 0x250000 -d rootfs.squashfs.hi3516ev300  rootfs.img
+# U-Boot itself
+mkimage -A arm -T firmware -C none -a 0x0      -d u-boot-hi3516ev300-nor.bin   uboot.img
+```
+
+Copy the files to the card, insert it and power on. Remove the card when
+the console shows `Recovery: wrote ...`.
+
+On SPI NAND, recovery takes a single raw file with no wrapper,
+`rootfs.ubifs.<soc>.img`, and writes it into the `rootfs` UBI volume.
+`rootfs_data` is kept if the new rootfs fits. Some vendors accept only
+fixed file names, as their sections say.
+
+## Building
+
+```sh
+git clone --branch openipc-<vendor> https://github.com/OpenIPC/u-boot.git
 cd u-boot
-
-bash build.sh               # every target
-bash build.sh t31n          # a single target
+bash build.sh          # every SoC on the branch
+bash build.sh <soc>    # one SoC, e.g. bash build.sh hi3516ev300
 ```
 
-The toolchain is `mipsel-linux-gnu-` (Debian/Ubuntu package
-`gcc-mipsel-linux-gnu`), plus `lzop`. Images land in `output/` as
-`u-boot-<soc>-nor.bin` and `u-boot-<soc>-nand.bin`.
+Images land in `output/`. The toolchain is `arm-linux-gnueabi-`
+(Debian/Ubuntu `gcc-arm-linux-gnueabi`). Any extra tools a vendor needs
+are listed in its section. The build fails if an image would overflow its
+boot partition, because flashing it would overwrite the environment.
 
-## CI
+## Branches and CI
 
-The [build-hisilicon](.github/workflows/build-hisilicon.yml) workflow runs
-on pull requests to this branch, on pushes and pull requests to
-`openipc-hisilicon` (through that branch's `ci.yml`, which builds the
-pushed commit or the pull request merged into its base), and manually
-from the Actions tab. Each run:
+This `openipc` branch holds only this README and the CI workflows. The
+bootloader sources are on the `openipc-<vendor>` branches listed
+[above](#supported-vendors). `main` mirrors upstream U-Boot.
 
-- builds every SoC in the list above, one matrix leg per SoC, and fails
-  if an image overflows its boot partition;
-- boots each NOR image in the matching machine model from
-  [widgetii/qemu-hisilicon](https://github.com/widgetii/qemu-hisilicon);
-  the 31 SoCs with a machine model are a hard gate, the eight without one
-  get no smoke leg;
-- uploads one artifact per SoC.
-
-Two dispatch inputs control uploads; both skip the held GK7206 images.
-
-- **`release: true`** uploads the built images to this repository's
-  releases: the HiSilicon `hi*` images to the
-  [`Hisilicon` release](../../releases/tag/hisilicon), the Goke `gk*`
-  images to the [`Goke` release](../../releases/tag/goke).
-- **`publish: true`** pushes them to the `OpenIPC/firmware` `latest`
-  release and reports the result to openipc.org. This requires a
-  `FIRMWARE_RELEASE_TOKEN` secret with release write access to
-  `OpenIPC/firmware`. `latest` already carries images under the same
-  names from OpenIPC/u-boot-xmedia (`u-boot-gk7205v500/v510/v530-*`,
-  `u-boot-hi3516ev200/ev300/dv200-*`, `u-boot-hi3518ev300-*`) and
-  u-boot-hi3516cv6xx (`boot-hi3516cv60x/cv610-*`) and u-boot-hi3519dv500
-  (`boot-hi3519dv500-*`); publishing replaces them with this tree's builds.
+Each vendor has a `build-<vendor>.yml` workflow here, which its branch
+calls on every push and pull request. It builds every SoC and uploads
+the images. Run by hand, it can also publish:
 
 ```sh
-gh workflow run build-hisilicon.yml                                   # build + smoke test
-gh workflow run build-hisilicon.yml -f release=true                   # ... and this repo's release
-gh workflow run build-hisilicon.yml -f release=true -f publish=true   # ... and OpenIPC/firmware + openipc.org
+gh workflow run build-<vendor>.yml                                   # build
+gh workflow run build-<vendor>.yml -f release=true                   # + this repo's release
+gh workflow run build-<vendor>.yml -f release=true -f publish=true   # + OpenIPC/firmware latest and openipc.org
 ```
 
-### xiongmai
+`publish` needs a `FIRMWARE_RELEASE_TOKEN` secret. Ingenic has no
+`publish`, and held SoCs are never released.
 
-The [build-xm](.github/workflows/build-xm.yml) workflow has the same
-shape. It runs on pull requests to this branch that change it, on pushes
-and pull requests to `openipc-xm` (through that branch's `ci.yml`), and
-manually. Every SoC has a qemu-hisilicon machine model, so every image is
-smoke-tested:
-
-- booted in place from an 8 MiB flash image whose part powers up with the
-  Xiongmai per-block protection on;
-- booted a second time, which must load the environment the first boot
-  saved.
-
-Its `release` input fills this repository's
-[`Xiongmai` release](../../releases/tag/xiongmai); `publish` uploads to
-`OpenIPC/firmware` `latest`, where no other repository publishes
-`u-boot-xm*` names, and reports to openipc.org.
-
-```sh
-gh workflow run build-xm.yml -f release=true -f publish=true
-```
-
-### gk710x
-
-The [build-gk710x](.github/workflows/build-gk710x.yml) workflow has the
-same shape. It runs on pull requests to this branch that change it, on
-pushes and pull requests to `openipc-gk710x` (through that branch's
-`ci.yml`), and manually. Every SoC has a qemu-hisilicon machine model, so
-every image is smoke-tested: booted from an 8 MiB flash image holding it as
-a programmer would write it (word-swapped), then a second time, which must load the
-environment the first boot saved.
-
-Its `release` input fills this repository's
-[`Goke` release](../../releases/tag/goke); `publish` uploads to
-`OpenIPC/firmware` `latest`, where no other repository publishes
-`u-boot-gk710*` names, and reports to openipc.org.
-
-```sh
-gh workflow run build-gk710x.yml -f release=true -f publish=true
-```
-
-### anyka
-
-The [build-anyka](.github/workflows/build-anyka.yml) workflow has the same
-shape. It runs on pull requests to this branch that change it, on pushes
-and pull requests to `openipc-anyka` (through that branch's `ci.yml`), and
-manually. Every SoC has a qemu-hisilicon machine model, so every image is
-smoke-tested: booted from an 8 MiB flash image, then a second time, which
-must load the environment the first boot saved.
-
-Its `release` input fills this repository's
-[`Anyka` release](../../releases/tag/anyka); `publish` uploads to
-`OpenIPC/firmware` `latest`, where no other repository publishes
-`u-boot-ak39*` names, and reports to openipc.org.
-
-```sh
-gh workflow run build-anyka.yml -f release=true -f publish=true
-```
-
-### novatek
-
-The [build-novatek](.github/workflows/build-novatek.yml) workflow has the
-same shape. It runs on pull requests to this branch that change it, on
-pushes and pull requests to `openipc-novatek` (through that branch's
-`ci.yml`), and manually. Both SoCs have a qemu-hisilicon machine model,
-which does the loader's job, so both images are smoke-tested: booted from
-an 8 MiB flash image, then a second time, which must load the environment
-the first boot saved.
-
-Its `release` input fills this repository's
-[`Novatek` release](../../releases/tag/novatek); `publish` uploads to
-`OpenIPC/firmware` `latest`, where no other repository publishes
-`u-boot-nt985*` names, and reports to openipc.org.
-
-```sh
-gh workflow run build-novatek.yml -f release=true -f publish=true
-```
-
-### allwinner
-
-The [build-allwinner](.github/workflows/build-allwinner.yml) workflow has
-the same shape. It runs on pull requests to this branch that change it,
-on pushes and pull requests to `openipc-allwinner` (through that branch's
-`ci.yml`), and manually. Every SoC has a qemu-hisilicon machine
-model, so every image is smoke-tested: booted -- the `-nor` one from an
-8 MiB flash, the `-mmc` one from a card with the flash erased -- then a
-second time, which must load the environment the first saved.
-
-Its `release` input will fill this repository's
-[`Allwinner` release](../../releases/tag/allwinner); `publish` uploads to
-`OpenIPC/firmware` `latest` and reports to openipc.org, all but the
-V851s images: there OpenIPC/u-boot-allwinner publishes
-`u-boot-v851s-nor.bin`.
-
-```sh
-gh workflow run build-allwinner.yml -f release=true -f publish=true
-```
-
-### fullhan
-
-The [build-fullhan](.github/workflows/build-fullhan.yml) workflow has the
-same shape. It runs on pull requests to this branch that change it, on
-pushes and pull requests to `openipc-fullhan` (through that branch's
-`ci.yml`), and manually. Every SoC has a qemu-hisilicon machine model
-(the V210 images boot on their V200 machine, `fh8833v100` on `fh8632`),
-so every image is smoke-tested: booted from an 8 MiB flash image, then a
-second time, which must load the environment the first boot saved.
-
-Its `release` input fills this repository's
-[`Fullhan` release](../../releases/tag/fullhan); `publish` uploads to
-`OpenIPC/firmware` `latest`, where no other repository publishes
-`u-boot-fh*` names, and reports to openipc.org.
-
-```sh
-gh workflow run build-fullhan.yml -f release=true -f publish=true
-```
-
-### grainmedia
-
-The [build-grainmedia](.github/workflows/build-grainmedia.yml) workflow
-has the same shape. It runs on pull requests to this branch that change
-it, on pushes and pull requests to `openipc-grainmedia` (through that
-branch's `ci.yml`), and manually. Each image is smoke-tested on every
-qemu-hisilicon machine it serves -- `gm8136` on `gm8136` and `gm8136s`,
-`gm8135` on `gm8135s` --: booted from an 8 MiB flash image, then a second
-time, which must load the environment the first boot saved.
-
-Its `release` input fills this repository's
-[`Grain Media` release](../../releases/tag/grainmedia); `publish` uploads
-to `OpenIPC/firmware` `latest`, where no other repository publishes
-`u-boot-gm*` names, and reports to openipc.org.
-
-```sh
-gh workflow run build-grainmedia.yml -f release=true -f publish=true
-```
-
-### sigmastar
-
-The [build-sigmastar](.github/workflows/build-sigmastar.yml) workflow has
-the same shape. It runs on pull requests to this branch that change it, on
-pushes and pull requests to `openipc-sigmastar` (through that branch's
-`ci.yml`), and manually. Every image is smoke-tested on qemu-hisilicon's
-`msc313e` machine (the MSC316 images too: there is no MSC316 machine, and
-their IPL sizes its 64 MiB): booted from an 8 MiB flash image, then a
-second time, which must load the environment the first boot saved.
-
-Its `release` input fills this repository's
-[`SigmaStar` release](../../releases/tag/sigmastar); `publish` uploads to
-`OpenIPC/firmware` `latest`, where no other repository publishes
-`u-boot-msc31*` names, and reports to openipc.org.
-
-```sh
-gh workflow run build-sigmastar.yml -f release=true -f publish=true
-```
-
-### ingenic
-
-The [build-ingenic](.github/workflows/build-ingenic.yml) workflow builds
-every target on pull requests to this branch that change it, on pushes
-and pull requests to `openipc-ingenic` (through that branch's `ci.yml`),
-and manually. There is no smoke test: qemu-hisilicon has no Ingenic
-machine. Its `release` input fills this repository's
-[`Ingenic` release](../../releases/tag/ingenic). It has no `publish`:
-the `u-boot-t*-nor.bin` in `OpenIPC/firmware` `latest` are
-u-boot-ingenic's, which cameras run.
-
-```sh
-gh workflow run build-ingenic.yml -f release=true
-```
-
-## Adding a SoC family
-
-1. Push the port on a new branch, based on a mainline U-Boot release or
-   on an existing family's baseline.
-2. Add a `build-<family>.yml` workflow on this branch.
-3. Document the family and its branches here.
+**Adding a vendor:** push the port on a new `openipc-<vendor>` branch,
+add `build-<vendor>.yml` here, and add a row and a section to this
+README.
 
 ## License
 
-U-Boot is licensed under the GPL-2.0+; see the `Licenses/` directory and
-the per-file SPDX tags on the corresponding branch.
+U-Boot is GPL-2.0+; see `Licenses/` and the SPDX tags on each vendor
+branch.
 
 ## Support
 
