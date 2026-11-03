@@ -84,10 +84,13 @@ build_nvt() {
 }
 
 # Novatek NVR dies, AArch64: the board's loader and BL31 stay, the image
-# is U-Boot's slot alone (openipc/nvt-nvr-image.py)
+# is U-Boot's slot alone (openipc/nvt-nvr-image.py). FLASH is nor or nand,
+# LAYOUT where the boards have their tree and U-Boot, and the boot area.
 build_nvr() {
     soc=$1
-    builddir=${BOOT_SRCDIR}/output/build-${soc}-nor
+    flash=$2
+    layout=$3
+    builddir=${BOOT_SRCDIR}/output/build-${soc}-${flash}
     make_opts="-C ${BOOT_SRCDIR} O=${builddir} -j$(nproc) CROSS_COMPILE=${CROSS_COMPILE_A64}"
 
     rm -rf "${builddir}"
@@ -97,22 +100,22 @@ build_nvr() {
 
     text=$(sed -n 's/^CONFIG_SYS_TEXT_BASE=//p' "${builddir}/.config")
     python3 openipc/nvt-nvr-image.py "${soc}" "${builddir}/u-boot.bin" \
-        "${text}" "output/u-boot-${soc}-nor.bin" || return 1
+        "${text}" "output/u-boot-${soc}-${flash}.bin" || return 1
 
-    # For the emulator's stand-in loader (CI): no loader, a plain tree at
-    # 0x10000 and the slot, as a 256 KiB boot image
-    [ -f "openipc/${soc}.dts" ] || return 0
+    # For the emulator's stand-in loader (CI): no loader, a plain tree and
+    # the slot where the boards have theirs, as a boot area image
     make ${make_opts} scripts_dtc </dev/null >/dev/null &&
     "${builddir}/scripts/dtc/dtc" -q -I dts -O dtb \
         -o "${builddir}/${soc}.dtb" "openipc/${soc}.dts" || return 1
-    python3 - "${builddir}/${soc}.dtb" "output/u-boot-${soc}-nor.bin" \
-        "output/u-boot-${soc}-qemu.bin" <<'EOF'
+    python3 - "${builddir}/${soc}.dtb" "output/u-boot-${soc}-${flash}.bin" \
+        "output/u-boot-${soc}-qemu.bin" ${layout} <<'EOF'
 import sys
-img = bytearray(b'\xff' * 0x40000)
+fdt, slot, size = (int(x, 0) for x in sys.argv[4:7])
+img = bytearray(b'\xff' * size)
 dtb = open(sys.argv[1], 'rb').read()
-slot = open(sys.argv[2], 'rb').read()
-img[0x10000:0x10000 + len(dtb)] = dtb
-img[0x20000:0x20000 + len(slot)] = slot
+ub = open(sys.argv[2], 'rb').read()
+img[fdt:fdt + len(dtb)] = dtb
+img[slot:slot + len(ub)] = ub
 open(sys.argv[3], 'wb').write(img)
 EOF
 }
@@ -137,15 +140,19 @@ build_soc() {
             build_nvt "${soc}" 562 666 ;;
         nt98566)
             build_nvt "${soc}" 566 933 ;;
+        # The NVRs: NA51103 on SPI NOR (Xiongmai's layout, OpenIPC's from
+        # 0x40000), NA51090 on SPI NAND (the SDK's, env and UBI after it)
         nt98332)
-            build_nvr "${soc}" ;;
+            build_nvr "${soc}" nor "0x10000 0x20000 0x40000" ;;
+        nt98633)
+            build_nvr "${soc}" nand "0x40000 0xc0000 0x1a0000" ;;
         *)
             echo "unsupported SoC: ${soc}" >&2
             return 1 ;;
     esac
 }
 
-ALL_SOCS="nt98560 nt98561 nt98562 nt98566 nt98332"
+ALL_SOCS="nt98560 nt98561 nt98562 nt98566 nt98332 nt98633"
 
 SOCS="$@"
 [ -z "${SOCS}" ] && SOCS="${ALL_SOCS}"
