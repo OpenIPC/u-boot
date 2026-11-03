@@ -1219,6 +1219,25 @@ static _THUMB2 int bl_load_uboot_from_flash(unsigned char *p_fdt, unsigned char 
 				debug_err_var("bl_load_uboot_from_flash_comp,er=", er); // read bfc-uboot failed
 				bl_displayErrMsg(RWErrorMsg);
 			}
+			/*
+			 * OpenIPC: algorithm 11, LZMA, through the decoder
+			 * Compress.a has for the bound U-Boot
+			 * (bl_boot_bind_uboot()), as NA51089's loader takes it
+			 * to its mask ROM
+			 */
+			if ((cpu_to_be32(pBfc->uiAlgorithm) & 0xFF) == 11) {
+				extern char _lzma_tmp_start[];
+				extern char _lzma_tmp_end[];
+
+				if (lzma_inflate(p_tmp + sizeof(NVTPACK_BFC_HDR), size_comp_le,
+						(UINT8 *)p_dram_partition->uboot_addr,
+						invertEndian(pBfc->uiSizeUnComp),
+						(UINT8 *)_lzma_tmp_start,
+						(UINT32)(_lzma_tmp_end - _lzma_tmp_start)) < 0) {
+					debug_err("lzma\r\n");
+					return -1;
+				}
+			} else
 			LZ_Uncompress(p_tmp + sizeof(NVTPACK_BFC_HDR), (unsigned char *)p_dram_partition->uboot_addr, size_comp_le);
 		}
 		else
