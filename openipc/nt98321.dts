@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: GPL-2.0+
+/dts-v1/;
+
+/include/ "na51068.dtsi"
+
+/*
+ * What the SDK's NT98321 EVB (cfg_98321_DDR3_4GX1_NAND_EVB, one 4 Gb DDR3
+ * die, 512 MiB) changes, but for its NAND: Linux gets 160 MiB, and the
+ * audio input's first SSP port is enabled. The flash is OpenIPC's NOR.
+ */
+/ {
+	audio_in_part {
+		ssp = <0x01 0x01 0x10 0x10 0x1f40 0xbb8000 0x1f4000 0x00 0xffffffff 0x06 0x00 0x01 0x10 0x1f40 0xbb8000 0x2ee000 0x01 0xffffffff 0xffffffff 0x00 0x01 0x10 0x1f40 0xbb8000 0x7d000 0x01 0xffffffff 0xffffffff 0x00 0x01 0x10 0x1f40 0xbb8000 0x7d000 0x01 0xffffffff>;
+	};
+
+	memory {
+		reg = <0x00 0xa000000>;
+	};
+
+	hdal-memory {
+		media {
+			reg = <0xa000000 0x16000000>;
+		};
+	};
+
+	nvt_info {
+		BIN_NAME = "FW98321A";
+		BIN_NAME_T = "FW98321T";
+	};
+};

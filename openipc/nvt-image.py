@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0+
 #
-# Build the boot partition image of a Novatek NA51089 camera:
+# Build the boot partition image of a Novatek NA51089 camera, or of an
+# NA51068 (NT98321 / NT98323) DVR/NVR board:
 #
 #   0x00000  the loader (it trains the DDR; the mask ROM starts it)
 #   0x10000  the device tree the loader reads, then hands to U-Boot
 #   0x20000  U-Boot, in an LZMA BCL1 container
 #
 # up to the environment at 0x40000. The loader finds U-Boot through the
-# device tree's /nor/partition_uboot, unpacks it with the mask ROM's LZMA
-# decoder to /nvt_memory_cfg/uboot and starts it at the HEADINFO's
-# CodeEntry, once the checksum over the unpacked image adds up.
+# device tree's /nor/partition_uboot, unpacks it with an LZMA decoder
+# (NA51089's mask ROM's, the one the NA51068 loader's Compress.a has) to
+# /nvt_memory_cfg/uboot and starts it at the HEADINFO's CodeEntry, once
+# the checksum over the unpacked image adds up (NA51089).
 #
 # usage: nvt-image.py LOADER DTB U-BOOT.BIN TEXT_BASE OUTPUT
 
