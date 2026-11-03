@@ -1,0 +1,157 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * NT98533: the NS02501 tree with what the SDK's 533QD boards
+ * (cfg_533_IPC_NAND_UBIFS_QD_EVB, its memory split the NT98532 NOR
+ * board's) change past their storage: the engines the NT98533 has more
+ * of (DNE, PRE, MI; IME, IPE and IFE's register ranges), its sensor list,
+ * the I2C auto reset, the EIS and gyro modules, SDIO3's clock source.
+ */
+/dts-v1/;
+
+/include/ "ns02501.dtsi"
+
+/ {
+	top@f0010000 {
+		nvt_sen_os02k10@0 {
+			pinctrl = <0x0e 0x01 0x03 0x01 0x0a 0x01>;
+		};
+
+		nvt_sen_os04a10@0 {
+			pinctrl = <0x0e 0x01 0x03 0x01 0x0a 0x01>;
+		};
+
+		nvt_sen_os04c10@0 {
+			pinctrl = <0x0e 0x01 0x03 0x01 0x0a 0x01>;
+		};
+
+		nvt_sen_os04d10@0 {
+			pinctrl = <0x0e 0x01 0x03 0x01 0x0a 0x01>;
+		};
+
+		nvt_sen_os04e10@0 {
+			pinctrl = <0x0e 0x01 0x03 0x01 0x0a 0x01>;
+		};
+
+		nvt_sen_os05a10@0 {
+			pinctrl = <0x0e 0x01 0x03 0x01 0x0a 0x01>;
+		};
+
+		nvt_sen_os05a10@1 {
+			pinctrl = <0x0a 0x10 0x0e 0x01 0x03 0x01>;
+		};
+
+		nvt_sen_ov64b_pdaf@0 {
+			pinctrl = <0x0e 0x01 0x03 0x01 0x0a 0x01>;
+		};
+
+		nvt_sen_sc450ai@0 {
+			pinctrl = <0x0e 0x01 0x03 0x01 0x0a 0x01>;
+		};
+
+		nvt_sen_sc485sl@0 {
+			pinctrl = <0x0e 0x01 0x03 0x01 0x0a 0x01>;
+		};
+
+		nvt_sen_sc835hai@0 {
+			pinctrl = <0x0e 0x01 0x03 0x01 0x0a 0x01>;
+		};
+
+		nvt_sen_sc850sl@0 {
+			pinctrl = <0x0e 0x01 0x03 0x01 0x0a 0x01>;
+		};
+
+		nvt_sen_nt99436@0 {
+			pinctrl = <0x0e 0x01 0x03 0x01 0x0a 0x01>;
+		};
+
+		nvt_sen_gc4103@0 {
+			pinctrl = <0x0e 0x01 0x03 0x01 0x0a 0x01>;
+		};
+
+		nvt_sen_imx123@0 {
+			pinctrl = <0x0e 0x01 0x03 0x01 0x0a 0x01>;
+		};
+
+		nvt_sen_imx290@0 {
+			pinctrl = <0x0e 0x01 0x03 0x01 0x0a 0x01>;
+		};
+
+		nvt_sen_imx415@0 {
+			pinctrl = <0x0e 0x01 0x03 0x01 0x0a 0x01>;
+		};
+
+		nvt_sen_imx678@0 {
+			pinctrl = <0x0e 0x01 0x03 0x01 0x0a 0x01>;
+		};
+	};
+
+	ime@f0c40000 {
+		reg = <0xf0c40000 0xebc>;
+	};
+
+	ipe@f0c30000 {
+		reg = <0xf0c30000 0xaa0>;
+	};
+
+	ife@f0c70000 {
+		reg = <0xf0c70000 0xffc>;
+	};
+
+	dne@f0ca0000 {
+		compatible = "nvt,kdrv_dne";
+		reg = <0xf0ca0000 0xffc>;
+		clocks = <&clk_dne>;
+		clock-names = "f0ca0000.dne";
+		interrupts = <0x00 0x4f 0x04>;
+	};
+
+	pre@f0c71000 {
+		compatible = "nvt,kdrv_pre";
+		reg = <0xf0c71000 0xffc>;
+		clocks = <&clk_pre>;
+		clock-names = "f0c71000.pre";
+		interrupts = <0x00 0x4e 0x04>;
+	};
+
+	mi@f0110000 {
+		compatible = "nvt,nvt_mi";
+		clocks = <&clk_mi>;
+		reg = <0xf0110000 0x1000>;
+		interrupts = <0x00 0x2f 0x04>;
+	};
+
+	nvt_eis {
+		compatible = "nvt,nvt_eis";
+	};
+
+	nvt_gyro_common {
+		compatible = "nvt,nvt_gyro_comm";
+	};
+
+	nvt_hr_hwtimer@f01e0000 {
+		stbc_en = <0x01>;
+	};
+
+	i2c@f0220000 {
+		auto_rst = <0x01>;
+	};
+
+	i2c2@f0350000 {
+		auto_rst = <0x01>;
+	};
+
+	i2c3@f0360000 {
+		auto_rst = <0x01>;
+	};
+
+	nvt-clk {
+		clk_mmc2 {
+			parent_idx = <0x02>;
+		};
+	};
+
+	nvt_info {
+		BIN_NAME = "FW98533A";
+		BIN_NAME_T = "FW98533T";
+	};
+};

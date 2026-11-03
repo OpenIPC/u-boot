@@ -1,0 +1,6000 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * Novatek NS02501 (NT98532/533): the device tree of the NS02501 SDK's
+ * NT98532 NOR board (cfg_532_IPC_NOR_SQUASHFS_BD_EVB, flattened), with
+ * the OpenIPC boot chain in the nor node: the loader at 0, this tree at
+ * 0x10000, U-Boot at 0x20000. U-Boot runs at 0x03900000, below 64 MiB as
+ * on NA51089, and the loader's scratch (linuxtmp) ends there; SHMINFO
+ * stays at the SDK's 0xA00000.
+ *
+ * The tree is ~95 KiB, its clocks described in it (nvt-clk), more than
+ * its 64 KiB slot: openipc/nvt-image.py stores it in an LZMA BCL1
+ * container, which the loader unpacks (board/novatek/ns02501/loader).
+ *
+ * The loader reads /nvt_memory_cfg (where U-Boot runs, where this tree
+ * and SHMINFO go) and /nor/partition_uboot. U-Boot hands the tree on to
+ * the kernel, with /memory and /hdal-memory/media split at ${osmem}
+ * (board/novatek/na51089/na51089.c).
+ */
+
+/ {
+	model = "Novatek NS02501";
+	compatible = "novatek,ns02501", "nvt,ca32";
+	interrupt-parent = <&gic>;
+	#address-cells = <0x01>;
+	#size-cells = <0x01>;
+
+	cpu_opp_table: opp_table {
+		compatible = "operating-points-v2";
+		opp-shared;
+		phandle = <0x02>;
+
+		opp-80000000 {
+			opp-hz = /bits/ 64 <0x4c4b400>;
+		};
+
+		opp-240000000 {
+			opp-hz = /bits/ 64 <0xe4e1c00>;
+		};
+
+		opp-480000000 {
+			opp-hz = /bits/ 64 <0x1c9c3800>;
+		};
+
+		opp-800000000 {
+			opp-hz = /bits/ 64 <0x2faf0800>;
+		};
+	};
+
+	cpus {
+		#address-cells = <0x01>;
+		#size-cells = <0x00>;
+
+		cpu0: cpu@0 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a32";
+			reg = <0x00>;
+			clock-frequency = <0x2faf0800>;
+			operating-points-v2 = <&cpu_opp_table>;
+			phandle = <0x03>;
+		};
+
+		cpu1: cpu@1 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a32";
+			reg = <0x01>;
+			cpu-release-addr = <0xf0090100>;
+			clock-frequency = <0x2faf0800>;
+			operating-points-v2 = <&cpu_opp_table>;
+			phandle = <0x04>;
+		};
+	};
+
+	cg@f0020000 {
+		compatible = "nvt,core_clk";
+		reg = <0xf0020000 0x10000>;
+	};
+
+	timer {
+		compatible = "arm,armv8-timer";
+		interrupts = <0x01 0x0d 0x308>, <0x01 0x0e 0x308>, <0x01 0x0b 0x308>, <0x01 0x0a 0x308>;
+		clock-frequency = <0xb71b00>;
+		arm,cpu-registers-not-fw-configured;
+		always-on;
+	};
+
+	pmu {
+		compatible = "arm,cortex-a7-pmu";
+		interrupts = <0x00 0x74 0x04>, <0x00 0x75 0x04>;
+		interrupt-affinity = <&cpu0>, <&cpu1>;
+	};
+
+	gic: interrupt-controller@0xfff00000 {
+		compatible = "arm,cortex-a7-gic";
+		#interrupt-cells = <0x03>;
+		interrupt-controller;
+		reg = <0xfff01000 0x1000>, <0xfff02000 0x1000>;
+		phandle = <0x01>;
+	};
+
+	scu: snoop-control-unit@0xf0620000 {
+		compatible = "arm,cortex-a7-scu";
+		reg = <0xf0620000 0x100>;
+	};
+
+	aliases {
+		mmc0 = "/mmc@f0420000";
+	};
+
+	uart@f0290000 {
+		compatible = "ns16550a";
+		reg = <0xf0290000 0x1000>;
+		clocks = <&clk_uart0>;
+		clock-names = "f0290000.uart";
+		interrupts = <0x00 0x2b 0x04>;
+		baud = <0x1c200>;
+		reg-shift = <0x02>;
+		reg-io-width = <0x04>;
+		no-loopback-test = <0x01>;
+		clock-frequency = <0x2dc6c00>;
+		fifo-size = <0x40>;
+		uart_id = <0x00>;
+	};
+
+	uart@f0300000 {
+		compatible = "ns16550a";
+		reg = <0xf0300000 0x1000>;
+		clocks = <&clk_uart1>;
+		clock-names = "f0300000.uart";
+		interrupts = <0x00 0x2c 0x04>;
+		baud = <0x1c200>;
+		reg-shift = <0x02>;
+		reg-io-width = <0x04>;
+		no-loopback-test = <0x01>;
+		clock-frequency = <0x2dc6c00>;
+		fifo-size = <0x40>;
+		hw_flowctrl = <0x00>;
+		rx_trig_level = <0x03>;
+		uart_id = <0x01>;
+	};
+
+	uart@f0310000 {
+		compatible = "ns16550a";
+		reg = <0xf0310000 0x1000>;
+		clocks = <&clk_uart2>;
+		clock-names = "f0310000.uart";
+		interrupts = <0x00 0x2d 0x04>;
+		baud = <0x1c200>;
+		reg-shift = <0x02>;
+		reg-io-width = <0x04>;
+		no-loopback-test = <0x01>;
+		clock-frequency = <0x2dc6c00>;
+		fifo-size = <0x40>;
+		hw_flowctrl = <0x00>;
+		rx_trig_level = <0x03>;
+		uart_id = <0x02>;
+	};
+
+	kdrv_rpc: cc@f0090000 {
+		compatible = "kdrv_rpc";
+		reg = <0xf0090000 0x300>;
+		interrupts = <0x00 0x3b 0x04>;
+	};
+
+	mmc0: mmc@f0420000 {
+		compatible = "nvt,nvt_mmc";
+		reg = <0xf0420000 0x1000>;
+		clocks = <&clk_mmc0>;
+		clock-names = "f0420000.mmc";
+		interrupts = <0x00 0x1e 0x04>;
+		max-frequency = <0x2dc6c00>;
+		voltage-switch = <0x00>;
+		max-voltage = <0xce4>;
+		bus-width = <0x04>;
+		neg-sample-edge = <0x00>;
+		driving = <0x02 0x02 0x02 0x02 0x02 0x02 0x04 0x04 0x04 0x04 0x04 0x04>;
+		cd_gpio = <0x66 0x00 0x00>;
+		no-sdio;
+		no-mmc;
+	};
+
+	nand: nand@f0400000 {
+		#address-cells = <0x02>;
+		#size-cells = <0x02>;
+		compatible = "nvt,nvt_spinand";
+		reg = <0xf0400000 0x1000>;
+		interrupts = <0x00 0x1d 0x04>;
+		clock-frequency = <0xb71b00>;
+		nvt-devname = "spi_nand.0";
+	};
+
+	nor: nor@f0400000 {
+		#address-cells = <0x02>;
+		#size-cells = <0x02>;
+		clocks = <&clk_nand>;
+		clock-names = "f0400000.nor";
+		compatible = "nvt,nvt_spinor";
+		reg = <0xf0400000 0x1000>;
+		interrupts = <0x00 0x1d 0x04>;
+		clock-frequency = <0xb71b00>;
+		nvt-devname = "spi_nor.0";
+		trace-stdtable = <0x01>;
+
+
+		partition_loader {
+			label = "loader";
+			reg = <0x00 0x00 0x00 0x10000>;
+		};
+
+		partition_fdt {
+			label = "fdt";
+			reg = <0x00 0x10000 0x00 0x10000>;
+		};
+
+		partition_uboot {
+			label = "uboot";
+			reg = <0x00 0x20000 0x00 0x20000>;
+		};
+
+		/* The loader looks a partition up here by its label */
+		nvtpack {
+			ver = "NVTPACK_FW_INI_16072017";
+			method = <0x01>;
+
+			index {
+
+				id0 {
+					partition_name = "loader";
+				};
+
+				id1 {
+					partition_name = "fdt";
+				};
+
+				id2 {
+					partition_name = "uboot";
+				};
+			};
+		};
+	};
+
+	gpio: gpio@f0070000 {
+		compatible = "nvt,nvt_gpio";
+		reg = <0xf0070000 0x10000>;
+		interrupts = <0x00 0x18 0x04 0x00 0x31 0x04>;
+		#interrupt-cells = <0x03>;
+		interrupt-controller;
+		interrupt-parent = <&gic>;
+		#gpio-cells = <0x02>;
+	};
+
+	eth0@f02b0000 {
+		compatible = "nvt,synopsys_eth";
+		reg = <0xf02b0000 0x3800>;
+		interrupts = <0x00 0x22 0x04>;
+		sp-clk = <0x00>;
+		ref-clk-out = <0x00>;
+	};
+
+	phy@f02b3800 {
+		compatible = "nvt,eth_phy";
+		reg = <0xf02b3800 0x400>;
+	};
+
+	wdt@f0050000 {
+		compatible = "nvt,nvt_wdt";
+		reg = <0xf0050000 0x1000>;
+		clocks = <&clk_wdt>;
+		clock-names = "f0050000.wdt";
+		interrupts = <0x00 0x4b 0x04>;
+	};
+
+	pwm@f0210000 {
+		compatible = "nvt,nvt_pwm";
+		reg = <0xf0210000 0x1000>;
+		interrupts = <0x00 0x1a 0x04>;
+		clocks = <&clk_pwm0>, <&clk_pwm1>, <&clk_pwm2>, <&clk_pwm3>, <&clk_pwm4>, <&clk_pwm5>, <&clk_pwm6>, <&clk_pwm7>, <&clk_pwm8>, <&clk_pwm9>, <&clk_pwm10>, <&clk_pwm11>;
+		clock-names = "f0210000.pwm0", "f0210000.pwm1", "f0210000.pwm2", "f0210000.pwm3", "f0210000.pwm4", "f0210000.pwm5", "f0210000.pwm6", "f0210000.pwm7", "f0210000.pwm8", "f0210000.pwm9", "f0210000.pwm10", "f0210000.pwm11";
+		nums = <0x0c>;
+		src_freq = <0x7270e00>;
+		status = "okay";
+		bypass_pm = <0x00>;
+	};
+
+	adc@2,f01D0000 {
+		compatible = "nvt,nvt_adc";
+		reg = <0xf01d0000 0x1000>;
+		clocks = <&clk_adc>;
+		clock-names = "f01d0000.adc";
+		interrupts = <0x00 0x49 0x04>;
+		clock-frequency = <0xf42400>;
+		#io-channel-cells = <0x01>;
+	};
+
+	rtc@f0060000 {
+		compatible = "nvt,nvt_rtc";
+		reg = <0xf0060000 0x100>;
+		interrupts = <0x00 0x4c 0x04>;
+	};
+
+	drtc@f00b0000 {
+		compatible = "nvt,nvt_drtc";
+		reg = <0xf00b0000 0x100>;
+		clocks = <&clk_drtc>;
+		interrupts = <0x00 0x04 0x04>;
+	};
+
+	cypt: cypt@f0620000 {
+		compatible = "nvt,nvt_crypto";
+		reg = <0xf0620000 0x100>;
+		interrupts = <0x00 0x26 0x04>;
+		mclk = <0x01>;
+	};
+
+	hash: hash@f0670000 {
+		compatible = "nvt,nvt_hash";
+		reg = <0xf0670000 0x100>;
+		interrupts = <0x00 0x1c 0x04>;
+		mclk = <0x01>;
+	};
+
+	rsa: rsa@f06a0000 {
+		compatible = "nvt,nvt_rsa";
+		reg = <0xf06a0000 0x100>;
+		interrupts = <0x00 0x14 0x04>;
+		mclk = <0x01>;
+	};
+
+	top: top@f0010000 {
+		compatible = "nvt,nvt_top";
+		reg = <0xf0010000 0x2000 0xf0030000 0x2000 0xf0070000 0x10000 0xf0110000 0x2000 0xf0130000 0x2000 0xf0170000 0x2000>;
+
+		sdio {
+			pinmux = <0x01>;
+		};
+
+		nand {
+			pinmux = <0x01>;
+		};
+
+		eth {
+			pinmux = <0x00>;
+		};
+
+		i2c {
+			pinmux = <0x00>;
+		};
+
+		pwm {
+			pinmux = <0x00>;
+		};
+
+		pwmII {
+			pinmux = <0x00>;
+		};
+
+		pwmIII {
+			pinmux = <0x00>;
+		};
+
+		ccnt {
+			pinmux = <0x00>;
+		};
+
+		sensor {
+			pinmux = <0x00>;
+		};
+
+		sensor2 {
+			pinmux = <0x00>;
+		};
+
+		sensormisc {
+			pinmux = <0x00>;
+		};
+
+		sensorsync {
+			pinmux = <0x00>;
+		};
+
+		audio {
+			pinmux = <0x00>;
+		};
+
+		uart {
+			pinmux = <0x01>;
+		};
+
+		csi {
+			pinmux = <0x00>;
+		};
+
+		remote {
+			pinmux = <0x00>;
+		};
+
+		sdp {
+			pinmux = <0x00>;
+		};
+
+		spi {
+			pinmux = <0x00>;
+		};
+
+		sif {
+			pinmux = <0x00>;
+		};
+
+		misc {
+			pinmux = <0x00>;
+		};
+
+		lcd {
+			pinmux = <0x00>;
+		};
+
+		tv {
+			pinmux = <0x00>;
+		};
+
+		sel_lcd {
+			pinmux = <0x00>;
+		};
+
+		weigand {
+			pinmux = <0x00>;
+		};
+
+		pgpio0 {
+			pad_config = <0x180 0x00 0x40 0x00>;
+		};
+
+		pgpio1 {
+			pad_config = <0x182 0x00 0x42 0x00>;
+		};
+
+		nvt_sen_os04c10@0 {
+			pinctrl = <0x0e 0x01 0x03 0x01>;
+		};
+
+		nvt_sen_os04e10@0 {
+			pinctrl = <0x0e 0x01 0x03 0x01>;
+		};
+
+		nvt_sen_sc450ai@0 {
+			pinctrl = <0x0e 0x01 0x03 0x01>;
+		};
+
+		nvt_sen_nt99436@0 {
+			pinctrl = <0x0e 0x01 0x03 0x01>;
+		};
+
+		nvt_sen_os05a10@0 {
+			pinctrl = <0x0e 0x01 0x03 0x01>;
+		};
+
+		nvt_sen_gc4103@0 {
+			pinctrl = <0x0e 0x01 0x03 0x01>;
+		};
+	};
+
+	sie: sie@f0c00000 {
+		compatible = "nvt,nvt_sie";
+		reg = <0xf0c00000 0xb00 0xf0d20000 0xb00 0xf0d30000 0xb00 0xf0d40000 0xb00>;
+		interrupts = <0x00 0x01 0x04 0x00 0x02 0x04 0x00 0x03 0x04 0x00 0x51 0x04>;
+		clocks = <&clk_sie1>, <&clk_sie2>, <&clk_sie3>, <&clk_sie4>, <&sie1_pclk>, <&sie2_pclk>, <&sie3_pclk>, <&sie4_pclk>, <&sie1_pxclk>, <&sie2_pxclk>, <&sie3_pxclk>, <&sie4_pxclk>, <&sie2_intclk>, <&sn_mclk1>, <&sn_mclk2>, <&sn_mclk3>;
+		clock-names = "f0c00000.sie1", "f0d20000.sie2", "f0d30000.sie3", "f0d40000.sie4", "sie1_pclk", "sie2_pclk", "sie3_pclk", "sie4_pclk", "sie1_pxclk", "sie2_pxclk", "sie3_pxclk", "sie4_pxclk", "sie2_intclk", "sn_mclk1", "sn_mclk2", "sn_mclk3";
+	};
+
+	tge: tge@f0cc0000 {
+		compatible = "nvt,kdrv_tge";
+		reg = <0xf0cc0000 0x140>;
+		clocks = <&clk_tge>, <&clk_tgeflashA>, <&clk_tgemshA>, <&tge_pclk>, <&sn_mclk1>, <&sn_mclk2>;
+		clock-names = "f0cc0000.tge", "clk_tgeflashA", "clk_tgemshA", "tge_pclk", "sn_mclk1", "sn_mclk2";
+		interrupts = <0x00 0x16 0x04>;
+	};
+
+	rhe@f0ce0000 {
+		compatible = "nvt,kdrv_rhe";
+		reg = <0xf0ce0000 0x900>;
+		interrupts = <0x00 0x0d 0x04>;
+	};
+
+	ime@f0c40000 {
+		compatible = "nvt,kdrv_ime";
+		reg = <0xf0c40000 0xbfc>;
+		clocks = <&clk_ime>;
+		clock-names = "f0c40000.ime";
+		interrupts = <0x00 0x06 0x04>;
+	};
+
+	ife2@f0d00000 {
+		compatible = "nvt,kdrv_ife2";
+		reg = <0xf0d00000 0x100>;
+		interrupts = <0x00 0x09 0x04>;
+	};
+
+	ise@f0c90000 {
+		compatible = "nvt,kdrv_ise";
+		reg = <0xf0c90000 0x154>;
+		clocks = <&clk_ise>;
+		clock-names = "f0c90000.ise";
+		interrupts = <0x00 0x15 0x04>;
+	};
+
+	ipe@f0c30000 {
+		compatible = "nvt,kdrv_ipe";
+		reg = <0xf0c30000 0xa4c>;
+		clocks = <&clk_ipe>;
+		clock-names = "f0c30000.ipe";
+		interrupts = <0x00 0x05 0x04>;
+	};
+
+	ife@f0c70000 {
+		compatible = "nvt,kdrv_ife";
+		reg = <0xf0c70000 0xd3c>;
+		clocks = <&clk_ife>;
+		clock-names = "f0c70000.ife";
+		interrupts = <0x00 0x08 0x04>;
+	};
+
+	vpe@f0cd0000 {
+		compatible = "nvt,kdrv_vpe";
+		reg = <0xf0cd0000 0x808>;
+		clocks = <&clk_vpe>;
+		clock-names = "f0cd0000.vpe";
+		interrupts = <0x00 0x07 0x04>;
+	};
+
+	ai@f0cb0000 {
+		compatible = "nvt,kdrv_ai";
+		reg = <0xf0cb0000 0x1000 0xf0d50000 0x1000 0xf0c60000 0x1000>;
+		interrupts = <0x00 0x0b 0x04 0x00 0x0d 0x04 0x00 0x0e 0x04>;
+		clock-frequency = <0x23c34600 0x1c9c3800 0x23c34600>;
+	};
+
+	mdbc@f0c10000 {
+		compatible = "nvt,kdrv_mdbc";
+		reg = <0xf0c10000 0x15c>;
+		clocks = <&clk_mdbc>;
+		clock-names = "0xf0c10000.mdbc";
+		interrupts = <0x00 0x2e 0x04>;
+	};
+
+	dis@f0c50000 {
+		compatible = "nvt,kdrv_dis";
+		reg = <0xf0c50000 0x114>;
+		interrupts = <0x00 0x0a 0x04>;
+	};
+
+	coe@f0a11000 {
+		compatible = "nvt,nvt_coe";
+		reg = <0xf0a11000 0x2c0>;
+	};
+
+	dce@f0c20000 {
+		compatible = "nvt,kdrv_dce";
+		reg = <0xf0c20000 0x650>;
+		interrupts = <0x00 0x07 0x04>;
+	};
+
+	ive@f0d70000 {
+		compatible = "nvt,kdrv_ive";
+		reg = <0xf0d70000 0x1d0>;
+		clocks = <&clk_ive>;
+		clock-names = "f0d70000.ive";
+		interrupts = <0x00 0x35 0x04>;
+	};
+
+	sde@f0d90000 {
+		compatible = "nvt,kdrv_sde";
+		reg = <0xf0d90000 0x90>;
+		interrupts = <0x00 0x4a 0x04>;
+	};
+
+	ide@f0800000 {
+		compatible = "nvt,nvt_ide";
+		clocks = <&clk_ide>;
+		reg = <0xf0800000 0x1000>;
+		interrupts = <0x00 0x30 0x04>;
+	};
+
+	dsi@f0120000 {
+		compatible = "nvt,nvt_dsi";
+		reg = <0xf0120000 0x1000>;
+		interrupts = <0x00 0x47 0x04>;
+	};
+
+	dsiphy@f0130000 {
+		compatible = "nvt,nvt_dsiphy";
+		reg = <0xf0130000 0x1000>;
+	};
+
+	csi@f0280000 {
+		compatible = "nvt,nvt_csi";
+		reg = <0xf0280000 0x100 0xf0330000 0x100>;
+		interrupts = <0x00 0x36 0x04 0x00 0x37 0x04>;
+	};
+
+	lvds@f0270000 {
+		compatible = "nvt,nvt_lvds";
+		clocks = <&clk_csi0>, <&clk_csi1>;
+		clock-names = "f0270000.lvds1", "f0370000.lvds2";
+		reg = <0xf0270000 0x200 0xf0370000 0x200>;
+		interrupts = <0x00 0x36 0x04 0x00 0x37 0x04>;
+	};
+
+	senphy@f06b0000 {
+		compatible = "nvt,nvt_senphy";
+		reg = <0xf06b0000 0x100>;
+	};
+
+	ssenif@f0xx0000 {
+		compatible = "nvt,nvt_ssenif";
+		reg = <0xf02c0000 0x2000>;
+		interrupts = <0x00 0x3d 0x04>;
+	};
+
+	thmal@2,f0260000 {
+		compatible = "nvt,thermal";
+		reg = <0xf0260000 0x100>;
+		clocks = <&clk_thmal>;
+		clock-names = "f0260000.thmal";
+		clock-frequency = <0xb71b00>;
+		default_trim = <0xbf>;
+	};
+
+	sif@f0240000 {
+		compatible = "nvt,nvt_sif";
+		reg = <0xf0240000 0x200>;
+		interrupts = <0x00 0x28 0x04>;
+		clocks = <&clk_sif>;
+		clock-names = "f0240000.sif";
+		clock-frequency = <0x5b8d800>;
+	};
+
+	graphic@f0c80000 {
+		compatible = "nvt,nvt_graphic";
+		clocks = <&clk_grph>, <&clk_grph2>;
+		reg = <0xf0c80000 0x300 0xf0d10000 0x100>;
+		interrupts = <0x00 0x12 0x04 0x00 0x13 0x04>;
+	};
+
+	affine@f0ca0000 {
+		compatible = "nvt,nvt_affine";
+		reg = <0xf0ca0000 0x100>;
+		interrupts = <0x00 0x34 0x04>;
+	};
+
+	h26x@f0a10000 {
+		compatible = "nvt,nvt_venc";
+		reg = <0xf0a10000 0xc00>;
+		interrupts = <0x00 0x10 0x04>;
+		power_saving = <0x00>;
+	};
+
+	timer@f0040000 {
+		compatible = "nvt,nvt_timer";
+		reg = <0xf0040000 0x300>;
+		interrupts = <0x00 0x00 0x04>;
+	};
+
+	nvt_hr_hwtimer@f00c0000 {
+		compatible = "nvt,nvt_hwtimer";
+		reg = <0xf00c0000 0x1000>;
+		clocks = <&clk_hrtimer1>;
+		interrupts = <0x00 0x3d 0x04>;
+		index = <0x00>;
+	};
+
+	nvt_hr_hwtimer@f0150000 {
+		compatible = "nvt,nvt_hwtimer";
+		reg = <0xf0150000 0x1000>;
+		clocks = <&clk_hrtimer2>;
+		interrupts = <0x00 0x3e 0x04>;
+		index = <0x01>;
+	};
+
+	nvt_hr_hwtimer@f0160000 {
+		compatible = "nvt,nvt_hwtimer";
+		reg = <0xf0160000 0x1000>;
+		clocks = <&clk_hrtimer3>;
+		interrupts = <0x00 0x3f 0x04>;
+		index = <0x02>;
+	};
+
+	nvt_hr_hwtimer@f0170000 {
+		compatible = "nvt,nvt_hwtimer";
+		reg = <0xf0170000 0x1000>;
+		clocks = <&clk_hrtimer4>;
+		interrupts = <0x00 0x40 0x04>;
+		index = <0x03>;
+	};
+
+	nvt_hr_hwtimer@f0180000 {
+		compatible = "nvt,nvt_hwtimer";
+		reg = <0xf0180000 0x1000>;
+		clocks = <&clk_hrtimer5>;
+		interrupts = <0x00 0x41 0x04>;
+		index = <0x04>;
+	};
+
+	nvt_hr_hwtimer@f0190000 {
+		compatible = "nvt,nvt_hwtimer";
+		reg = <0xf0190000 0x1000>;
+		clocks = <&clk_hrtimer6>;
+		interrupts = <0x00 0x42 0x04>;
+		index = <0x05>;
+	};
+
+	nvt_hr_hwtimer@f01a0000 {
+		compatible = "nvt,nvt_hwtimer";
+		reg = <0xf01a0000 0x1000>;
+		clocks = <&clk_hrtimer7>;
+		interrupts = <0x00 0x43 0x04>;
+		index = <0x06>;
+	};
+
+	clocksource@f01c0000 {
+		compatible = "nvt,nvt_clk_src";
+		reg = <0xf01c0000 0x1000>;
+		clock-frequency = <0x7270e00>;
+		clocks = <&clk_hrtimer8>;
+		interrupts = <0x00 0x44 0x04>;
+	};
+
+	nvt_hr_hwtimer@f01e0000 {
+		compatible = "nvt,nvt_hwtimer";
+		reg = <0xf01e0000 0x1000>;
+		clocks = <&clk_hrtimer9>;
+		interrupts = <0x00 0x48 0x04>;
+		index = <0x07>;
+	};
+
+	eac@f0640000 {
+		compatible = "nvt,nvt_eac";
+		reg = <0xf0640000 0x200>;
+	};
+
+	jpeg_1: jpeg_1@f0a00000 {
+		compatible = "nvt,jpeg";
+		reg = <0xf0a00000 0x10000>;
+		interrupts = <0x00 0x11 0x04>;
+		clocks = <&jpeg1_clk>;
+		clock-names = "jpeg1_clk";
+		device-id = <0x00>;
+	};
+
+	usb20host@ff600000 {
+		compatible = "nvt,ehci-nvtivot";
+		reg = <0xff600000 0x1000 0xf0601000 0x1000 0xf0600000 0x1000>;
+		interrupts = <0x00 0x1b 0x04>;
+		channel = <0x00>;
+		clocks = <&clk_usb20>;
+		clock-names = "ff600000.usb20host";
+		use_top = <0x01>;
+	};
+
+	usb20@ff600000 {
+		compatible = "nvt,fotg200_udc";
+		reg = <0xff600000 0x1000 0xf0601000 0x1000 0xf0600000 0x1000>;
+		interrupts = <0x00 0x1b 0x04>;
+		channel = <0x00>;
+		clocks = <&clk_usb20>;
+		clock-names = "ff600000.usb20";
+		use_top = <0x01>;
+	};
+
+	nvt_usb_chrg@ff600000 {
+		compatible = "nvt,nvt_usb_chrgdet";
+		reg = <0xff600000 0x1000>;
+	};
+
+	dai@f0630000 {
+		compatible = "nvt,nvt_dai";
+		reg = <0xf0630000 0x1000>;
+		interrupts = <0x00 0x0f 0x04>;
+	};
+
+	rotate@f0cf0000 {
+		compatible = "nvt,nvt_rotation";
+		reg = <0xf0cf0000 0x100>;
+		interrupts = <0x00 0x51 0x04>;
+	};
+
+	drvdump@0 {
+		compatible = "nvt,nvt_drvdump";
+	};
+
+	dsp@f1430000 {
+		compatible = "nvt,nvt_dsp";
+		reg = <0xf1430000 0x200 0xf2000000 0x1000000 0xf1440000 0x200 0xf3000000 0x1000000>;
+		interrupts = <0x00 0x4c 0x04 0x00 0x4d 0x04>;
+	};
+
+	spi0: spi@f0230000 {
+		compatible = "nvt,nvt_spi";
+		reg = <0xf0230000 0x1000>;
+		interrupts = <0x00 0x23 0x04>;
+		dma-support = <0x00>;
+		nvt-devname = <0x00>;
+		clock-frequency = <0x2dc6c00>;
+		clocks = <&clk_spi0>;
+		clock-names = "f0230000.spi";
+	};
+
+	spi1: spi@f0320000 {
+		compatible = "nvt,nvt_spi";
+		reg = <0xf0320000 0x1000>;
+		interrupts = <0x00 0x24 0x04>;
+		dma-support = <0x00>;
+		nvt-devname = <0x01>;
+		clock-frequency = <0x2dc6c00>;
+		clocks = <&clk_spi1>;
+		clock-names = "f0320000.spi";
+	};
+
+	spi2: spi@f0340000 {
+		compatible = "nvt,nvt_spi";
+		reg = <0xf0340000 0x1000>;
+		interrupts = <0x00 0x25 0x04>;
+		dma-support = <0x00>;
+		nvt-devname = <0x02>;
+		clock-frequency = <0x2dc6c00>;
+		clocks = <&clk_spi2>;
+		clock-names = "f0340000.spi";
+	};
+
+	sdp@f0390000 {
+		compatible = "nvt,nvt_sdp";
+		reg = <0xf0390000 0x200>;
+		interrupts = <0x00 0x0c 0x04>;
+		clocks = <&clk_sdp>;
+		clock-names = "f0390000.sdp";
+	};
+
+	tse@f0650000 {
+		compatible = "nvt,nvt_tse";
+		reg = <0xf0650000 0x90>;
+		interrupts = <0x00 0x17 0x04>;
+		clocks = <&clk_tse>;
+		clock-names = "f0650000.tse";
+		max-frequency = <0x1312d000>;
+	};
+
+	remote@f0250000 {
+		compatible = "nvt,nvt_remote";
+		reg = <0xf0250000 0x28>;
+		clocks = <&remote_clk>;
+		clock-names = "remote_clk";
+		interrupts = <0x00 0x19 0x04>;
+	};
+
+	rng: rng@f0680000 {
+		compatible = "nvt,nvt_rng";
+		reg = <0xf0680000 0x100>;
+	};
+
+	nvt_arb@f0000000 {
+		compatible = "nvt,nvt_arb";
+		reg = <0xf0000000 0xa000 0xf0fe0000 0x300>;
+		interrupts = <0x00 0x21 0x04>;
+	};
+
+	nvt_otp@f0660000 {
+		compatible = "nvt,nvt_otp";
+		reg = <0xf0660000 0x70>;
+	};
+
+	nvt_gzip@f0100000 {
+		compatible = "nvt,nvt_gzip";
+		reg = <0xf0100000 0x50 0xf0000000 0x8100>;
+		interrupts = <0x00 0x3c 0x04>;
+		clocks = <&clk_gzip>;
+		clock-names = "clk_gzip";
+		nvt-devname = "nvt_gzip.0";
+	};
+
+	kdrv_ipp {
+		clock-frequency = <0xe4e1c00>;
+	};
+
+	uvcp: uvcp@f0690000 {
+		compatible = "nvt,nvt_uvcp";
+		reg = <0xf0690000 0x200>;
+		clocks = <&clk_uvcp>;
+		clock-names = "f0690000.uvcp";
+		interrupts = <0x00 0x3b 0x04>;
+	};
+
+	nvt_ddr_slow@f00d0000 {
+		compatible = "nvt,nvt_ddr_slow";
+		reg = <0xf00d0000 0x9000>;
+		clocks = <&clk_cfe>;
+		clock-names = "cfe_clk";
+		interrupts = <0x00 0x38 0x04>;
+	};
+
+	nvt_at80c51@f00a0000 {
+		compatible = "nvt,nvt_at80c51";
+		reg = <0xf00a0000 0x200 0xf0140000 0x4000>;
+		clocks = <&prfll>, <&clk_apb>, <&clk_uart2>;
+		clock-names = "clk_prmcu";
+	};
+
+	pll_preset@0 {
+
+		pll3 {
+			pll_config = <0x03 0x00 0x00>;
+		};
+
+		pll4 {
+			pll_config = <0x04 0x00 0x00>;
+		};
+
+		pll5 {
+			pll_config = <0x05 0x11b3dc40 0x01>;
+		};
+
+		pll6 {
+			pll_config = <0x06 0x00 0x00>;
+		};
+
+		pll7 {
+			pll_config = <0x07 0x00 0x00>;
+		};
+
+		pll8 {
+			pll_config = <0x08 0x00 0x00>;
+		};
+
+		pll9 {
+			pll_config = <0x09 0x00 0x00>;
+		};
+
+		pll11 {
+			pll_config = <0x0b 0x00 0x00>;
+		};
+
+		pll12 {
+			pll_config = <0x0c 0x00 0x01>;
+		};
+	};
+
+	i2c: i2c@f0220000 {
+		compatible = "nvt,nvt_i2c";
+		reg = <0xf0220000 0x100>;
+		interrupts = <0x00 0x0a 0x04>;
+		clock-frequency = <0x61a80>;
+		id = <0x00>;
+		clocks = <&clk_i2c>;
+		clock-names = "f0220000.i2c";
+	};
+
+	i2c2: i2c2@f0350000 {
+		compatible = "nvt,nvt_i2c";
+		reg = <0xf0350000 0x100>;
+		interrupts = <0x00 0x29 0x04>;
+		clock-frequency = <0x61a80>;
+		id = <0x01>;
+		clocks = <&clk_i2c2>;
+		clock-names = "f0350000.i2c2";
+	};
+
+	i2c3: i2c3@f0360000 {
+		compatible = "nvt,nvt_i2c";
+		reg = <0xf0360000 0x100>;
+		interrupts = <0x00 0x2a 0x04>;
+		clock-frequency = <0x61a80>;
+		id = <0x02>;
+		clocks = <&clk_i2c3>;
+		clock-names = "f0360000.i2c3";
+	};
+
+	display {
+		type = "lcd";
+		lcd_ctrl = <0x01>;
+		sif_channel = <0x02>;
+		gpio_cs = <0x63>;
+		gpio_clk = <0x64>;
+		gpio_data = <0x65>;
+	};
+
+	nvtvos {
+		bIstrylock = <0x01>;
+		trylock_timeout = <0x1388>;
+	};
+
+	nvtmpp {
+		compatible = "nvt,nvtmpp";
+	};
+
+	isf_stream {
+		compatible = "nvt,isf_stream";
+	};
+
+	isf_flow {
+		compatible = "nvt,isf_flow";
+	};
+
+	isf_vdocap {
+		compatible = "nvt,isf_vdocap";
+	};
+
+	isf_vdoprc {
+		compatible = "nvt,isf_vdoprc";
+	};
+
+	isf_dummy {
+		compatible = "nvt,isf_dummy";
+	};
+
+	isf_vdoenc {
+		compatible = "nvt,isf_vdoenc";
+	};
+
+	isf_vdodec {
+		compatible = "nvt,isf_vdodec";
+	};
+
+	isf_vdoout {
+		compatible = "nvt,isf_vdoout";
+	};
+
+	dispobj {
+		compatible = "nvt,nvt_dispobj";
+	};
+
+	dispdev {
+		compatible = "nvt,nvt_dispdev";
+	};
+
+	audio {
+		compatible = "nvt,nvt_audio";
+	};
+
+	wavstudio {
+		compatible = "nvt,wavstudio";
+	};
+
+	isf_audenc {
+		compatible = "nvt,isf_audenc";
+	};
+
+	isf_auddec {
+		compatible = "nvt,isf_auddec";
+	};
+
+	isf_audcap {
+		compatible = "nvt,isf_audcap";
+	};
+
+	isf_audout {
+		compatible = "nvt,isf_audout";
+	};
+
+	nvt_ipc {
+		compatible = "nvt,nvt_ipc";
+	};
+
+	nvt_gfx {
+		compatible = "nvt,nvt_gfx";
+	};
+
+	chosen {
+		bootargs = "earlyprintk console=ttyS0,115200 rootfstype=squashfs ro ";
+	};
+
+	nvt_memory_cfg {
+		#address-cells = <0x01>;
+		#size-cells = <0x01>;
+
+		dram {
+			reg = <0x00 0x10000000>;
+		};
+
+		core2entry1 {
+			reg = <0x00 0x10000>;
+		};
+
+		core2entry2 {
+			reg = <0x10000 0x10000>;
+		};
+
+		fdt {
+			reg = <0x100000 0x100000>;
+		};
+
+		shmem {
+			reg = <0xa00000 0x100000>;
+		};
+
+		loader {
+			reg = <0x1000000 0x100000>;
+		};
+
+		linuxtmp {
+			reg = <0x1100000 0x2800000>;
+		};
+
+		all_in_one {
+			reg = <0x6640000 0x9000000>;
+		};
+
+		kernel_img {
+			reg = <0xf640000 0x300000>;
+		};
+
+		uboot {
+			reg = <0x3900000 0x6c0000>;
+		};
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x00 0x2400000>;
+	};
+
+	reserved-memory {
+		#address-cells = <0x01>;
+		#size-cells = <0x01>;
+		ranges;
+	};
+
+	nvt_os_mem {
+		compatible = "nvt,nvt_os_mem";
+	};
+
+	nvtfmem {
+		compatible = "nvt,nvt_fmem";
+	};
+
+	hdal-memory {
+		#address-cells = <0x02>;
+		#size-cells = <0x01>;
+
+		media {
+			reg = <0x00 0x2400000 0xdc00000>;
+		};
+
+		cfgs {
+			max_pools_cnt = <0x100>;
+		};
+	};
+
+	hdal-maxpath-cfg {
+		vdocap_active_list = <0x01 0x01 0x01 0x01 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00>;
+		vdoprc_maxdevice = <0x04>;
+		vdoenc_maxpath = <0x08>;
+		vdodec_maxpath = <0x02>;
+		vdoout_maxdevice = <0x02>;
+		adocap_maxdevice = <0x01>;
+		adoout_maxdevice = <0x02>;
+		adoenc_maxpath = <0x01>;
+		adodec_maxpath = <0x01>;
+		gfx_maxjob = <0x02>;
+		stamp_maximg = <0x40>;
+		vdoprc_maxstamp = <0x00 0x10>;
+		vdoprc_maxmask = <0x08 0x40>;
+		vdoenc_maxstamp = <0x20 0x10>;
+		vdoenc_maxmask = <0x10 0x40>;
+		vdoout_maxstamp = <0x00 0x10>;
+		vdoout_maxmask = <0x00 0x40>;
+	};
+
+	nvt_chip_mapping {
+		#address-cells = <0x03>;
+		#size-cells = <0x01>;
+
+		dram_map {
+			reg = <0x00 0x00 0x00 0x10000000>;
+		};
+	};
+
+	max-resolution {
+		vdoenc_maxresolution = <0x1000 0x1000>;
+	};
+
+	nvt_info {
+		BIN_NAME = "FW98532A";
+		BIN_NAME_T = "FW98532T";
+		EMBMEM_BLK_SIZE = "0x10000";
+		EMBMEM = "EMBMEM_SPI_NOR";
+		NVT_CFG_APP_EXTERNAL = "dhd_priv iperf-3";
+		NVT_CFG_APP = "mem";
+		NVT_ROOTFS_ETC = "COMMON";
+		NVT_BINARY_FILE_STRIP = "yes";
+		NVT_CFG_KERNEL_CFG = "ns02501_ipc_a32_evb_defconfig_nor_release";
+		NVT_CFG_UBOOT_CFG = "nvt-ns02501_a32_nor_defconfig";
+		NVT_OPTEE_INSTALL = "DISABLE";
+		NVT_LINUX_SMP = "NVT_LINUX_SMP_OFF";
+		NVT_FPGA_EMULATION = "NVT_FPGA_EMULATION_OFF";
+		NVT_DEFAULT_NETWORK_BOOT_PROTOCOL = "NVT_DEFAULT_NETWORK_BOOT_PROTOCOL_STATIC_IP";
+		NVT_ROOTFS_TYPE = "NVT_ROOTFS_TYPE_NOR_SQUASH";
+		NVT_ETHERNET = "NVT_ETHERNET_EQOS";
+		NVT_SDIO_WIFI = "NVT_SDIO_WIFI_NONE";
+		NVT_USB_WIFI = "NVT_USB_WIFI_NONE";
+		NVT_USB_4G = "NVT_USB_4G_NONE";
+		WIFI_RTK_MDL = "WIFI_RTK_MDL_8189";
+		WIFI_BRCM_MDL = "WIFI_BRCM_MDL_43438a1_ampk6212axtal26";
+		WIFI_NVT_MDL = "WIFI_NVT_MDL_18211";
+		NVT_CURL_SSL = "NVT_CURL_SSL_OPENSSL";
+		NVT_UBOOT_ENV_IN_STORG_SUPPORT = "NVT_UBOOT_ENV_IN_STORG_SUPPORT_OFF";
+	};
+
+	nvt-clk {
+
+		reserved: reserved {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "reserved";
+			phandle = <0x60>;
+		};
+
+		PAUTOGATING: PAUTOGATING {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "PAUTOGATING";
+			phandle = <0x5c>;
+		};
+
+		ext: ext {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "ext";
+		};
+
+		ext2: ext2 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "ext2";
+		};
+
+		pre_sram_cpu: pre_sram_cpu {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "pre_sram_cpu";
+			phandle = <0x6f>;
+		};
+
+		pre_sram_pre: pre_sram_pre {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "pre_sram_pre";
+			phandle = <0x70>;
+		};
+
+		preife_sram_ife: preife_sram_ife {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "preife_sram_ife";
+			phandle = <0x71>;
+		};
+
+		preife_sram_pre: preife_sram_pre {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "preife_sram_pre";
+			phandle = <0x72>;
+		};
+
+		dne_sram_cpu: dne_sram_cpu {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "dne_sram_cpu";
+			phandle = <0x73>;
+		};
+
+		dne_sram_ime: dne_sram_ime {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "dne_sram_ime";
+			phandle = <0x74>;
+		};
+
+		dne_sram_dne: dne_sram_dne {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "dne_sram_dne";
+			phandle = <0x75>;
+		};
+
+		ife_sram_cpu: ife_sram_cpu {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "ife_sram_cpu";
+			phandle = <0x76>;
+		};
+
+		ife_sram_ife: ife_sram_ife {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "ife_sram_ife";
+			phandle = <0x77>;
+		};
+
+		cnn_sram_dce: cnn_sram_dce {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "cnn_sram_dce";
+		};
+
+		ipe_sram_cpu: ipe_sram_cpu {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "ipe_sram_cpu";
+			phandle = <0x78>;
+		};
+
+		ipe_sram_ipe: ipe_sram_ipe {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "ipe_sram_ipe";
+			phandle = <0x79>;
+		};
+
+		ime_sram_cpu: ime_sram_cpu {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "ime_sram_cpu";
+			phandle = <0x7a>;
+		};
+
+		ime_sram_ime: ime_sram_ime {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "ime_sram_ime";
+			phandle = <0x7b>;
+		};
+
+		sie3_sram_sie3: sie3_sram_sie3 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "sie3_sram_sie3";
+			phandle = <0x61>;
+		};
+
+		sie3_sram_sie4: sie3_sram_sie4 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "sie3_sram_sie4";
+			phandle = <0x62>;
+		};
+
+		osc_in: osc_in {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0xb71b00>;
+			clock-output-names = "osc_in";
+			phandle = <0x58>;
+		};
+
+		osc_rtc: osc_rtc {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x8000>;
+			clock-output-names = "osc_rtc";
+			phandle = <0x59>;
+		};
+
+		fix850m: fix850m {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x32a9f880>;
+			clock-output-names = "fix850m";
+		};
+
+		fix480m: fix480m {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x1c9c3800>;
+			clock-output-names = "fix480m";
+			phandle = <0x54>;
+		};
+
+		fix360m: fix360m {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x15752a00>;
+			clock-output-names = "fix360m";
+		};
+
+		fix320m: fix320m {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x1312d000>;
+			clock-output-names = "fix320m";
+			phandle = <0x5f>;
+		};
+
+		fix240m: fix240m {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0xe4e1c00>;
+			clock-output-names = "fix240m";
+			phandle = <0x57>;
+		};
+
+		fix196m: fix196m {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0xbaeb900>;
+			clock-output-names = "fix196m";
+		};
+
+		fix192m: fix192m {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0xb71b000>;
+			clock-output-names = "fix192m";
+			phandle = <0x63>;
+		};
+
+		fix160m: fix160m {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x9896800>;
+			clock-output-names = "fix160m";
+			phandle = <0x81>;
+		};
+
+		fix150m: fix150m {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x8f0d180>;
+			clock-output-names = "fix150m";
+		};
+
+		fix120m: fix120m {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x7270e00>;
+			clock-output-names = "fix120m";
+			phandle = <0x66>;
+		};
+
+		fix96m: fix96m {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x5b8d800>;
+			clock-output-names = "fix96m";
+			phandle = <0x5d>;
+		};
+
+		fix80m: fix80m {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x4c4b400>;
+			clock-output-names = "fix80m";
+			phandle = <0x55>;
+		};
+
+		fix60m: fix60m {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x3938700>;
+			clock-output-names = "fix60m";
+			phandle = <0x86>;
+		};
+
+		fix48m: fix48m {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x2dc6c00>;
+			clock-output-names = "fix48m";
+			phandle = <0x5a>;
+		};
+
+		fix30m: fix30m {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x1c9c380>;
+			clock-output-names = "fix30m";
+			phandle = <0x5b>;
+		};
+
+		fix24m: fix24m {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x16e3600>;
+			clock-output-names = "fix24m";
+		};
+
+		fix16m: fix16m {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0xf42400>;
+			clock-output-names = "fix16m";
+			phandle = <0x5e>;
+		};
+
+		fix12m: fix12m {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0xb71b00>;
+			clock-output-names = "fix12m";
+			phandle = <0x6d>;
+		};
+
+		fix3m: fix3m {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x2dc6c0>;
+			clock-output-names = "fix3m";
+			phandle = <0x65>;
+		};
+
+		fix32768: fix32768 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x8000>;
+			clock-output-names = "fix32768";
+			phandle = <0x6b>;
+		};
+
+		fix32k: fix32k {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x7d00>;
+			clock-output-names = "fix32k";
+			phandle = <0x6c>;
+		};
+
+		clk_nand_fac: clk_nand_fac {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-factor-clock";
+			clocks = <&fix480m>;
+			clock-div = <0x02>;
+			clock-mult = <0x01>;
+			phandle = <0x7c>;
+		};
+
+		clkout_normal: clkout_normal {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "clkout_normal";
+			phandle = <0x83>;
+		};
+
+		clkout_invert: clkout_invert {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "clkout_invert";
+			phandle = <0x84>;
+		};
+
+		siex_pxclkpad1: siex_pxclkpad1 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "siex_pxclkpad1";
+			phandle = <0x89>;
+		};
+
+		siex_pxclkpad2: siex_pxclkpad2 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "siex_pxclkpad2";
+			phandle = <0x8a>;
+		};
+
+		siex_intclk0: siex_intclk0 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "siex_intclk0";
+			phandle = <0x87>;
+		};
+
+		siex_intclk1: siex_intclk1 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "siex_intclk1";
+			phandle = <0x88>;
+		};
+
+		tge_clksrc: tge_clksrc {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "tge_clksrc";
+			phandle = <0x85>;
+		};
+
+		csi_hsclk: csi_hsclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-fixed-clock";
+			clock-frequency = <0x00>;
+			clock-output-names = "csi_hsclk";
+			phandle = <0x67>;
+		};
+
+		cpu_clk: cpu_clk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix80m>, <&pll8>, <&fix480m>, <&fix240m>;
+			current_rate = <0x2faf0800>;
+			parent_idx = <0x01>;
+			mux_reg_offset = <0x10>;
+			mux_bit_idx = <0x00>;
+			mux_bit_width = <0x02>;
+			clock-output-names = "cpu_clk";
+			keep_rate = <0x01>;
+		};
+
+		pll3: pll3 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-pll";
+			clocks = <&osc_in>;
+			default_value = <0x20000>;
+			pll_ratio = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x03>;
+			rate_reg_offset = <0x4460>;
+			rate_bit_idx = <0x00>;
+			rate_bit_width = <0x08>;
+			clock-output-names = "pll3";
+		};
+
+		pll5: pll5 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-pll";
+			clocks = <&osc_in>;
+			default_value = <0x20000>;
+			pll_ratio = <0x280000>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x05>;
+			rate_reg_offset = <0x4560>;
+			rate_bit_idx = <0x00>;
+			rate_bit_width = <0x08>;
+			clock-output-names = "pll5";
+			phandle = <0x82>;
+		};
+
+		pll6: pll6 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-pll";
+			clocks = <&osc_in>;
+			default_value = <0x20000>;
+			pll_ratio = <0x320000>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x06>;
+			rate_reg_offset = <0x44e0>;
+			rate_bit_idx = <0x00>;
+			rate_bit_width = <0x08>;
+			clock-output-names = "pll6";
+			phandle = <0x6e>;
+		};
+
+		pll7: pll7 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-pll";
+			clocks = <&osc_in>;
+			default_value = <0x20000>;
+			pll_ratio = <0x3d70a4>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x07>;
+			rate_reg_offset = <0x45e0>;
+			rate_bit_idx = <0x00>;
+			rate_bit_width = <0x08>;
+			clock-output-names = "pll7";
+			phandle = <0x7d>;
+		};
+
+		pll8: pll8 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-pll";
+			clocks = <&osc_in>;
+			default_value = <0x20000>;
+			pll_ratio = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x08>;
+			rate_reg_offset = <0x4420>;
+			rate_bit_idx = <0x00>;
+			rate_bit_width = <0x08>;
+			clock-output-names = "pll8";
+			phandle = <0x56>;
+		};
+
+		pll9: pll9 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-pll";
+			clocks = <&osc_in>;
+			default_value = <0x20000>;
+			pll_ratio = <0x640000>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x09>;
+			rate_reg_offset = <0x4520>;
+			rate_bit_idx = <0x00>;
+			rate_bit_width = <0x08>;
+			clock-output-names = "pll9";
+			phandle = <0x64>;
+		};
+
+		pll11: pll11 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-pll";
+			clocks = <&osc_in>;
+			default_value = <0x20000>;
+			pll_ratio = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x0b>;
+			rate_reg_offset = <0x44a0>;
+			rate_bit_idx = <0x00>;
+			rate_bit_width = <0x08>;
+			clock-output-names = "pll11";
+			phandle = <0x68>;
+		};
+
+		pll12: pll12 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-pll";
+			clocks = <&osc_in>;
+			default_value = <0x20000>;
+			pll_ratio = <0x42aaaa>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x0c>;
+			rate_reg_offset = <0x45a0>;
+			rate_bit_idx = <0x00>;
+			rate_bit_width = <0x08>;
+			clock-output-names = "pll12";
+			phandle = <0x69>;
+		};
+
+		pll13: pll13 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-pll";
+			clocks = <&osc_in>;
+			default_value = <0x20000>;
+			pll_ratio = <0x500000>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x0d>;
+			rate_reg_offset = <0x4620>;
+			rate_bit_idx = <0x00>;
+			rate_bit_width = <0x08>;
+			clock-output-names = "pll13";
+			phandle = <0x6a>;
+		};
+
+		prfll: prfll {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&osc_rtc>, <&osc_in>;
+			parent_idx = <0x01>;
+			current_rate = <0x00>;
+			gate_reg_offset = <0x110>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x8c>;
+			reset_bit_idx = <0x06>;
+			do_reset = <0x00>;
+			clock-output-names = "prfll";
+			phandle = <0x4f>;
+		};
+
+		clk_uart0: clk_uart0 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix48m>, <&fix30m>;
+			current_rate = <0x2dc6c00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x74>;
+			gate_bit_idx = <0x0a>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x84>;
+			reset_bit_idx = <0x0a>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "f0290000.uart";
+			max_rate = <0x2dc6c00>;
+			phandle = <0x05>;
+		};
+
+		clk_uart1: clk_uart1 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix48m>, <&fix30m>, <&prfll>;
+			current_rate = <0x2dc6c00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x74>;
+			gate_bit_idx = <0x0b>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x84>;
+			reset_bit_idx = <0x0b>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "f0300000.uart";
+			max_rate = <0x2dc6c00>;
+			phandle = <0x06>;
+		};
+
+		clk_uart2: clk_uart2 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix48m>, <&fix30m>, <&prfll>;
+			current_rate = <0x2dc6c00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x74>;
+			gate_bit_idx = <0x16>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x84>;
+			reset_bit_idx = <0x16>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "f0310000.uart";
+			max_rate = <0x2dc6c00>;
+			phandle = <0x07>;
+		};
+
+		uart_pclk: uart_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x1c>;
+			do_autogating = <0x01>;
+			clock-output-names = "uart_pclk";
+		};
+
+		uart2_pclk: uart2_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x1d>;
+			do_autogating = <0x01>;
+			clock-output-names = "uart2_pclk";
+		};
+
+		uart3_pclk: uart3_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x10>;
+			do_autogating = <0x01>;
+			clock-output-names = "uart3_pclk";
+		};
+
+		pre_pclk: pre_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc8>;
+			autogating_bit_idx = <0x0c>;
+			do_autogating = <0x01>;
+			clock-output-names = "pre_pclk";
+		};
+
+		dne_pclk: dne_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc8>;
+			autogating_bit_idx = <0x08>;
+			do_autogating = <0x01>;
+			clock-output-names = "dne_pclk";
+		};
+
+		ife_pclk: ife_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x07>;
+			do_autogating = <0x01>;
+			clock-output-names = "ife_pclk";
+		};
+
+		dce_pclk: dce_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&osc_in>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "dce_pclk";
+		};
+
+		ipe_pclk: ipe_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x02>;
+			do_autogating = <0x01>;
+			clock-output-names = "ipe_pclk";
+		};
+
+		ime_pclk: ime_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x03>;
+			do_autogating = <0x01>;
+			clock-output-names = "ime_pclk";
+		};
+
+		pre_bnr_clk_en: pre_bnr_clk_en {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x1e>;
+			do_autogating = <0x01>;
+			clock-output-names = "pre_bnr_clk_en";
+		};
+
+		ife_2dnr_clk_en: ife_2dnr_clk_en {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x1e>;
+			do_autogating = <0x01>;
+			clock-output-names = "ife_2dnr_clk_en";
+		};
+
+		ife_wdr_clk_en: ife_wdr_clk_en {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x1f>;
+			do_autogating = <0x01>;
+			clock-output-names = "ife_wdr_clk_en";
+		};
+
+		ime_nr_pclk: ime_nr_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x04>;
+			do_autogating = <0x01>;
+			clock-output-names = "ime_nr_pclk";
+		};
+
+		ime_lca_pclk: ime_lca_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x05>;
+			do_autogating = <0x01>;
+			clock-output-names = "ime_lca_pclk";
+		};
+
+		ime_h264_pclk: ime_h264_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x06>;
+			do_autogating = <0x01>;
+			clock-output-names = "ime_h264_pclk";
+		};
+
+		clk_sif: clk_sif {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix96m>;
+			current_rate = <0x5b8d800>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x74>;
+			gate_bit_idx = <0x09>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x84>;
+			reset_bit_idx = <0x09>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x1b>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0240000.sif";
+			max_rate = <0x5b8d800>;
+			phandle = <0x38>;
+		};
+
+		sif_pclk: sif_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe0>;
+			gate_bit_idx = <0x1c>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x1b>;
+			do_autogating = <0x01>;
+			clock-output-names = "sif_pclk";
+		};
+
+		clk_adc: clk_adc {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix16m>, <&osc_rtc>;
+			current_rate = <0xf42400>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x74>;
+			gate_bit_idx = <0x10>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x84>;
+			reset_bit_idx = <0x15>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "f01d0000.adc";
+			max_rate = <0xf42400>;
+			phandle = <0x17>;
+		};
+
+		adc_pclk: adc_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x0f>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x0f>;
+			do_autogating = <0x00>;
+			clock-output-names = "adc_pclk";
+		};
+
+		clk_thmal: clk_thmal {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&osc_in>;
+			current_rate = <0xb71b00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x74>;
+			gate_bit_idx = <0x0d>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x84>;
+			reset_bit_idx = <0x0d>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "f0260000.thmal";
+			max_rate = <0xb71b00>;
+			phandle = <0x37>;
+		};
+
+		thmal_pclk: thmal_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe0>;
+			gate_bit_idx = <0x18>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x1f>;
+			do_autogating = <0x01>;
+			clock-output-names = "thmal_pclk";
+		};
+
+		wdt_pclk: wdt_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x0b>;
+			do_autogating = <0x00>;
+			clock-output-names = "wdt_pclk";
+		};
+
+		gpio_pclk: gpio_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x84>;
+			reset_bit_idx = <0x19>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc8>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "gpio_pclk";
+		};
+
+		prspi_pclk: prspi_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x1c>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x1c>;
+			do_autogating = <0x00>;
+			clock-output-names = "prspi_pclk";
+		};
+
+		prwg_pclk: prwg_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x0c>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x0c>;
+			do_autogating = <0x00>;
+			clock-output-names = "prwg_pclk";
+		};
+
+		clk_spi0: clk_spi0 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix96m>;
+			current_rate = <0xb71b00>;
+			div_reg_offset = <0x44>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x0b>;
+			gate_reg_offset = <0x74>;
+			gate_bit_idx = <0x06>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x84>;
+			reset_bit_idx = <0x06>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x18>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0230000.spi";
+			max_rate = <0x2dc6c00>;
+			phandle = <0x46>;
+		};
+
+		clk_spi1: clk_spi1 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix96m>;
+			current_rate = <0xb71b00>;
+			div_reg_offset = <0x44>;
+			div_bit_idx = <0x10>;
+			div_bit_width = <0x0b>;
+			gate_reg_offset = <0x74>;
+			gate_bit_idx = <0x07>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x84>;
+			reset_bit_idx = <0x07>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x19>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0320000.spi";
+			max_rate = <0x2dc6c00>;
+			phandle = <0x47>;
+		};
+
+		clk_spi2: clk_spi2 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix96m>;
+			current_rate = <0xb71b00>;
+			div_reg_offset = <0x48>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x0b>;
+			gate_reg_offset = <0x74>;
+			gate_bit_idx = <0x08>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x84>;
+			reset_bit_idx = <0x08>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x1a>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0340000.spi";
+			max_rate = <0x2dc6c00>;
+			phandle = <0x48>;
+		};
+
+		spi0_pclk: spi0_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe0>;
+			gate_bit_idx = <0x1d>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x18>;
+			do_autogating = <0x01>;
+			clock-output-names = "spi0_pclk";
+		};
+
+		spi1_pclk: spi1_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe0>;
+			gate_bit_idx = <0x1e>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x19>;
+			do_autogating = <0x01>;
+			clock-output-names = "spi1_pclk";
+		};
+
+		spi2_pclk: spi2_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe0>;
+			gate_bit_idx = <0x1f>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x1a>;
+			do_autogating = <0x01>;
+			clock-output-names = "spi2_pclk";
+		};
+
+		clk_sdp: clk_sdp {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix96m>;
+			current_rate = <0x5b8d800>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x7c>;
+			gate_bit_idx = <0x10>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x14>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "f0390000.sdp";
+			max_rate = <0x5b8d800>;
+			phandle = <0x49>;
+		};
+
+		sdp_pclk: sdp_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe0>;
+			gate_bit_idx = <0x1b>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc8>;
+			autogating_bit_idx = <0x07>;
+			do_autogating = <0x01>;
+			clock-output-names = "sdp_pclk";
+		};
+
+		clk_tse: clk_tse {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix240m>, <&fix320m>, <&reserved>, <&reserved>;
+			current_rate = <0x1312d000>;
+			parent_idx = <0x01>;
+			mux_reg_offset = <0x24>;
+			mux_bit_idx = <0x04>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x0d>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x0d>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x19>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0650000.tse";
+			max_rate = <0x1312d000>;
+			phandle = <0x4a>;
+		};
+
+		tse_pclk: tse_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe4>;
+			gate_bit_idx = <0x0c>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x19>;
+			do_autogating = <0x01>;
+			clock-output-names = "tse_pclk";
+		};
+
+		nue_pclk: nue_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe4>;
+			gate_bit_idx = <0x15>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x01>;
+			clock-output-names = "nue_pclk";
+		};
+
+		nue2_pclk: nue2_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe4>;
+			gate_bit_idx = <0x16>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x0c>;
+			do_autogating = <0x01>;
+			clock-output-names = "nue2_pclk";
+		};
+
+		cnn_pclk: cnn_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe4>;
+			gate_bit_idx = <0x19>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x01>;
+			do_autogating = <0x01>;
+			clock-output-names = "cnn_pclk";
+		};
+
+		ise_pclk: ise_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x08>;
+			do_autogating = <0x01>;
+			clock-output-names = "ise_pclk";
+		};
+
+		vpe_pclk: vpe_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x13>;
+			do_autogating = <0x01>;
+			clock-output-names = "vpe_pclk";
+		};
+
+		tge_pclk: tge_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe4>;
+			gate_bit_idx = <0x12>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x14>;
+			do_autogating = <0x00>;
+			clock-output-names = "tge_pclk";
+			phandle = <0x2c>;
+		};
+
+		sie1_pclk: sie1_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe4>;
+			gate_bit_idx = <0x0f>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "sie1_pclk";
+			phandle = <0x1d>;
+		};
+
+		sie2_pclk: sie2_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe4>;
+			gate_bit_idx = <0x10>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x09>;
+			do_autogating = <0x00>;
+			clock-output-names = "sie2_pclk";
+			phandle = <0x1e>;
+		};
+
+		sie3_pclk: sie3_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe4>;
+			gate_bit_idx = <0x11>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x0a>;
+			do_autogating = <0x00>;
+			clock-output-names = "sie3_pclk";
+			phandle = <0x1f>;
+		};
+
+		sie4_pclk: sie4_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe8>;
+			gate_bit_idx = <0x0f>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc8>;
+			autogating_bit_idx = <0x12>;
+			do_autogating = <0x00>;
+			clock-output-names = "sie4_pclk";
+			phandle = <0x20>;
+		};
+
+		sie3_share_sram: sie3_share_sram {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&sie3_sram_sie3>, <&sie3_sram_sie4>;
+			current_rate = <0x00>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x18>;
+			mux_bit_idx = <0x0e>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "sie3_share_sram";
+		};
+
+		clk_mmc0: clk_mmc0 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix480m>, <&fix192m>, <&fix320m>, <&pll9>;
+			current_rate = <0x4c4b4>;
+			parent_idx = <0x01>;
+			mux_reg_offset = <0x20>;
+			mux_bit_idx = <0x04>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x3c>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x0b>;
+			gate_reg_offset = <0x74>;
+			gate_bit_idx = <0x02>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x84>;
+			reset_bit_idx = <0x02>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x14>;
+			do_autogating = <0x00>;
+			clock-output-names = "f0420000.mmc";
+			max_rate = <0x5b8d800>;
+			phandle = <0x08>;
+		};
+
+		clk_mmc1: clk_mmc1 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix480m>, <&fix192m>, <&fix320m>, <&pll9>;
+			current_rate = <0x4c4b4>;
+			parent_idx = <0x01>;
+			mux_reg_offset = <0x20>;
+			mux_bit_idx = <0x08>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x3c>;
+			div_bit_idx = <0x10>;
+			div_bit_width = <0x0b>;
+			gate_reg_offset = <0x74>;
+			gate_bit_idx = <0x03>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x84>;
+			reset_bit_idx = <0x03>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x15>;
+			do_autogating = <0x00>;
+			clock-output-names = "f0500000.mmc";
+			max_rate = <0x5b8d800>;
+		};
+
+		clk_mmc2: clk_mmc2 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix480m>, <&fix192m>, <&fix320m>, <&pll9>;
+			current_rate = <0x4c4b4>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x24>;
+			mux_bit_idx = <0x00>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x40>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x0b>;
+			gate_reg_offset = <0x74>;
+			gate_bit_idx = <0x0e>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x84>;
+			reset_bit_idx = <0x0e>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x0f>;
+			do_autogating = <0x00>;
+			clock-output-names = "f0510000.mmc";
+			max_rate = <0x9896800>;
+		};
+
+		clk_timer: clk_timer {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix3m>;
+			current_rate = <0x2dc6c0>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x74>;
+			gate_bit_idx = <0x12>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x84>;
+			reset_bit_idx = <0x12>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0040000.timer";
+		};
+
+		clk_i2c: clk_i2c {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix48m>;
+			current_rate = <0x2dc6c00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x74>;
+			gate_bit_idx = <0x04>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x84>;
+			reset_bit_idx = <0x04>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "f0220000.i2c";
+			max_rate = <0x2dc6c00>;
+			phandle = <0x51>;
+		};
+
+		clk_i2c2: clk_i2c2 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix48m>;
+			current_rate = <0x2dc6c00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x74>;
+			gate_bit_idx = <0x05>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x84>;
+			reset_bit_idx = <0x05>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "f0350000.i2c2";
+			max_rate = <0x2dc6c00>;
+			phandle = <0x52>;
+		};
+
+		clk_i2c3: clk_i2c3 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix48m>;
+			current_rate = <0x2dc6c00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x74>;
+			gate_bit_idx = <0x0f>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x84>;
+			reset_bit_idx = <0x14>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "f0360000.i2c3";
+			max_rate = <0x2dc6c00>;
+			phandle = <0x53>;
+		};
+
+		i2c_pclk: i2c_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x16>;
+			do_autogating = <0x01>;
+			clock-output-names = "i2c_pclk";
+		};
+
+		i2c2_pclk: i2c2_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x17>;
+			do_autogating = <0x01>;
+			clock-output-names = "i2c2_pclk";
+		};
+
+		i2c3_pclk: i2c3_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x07>;
+			do_autogating = <0x01>;
+			clock-output-names = "i2c3_pclk";
+		};
+
+		pri2c_pclk: pri2c_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x0b>;
+			do_autogating = <0x01>;
+			clock-output-names = "pri2c_pclk";
+		};
+
+		clk_hrtimer1: clk_hrtimer1 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix120m>;
+			current_rate = <0x7270e00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x0e>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x03>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x01>;
+			do_autogating = <0x01>;
+			phandle = <0x3b>;
+		};
+
+		clk_hrtimer2: clk_hrtimer2 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix120m>;
+			current_rate = <0x7270e00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x0f>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x04>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x02>;
+			do_autogating = <0x01>;
+			phandle = <0x3c>;
+		};
+
+		clk_hrtimer3: clk_hrtimer3 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix120m>;
+			current_rate = <0x7270e00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x10>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x05>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x03>;
+			do_autogating = <0x01>;
+			phandle = <0x3d>;
+		};
+
+		clk_hrtimer4: clk_hrtimer4 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix120m>;
+			current_rate = <0x7270e00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x11>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x06>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x04>;
+			do_autogating = <0x01>;
+			phandle = <0x3e>;
+		};
+
+		clk_hrtimer5: clk_hrtimer5 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix120m>;
+			current_rate = <0x7270e00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x12>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x07>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x05>;
+			do_autogating = <0x01>;
+			phandle = <0x3f>;
+		};
+
+		clk_hrtimer6: clk_hrtimer6 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix120m>;
+			current_rate = <0x7270e00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x13>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x8c>;
+			reset_bit_idx = <0x08>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x0c>;
+			do_autogating = <0x01>;
+			phandle = <0x40>;
+		};
+
+		clk_hrtimer7: clk_hrtimer7 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix120m>;
+			current_rate = <0x7270e00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x14>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x8c>;
+			reset_bit_idx = <0x09>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x0d>;
+			do_autogating = <0x01>;
+			phandle = <0x41>;
+		};
+
+		clk_hrtimer8: clk_hrtimer8 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix120m>;
+			current_rate = <0x7270e00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x15>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x8c>;
+			reset_bit_idx = <0x0a>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x0e>;
+			do_autogating = <0x01>;
+			phandle = <0x42>;
+		};
+
+		clk_hrtimer9: clk_hrtimer9 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix120m>, <&prfll>;
+			current_rate = <0x7270e00>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x2c>;
+			mux_bit_idx = <0x0f>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x7c>;
+			gate_bit_idx = <0x13>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x84>;
+			reset_bit_idx = <0x17>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x1c>;
+			do_autogating = <0x01>;
+			phandle = <0x43>;
+		};
+
+		clk_hrtimer10: clk_hrtimer10 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix120m>, <&prfll>;
+			current_rate = <0x7270e00>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x2c>;
+			mux_bit_idx = <0x10>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x7c>;
+			gate_bit_idx = <0x14>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x84>;
+			reset_bit_idx = <0x18>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x1d>;
+			do_autogating = <0x01>;
+		};
+
+		hrtimer1_pclk: hrtimer1_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe0>;
+			gate_bit_idx = <0x01>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x0c>;
+			do_autogating = <0x00>;
+			clock-output-names = "hrtimer1_pclk";
+		};
+
+		hrtimer2_pclk: hrtimer2_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe0>;
+			gate_bit_idx = <0x02>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x0d>;
+			do_autogating = <0x00>;
+			clock-output-names = "hrtimer2_pclk";
+		};
+
+		hrtimer3_pclk: hrtimer3_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe0>;
+			gate_bit_idx = <0x03>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x0e>;
+			do_autogating = <0x00>;
+			clock-output-names = "hrtimer3_pclk";
+		};
+
+		hrtimer4_pclk: hrtimer4_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe0>;
+			gate_bit_idx = <0x04>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x11>;
+			do_autogating = <0x00>;
+			clock-output-names = "hrtimer4_pclk";
+		};
+
+		hrtimer5_pclk: hrtimer5_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe0>;
+			gate_bit_idx = <0x05>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x12>;
+			do_autogating = <0x00>;
+			clock-output-names = "hrtimer5_pclk";
+		};
+
+		hrtimer6_pclk: hrtimer6_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe8>;
+			gate_bit_idx = <0x09>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc8>;
+			autogating_bit_idx = <0x0f>;
+			do_autogating = <0x00>;
+			clock-output-names = "hrtimer6_pclk";
+		};
+
+		hrtimer7_pclk: hrtimer7_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe8>;
+			gate_bit_idx = <0x0a>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc8>;
+			autogating_bit_idx = <0x10>;
+			do_autogating = <0x00>;
+			clock-output-names = "hrtimer7_pclk";
+		};
+
+		hrtimer8_pclk: hrtimer8_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe8>;
+			gate_bit_idx = <0x0b>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc8>;
+			autogating_bit_idx = <0x11>;
+			do_autogating = <0x00>;
+			clock-output-names = "hrtimer8_pclk";
+		};
+
+		hrtimer9_pclk: hrtimer9_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe8>;
+			gate_bit_idx = <0x0c>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x05>;
+			do_autogating = <0x00>;
+			clock-output-names = "hrtimer9_pclk";
+		};
+
+		csi_ck0d4: csi_ck0d4 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&csi_hsclk>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x1d>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "csi_ck0d4";
+		};
+
+		csi_ck1d4: csi_ck1d4 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&csi_hsclk>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x1e>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "csi_ck1d4";
+		};
+
+		csi2_ck1d4: csi2_ck1d4 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&osc_in>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x1f>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "csi2_ck1d4";
+		};
+
+		clk_pre: clk_pre {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix240m>, <&fix320m>, <&pll11>, <&pll12>, <&pll13>, <&fix480m>, <&fix96m>, <&reserved>;
+			current_rate = <0x17d78400>;
+			parent_idx = <0x03>;
+			mux_reg_offset = <0x2c>;
+			mux_bit_idx = <0x00>;
+			mux_bit_width = <0x03>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x7c>;
+			gate_bit_idx = <0x12>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x0c>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x1d>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0c71000.pre";
+			max_rate = <0x17d78400>;
+		};
+
+		clk_dne: clk_dne {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix240m>, <&fix320m>, <&pll11>, <&pll12>, <&pll13>, <&fix480m>, <&fix96m>, <&reserved>;
+			current_rate = <0x17d78400>;
+			parent_idx = <0x03>;
+			mux_reg_offset = <0x2c>;
+			mux_bit_idx = <0x14>;
+			mux_bit_width = <0x03>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x13>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x80>;
+			reset_bit_idx = <0x12>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x0b>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0ca0000.dne";
+			max_rate = <0x17d78400>;
+		};
+
+		clk_ife: clk_ife {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix240m>, <&fix320m>, <&pll11>, <&pll12>, <&pll13>, <&fix480m>, <&fix96m>, <&reserved>;
+			current_rate = <0x17d78400>;
+			parent_idx = <0x03>;
+			mux_reg_offset = <0x18>;
+			mux_bit_idx = <0x04>;
+			mux_bit_width = <0x03>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x0d>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x80>;
+			reset_bit_idx = <0x0d>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x07>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0c70000.ife";
+			max_rate = <0x17d78400>;
+			phandle = <0x30>;
+		};
+
+		clk_ipe: clk_ipe {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix240m>, <&fix320m>, <&pll11>, <&pll12>, <&pll13>, <&fix480m>, <&fix96m>, <&reserved>;
+			current_rate = <0x17d78400>;
+			parent_idx = <0x03>;
+			mux_reg_offset = <0x14>;
+			mux_bit_idx = <0x04>;
+			mux_bit_width = <0x03>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x07>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x80>;
+			reset_bit_idx = <0x07>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x02>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0c30000.ipe";
+			max_rate = <0x17d78400>;
+			phandle = <0x2f>;
+		};
+
+		clk_ime: clk_ime {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix240m>, <&fix320m>, <&pll11>, <&pll12>, <&pll13>, <&fix480m>, <&fix96m>, <&reserved>;
+			current_rate = <0x17d78400>;
+			parent_idx = <0x03>;
+			mux_reg_offset = <0x14>;
+			mux_bit_idx = <0x0c>;
+			mux_bit_width = <0x03>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x09>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x80>;
+			reset_bit_idx = <0x09>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x03>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0c40000.ime";
+			max_rate = <0x17d78400>;
+			phandle = <0x2d>;
+		};
+
+		clk_ise: clk_ise {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix480m>, <&fix240m>, <&fix320m>;
+			current_rate = <0x1c9c3800>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x14>;
+			mux_bit_idx = <0x18>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x0b>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x80>;
+			reset_bit_idx = <0x0b>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x08>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0c90000.ise";
+			max_rate = <0x1c9c3800>;
+			phandle = <0x2e>;
+		};
+
+		remote_pclk: remote_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x1e>;
+			do_autogating = <0x01>;
+			clock-output-names = "remote_pclk";
+		};
+
+		remote_clk: remote_clk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix32768>, <&fix32k>, <&reserved>, <&fix3m>;
+			current_rate = <0x7d00>;
+			parent_idx = <0x01>;
+			mux_reg_offset = <0x24>;
+			mux_bit_idx = <0x15>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x74>;
+			gate_bit_idx = <0x0c>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x84>;
+			reset_bit_idx = <0x0c>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "remote_clk";
+			max_rate = <0x2dc6c0>;
+			phandle = <0x4b>;
+		};
+
+		clk_wdt: clk_wdt {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&osc_in>, <&prfll>;
+			parent_idx = <0x00>;
+			current_rate = <0xb71b00>;
+			mux_reg_offset = <0x2c>;
+			mux_bit_idx = <0x18>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x64>;
+			div_bit_idx = <0x14>;
+			div_bit_width = <0x02>;
+			gate_reg_offset = <0x74>;
+			gate_bit_idx = <0x13>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x80>;
+			reset_bit_idx = <0x08>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "f0050000.wdt";
+			phandle = <0x0a>;
+		};
+
+		clk_cfe: clk_cfe {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&osc_in>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x14>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x15>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "cfe_clk";
+			phandle = <0x4e>;
+		};
+
+		clk_uvcp: clk_uvcp {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix240m>, <&fix320m>, <&fix120m>;
+			current_rate = <0xe4e1c00>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x1c>;
+			mux_bit_idx = <0x0e>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x74>;
+			gate_bit_idx = <0x15>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x84>;
+			reset_bit_idx = <0x15>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x1e>;
+			do_autogating = <0x00>;
+			clock-output-names = "f0690000.uvcp";
+			max_rate = <0x1312d000>;
+			phandle = <0x4d>;
+		};
+
+		clk_usb20: clk_usb20 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix12m>;
+			current_rate = <0x1c9c380>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x84>;
+			reset_bit_idx = <0x13>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "u2ctrl";
+			phandle = <0x45>;
+		};
+
+		clk_u2phy: clk_u2phy {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix12m>;
+			current_rate = <0xb71b00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x13>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "u2phy";
+		};
+
+		clk_rtc: clk_rtc {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&osc_rtc>;
+			current_rate = <0x8000>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x84>;
+			reset_bit_idx = <0x10>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "f0060000.rtc";
+			max_rate = <0x8000>;
+		};
+
+		clk_drtc: clk_drtc {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&osc_in>, <&osc_rtc>;
+			current_rate = <0xb71b00>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x24>;
+			mux_bit_idx = <0x14>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x16>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x16>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "f00b0000.drtc";
+			max_rate = <0xb71b00>;
+			phandle = <0x18>;
+		};
+
+		drtc_pclk: drtc_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x02>;
+			do_autogating = <0x01>;
+			clock-output-names = "drtc_pclk";
+		};
+
+		clk_grph: clk_grph {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix240m>, <&fix320m>, <&fix480m>;
+			current_rate = <0x1c9c3800>;
+			parent_idx = <0x02>;
+			mux_reg_offset = <0x1c>;
+			mux_bit_idx = <0x08>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x1b>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x80>;
+			reset_bit_idx = <0x1b>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x08>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0c80000.grph";
+			max_rate = <0x1c9c3800>;
+			phandle = <0x39>;
+		};
+
+		clk_grph2: clk_grph2 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix240m>, <&fix320m>, <&fix480m>;
+			current_rate = <0x1c9c3800>;
+			parent_idx = <0x02>;
+			mux_reg_offset = <0x1c>;
+			mux_bit_idx = <0x0c>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x1c>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x80>;
+			reset_bit_idx = <0x1c>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x09>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0d10000.grph";
+			max_rate = <0x1c9c3800>;
+			phandle = <0x3a>;
+		};
+
+		grph_pclk: grph_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe4>;
+			gate_bit_idx = <0x1b>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x08>;
+			do_autogating = <0x00>;
+			clock-output-names = "grph_pclk";
+		};
+
+		grph2_pclk: grph2_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0xe4>;
+			gate_bit_idx = <0x1c>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x09>;
+			do_autogating = <0x00>;
+			clock-output-names = "grph2_pclk";
+		};
+
+		clk_vpe: clk_vpe {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix240m>, <&fix320m>, <&pll11>, <&pll12>, <&pll13>, <&fix480m>, <&reserved>, <&pll6>;
+			current_rate = <0x17d78400>;
+			parent_idx = <0x03>;
+			mux_reg_offset = <0x24>;
+			mux_bit_idx = <0x0c>;
+			mux_bit_width = <0x03>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x7c>;
+			gate_bit_idx = <0x11>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x0e>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x1a>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0cd0000.vpe";
+			max_rate = <0x17d78400>;
+			phandle = <0x31>;
+		};
+
+		pwm_pclk: pwm_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x08>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x0b>;
+			do_autogating = <0x01>;
+			clock-output-names = "pwm_pclk";
+		};
+
+		clk_pwm0: clk_pwm0 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix120m>, <&prfll>;
+			current_rate = <0x1c9c380>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x2c>;
+			mux_bit_idx = <0x04>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x50>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x0e>;
+			gate_reg_offset = <0x7c>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x08>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x0b>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0210000.pwm0";
+			max_rate = <0x1c9c380>;
+			phandle = <0x0b>;
+		};
+
+		clk_pwm1: clk_pwm1 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix120m>, <&prfll>;
+			current_rate = <0x1c9c380>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x2c>;
+			mux_bit_idx = <0x04>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x50>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x0e>;
+			gate_reg_offset = <0x7c>;
+			gate_bit_idx = <0x01>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x08>;
+			do_reset = <0x00>;
+			autogating_shared = <&clk_pwm0>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x0b>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0210000.pwm1";
+			max_rate = <0x1c9c380>;
+			phandle = <0x0c>;
+		};
+
+		clk_pwm2: clk_pwm2 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix120m>, <&prfll>;
+			current_rate = <0x1c9c380>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x2c>;
+			mux_bit_idx = <0x04>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x50>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x0e>;
+			gate_reg_offset = <0x7c>;
+			gate_bit_idx = <0x02>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x08>;
+			do_reset = <0x00>;
+			autogating_shared = <&clk_pwm0>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x0b>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0210000.pwm2";
+			max_rate = <0x1c9c380>;
+			phandle = <0x0d>;
+		};
+
+		clk_pwm3: clk_pwm3 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix120m>, <&prfll>;
+			current_rate = <0x1c9c380>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x2c>;
+			mux_bit_idx = <0x04>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x50>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x0e>;
+			gate_reg_offset = <0x7c>;
+			gate_bit_idx = <0x03>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x08>;
+			do_reset = <0x00>;
+			autogating_shared = <&clk_pwm0>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x0b>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0210000.pwm3";
+			max_rate = <0x1c9c380>;
+			phandle = <0x0e>;
+		};
+
+		clk_pwm4: clk_pwm4 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix120m>, <&prfll>;
+			current_rate = <0x1c9c380>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x2c>;
+			mux_bit_idx = <0x05>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x50>;
+			div_bit_idx = <0x10>;
+			div_bit_width = <0x0e>;
+			gate_reg_offset = <0x7c>;
+			gate_bit_idx = <0x04>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x08>;
+			do_reset = <0x00>;
+			autogating_shared = <&clk_pwm0>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x0b>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0210000.pwm4";
+			max_rate = <0x1c9c380>;
+			phandle = <0x0f>;
+		};
+
+		clk_pwm5: clk_pwm5 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix120m>, <&prfll>;
+			current_rate = <0x1c9c380>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x2c>;
+			mux_bit_idx = <0x05>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x50>;
+			div_bit_idx = <0x10>;
+			div_bit_width = <0x0e>;
+			gate_reg_offset = <0x7c>;
+			gate_bit_idx = <0x05>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x08>;
+			do_reset = <0x00>;
+			autogating_shared = <&clk_pwm0>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x0b>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0210000.pwm5";
+			max_rate = <0x1c9c380>;
+			phandle = <0x10>;
+		};
+
+		clk_pwm6: clk_pwm6 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix120m>, <&prfll>;
+			current_rate = <0x1c9c380>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x2c>;
+			mux_bit_idx = <0x05>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x50>;
+			div_bit_idx = <0x10>;
+			div_bit_width = <0x0e>;
+			gate_reg_offset = <0x7c>;
+			gate_bit_idx = <0x06>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x08>;
+			do_reset = <0x00>;
+			autogating_shared = <&clk_pwm0>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x0b>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0210000.pwm6";
+			max_rate = <0x1c9c380>;
+			phandle = <0x11>;
+		};
+
+		clk_pwm7: clk_pwm7 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix120m>, <&prfll>;
+			current_rate = <0x1c9c380>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x2c>;
+			mux_bit_idx = <0x05>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x50>;
+			div_bit_idx = <0x10>;
+			div_bit_width = <0x0e>;
+			gate_reg_offset = <0x7c>;
+			gate_bit_idx = <0x07>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x08>;
+			do_reset = <0x00>;
+			autogating_shared = <&clk_pwm0>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x0b>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0210000.pwm7";
+			max_rate = <0x1c9c380>;
+			phandle = <0x12>;
+		};
+
+		clk_pwm8: clk_pwm8 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix120m>, <&prfll>;
+			current_rate = <0x1c9c380>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x2c>;
+			mux_bit_idx = <0x06>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x54>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x0e>;
+			gate_reg_offset = <0x7c>;
+			gate_bit_idx = <0x08>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x08>;
+			do_reset = <0x00>;
+			autogating_shared = <&clk_pwm0>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x0b>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0210000.pwm8";
+			max_rate = <0x1c9c380>;
+			phandle = <0x13>;
+		};
+
+		clk_pwm9: clk_pwm9 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix120m>, <&prfll>;
+			current_rate = <0x1c9c380>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x2c>;
+			mux_bit_idx = <0x07>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x54>;
+			div_bit_idx = <0x10>;
+			div_bit_width = <0x0e>;
+			gate_reg_offset = <0x7c>;
+			gate_bit_idx = <0x09>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x08>;
+			do_reset = <0x00>;
+			autogating_shared = <&clk_pwm0>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x0b>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0210000.pwm9";
+			max_rate = <0x1c9c380>;
+			phandle = <0x14>;
+		};
+
+		clk_pwm10: clk_pwm10 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix120m>, <&prfll>;
+			current_rate = <0x1c9c380>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x2c>;
+			mux_bit_idx = <0x08>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x58>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x0e>;
+			gate_reg_offset = <0x7c>;
+			gate_bit_idx = <0x0a>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x08>;
+			do_reset = <0x00>;
+			autogating_shared = <&clk_pwm0>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x0b>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0210000.pwm10";
+			max_rate = <0x1c9c380>;
+			phandle = <0x15>;
+		};
+
+		clk_pwm11: clk_pwm11 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix120m>, <&prfll>;
+			current_rate = <0x1c9c380>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x2c>;
+			mux_bit_idx = <0x09>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x58>;
+			div_bit_idx = <0x10>;
+			div_bit_width = <0x0e>;
+			gate_reg_offset = <0x7c>;
+			gate_bit_idx = <0x0b>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x08>;
+			do_reset = <0x00>;
+			autogating_shared = <&clk_pwm0>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x0b>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0210000.pwm11";
+			max_rate = <0x1c9c380>;
+			phandle = <0x16>;
+		};
+
+		clk_ccnt0: clk_ccnt0 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix3m>;
+			current_rate = <0x2dc6c0>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x08>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x08>;
+			do_reset = <0x00>;
+			autogating_shared = <&clk_pwm0>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x0b>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0210000.ccnt0";
+			max_rate = <0x2dc6c0>;
+		};
+
+		clk_ccnt1: clk_ccnt1 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix3m>;
+			current_rate = <0x2dc6c0>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x09>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x08>;
+			do_reset = <0x00>;
+			autogating_shared = <&clk_pwm0>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x0b>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0210000.ccnt1";
+			max_rate = <0x2dc6c0>;
+		};
+
+		clk_ccnt2: clk_ccnt2 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&fix3m>;
+			current_rate = <0x2dc6c0>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x0a>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x08>;
+			do_reset = <0x00>;
+			autogating_shared = <&clk_pwm0>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x0b>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0210000.ccnt2";
+			max_rate = <0x2dc6c0>;
+		};
+
+		pre_shared_sram: pre_shared_sram {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&pre_sram_cpu>, <&pre_sram_pre>;
+			current_rate = <0x00>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x18>;
+			mux_bit_idx = <0x1c>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "pre_shared_sram";
+		};
+
+		p_f_shared_sram: p_f_shared_sram {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&preife_sram_ife>, <&preife_sram_pre>;
+			current_rate = <0x00>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x18>;
+			mux_bit_idx = <0x1d>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "p_f_shared_sram";
+		};
+
+		dne_shared_sram: dne_shared_sram {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&dne_sram_cpu>, <&dne_sram_ime>, <&dne_sram_dne>;
+			current_rate = <0x00>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x18>;
+			mux_bit_idx = <0x00>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "dne_shared_sram";
+		};
+
+		ife_shared_sram: ife_shared_sram {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&ife_sram_cpu>, <&ife_sram_ife>;
+			current_rate = <0x00>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x18>;
+			mux_bit_idx = <0x1a>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "ife_shared_sram";
+		};
+
+		ipe_shared_sram: ipe_shared_sram {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&ipe_sram_cpu>, <&ipe_sram_ipe>;
+			current_rate = <0x00>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x18>;
+			mux_bit_idx = <0x02>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "ipe_shared_sram";
+		};
+
+		ime_shared_sram: ime_shared_sram {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&ime_sram_cpu>, <&ime_sram_ime>;
+			current_rate = <0x00>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x18>;
+			mux_bit_idx = <0x03>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "ime_shared_sram";
+		};
+
+		clk_nand: clk_nand {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&clk_nand_fac>;
+			current_rate = <0x2dc6c00>;
+			div_reg_offset = <0x40>;
+			div_bit_idx = <0x0c>;
+			div_bit_width = <0x06>;
+			gate_reg_offset = <0x74>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x84>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x13>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0400000.nand";
+			max_rate = <0x9896800>;
+			phandle = <0x09>;
+		};
+
+		nand_pclk: nand_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x13>;
+			do_autogating = <0x01>;
+			clock-output-names = "nand_pclk";
+		};
+
+		clk_gzip: clk_gzip {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix240m>, <&fix320m>, <&fix480m>, <&reserved>;
+			current_rate = <0x1c9c3800>;
+			parent_idx = <0x02>;
+			mux_reg_offset = <0x28>;
+			mux_bit_idx = <0x0c>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x0b>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x8c>;
+			reset_bit_idx = <0x07>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x1f>;
+			do_autogating = <0x01>;
+			clock-output-names = "clk_gzip";
+			max_rate = <0x1c9c3800>;
+			phandle = <0x4c>;
+		};
+
+		clk_gli_mux: clk_gli_mux {
+			#clock-cells = <0x00>;
+			clocks = <&prfll>;
+			compatible = "nvt,nvt-clk-gate";
+			gate_reg_offset = <0x120>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			clock-output-names = "clk_gli_mux";
+		};
+
+		fll_aud_m: fll_aud_m {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&prfll>;
+			parent_idx = <0x00>;
+			current_rate = <0xbb8000>;
+			div_reg_offset = <0x130>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x11>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			clock-output-names = "fll_aud_m";
+			phandle = <0x7e>;
+		};
+
+		clk_eacdac: clk_eacdac {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&pll7>, <&fll_aud_m>;
+			current_rate = <0xbb8000>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x28>;
+			mux_bit_idx = <0x18>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x38>;
+			div_bit_idx = <0x18>;
+			div_bit_width = <0x08>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x1f>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x80>;
+			reset_bit_idx = <0x1e>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "clk_eacdac";
+			max_rate = <0xbb8000>;
+			phandle = <0x7f>;
+		};
+
+		clk_eacadc: clk_eacadc {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&clk_eacdac>;
+			current_rate = <0xbb8000>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x00>;
+			mux_bit_idx = <0x00>;
+			mux_bit_width = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x1e>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "clk_eacadc";
+			max_rate = <0xbb8000>;
+		};
+
+		clk_eac: clk_eac {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&clk_eacdac>;
+			current_rate = <0xbb8000>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x00>;
+			mux_bit_idx = <0x00>;
+			mux_bit_width = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x74>;
+			gate_bit_idx = <0x14>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x80>;
+			reset_bit_idx = <0x1e>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "clk_eac";
+			max_rate = <0xbb8000>;
+		};
+
+		clk_cypt: clk_crpt {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix320m>, <&fix240m>, <&pll6>;
+			current_rate = <0x1312d000>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x1c>;
+			mux_bit_idx = <0x14>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x17>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x80>;
+			reset_bit_idx = <0x17>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "f0620000.cypt";
+			max_rate = <0x1312d000>;
+		};
+
+		clk_hash: clk_hash {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix320m>, <&fix240m>, <&pll6>;
+			current_rate = <0x1312d000>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x24>;
+			mux_bit_idx = <0x10>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x1b>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x1b>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "f0670000.hash";
+			max_rate = <0x1312d000>;
+		};
+
+		clk_rsa: clk_rsa {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix320m>, <&fix240m>, <&pll6>;
+			current_rate = <0x1312d000>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x1c>;
+			mux_bit_idx = <0x16>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x1a>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x1a>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "f06a0000.rsa";
+			max_rate = <0x1312d000>;
+		};
+
+		crypto_pclk: crypto_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x16>;
+			do_autogating = <0x00>;
+			clock-output-names = "crypto_pclk";
+		};
+
+		hash_pclk: hash_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x1a>;
+			do_autogating = <0x00>;
+			clock-output-names = "hash_pclk";
+		};
+
+		rsa_pclk: rsa_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x17>;
+			do_autogating = <0x00>;
+			clock-output-names = "rsa_pclk";
+		};
+
+		ecdsa_pclk: ecdsa_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x15>;
+			do_autogating = <0x00>;
+			clock-output-names = "ecdsa_pclk";
+		};
+
+		jpeg1_clk: jpeg1_clk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix120m>, <&fix320m>, <&fix480m>;
+			current_rate = <0x1c9c3800>;
+			parent_idx = <0x02>;
+			mux_reg_offset = <0x1c>;
+			mux_bit_idx = <0x00>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x1a>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x80>;
+			reset_bit_idx = <0x1a>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x0f>;
+			do_autogating = <0x00>;
+			clock-output-names = "jpeg1_clk";
+			max_rate = <0x1c9c3800>;
+			phandle = <0x44>;
+		};
+
+		dai_pclk: dai_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x11>;
+			do_autogating = <0x01>;
+			clock-output-names = "dai_pclk";
+		};
+
+		clk_dai: clk_dai {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&clk_eacdac>;
+			current_rate = <0xbb8000>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x00>;
+			mux_bit_idx = <0x00>;
+			mux_bit_width = <0x00>;
+			div_reg_offset = <0x38>;
+			div_bit_idx = <0x10>;
+			div_bit_width = <0x08>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x1d>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x80>;
+			reset_bit_idx = <0x1d>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "clk_dai";
+			max_rate = <0xea6000>;
+			phandle = <0x80>;
+		};
+
+		dai_mclk: dai_mclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&clk_dai>, <&pll12>;
+			current_rate = <0xbb8000>;
+			parent_idx = <0x01>;
+			mux_reg_offset = <0x20>;
+			mux_bit_idx = <0x16>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x60>;
+			div_bit_idx = <0x18>;
+			div_bit_width = <0x08>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "dai_mclk";
+			max_rate = <0x1770000>;
+		};
+
+		prdai_pclk: prdai_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x1d>;
+			do_autogating = <0x01>;
+			clock-output-names = "prdai_pclk";
+		};
+
+		clk_rng: clk_rng {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix160m>, <&fix240m>;
+			current_rate = <0x9896800>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x00>;
+			mux_bit_idx = <0x00>;
+			mux_bit_width = <0x00>;
+			div_reg_offset = <0x34>;
+			div_bit_idx = <0x18>;
+			div_bit_width = <0x08>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x19>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x19>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "f0680000.rng";
+		};
+
+		clk_rngro: clk_rngro {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&osc_in>, <&pll9>;
+			current_rate = <0x16e3600>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x00>;
+			mux_bit_idx = <0x00>;
+			mux_bit_width = <0x00>;
+			div_reg_offset = <0x60>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x08>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x15>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "f0680000.rngro";
+		};
+
+		sn_mclk1: sn_mclk1 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix480m>, <&pll5>, <&prfll>, <&pll12>;
+			current_rate = <0x7270e00>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x18>;
+			mux_bit_idx = <0x08>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x30>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x08>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x02>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "sn_mclk1";
+			max_rate = <0x8f0d180>;
+			phandle = <0x26>;
+		};
+
+		sn_mclk2: sn_mclk2 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix480m>, <&pll5>, <&reserved>, <&pll12>;
+			current_rate = <0x7270e00>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x18>;
+			mux_bit_idx = <0x0a>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x30>;
+			div_bit_idx = <0x08>;
+			div_bit_width = <0x08>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x03>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "sn_mclk2";
+			max_rate = <0x8f0d180>;
+			phandle = <0x27>;
+		};
+
+		sn_mclk3: sn_mclk3 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix480m>, <&pll5>, <&reserved>, <&pll12>;
+			current_rate = <0x7270e00>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x18>;
+			mux_bit_idx = <0x0c>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x34>;
+			div_bit_idx = <0x10>;
+			div_bit_width = <0x08>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x0a>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "sn_mclk3";
+			max_rate = <0x8f0d180>;
+			phandle = <0x28>;
+		};
+
+		sn_mclk1out: sn_mclk1out {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&clkout_normal>, <&clkout_invert>;
+			current_rate = <0x00>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x18>;
+			mux_bit_idx = <0x13>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "sn_mclk1out";
+		};
+
+		sn_mclk2out: sn_mclk2out {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&clkout_normal>, <&clkout_invert>;
+			current_rate = <0x00>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x18>;
+			mux_bit_idx = <0x18>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "sn_mclk2out";
+		};
+
+		sn_mclk3out: sn_mclk3out {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&clkout_normal>, <&clkout_invert>;
+			current_rate = <0x00>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x18>;
+			mux_bit_idx = <0x19>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "sn_mclk3out";
+		};
+
+		clk_tge: clk_tge {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&tge_clksrc>;
+			current_rate = <0x00>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x00>;
+			mux_bit_idx = <0x00>;
+			mux_bit_width = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x06>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x80>;
+			reset_bit_idx = <0x06>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "f0cc0000.tge";
+			phandle = <0x29>;
+		};
+
+		clk_tgeflashA: clk_tgeflashA {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&sn_mclk1>, <&sn_mclk2>;
+			current_rate = <0x00>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x14>;
+			mux_bit_idx = <0x10>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "clk_tgeflashA";
+			phandle = <0x2a>;
+		};
+
+		clk_tgemshA: clk_tgemshA {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&sn_mclk1>, <&sn_mclk2>;
+			current_rate = <0x00>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x14>;
+			mux_bit_idx = <0x08>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "clk_tgemshA";
+			phandle = <0x2b>;
+		};
+
+		clk_csi0: clk_csi0 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix60m>, <&fix120m>, <&fix240m>;
+			current_rate = <0x3938700>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x20>;
+			mux_bit_idx = <0x0c>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x01>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x01>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x03>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0280000.csi";
+			phandle = <0x35>;
+		};
+
+		clk_csi1: clk_csi1 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix60m>, <&fix120m>, <&fix240m>;
+			current_rate = <0x3938700>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x20>;
+			mux_bit_idx = <0x0e>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x02>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x02>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x04>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0330000.csi2";
+			phandle = <0x36>;
+		};
+
+		clk_sie1: clk_sie1 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix480m>, <&reserved>, <&pll5>, <&reserved>, <&pll12>, <&fix320m>, <&fix192m>, <&reserved>;
+			current_rate = <0x1312d000>;
+			parent_idx = <0x05>;
+			mux_reg_offset = <0x1c>;
+			mux_bit_idx = <0x18>;
+			mux_bit_width = <0x03>;
+			div_reg_offset = <0x30>;
+			div_bit_idx = <0x10>;
+			div_bit_width = <0x08>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x04>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x80>;
+			reset_bit_idx = <0x04>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x11>;
+			do_autogating = <0x00>;
+			clock-output-names = "f0c00000.sie1";
+			max_rate = <0x17d78400>;
+			phandle = <0x19>;
+		};
+
+		clk_sie2: clk_sie2 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix480m>, <&reserved>, <&pll5>, <&reserved>, <&pll12>, <&fix320m>, <&fix192m>, <&reserved>;
+			current_rate = <0x1312d000>;
+			parent_idx = <0x05>;
+			mux_reg_offset = <0x1c>;
+			mux_bit_idx = <0x1c>;
+			mux_bit_width = <0x03>;
+			div_reg_offset = <0x30>;
+			div_bit_idx = <0x18>;
+			div_bit_width = <0x08>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x05>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x80>;
+			reset_bit_idx = <0x05>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x16>;
+			do_autogating = <0x00>;
+			clock-output-names = "f0d20000.sie2";
+			max_rate = <0x17d78400>;
+			phandle = <0x1a>;
+		};
+
+		clk_sie3: clk_sie3 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix480m>, <&reserved>, <&pll5>, <&reserved>, <&pll12>, <&fix320m>, <&fix192m>, <&reserved>;
+			current_rate = <0x1312d000>;
+			parent_idx = <0x05>;
+			mux_reg_offset = <0x1c>;
+			mux_bit_idx = <0x10>;
+			mux_bit_width = <0x03>;
+			div_reg_offset = <0x38>;
+			div_bit_idx = <0x08>;
+			div_bit_width = <0x08>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x11>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x09>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x17>;
+			do_autogating = <0x00>;
+			clock-output-names = "f0d30000.sie3";
+			max_rate = <0x17d78400>;
+			phandle = <0x1b>;
+		};
+
+		clk_sie4: clk_sie4 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix480m>, <&reserved>, <&pll5>, <&reserved>, <&pll12>, <&fix320m>, <&fix192m>, <&reserved>;
+			current_rate = <0x1312d000>;
+			parent_idx = <0x05>;
+			mux_reg_offset = <0x1c>;
+			mux_bit_idx = <0x10>;
+			mux_bit_width = <0x03>;
+			div_reg_offset = <0x38>;
+			div_bit_idx = <0x08>;
+			div_bit_width = <0x08>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x19>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x0a>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "f0d40000.sie4";
+			max_rate = <0x17d78400>;
+			phandle = <0x1c>;
+		};
+
+		sie2_intclk: sie2_intclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&siex_intclk0>, <&siex_intclk1>;
+			current_rate = <0x00>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x18>;
+			mux_bit_idx = <0x1b>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "sie2_intclk";
+			phandle = <0x25>;
+		};
+
+		sie1_pxclk: sie1_pxclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&siex_pxclkpad1>, <&reserved>, <&sn_mclk1>;
+			current_rate = <0x00>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x28>;
+			mux_bit_idx = <0x1c>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x04>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "sie1_pxclk";
+			phandle = <0x21>;
+		};
+
+		sie2_pxclk: sie2_pxclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&siex_pxclkpad1>, <&siex_pxclkpad2>, <&sn_mclk1>;
+			current_rate = <0x00>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x28>;
+			mux_bit_idx = <0x0e>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x05>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "sie2_pxclk";
+			phandle = <0x22>;
+		};
+
+		sie3_pxclk: sie3_pxclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&siex_pxclkpad1>, <&siex_pxclkpad2>, <&sn_mclk1>;
+			current_rate = <0x00>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x28>;
+			mux_bit_idx = <0x10>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x06>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "sie3_pxclk";
+			phandle = <0x23>;
+		};
+
+		sie4_pxclk: sie4_pxclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&siex_pxclkpad1>, <&siex_pxclkpad2>, <&sn_mclk1>;
+			current_rate = <0x00>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x28>;
+			mux_bit_idx = <0x12>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x03>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "sie4_pxclk";
+			phandle = <0x24>;
+		};
+
+		mmc0_pclk: mmc0_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x14>;
+			do_autogating = <0x00>;
+			clock-output-names = "mmc0_pclk";
+		};
+
+		mmc1_pclk: mmc1_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x15>;
+			do_autogating = <0x00>;
+			clock-output-names = "mmc1_pclk";
+		};
+
+		mmc2_pclk: mmc2_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x0f>;
+			do_autogating = <0x00>;
+			clock-output-names = "mmc2_pclk";
+		};
+
+		eac_pclk: eac_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x12>;
+			do_autogating = <0x00>;
+			clock-output-names = "eac_pclk";
+		};
+
+		clk_eth0: clk_eth0 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&pll6>;
+			current_rate = <0x11e1a300>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x74>;
+			gate_bit_idx = <0x1d>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x84>;
+			reset_bit_idx = <0x1d>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x1b>;
+			do_autogating = <0x01>;
+			clock-output-names = "f02b0000.eth0";
+			max_rate = <0x11e1a300>;
+		};
+
+		eth0_extphy_clk: eth0_extphy_clk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&pll6>;
+			current_rate = <0x11e1a300>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x24>;
+			mux_bit_idx = <0x1a>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x78>;
+			gate_bit_idx = <0x18>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "eth0_extphy_clk";
+			max_rate = <0x11e1a300>;
+		};
+
+		clk_ide_src: clk_ide_src {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix480m>, <&pll6>, <&fix192m>, <&pll9>, <&pll11>;
+			current_rate = <0x8f0d180>;
+			parent_idx = <0x03>;
+			mux_reg_offset = <0x20>;
+			mux_bit_idx = <0x10>;
+			mux_bit_width = <0x03>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x01>;
+			clock-output-names = "ide_clk_src";
+			phandle = <0x8b>;
+		};
+
+		clk_ide: clk_ide {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&clk_ide_src>;
+			current_rate = <0x8f0d180>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x00>;
+			mux_bit_idx = <0x00>;
+			mux_bit_width = <0x00>;
+			div_reg_offset = <0x34>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x08>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x10>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x80>;
+			reset_bit_idx = <0x10>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x0a>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0800000.ide";
+			max_rate = <0x8f0d180>;
+			phandle = <0x34>;
+		};
+
+		clk_ideif: clk_ideif {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&clk_ide_src>;
+			current_rate = <0x8f0d180>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x00>;
+			mux_bit_idx = <0x00>;
+			mux_bit_width = <0x00>;
+			div_reg_offset = <0x34>;
+			div_bit_idx = <0x08>;
+			div_bit_width = <0x08>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x01>;
+			clock-output-names = "clk_ideif";
+			max_rate = <0x8f0d180>;
+		};
+
+		clk_dsi: clk_dsi {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix60m>, <&fix80m>, <&fix120m>, <&pll11>;
+			current_rate = <0x3938700>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x28>;
+			mux_bit_idx = <0x08>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x0e>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x80>;
+			reset_bit_idx = <0x0e>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x01>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0120000.dsi";
+			max_rate = <0x7270e00>;
+		};
+
+		clk_dsi_reset: clk_dsi_reset {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix60m>, <&fix80m>, <&fix120m>, <&pll11>;
+			current_rate = <0x3938700>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x00>;
+			mux_bit_idx = <0x00>;
+			mux_bit_width = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x0e>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x80>;
+			reset_bit_idx = <0x0e>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "dsi_reset";
+		};
+
+		clk_mi: clk_mi {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix192m>, <&fix320m>;
+			current_rate = <0x5b8d800>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x2c>;
+			mux_bit_idx = <0x0b>;
+			mux_bit_width = <0x01>;
+			div_reg_offset = <0x64>;
+			div_bit_idx = <0x0c>;
+			div_bit_width = <0x08>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x12>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x80>;
+			reset_bit_idx = <0x11>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x0a>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0110000.mi";
+			max_rate = <0x5b8d800>;
+		};
+
+		venc_clk: venc_clk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix240m>, <&fix320m>, <&pll11>, <&pll12>, <&pll13>, <&fix192m>, <&fix96m>;
+			current_rate = <0x1312d000>;
+			parent_idx = <0x01>;
+			mux_reg_offset = <0x28>;
+			mux_bit_idx = <0x14>;
+			mux_bit_width = <0x03>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x18>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x80>;
+			reset_bit_idx = <0x18>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x10>;
+			do_autogating = <0x01>;
+			clock-output-names = "venc_clk";
+			max_rate = <0x1312d000>;
+			power_saving = <0x00>;
+		};
+
+		venc_pclk: venc_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x10>;
+			do_autogating = <0x01>;
+			clock-output-names = "venc_pclk";
+		};
+
+		ive_pclk: ive_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc4>;
+			autogating_bit_idx = <0x1c>;
+			do_autogating = <0x01>;
+			clock-output-names = "ive_pclk";
+		};
+
+		clk_ive: clk_ive {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix480m>, <&fix240m>, <&fix320m>;
+			current_rate = <0x1c9c3800>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x14>;
+			mux_bit_idx = <0x02>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x7c>;
+			gate_bit_idx = <0x19>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x80>;
+			reset_bit_idx = <0x0c>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xb4>;
+			autogating_bit_idx = <0x1c>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0d70000.ive";
+			max_rate = <0x1c9c3800>;
+			phandle = <0x33>;
+		};
+
+		mdbc_pclk: mdbc_pclk {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-gate";
+			clocks = <&PAUTOGATING>;
+			current_rate = <0x00>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x00>;
+			gate_bit_idx = <0x00>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x00>;
+			reset_bit_idx = <0x00>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0xc0>;
+			autogating_bit_idx = <0x0d>;
+			do_autogating = <0x01>;
+			clock-output-names = "mdbc_pclk";
+		};
+
+		clk_mdbc: clk_mdbc {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix192m>, <&fix240m>, <&fix96m>, <&fix320m>;
+			current_rate = <0xe4e1c00>;
+			parent_idx = <0x01>;
+			mux_reg_offset = <0x14>;
+			mux_bit_idx = <0x14>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x7c>;
+			gate_bit_idx = <0x16>;
+			do_enable = <0x01>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x10>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x0d>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0c10000.mdbc";
+			max_rate = <0x1312d000>;
+			phandle = <0x32>;
+		};
+
+		clk_mcu: clk_mcu {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix120m>, <&osc_rtc>, <&osc_in>, <&prfll>;
+			current_rate = <0x2dc6c00>;
+			parent_idx = <0x03>;
+			mux_reg_offset = <0x10>;
+			mux_bit_idx = <0x1c>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x70>;
+			gate_bit_idx = <0x08>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x80>;
+			reset_bit_idx = <0x19>;
+			do_reset = <0x00>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "clk_mcu";
+			max_rate = <0x7270e00>;
+		};
+
+		clk_ai0: clk_ai0 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix480m>, <&fix320m>, <&pll12>, <&pll9>;
+			current_rate = <0x23c34600>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x14>;
+			mux_bit_idx = <0x00>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x7c>;
+			gate_bit_idx = <0x17>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x11>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x01>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0cb0000.ai";
+			max_rate = <0x23c34600>;
+		};
+
+		clk_ai1: clk_ai1 {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&fix480m>, <&fix320m>, <&pll12>, <&pll9>;
+			current_rate = <0x1c9c3800>;
+			parent_idx = <0x00>;
+			mux_reg_offset = <0x18>;
+			mux_bit_idx = <0x1e>;
+			mux_bit_width = <0x02>;
+			div_reg_offset = <0x00>;
+			div_bit_idx = <0x00>;
+			div_bit_width = <0x00>;
+			gate_reg_offset = <0x7c>;
+			gate_bit_idx = <0x15>;
+			do_enable = <0x00>;
+			reset_reg_offset = <0x88>;
+			reset_bit_idx = <0x0f>;
+			do_reset = <0x01>;
+			autogating_reg_offset = <0xb0>;
+			autogating_bit_idx = <0x0c>;
+			do_autogating = <0x01>;
+			clock-output-names = "f0d50000.ai";
+			max_rate = <0x23c34600>;
+		};
+
+		clk_apb: clk_apb {
+			#clock-cells = <0x00>;
+			compatible = "nvt,nvt-clk-mux";
+			clocks = <&prfll>, <&fix60m>, <&fix80m>, <&fix120m>;
+			current_rate = <0x7270e00>;
+			parent_idx = <0x03>;
+			keep_rate = <0x01>;
+			mux_reg_offset = <0x10>;
+			mux_bit_idx = <0x08>;
+			mux_bit_width = <0x02>;
+			autogating_reg_offset = <0x00>;
+			autogating_bit_idx = <0x00>;
+			do_autogating = <0x00>;
+			clock-output-names = "apb_clk";
+			phandle = <0x50>;
+		};
+	};
+
+	audio_i2s_part {
+		i2s = <0x00>, <0x01>, <0x02>, <0x01>, <0x10>, <0x1f40>, <0x3e800>, <0x01>, <0x01>, <0x01>;
+	};
+
+	audio_mclk_part {
+		mclk = <0x00>, <0xbb8000>;
+	};
+};

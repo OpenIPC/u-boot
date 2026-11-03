@@ -1,0 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * NT98532: the NS02501 tree as the SDK's cfg_532_IPC_NOR_SQUASHFS_BD_EVB
+ * has it, 256 MiB of DDR.
+ */
+/dts-v1/;
+
+/include/ "ns02501.dtsi"
