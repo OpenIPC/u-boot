@@ -155,6 +155,8 @@ swapped back.
 | `nt98525` | 2x Cortex-A9 | 2x 512 MiB DDR3, external | NOR | NA51055 |
 | `nt98528` | 2x Cortex-A9 | 2x 512 MiB DDR3, external | NOR | NA51084 |
 | `nt98529` | 2x Cortex-A9 | 2x 512 MiB DDR3, external | NOR | NA51084, 1.2 GHz |
+| `nt98532` | 2x Cortex-A32 | 256 MiB | NOR | NS02501 (532BD package) |
+| `nt98533` | 2x Cortex-A32 | 256 MiB | NOR | NS02501 (533QD package) |
 | `nt98321` | 2x Cortex-A9 | 512 MiB DDR3, external | NOR | NA51068, DVR/NVR |
 | `nt98323` | 2x Cortex-A9 | 512 MiB DDR4, external | NOR | NA51068, DVR/NVR |
 | `nt98332` | 2x Cortex-A53 | 1 GiB | NOR | NA51103, NVR: U-Boot's slot only |
