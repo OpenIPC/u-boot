@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Novatek NA51089: the loader's HEADINFO, reset and DRAM size. The
- * timer is timer 0 of the timer block, which the loader leaves running
- * (CONFIG_SYS_TIMER_COUNTER in include/configs/novatek.h).
+ * Novatek NA51089, NA51055 / NA51084: the loader's HEADINFO, reset and
+ * DRAM size. The timer is timer 0 of the timer block, which the loader
+ * leaves running (CONFIG_SYS_TIMER_COUNTER in include/configs/novatek.h).
  */
 
 #include <common.h>
@@ -37,7 +37,12 @@ struct nvt_headinfo {
 static const struct nvt_headinfo headinfo
 	__used __section(".nvt_headinfo") = {
 	.code_entry	= CONFIG_SYS_TEXT_BASE,
+	/* The vendor U-Boot's tag; no loader checks it */
+#ifdef CONFIG_NVT_NA51055
+	.chip_name	= "ub51055 ",
+#else
 	.chip_name	= "ub51089 ",
+#endif
 	.version	= "OpenIPC ",
 	.date		= "        ",
 	.bin_length	= 0xffffffff,

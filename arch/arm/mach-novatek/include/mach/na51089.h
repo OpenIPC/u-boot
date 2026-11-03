@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 /*
- * Novatek NA51089 (NT98562, NT98566): memory map, after the vendor
- * U-Boot 2019.04 (arch-nvt-na51089_a32/IOAddress.h) and the SDK's
- * device trees.
+ * Novatek NA51089 (NT98560/561/562/566), and NA51055 / NA51084
+ * (NT98520/522/523/525/528/529), which share its map: after the vendor
+ * U-Boot 2019.04 (arch-nvt-na51089_a32/IOAddress.h,
+ * arch-nvt-na51055_a32/IOAddress.h) and the SDKs' device trees.
  */
 
 #ifndef __NA51089_H
@@ -25,9 +26,22 @@
 #define NVT_SDIO1_BASE		0xF0420000
 #define NVT_PL310_BASE		0xFFE00000
 
-/* TOP */
+/*
+ * TOP. NA51055 (NT98520/522/523/525) and NA51084 (NT98528/529), the
+ * NT9852x SDK's two dies, have NA51089's blocks at NA51089's addresses;
+ * the vendor's code tells them apart at run time by this ID.
+ */
 #define NVT_TOP_CHIP_ID		(NVT_TOP_BASE + 0xF0)	/* [31:16] */
 #define NVT_CHIP_NA51089	0x7021
+#define NVT_CHIP_NA51055	0x4821
+#define NVT_CHIP_NA51084	0x5021
+
+#ifndef __ASSEMBLY__
+static inline unsigned int nvt_chip_id(void)
+{
+	return *(volatile unsigned int *)NVT_TOP_CHIP_ID >> 16;
+}
+#endif
 
 /* CG: per-module clock enables and resets (active low) */
 #define NVT_CG_CLKEN0		(NVT_CG_BASE + 0x74)

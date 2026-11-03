@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Ethernet MAC of the Novatek NA51089: a Synopsys DWC Ethernet QoS
- * (GMAC 4.x) core, run polled with one Tx and one Rx descriptor ring.
+ * Ethernet MAC of the Novatek NA51089, NA51055 and NA51084: a Synopsys DWC
+ * Ethernet QoS (GMAC 4.x) core, run polled with one Tx and one Rx
+ * descriptor ring.
  *
  * The block has the MAC at 0x0000, the MTL (the FIFOs) at 0x0D00 and the
  * DMA, channel 0 from 0x1100, at 0x1000; Novatek's glue (interface and
@@ -95,6 +96,7 @@
 #define DMA_SWR			BIT(0)
 /* DMA_SYSBUS_MODE: outstanding AXI reads, as the vendor driver */
 #define SYSBUS_RD_OSR_LMT(n)	((n) << 16)
+#define SYSBUS_AALE		BIT(10)	/* automatic AXI low-power entry */
 /* DMA_CH_CTRL */
 #define CH_PBLX8		BIT(16)
 #define CH_DSL(n)		((n) << 18)	/* skip, in 8-byte units */
@@ -111,10 +113,29 @@
 #define DES3_ES			BIT(15)		/* write-back, Rx */
 #define DES3_LEN(v)		((v) & 0x7fff)
 
-/* The core's own descriptor, padded to a cache line */
+/*
+ * The core's own descriptor, padded to a cache line on NA51089. The DMA
+ * skips the padding (DSL) in units of its bus width, 3 bits' worth: 8
+ * bytes on NA51089 and NA51084, but 4 on NA51055 (the vendor's
+ * eth_na51055.c), where no skip reaches a 64-byte line. The NT9852x
+ * targets therefore pack the descriptors, no skip: this port runs with
+ * the data cache off (SYS_DCACHE_OFF), so no cache line is shared with
+ * the DMA.
+ */
+#ifdef CONFIG_NVT_NA51055
+#if !CONFIG_IS_ENABLED(SYS_DCACHE_OFF)
+#error "packed descriptors need the data cache off"
+#endif
+#define DESC_SIZE		16
+#else
+#define DESC_SIZE		ARCH_DMA_MINALIGN
+#endif
+
 struct eqos_desc {
 	u32 des0, des1, des2, des3;
-	u8 pad[ARCH_DMA_MINALIGN - 16];
+#if DESC_SIZE > 16
+	u8 pad[DESC_SIZE - 16];
+#endif
 };
 
 #define TX_DESCS		4
@@ -247,11 +268,16 @@ static int eqos_start(struct eth_device *dev, struct bd_info *bis)
 	writel(RXQ0_EN, MAC_RXQ_CTRL0);
 	eqos_write_hwaddr(dev);
 
-	/* Bursts of 16 x 8 beats, as the vendor driver */
-	writel(CH_PBLX8 | CH_DSL((ARCH_DMA_MINALIGN - 16) / 8), DMA_CH_CTRL);
+	/*
+	 * Bursts of 16 x 8 beats, as the vendor drivers; the NT9852x one
+	 * also lets the AXI master idle into low power (AALE).
+	 */
+	writel(CH_PBLX8 | CH_DSL((DESC_SIZE - 16) / 8), DMA_CH_CTRL);
 	writel(CH_PBL(16) | CH_TX_OSP, DMA_CH_TX_CTRL);
 	writel(CH_PBL(16) | CH_RBSZ(PKT_SIZE), DMA_CH_RX_CTRL);
-	writel(SYSBUS_RD_OSR_LMT(2), DMA_SYSBUS_MODE);
+	writel(SYSBUS_RD_OSR_LMT(2) |
+	       (nvt_chip_id() == NVT_CHIP_NA51089 ? 0 : SYSBUS_AALE),
+	       DMA_SYSBUS_MODE);
 
 	memset(tx_descs, 0, sizeof(tx_descs));
 	memset(rx_descs, 0, sizeof(rx_descs));

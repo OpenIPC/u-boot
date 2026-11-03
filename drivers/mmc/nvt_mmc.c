@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * SD card on SDIO1 of the Novatek NA51089 (NT98562, NT98566), non-DM.
+ * SD card on SDIO1 of the Novatek NA51089, NA51055 and NA51084, non-DM.
+ * The three take the same set-up (the vendor driver's default branch),
+ * but for the sampling clock.
  *
  * Software sets a data phase up first (block size, DATA_LENGTH, DATA_EN,
  * the FIFO's direction, then FIFO_EN), then writes the command with
@@ -81,6 +83,7 @@
 #define BUS_READY		BIT(0)		/* card not busy */
 #define PHY_SW_RST		BIT(0)
 #define PHY_BLK_FIFO_EN		BIT(4)
+#define DLY0_SRC_CLK_SEL	BIT(13)		/* the internal clock */
 #define DLY0_PAD_CLK_SEL	BIT(14)		/* sample before the pad */
 #define DLY1_READ_DLY_MASK	(0xf << 28)
 #define DLY1_READ_DLY		(0xa << 28)	/* DATA/DET_READ_DLY = 2 */
@@ -183,8 +186,17 @@ static int nvt_mmc_init(struct mmc *mmc)
 	udelay(10);
 
 	clrbits_le32(SDIO_CLK_CTRL, CLK_DIS);
-	/* Sample from the pad side, positive edge (neg-sample-edge = 0) */
-	clrsetbits_le32(SDIO_DLY0, BIT(12) | BIT(13), DLY0_PAD_CLK_SEL);
+	/*
+	 * Positive edge (neg-sample-edge = 0). The sampling clock: on
+	 * NA51089 and NA51084 from the pad, before it; on NA51055 the
+	 * internal one, after the pad (the vendor's setphysample()).
+	 */
+	if (nvt_chip_id() == NVT_CHIP_NA51055)
+		clrsetbits_le32(SDIO_DLY0, BIT(12) | DLY0_PAD_CLK_SEL,
+				DLY0_SRC_CLK_SEL);
+	else
+		clrsetbits_le32(SDIO_DLY0, BIT(12) | DLY0_SRC_CLK_SEL,
+				DLY0_PAD_CLK_SEL);
 	nvt_mmc_reset_data();
 	nvt_mmc_clock = SDIO_F_MIN;
 	nvt_mmc_set_clock(SDIO_F_MIN);
