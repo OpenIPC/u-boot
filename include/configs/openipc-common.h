@@ -34,7 +34,9 @@
 #endif
 
 /* Clear of the kernel at 0x8000 as it unpacks, below U-Boot */
+#ifndef OPENIPC_BASEADDR
 #define OPENIPC_BASEADDR	0x01000000
+#endif
 
 /* NOR layout, shared with every OpenIPC NOR camera */
 #define OPENIPC_KERNADDR	0x50000
@@ -105,6 +107,10 @@
 #define OPENIPC_FWUPD "fwupd=run ur; run uk\0"
 
 #define OPENIPC_LOADKERNEL "sf probe 0; sf read ${baseaddr} ${kernaddr} ${kernsize}"
+/* The boot image goes at 0, unless the SoC's config says otherwise */
+#ifndef OPENIPC_UBWRITE
+#define OPENIPC_UBWRITE "sf probe 0; sf erase 0x0 ${kernaddr}; sf write ${baseaddr} 0x0 ${filesize}"
+#endif
 #define OPENIPC_ENV_MEDIUM \
 	"ubfile=u-boot-" CONFIG_PRODUCT_SOC "-nor.bin\0" \
 	"urfile=rootfs.squashfs." CONFIG_PRODUCT_SOC "\0" \
@@ -114,7 +120,7 @@
 	"rootsize=" __stringify(OPENIPC_ROOTSIZE) "\0" \
 	"mtdslite=setenv kernsize 0x200000; setenv rootaddr 0x250000; setenv rootsize 0x500000\0" \
 	"mtdsultimate=setenv kernsize 0x300000; setenv rootaddr 0x350000; setenv rootsize 0xa00000\0" \
-	"ubwrite=sf probe 0; sf erase 0x0 ${kernaddr}; sf write ${baseaddr} 0x0 ${filesize}\0" \
+	"ubwrite=" OPENIPC_UBWRITE "\0" \
 	"ukwrite=sf probe 0; sf erase ${kernaddr} ${kernsize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0" \
 	"urwrite=sf probe 0; if itest ${filesize} -gt 500000; then run mtdsultimate; fi; sf erase ${rootaddr} ${rootsize}; sf write ${baseaddr} ${rootaddr} ${filesize}\0" \
 	"fwwrite=sf probe 0; sf erase ${kernaddr} ${filesize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0" \

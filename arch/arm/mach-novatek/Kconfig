@@ -28,13 +28,33 @@ config TARGET_NT98566
 	help
 	  NA51089 with 128 MiB of DDR3 in the package.
 
+config TARGET_NT98332
+	bool "NT98332 (NA51103)"
+	select NVT_NA51103
+	help
+	  NA51103, the NVR die with two Cortex-A53s, 1 GiB of DDR on the
+	  boards. U-Boot runs in AArch64 at EL2, started by the board's
+	  BL31.
+
 endchoice
 
 config NVT_NA51089
 	bool
 
+# The NVR dies: the board's loader warm-resets the A53s into AArch64 and
+# its BL31 (TF-A v2.2) enters U-Boot at EL2 with a fixed SPSR (0x3C9), so
+# U-Boot is an AArch64 one.
+config NVT_NA511XX
+	bool
+	select ARM64
+
+config NVT_NA51103
+	bool
+	select NVT_NA511XX
+
 config NVT_DDR_SIZE
 	hex
+	default 0x40000000 if TARGET_NT98332
 	default 0x20000000 if TARGET_NT98560
 	default 0x08000000 if TARGET_NT98566
 	default 0x04000000
@@ -49,6 +69,7 @@ config SYS_VENDOR
 	default "novatek"
 
 config SYS_BOARD
+	default "na511xx" if NVT_NA511XX
 	default "na51089"
 
 config SYS_CONFIG_NAME
