@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Ethernet MAC of the Novatek NA51089: a Synopsys DWC Ethernet QoS
- * (GMAC 4.x) core, run polled with one Tx and one Rx descriptor ring.
+ * Ethernet MAC of the Novatek NA51089, NA51103 and NA51090: a Synopsys DWC
+ * Ethernet QoS (GMAC 4.x) core, run polled with one Tx and one Rx
+ * descriptor ring.
  *
  * The block has the MAC at 0x0000, the MTL (the FIFOs) at 0x0D00 and the
  * DMA, channel 0 from 0x1100, at 0x1000; Novatek's glue (interface and
  * clock selection, LEDs) at 0x3000 and the embedded PHY's analog part at
  * 0x3800. Board code sets those last two up before this driver runs
- * (board/novatek/na51089), and the order matters: the DMA software reset
+ * (board/novatek/na51089, na511xx), and the order matters: the DMA software reset
  * only completes once the PHY feeds the MAC its Rx clock.
  *
  * Descriptors are four words, OWN in DES3 bit 31, each padded to a cache
@@ -30,7 +31,7 @@
 #include <phy.h>
 #include <asm/cache.h>
 #include <asm/io.h>
-#include <asm/arch/na51089.h>
+#include <asm/arch/hardware.h>
 #include <linux/delay.h>
 
 #define EQ(off)			(NVT_ETH_BASE + (off))
@@ -124,7 +125,7 @@ struct eqos_desc {
 
 /* What the CSR clock (CG+0x10 [9:8]) is, as an MDC divider (CR) */
 #define NVT_CG_SYSCLK		(NVT_CG_BASE + 0x10)
-static const u8 mdio_cr[4] = {
+static const u8 __maybe_unused mdio_cr[4] = {
 	3,	/* 48 MHz: CR 35-60 MHz, /26 */
 	0,	/* 60 MHz: CR 60-100 MHz, /42 */
 	0,	/* 80 MHz */
@@ -360,7 +361,11 @@ int nvt_eqos_initialize(phy_interface_t intf)
 	struct mii_dev *mii;
 
 	eqos.intf = intf;
+#ifdef NVT_ETH_MDIO_CR
+	eqos.cr = NVT_ETH_MDIO_CR;
+#else
 	eqos.cr = mdio_cr[(readl(NVT_CG_SYSCLK) >> 8) & 3];
+#endif
 
 	mii = mdio_alloc();
 	if (!mii)
