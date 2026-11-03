@@ -35,6 +35,7 @@
 #include "crypto.h"
 #include "nand.h"
 #include "nor.h"
+#include "bl_lzma.h"
 #include "bl_lowlevel_init.h"
 #include "at80c51.h"
 #include "bl_linux.h"
@@ -1410,6 +1411,38 @@ _THUMB2 static int bl_load_fdt_from_flash(unsigned char *p_tmp, unsigned int tmp
 
 	if (IS_SECURE() == 0 || SECURE_DECRYPT_FDT == 0) {
 		p_fdt_hdr = (unsigned char *)bl_lowlevel_get_fdt();
+		/*
+		 * OpenIPC: the tree in a BCL1 LZMA container (openipc/
+		 * nvt-image.py). This SDK's trees are ~95 KiB, its clocks
+		 * described in them; plain, one would not leave U-Boot a
+		 * 128 KiB slot before the environment at 0x40000.
+		 */
+		NVTPACK_BFC_HDR *p_bfc = (NVTPACK_BFC_HDR *)p_tmp;
+		if (p_fdt_hdr == NULL &&
+		    p_bfc->uiFourCC == MAKEFOURCC('B', 'C', 'L', '1') &&
+		    (cpu_to_be32(p_bfc->uiAlgorithm) & 0xFF) == 11) {
+			UINT32 size_comp = invertEndian(p_bfc->uiSizeComp);
+			UINT32 size_uncomp = invertEndian(p_bfc->uiSizeUnComp);
+			int total_size = ALIGN_CEIL(size_comp + sizeof(NVTPACK_BFC_HDR), blk_size);
+			unsigned char *p_out = p_tmp + total_size;
+
+			if (tmp_size < total_size + size_uncomp) {
+				debug_err_var("tmp_size too small, require:", total_size + size_uncomp);
+				return -1;
+			}
+			if (total_size > blk_size) {
+				er = int_strg_obj->flash_readSectors(g_uiStartBlkUpdateFW + 1, total_size - blk_size, p_tmp + blk_size, NAND_RW_FIRMWARE);
+				if (er < 0) {
+					debug_err("bl_load_fdt_from_flash\r\n");
+					return -1;
+				}
+			}
+			if (bl_lzma_inflate(p_tmp + sizeof(NVTPACK_BFC_HDR), size_comp, p_out, size_uncomp) < 0) {
+				debug_err("fdt lzma\r\n");
+				return -1;
+			}
+			p_fdt_hdr = p_out;
+		}
 		if (p_fdt_hdr == NULL) {
 			int fdt_size = fdt_totalsize(p_tmp);
 			int total_size = ALIGN_CEIL(fdt_size, blk_size);
@@ -2023,7 +2056,14 @@ _THUMB2 static int bl_load_uboot_from_flash(unsigned char *p_fdt, unsigned char 
 				rom_lzma_inflate(p_tmp + sizeof(NVTPACK_BFC_HDR), size_comp_le, (unsigned char *) p_dram_partition->uboot_addr, size_uncomp_le, (UINT8 *)lzma_temp_buffer, 65536);
 				debug_msg("lzma ");
 #else
-				debug_msg("Can not support LZMA\r\n");
+				/* OpenIPC: the loader's own decoder (bl_lzma.c) */
+				if (bl_lzma_inflate(p_tmp + sizeof(NVTPACK_BFC_HDR), size_comp_le,
+						(unsigned char *)p_dram_partition->uboot_addr,
+						invertEndian(pBfc->uiSizeUnComp)) < 0) {
+					debug_err("lzma\r\n");
+					return -1;
+				}
+				debug_msg("lzma ");
 #endif
 			} else {
 				LZ_Un_compress(p_tmp + sizeof(NVTPACK_BFC_HDR), (unsigned char *)p_dram_partition->uboot_addr, size_comp_le);

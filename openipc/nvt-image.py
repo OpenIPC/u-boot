@@ -9,10 +9,14 @@
 #
 # up to the environment at 0x40000. The loader finds U-Boot through the
 # device tree's /nor/partition_uboot, unpacks it with the mask ROM's LZMA
-# decoder to /nvt_memory_cfg/uboot and starts it at the HEADINFO's
-# CodeEntry, once the checksum over the unpacked image adds up.
+# decoder (or its own) to /nvt_memory_cfg/uboot and starts it at the
+# HEADINFO's CodeEntry, once the checksum over the unpacked image adds up.
 #
-# usage: nvt-image.py LOADER DTB U-BOOT.BIN TEXT_BASE OUTPUT
+# With --fdt-lzma the device tree goes in an LZMA BCL1 container too: the
+# NS02501 trees (~95 KiB) do not fit their 64 KiB plain, and that loader
+# (board/novatek/ns02501/loader) unpacks one.
+#
+# usage: nvt-image.py [--fdt-lzma] LOADER DTB U-BOOT.BIN TEXT_BASE OUTPUT
 
 import lzma
 import struct
@@ -78,13 +82,20 @@ def bcl1_lzma(data):
 
 
 def main():
-    if len(sys.argv) != 6:
-        sys.exit(__doc__ or 'usage: nvt-image.py LOADER DTB U-BOOT.BIN '
-                 'TEXT_BASE OUTPUT')
-    loader = open(sys.argv[1], 'rb').read()
-    dtb = open(sys.argv[2], 'rb').read()
-    uboot = open(sys.argv[3], 'rb').read()
-    text_base = int(sys.argv[4], 0)
+    args = sys.argv[1:]
+    fdt_lzma = args[:1] == ['--fdt-lzma']
+    if fdt_lzma:
+        args = args[1:]
+    if len(args) != 5:
+        sys.exit(__doc__ or 'usage: nvt-image.py [--fdt-lzma] LOADER DTB '
+                 'U-BOOT.BIN TEXT_BASE OUTPUT')
+    loader = open(args[0], 'rb').read()
+    dtb = open(args[1], 'rb').read()
+    uboot = open(args[2], 'rb').read()
+    text_base = int(args[3], 0)
+    dtb_len = len(dtb)
+    if fdt_lzma:
+        dtb = bcl1_lzma(dtb)
 
     bcl = bcl1_lzma(headinfo(uboot, text_base))
     for name, blob, room in (('loader', loader, FDT_OFFSET),
@@ -98,9 +109,11 @@ def main():
     img[0:len(loader)] = loader
     img[FDT_OFFSET:FDT_OFFSET + len(dtb)] = dtb
     img[UBOOT_OFFSET:UBOOT_OFFSET + len(bcl)] = bcl
-    open(sys.argv[5], 'wb').write(img)
-    print('%s: loader %d, device tree %d, U-Boot %d packed (%d)' %
-          (sys.argv[5], len(loader), len(dtb), len(bcl), len(uboot)))
+    open(args[4], 'wb').write(img)
+    print('%s: loader %d, device tree %d%s, U-Boot %d packed (%d)' %
+          (args[4], len(loader), len(dtb),
+           ' packed (%d)' % dtb_len if fdt_lzma else '', len(bcl),
+           len(uboot)))
 
 
 if __name__ == '__main__':

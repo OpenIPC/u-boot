@@ -24,6 +24,8 @@ SRC = \
 	bl_func.c \
 	bl_linux.c \
 	arch_timer.c \
+	bl_lzma.c \
+	LzmaDec.c \
 
 ASM =
 
