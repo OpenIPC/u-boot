@@ -10,11 +10,12 @@
 #include <asm/arch/na51089.h>
 
 #define CONFIG_SYS_SDRAM_BASE		NVT_DDR_BASE
-/* The DDR in the package */
-#ifdef CONFIG_TARGET_NT98566
-#define PHYS_SDRAM_1_SIZE		0x08000000
-#else
-#define PHYS_SDRAM_1_SIZE		0x04000000
+/* The DDR in the package, or on the board */
+#define PHYS_SDRAM_1_SIZE		CONFIG_NVT_DDR_SIZE
+
+/* Linux's share of a 512 MiB part, as on the SDK's boards (mem=) */
+#if CONFIG_NVT_DDR_SIZE >= 0x20000000
+#define OPENIPC_OSMEM			"256M"
 #endif
 
 /* The loader starts U-Boot at its link address */

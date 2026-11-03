@@ -38,12 +38,14 @@ build_loader() {
     loaderdir=$1
     chip=$2
     dram_clk=$3
+    dram_size=$4
 
     rm -rf "${loaderdir}"
     cp -a "${LOADER_SRCDIR}" "${loaderdir}"
     if ! make -C "${loaderdir}/MakeCommon" release \
             CROSS_COMPILE="${LOADER_CROSS_COMPILE}" \
             CHIP="${chip}" DRAM1_CLK="${dram_clk}" \
+            ${dram_size:+SDRAM_SIZE="${dram_size}"} \
             >"${loaderdir}.log" 2>&1 </dev/null; then
         tail -n 30 "${loaderdir}.log" >&2
         return 1
@@ -57,6 +59,7 @@ build_nvt() {
     soc=$1
     chip=$2
     dram_clk=$3
+    dram_size=$4
     builddir=${BOOT_SRCDIR}/output/build-${soc}-nor
     loaderdir=${BOOT_SRCDIR}/output/build-${soc}-loader
     loader=${loaderdir}/Project/Model/Loader${chip}_Data/Release/LD98${chip}A.bin
@@ -70,7 +73,8 @@ build_nvt() {
 
     "${builddir}/scripts/dtc/dtc" -q -I dts -O dtb \
         -o "${builddir}/${soc}.dtb" "openipc/${soc}.dts" || return 1
-    build_loader "${loaderdir}" "${chip}" "${dram_clk}" || return 1
+    build_loader "${loaderdir}" "${chip}" "${dram_clk}" "${dram_size}" ||
+        return 1
 
     text=$(sed -n 's/^CONFIG_SYS_TEXT_BASE=//p' "${builddir}/.config")
     python3 openipc/nvt-image.py "${loader}" "${builddir}/${soc}.dtb" \
@@ -80,11 +84,19 @@ build_nvt() {
 build_soc() {
     soc=$1
     case "${soc}" in
-        # The DDR clocks of Xiongmai's loaders for these parts. The DDR is
-        # in the package: Configram560 writes its parameters from its own
-        # tables for -package=562/566, and the ConfigRam/<chip>/*.ini path
-        # the make system names, which does not exist, is not read (a 560
-        # profile of any clock and size gives the same loader).
+        # The DDR clocks of Xiongmai's loaders for the NT98562 / NT98566,
+        # and of the SDK's prebuilt LD98560A / LD98561A. The DDR of the
+        # 561/562/566 is in the package: Configram560 writes its
+        # parameters from its own tables for -package=561/562/566, and the
+        # ConfigRam/<chip>/*.ini path the make system names, which does not
+        # exist, is not read (a 560 profile of any clock and size gives
+        # the same loader). The NT98560's DDR is on the board: its profile
+        # is ConfigRam/560/51089A_DRAM1_<clock>_<size in Mbit>.ini, the
+        # SDK's 933 MHz, 4 Gbit.
+        nt98560)
+            build_nvt "${soc}" 560 933 4096 ;;
+        nt98561)
+            build_nvt "${soc}" 561 522 ;;
         nt98562)
             build_nvt "${soc}" 562 666 ;;
         nt98566)
@@ -95,7 +107,7 @@ build_soc() {
     esac
 }
 
-ALL_SOCS="nt98562 nt98566"
+ALL_SOCS="nt98560 nt98561 nt98562 nt98566"
 
 SOCS="$@"
 [ -z "${SOCS}" ] && SOCS="${ALL_SOCS}"

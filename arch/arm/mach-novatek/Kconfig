@@ -4,6 +4,18 @@ choice
 	prompt "Novatek SoC"
 	default TARGET_NT98562
 
+config TARGET_NT98560
+	bool "NT98560"
+	select NVT_NA51089
+	help
+	  NA51089 with external DDR3, 512 MiB on the SDK's board.
+
+config TARGET_NT98561
+	bool "NT98561"
+	select NVT_NA51089
+	help
+	  NA51089 with 64 MiB of DDR2 in the package, as the NT98562.
+
 config TARGET_NT98562
 	bool "NT98562"
 	select NVT_NA51089
@@ -20,6 +32,15 @@ endchoice
 
 config NVT_NA51089
 	bool
+
+config NVT_DDR_SIZE
+	hex
+	default 0x20000000 if TARGET_NT98560
+	default 0x08000000 if TARGET_NT98566
+	default 0x04000000
+	help
+	  The DDR at 0: the package's, or the board's for a part with
+	  external DDR.
 
 config SYS_SOC
 	default "novatek"

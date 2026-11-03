@@ -1,0 +1,39 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * NT98560: the NA51089 die with external DDR3, 512 MiB on the SDK's board
+ * (cfg_560_IPCAM1_EVB), which gives Linux the first 256 MiB and the media
+ * pool the rest. U-Boot stays where the NT98562 has it, below 64 MiB.
+ */
+/dts-v1/;
+
+/include/ "na51089.dtsi"
+
+/ {
+	nvt_memory_cfg {
+		dram {
+			reg = <0x00 0x20000000>;
+		};
+	};
+
+	memory {
+		reg = <0x00 0x10000000>;
+	};
+
+	hdal-memory {
+		media {
+			reg = <0x10000000 0x10000000>;
+		};
+	};
+
+	hdal-maxpath-cfg {
+		vdocap_active_list = <0x01 0x01 0x01 0x00 0x00 0x00 0x00 0x00>;
+		vdoprc_maxdevice = <0x02>;
+		vdoenc_maxpath = <0x08>;
+		vdodec_maxpath = <0x02>;
+	};
+
+	nvt_info {
+		BIN_NAME = "FW98560A";
+		BIN_NAME_T = "FW98560T";
+	};
+};
