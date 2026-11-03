@@ -1,0 +1,236 @@
+BIN_NAME = LD98$(CHIP_SHORT)A
+BL_UPDATE_FWNAME = FW98$(CHIP_SHORT)A.BIN
+BL_RUN_FWNAME = FW98$(CHIP_SHORT)T.BIN
+
+# Ext => DRAM is external die => Need user configuration
+# KGD => DRAM is internal die => Depend on specific chip (force fixed dram size)
+#===========+================+==================+
+# chip_name	| 	DDR1 size	|	DDR2 size		|
+#===========+===============+===================+
+#	528		|	1/2/4Gb(Ext)|	1/2/4Gb(Ext)	|
+#===========+===============+===================+
+#	529		|	1/2/4Gb(Ext)|	1/2/4Gb(Ext)	|
+#===========+===============+===================+
+# [CHIP] : main chip ID
+
+# 528
+# 580
+# 529
+CHIP = 528
+
+# [CHIP_VER] : chip version
+# A
+# B
+#CHIP_VER = A
+
+# [DRAM1_CLK] : DRAM1(16-bit) clock rate
+# 700
+# 793
+# 933
+# 1066
+DRAM1_CLK = 1066
+
+# [DRAM2_CLK] : DRAM2(16-bit) clock rate (must <= DRAM1_CLK)
+# 793
+# 933
+# 1066
+DRAM2_CLK = 1066
+
+# [DMA_CLOCK] : DMA clock rate
+# LV0
+# LV1
+#DMA_CLOCK = LV1
+
+# [SDRAM_SIZE] : DRAM Size (unit: Giga bit)
+# 1024
+# 2048
+# 4096
+SDRAM_SIZE = 4096
+
+# [SDRAM2_SIZE] : DRAM2 Size (unit: Giga bit)
+# 0
+# 1024
+# 2048
+# 4096
+SDRAM2_SIZE = 4096
+
+NC520_525_COMBO = OFF
+
+# [NC520_COMBO_DRAM1_CLK] : DRAM1(16-bit) clock rate
+# 700
+# 793
+# 933
+NC520_COMBO_DRAM1_CLK = 933
+
+# [2ND_525_SDRAM_SIZE] : DRAM Size (unit: Giga bit)
+# 1024
+# 2048
+# 4096
+NC520_COMBO_SDRAM_SIZE = 4096
+
+# [DRAM1_POWEROFF_S3] : PCB support powered off S3
+# Normal
+# Enabled
+#DRAM1_POWEROFF_S3 = Normal
+
+# [DRAM_NUMBER_DETECT] : enable DRAM number detect by L_GPIO3
+# Normal
+# Enabled
+DRAM_NUMBER_DETECT = Normal
+
+# [DRAM_PLL_SSC] : enable DRAM PLL spread spectrum
+# Normal
+# 1 (0.1%)
+# 2 (0.2%)
+# 3 (0.3%)
+# 4 (0.4%)
+# 5 (0.5%)
+DRAM_SSC_ENABLE = Normal
+
+# [DRAM_TYPE] : DRAM Type
+# DDR3
+# DDR3L
+DRAM_TYPE = DDR3
+
+# [DDR_TREFI] : ddr refresh time select by temparature range
+# Normal(0~85)
+# Extend(85~95)
+DDR_TREFI = Normal
+
+# [DRAM_2ND_TBL_DETECT] : enable DRAM 2nd table detect by GPIO (default: P_GPIO13)
+# Normal (No GPIO detected)
+# 0 (C_GPIO)
+# 1 (P_GPIO)
+# 2 (S_GPIO)
+# 3 (L_GPIO)
+# 4 (D_GPIO)
+# 5 (HSI_GPI)
+# 6 (ADC_GPIO)
+# 7 (Reserved)
+DRAM_2ND_TBL_DETECT = Normal
+
+# [DRAM_2ND_TBL_DETECT_GPIO_NO] : enable DRAM 2nd table detect by X_GPIO_n
+# where
+#   C_GPIO --> n=0~22
+#   P_GPIO --> n=0~25
+#   S_GPIO --> n=0~12
+#   L_GPIO --> n=0~24
+#   D_GPIO --> n=0~21
+#  HSI_GPI --> n=0~11
+# ADC_GPIO --> n=0~2
+DRAM_2ND_TBL_DETECT_GPIO_NO = 13
+
+# [DRAM1_2ND_CLK] : DRAM1(16-bit) 2nd table clock rate
+# 700
+# 793
+# 933
+# 1066
+DRAM1_2ND_CLK = 933
+
+# [DRAM2_2ND_CLK] : DRAM2(16-bit) 2nd table clock rate (must <= DRAM1_CLK)
+# 793
+# 933
+# 1066
+DRAM2_2ND_CLK = 933
+
+# [SDRAM_2ND_SIZE] : 2nd table DRAM Size (unit: Giga bit)
+# 1024
+# 2048
+# 4096
+SDRAM_2ND_SIZE = 4096
+
+# [SDRAM2_2ND_SIZE] : 2nd table DRAM2 Size (unit: Giga bit)
+# 0
+# 1024
+# 2048
+# 4096
+SDRAM2_2ND_SIZE = 4096
+
+# [STORAGEINT] :  internal storage device
+# NandSpi
+# SpiFlash
+# EMMC
+# EMMC_NAND_COMBO >>>[eMMC & NandSpi 2 in 1 & STORAGEEXT must choose NONE]<<<
+STORAGEINT = NandSpi
+
+# [SPI_SETTING] :  SPI pinmux setting (Valid when STORAGEINT is NandSpi or SpiFlash)
+# SPI_NORMAL
+# SPI_4BITS
+SPI_SETTING = SPI_4BITS
+
+# [STORAGEEXT] : external storage device
+# NONE
+# Sdio1
+# Usb
+# Eth 	>>>[During this option => STORAGEINT MUST not choose @EMMC_NAND_COMBO]<<<
+STORAGEEXT = Sdio1
+
+# [FAST_K] : enable fast k to shrink boot time
+# Normal
+# Enabled
+FAST_K = Normal
+
+#==============================================================================#
+#							ROM decrypt loader option						   #
+#==============================================================================#
+# [SECUREBOOT] : Secure boot enable or not(Generate loader for secure boot)
+# Normal
+# Secure
+SECUREBOOT = Normal
+
+# [SIGNATUREMETHOD] : Digital signature method (Only valid when SECUREBOOT = Secure )
+# AES128
+# RSA2048
+SIGNATUREMETHOD = AES128
+
+# [ENCRYPTIONDATA] : Is data area encrypt ? (Only valid when SECUREBOOT = Secure )
+# Normal
+# AES128
+ENCRYPTDATA = Normal
+
+# [AES key path] : Set absolute path of AES key configuration file
+ifeq "$(shell uname)" "Linux"
+#AES_KEY_FILE_DIR = /home/nvt00607/NT96680/01_Loader/na51000_loader_smp_crypto_190320_v2/Tools/Bin/aes.txt
+AES_KEY_FILE_DIR = ../../Tools/Bin/aes.txt
+else
+AES_KEY_FILE_DIR = Y:/NT96680/01_Loader/na51000_loader_smp_crypto_190320/Tools/Bin/aes.txt
+endif
+
+# [RSA key path] : Set absolute path of RSA key configuration file
+ifeq "$(shell uname)" "Linux"
+#RSA_KEY_FILE_DIR = /home/nvt00607/NT96680/01_Loader/na51000_loader_smp_crypto_190320_v2/Tools/Bin/aes.txt
+RSA_PUB_KEY_FILE_DIR = ../../Tools/Bin/rsa_pub.txt
+RSA_PRV_KEY_FILE_DIR = ../../Tools/Bin/rsa_priv.txt
+else
+RSA_KEY_FILE_DIR = Y:/NT96680/01_Loader/na51000_loader_smp_crypto_190320/Tools/Bin/aes.txt
+endif
+
+# [LOADER_DRAM_ADDR] : assign DRAM address used by loader (format 0xABCD)
+# 0x1000000
+LOADER_DRAM_ADDR = 0x1000000
+
+#==============================================================================#
+#							loader decrypt uboot option						   #
+#==============================================================================#
+# [SECUREBOOT_DECRYPT_UBOOT] : Loader decrypt uboot or not (Depend on uboot build as cypher text or not)
+# Normal
+# Secure
+SECUREBOOT_DECRYPT_UBOOT = Normal
+
+#==============================================================================#
+#							loader decrypt optee option						   #
+#==============================================================================#
+# [SECUREBOOT_DECRYPT_OPTEE] : Loader decrypt optee or not (Depend on optee build as cypher text or not)
+# Normal
+# Secure
+SECUREBOOT_DECRYPT_OPTEE = Normal
+
+#==============================================================================#
+#	exFAT support(Once customer want to use exFAT, need get license from $MS ) #
+#==============================================================================#
+# [exFAT] : Loader support exFAT or not
+# NONE
+# EXFAT
+EXFAT_FILESYSTEM_SUPPORT = NONE
+
+
