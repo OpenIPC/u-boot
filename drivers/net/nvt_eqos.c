@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Ethernet MAC of the Novatek NA51089, NA51055, NA51084, NA51103 and
- * NA51090: a Synopsys DWC
+ * Ethernet MAC of the Novatek NA51089, NA51055, NA51084, NS02501, NA51103
+ * and NA51090: a Synopsys DWC
  * Ethernet QoS (GMAC 4.x) core, run polled with one Tx and one Rx
  * descriptor ring.
  *
@@ -117,7 +117,7 @@
 /*
  * The core's own descriptor, padded to a cache line on NA51089. The DMA
  * skips the padding (DSL) in units of its bus width, 3 bits' worth: 8
- * bytes on NA51089 and NA51084, but 4 on NA51055 (the vendor's
+ * bytes on NA51089, NA51084 and NS02501, but 4 on NA51055 (the vendor's
  * eth_na51055.c), where no skip reaches a 64-byte line. The NT9852x
  * targets therefore pack the descriptors, no skip: this port runs with
  * the data cache off (SYS_DCACHE_OFF), so no cache line is shared with
@@ -270,14 +270,15 @@ static int eqos_start(struct eth_device *dev, struct bd_info *bis)
 	eqos_write_hwaddr(dev);
 
 	/*
-	 * Bursts of 16 x 8 beats, as the vendor drivers; the NT9852x one
-	 * also lets the AXI master idle into low power (AALE).
+	 * Bursts of 16 x 8 beats, as the vendor drivers; the NT9852x and
+	 * NS02501 ones also let the AXI master idle into low power (AALE).
 	 */
 	writel(CH_PBLX8 | CH_DSL((DESC_SIZE - 16) / 8), DMA_CH_CTRL);
 	writel(CH_PBL(16) | CH_TX_OSP, DMA_CH_TX_CTRL);
 	writel(CH_PBL(16) | CH_RBSZ(PKT_SIZE), DMA_CH_RX_CTRL);
 	writel(SYSBUS_RD_OSR_LMT(2) |
-	       (IS_ENABLED(CONFIG_NVT_NA51055) ? SYSBUS_AALE : 0),
+	       (IS_ENABLED(CONFIG_NVT_NA51055) ||
+		IS_ENABLED(CONFIG_NVT_NS02501) ? SYSBUS_AALE : 0),
 	       DMA_SYSBUS_MODE);
 
 	memset(tx_descs, 0, sizeof(tx_descs));
