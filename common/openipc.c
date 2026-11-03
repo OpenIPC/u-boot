@@ -749,7 +749,7 @@ static void altbootcmd_migrate(void) {
 
 int openipc_helper(void) {
   char msize[16];
-  sprintf(msize, "%ldM", gd->ram_size / 1024 / 1024);
+  sprintf(msize, "%luM", (ulong)(gd->ram_size >> 20));
   env_set("totalmem", msize);
   firmware_recovery();
   firmware_scan();
