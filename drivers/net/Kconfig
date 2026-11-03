@@ -226,7 +226,7 @@ config DWC_ETH_QOS_TEGRA186
 	  configuration used in NVIDIA's Tegra186 chip.
 
 config NVT_EQOS
-	bool "Novatek Ethernet (NA51089, NT9852x, NA51068, NA51103, NA51090)"
+	bool "Novatek Ethernet (NA51089, NT9852x, NS02501, NA51068, NA51103, NA51090)"
 	depends on ARCH_NOVATEK && !DM_ETH
 	select PHYLIB
 	help

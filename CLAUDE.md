@@ -41,9 +41,10 @@ Adding or dropping a SoC needs both branches:
 
 The NVR dies NA51103 (NT98332) and NA51090 (NT98633) are supported as
 AArch64 targets behind the board's own loader and BL31 (see "The NVR
-dies"), and the NA51068 DVR/NVR die (NT98321, NT98323) on SPI NOR (see
-"NA51068"). The other dies of the SDKs (NA51102, the NS02xxx parts) are
-not supported.
+dies"), the NA51068 DVR/NVR die (NT98321, NT98323) on SPI NOR (see
+"NA51068"), and NS02501 (NT98532, NT98533) with NA51089's layout and its
+own loader (see "NS02501"). The other dies of the SDKs (NA51102, the
+other NS02xxx parts) are not supported.
 
 ## Relationship to mainline
 
@@ -247,6 +248,59 @@ without running it.)
   of every block, the flash controller's timing, the PHY's power-on order
   and MDIO clock, the SD host's command and FIFO timing.
 - **On silicon:** nothing yet.
+
+## NS02501: NT98532, NT98533
+
+Two Cortex-A32s run in AArch32 (a GIC-400, the generic timer), chip ID
+`0x5521`, NA51089's blocks at NA51089's addresses. `NVT_NS02501`
+(`TARGET_NT98532`, `TARGET_NT98533`) builds the NA51089 board code with
+the die's differences compiled in; the vendor sources are the NS02501
+SDK's U-Boot 2021.10 (`nvt_ns02501_a32`, `nvt-ns02501`,
+`eth_ns02501.c`, `nvt_ivot_mmc_a64.c` + `_ns02501.h`, `nvt_flash_spi`).
+
+- **Loader** (`board/novatek/ns02501/loader`, `ns02501_loader_v3.07.101`):
+  45056 bytes, its main part deflated (the SoC's gzip engine unpacks
+  it). `CHIP` is the package, `532BD` / `533QD` here (the SDK boards':
+  2 Gbit, 1066 MHz; `Configram533` has every package's DDR parameters,
+  there is no ConfigRam directory). Built with `ROM_PUBLIC_API` off, it
+  has no ROM LZMA: it carries LzmaDec (`bl_lzma.c`), as NA51055's. Any
+  of arm-none-eabi, arm-linux-gnueabi 13 or 15 builds a working one.
+- **The tree is packed.** The SDK trees are ~95 KiB (the vendor kernels
+  take their clocks from `nvt-clk` in them): `nvt-image.py --fdt-lzma`
+  puts the tree at 0x10000 in an LZMA BCL1 container (~8.5 KiB), which
+  the loader unpacks (`bl_load_fdt_from_flash()`). Same layout otherwise.
+- **Memory:** 256 MiB; SHMINFO at the SDK's `0xA00000` (`NVT_SHMINFO`);
+  `osmem` 36M (the SDK boards'); `/hdal-memory` has two address cells
+  (`[DDR id][address]`), which `ft_board_setup()` follows.
+- **Console** UART0 at 48 MHz (the vendor's `ns02501_a32.h`); timer 0 as
+  on NA51089; reset by the watchdog with CG+0x80 bit 8, CG+0x74 bit 19,
+  CTRL `0x102` (`ns02501_hw_init.c`).
+- **Flash:** TOP+0x04 [13:12] = 1, pads off GPIO 0x140F, a 240 MHz
+  source, the tree's 12 MHz, fixed pad drive, output delay 3 from 48 MHz.
+- **Ethernet:** its own pinmux bits (RMII_1 0x1, RMII_2 0x2, EXTPHYCLK
+  0x100; the SDK boards' 0 is the embedded PHY), node `/eth0@f02b0000`,
+  PHY MDIO address 1, the vendor's default trims (its eFuse reader is
+  closed; Linux keeps what U-Boot set), AALE.
+- **SD:** CGPIO13-18, clock source code 1 for 192 MHz (0 is 480 MHz),
+  4-bit pad drive fields from PAD+0x50 (2 as the tree), the AXI channel
+  enabled.
+- **Not done:** the CPU clock (left as the loader sets it; the vendor
+  caps it at 800 MHz without an eFuse code), the OTP 800 ms power-down
+  wait, an external PHY's EVB reset GPIO, pad power from the tree.
+- **Other packages** (532QB..533BE): the same U-Boot with a loader
+  built for its `CHIP` and `NVT_DDR_SIZE` to match; no target each.
+
+Verified under qemu-hisilicon (`nt98532`, `nt98533`, images from CI's
+toolchains, the real loader): two boots with the env kept; dhcp, ping,
+3 MB tftp + crc32, unaligned `sf`, `mmc info`/`fatls`/write+read;
+`reset` makes the watchdog reset the machine (`-no-reboot` exits), but
+the model does not run its loader again after any reset, its own
+`system_reset` too (its core reset register at `0xFFE40000` keeps its
+value, so core 1, which trains the DDR, is not started again), so the
+reboot itself is not seen; SCTLR `0x00c5187d` at U-Boot's entry, `0x00c5187a` at the prompt;
+the SDK's 5.10.168 kernel boots to its shell with `/memory`
+`<0 0x2400000>` and media `<0 0x2400000 0xdc00000>`. **On silicon:**
+nothing yet.
 
 ## The NT9852x dies: NA51055, NA51084
 

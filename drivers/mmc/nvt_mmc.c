@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * SD card on SDIO1 of the Novatek NA51089, NA51055 and NA51084, non-DM.
- * The three take the same set-up (the vendor driver's default branch),
- * but for the sampling clock.
+ * SD card on SDIO1 of the Novatek NA51089, NA51055, NA51084 and NS02501,
+ * non-DM. The first three take the same set-up (the vendor driver's
+ * default branch), but for the sampling clock; NS02501 its own pins,
+ * clock source code and pad drive (the NS02501 SDK's U-Boot 2021.10,
+ * nvt_ivot_mmc_a64.c and nvt_ivot_mmc_ns02501.h).
  *
  * Software sets a data phase up first (block size, DATA_LENGTH, DATA_EN,
  * the FIFO's direction, then FIFO_EN), then writes the command with
@@ -51,6 +53,8 @@
 #define SDIO_FIFO_STS		(NVT_SDIO1_BASE + 0x108)
 #define SDIO_FIFO_CTRL		(NVT_SDIO1_BASE + 0x10C)
 #define SDIO_FIFO_SWITCH	(NVT_SDIO1_BASE + 0x1B0)
+#define SDIO_AXI0		(NVT_SDIO1_BASE + 0x160)	/* NS02501 */
+#define AXI_CH_DIS		BIT(16)
 
 /* CMD */
 #define CMD_NEED_RSP		BIT(6)
@@ -100,14 +104,27 @@
 #define TOP_PINMUX		(NVT_TOP_BASE + 0x04)
 #define TOP_SDIO_EN		BIT(14)
 #define TOP_PGPIO_C		(NVT_TOP_BASE + 0xA0)
-#define TOP_CGPIO11_16		(0x3f << 11)	/* clock, command, data 0-3 */
+#ifdef CONFIG_NVT_NS02501
+#define TOP_SDIO1_PINS		(0x3f << 13)	/* CGPIO13-18 */
+#define SDIO_CLKSEL_192		(1 << 4)	/* 0 is 480 MHz there */
+#else
+#define TOP_SDIO1_PINS		(0x3f << 11)	/* clock, command, data 0-3 */
+#define SDIO_CLKSEL_192		0
+#endif
 #define CG_CLKSEL		(NVT_CG_BASE + 0x20)
-#define CG_SDIO_CLKSEL		(3 << 4)	/* 0: 192 MHz */
+#define CG_SDIO_CLKSEL		(3 << 4)
 #define CG_SDIO_DIV		(NVT_CG_BASE + 0x3C)
 #define CG_SDIO_DIV_MASK	0x7ff
 #define CG_SDIO1		BIT(2)		/* in CLKEN0 and RSTN0 */
 #define PAD_DS10		(NVT_PAD_BASE + 0x68)
 #define PAD_DS_SDIO1		0x222222	/* 15 mA, 3 bits per pin */
+/*
+ * NS02501: four bits per pin from PAD+0x50, CGPIO13-15 in [31:20] of
+ * +0x54 and 16-18 in [11:0] of +0x58; the SDK tree's default-speed
+ * driving, 2 on every pin
+ */
+#define PAD_DS_02501_C13	(NVT_PAD_BASE + 0x54)
+#define PAD_DS_02501_C16	(NVT_PAD_BASE + 0x58)
 
 #define SDIO_SRC_CLK		192000000
 #define SDIO_F_MIN		400000
@@ -174,22 +191,30 @@ static void nvt_mmc_set_clock(uint hz)
 static int nvt_mmc_init(struct mmc *mmc)
 {
 	setbits_le32(TOP_PINMUX, TOP_SDIO_EN);
-	clrbits_le32(TOP_PGPIO_C, TOP_CGPIO11_16);
+	clrbits_le32(TOP_PGPIO_C, TOP_SDIO1_PINS);
 	clrbits_le32(NVT_CG_RSTN0, CG_SDIO1);
 	udelay(10);
 	setbits_le32(NVT_CG_RSTN0, CG_SDIO1);
-	clrbits_le32(CG_CLKSEL, CG_SDIO_CLKSEL);
+	clrsetbits_le32(CG_CLKSEL, CG_SDIO_CLKSEL, SDIO_CLKSEL_192);
 	clrsetbits_le32(CG_SDIO_DIV, CG_SDIO_DIV_MASK,
 			DIV_ROUND_UP(SDIO_SRC_CLK, SDIO_F_MIN) - 1);
 	setbits_le32(NVT_CG_CLKEN0, CG_SDIO1);
-	clrsetbits_le32(PAD_DS10, 0xffffff, PAD_DS_SDIO1);
+	if (IS_ENABLED(CONFIG_NVT_NS02501)) {
+		clrsetbits_le32(PAD_DS_02501_C13, 0xfff00000, 0x22200000);
+		clrsetbits_le32(PAD_DS_02501_C16, 0xfff, 0x222);
+	} else {
+		clrsetbits_le32(PAD_DS10, 0xffffff, PAD_DS_SDIO1);
+	}
 	udelay(10);
 
 	clrbits_le32(SDIO_CLK_CTRL, CLK_DIS);
+	/* NS02501's host has an AXI channel the vendor enables (for DMA) */
+	if (IS_ENABLED(CONFIG_NVT_NS02501))
+		clrbits_le32(SDIO_AXI0, AXI_CH_DIS);
 	/*
 	 * Positive edge (neg-sample-edge = 0). The sampling clock: on
-	 * NA51089 and NA51084 from the pad, before it; on NA51055 the
-	 * internal one, after the pad (the vendor's setphysample()).
+	 * NA51089, NA51084 and NS02501 from the pad, before it; on NA51055
+	 * the internal one, after the pad (the vendor's setphysample()).
 	 */
 	if (nvt_chip_id() == NVT_CHIP_NA51055)
 		clrsetbits_le32(SDIO_DLY0, BIT(12) | DLY0_PAD_CLK_SEL,

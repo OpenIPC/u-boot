@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Novatek: the loader's HEADINFO, reset and DRAM size. On NA51089,
- * NA51055 and NA51084 the timer is timer 0 of the timer block, which the
- * loader leaves running (CONFIG_SYS_TIMER_COUNTER in
+ * NA51055, NA51084 and NS02501 the timer is timer 0 of the timer block,
+ * which the loader leaves running (CONFIG_SYS_TIMER_COUNTER in
  * include/configs/novatek.h); on the AArch64 NVR dies (NA51103, NA51090)
  * it is the architected timer, and the MMU maps the DDR and the blocks
  * above 4 GiB.
@@ -51,6 +51,8 @@ static const struct nvt_headinfo headinfo
 	.chip_name	= "ub51090 ",
 #elif defined(CONFIG_NVT_NA51055)
 	.chip_name	= "ub51055 ",
+#elif defined(CONFIG_NVT_NS02501)
+	.chip_name	= "ub02501 ",
 #else
 	.chip_name	= "ub51089 ",
 #endif
@@ -75,19 +77,34 @@ const void *nvt_loader_fdt(void)
 	return fdt_check_header(fdt) ? NULL : fdt;
 }
 
-/* As the vendor U-Boot resets: the watchdog, then its manual trigger */
+/*
+ * As the vendor U-Boot resets: the watchdog, then its manual trigger.
+ * CTRL is written as each vendor U-Boot writes it: 0x112 under the key,
+ * 0x102 on NS02501 (ns02501_hw_init.c).
+ */
+#ifdef CONFIG_NVT_NS02501
+#define NVT_WDT_CFG	0x102
+#else
+#define NVT_WDT_CFG	0x112
+#endif
+
 void reset_cpu(void)
 {
-#ifdef CONFIG_NVT_NA511XX
+#if defined(CONFIG_NVT_NA511XX)
 	setbits_le32(NVT_CG_WDT_RSTN, NVT_CG_WDT_RST);
 	setbits_le32(NVT_CG_WDT_CLKEN, NVT_CG_WDT_EN);
+#elif defined(CONFIG_NVT_NS02501)
+	/* ns02501_hw_init.c: its reset and clock bits, a zero count */
+	setbits_le32(NVT_CG_WDT_RSTN, NVT_CG_WDT_RST);
+	setbits_le32(NVT_CG_CLKEN0, NVT_CG_WDT);
+	writel(0, NVT_WDT_DATA);
 #else
 	setbits_le32(NVT_CG_CLKEN0, NVT_CG_WDT);
 	setbits_le32(NVT_CG_RSTN0, NVT_CG_WDT);
 #endif
-	writel(NVT_WDT_KEY | 0x112, NVT_WDT_CTRL);
+	writel(NVT_WDT_KEY | NVT_WDT_CFG, NVT_WDT_CTRL);
 	udelay(80);
-	writel(NVT_WDT_KEY | 0x112 | NVT_WDT_EN, NVT_WDT_CTRL);
+	writel(NVT_WDT_KEY | NVT_WDT_CFG | NVT_WDT_EN, NVT_WDT_CTRL);
 	writel(1, NVT_WDT_MANUAL);
 	while (1)
 		;

@@ -37,7 +37,7 @@ config SPI_FLASH
 	  If unsure, say N
 
 config NVT_SFLASH
-	bool "Novatek SPI NOR (NA51089, NT9852x, NA51103, NA51090)"
+	bool "Novatek SPI NOR (NA51089, NT9852x, NS02501, NA51103, NA51090)"
 	depends on ARCH_NOVATEK && !NVT_NA51068 && !SPI_FLASH && !DM_SPI_FLASH
 	help
 	  The SPI NOR the Novatek camera dies and the NA51103 boot from, on

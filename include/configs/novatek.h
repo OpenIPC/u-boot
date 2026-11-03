@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 /*
- * Novatek NA51089, NA51055 / NA51084, NA51068, NA51103, NA51090: memory
+ * Novatek NA51089, NA51055 / NA51084, NS02501, NA51068, NA51103, NA51090: memory
  * map, console and timer. The environment and the rest of the OpenIPC
  * configuration come from openipc-common.h.
  */
@@ -66,7 +66,8 @@
 #define CONFIG_SYS_NS16550_MEM32
 #ifdef CONFIG_NVT_NA511XX
 #define CONFIG_SYS_NS16550_CLK		NVT_UART_HZ
-#elif defined(CONFIG_NVT_NA51068)
+#elif defined(CONFIG_NVT_NA51068) || defined(CONFIG_NVT_NS02501)
+/* NA51068, and NS02501 (the SDK's tree and its U-Boot's soc.c): 48 MHz */
 #define CONFIG_SYS_NS16550_CLK		48000000
 #else
 #define CONFIG_SYS_NS16550_CLK		24000000
