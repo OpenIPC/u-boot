@@ -36,7 +36,7 @@
 //int  __attribute__ ((section (".READ_CUSTOM_DATA"))) read_custom_data_if(unsigned int, struct buffer_info_t*, int, int);
 
 FLASH_TYPE_T flash_type = FLASH_SD;
-#define _THUMB2 __attribute__((target("thumb2")))
+#define _THUMB2 __attribute__((target("thumb")))
 #define VERSION			    "Version 1.0.00"
 
 // Specific test
@@ -204,7 +204,7 @@ _THUMB2 void check_storage_type(void)
 }
 
 #if HVYLOAD_TEST
-__attribute__((target("thumb2"))) void heavy_load_test(void)
+__attribute__((target("thumb"))) void heavy_load_test(void)
 {
     //volatile int tt = 0;
     unsigned int test_addr1 = 0x30001000, test_addr2 = 0x30101000, test_addr3 = 0x30202000;

@@ -1,5 +1,5 @@
 #ifndef __SYSTEM_H__
-#define __CUSTOM_SYSTEM_H__
+#define __SYSTEM_H__
 
 typedef enum {
 	SYS_SECURE_MODE = 0,

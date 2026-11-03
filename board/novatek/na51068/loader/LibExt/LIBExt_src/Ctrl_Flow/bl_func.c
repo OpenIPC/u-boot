@@ -33,7 +33,7 @@
 #include "nor.h"
 
 PSTORAGE_OBJ int_strg_obj = NULL;
-#define _THUMB2 __attribute__((target("thumb2")))
+#define _THUMB2 __attribute__((target("thumb")))
 #define FW_PART1_SIZE_OFFSET (CODE_SECTION_OFFSET + 0x04) //ref to CodeInfo.S on rtos (addr of _section_01_size)
 static uint32_t	global_timer_freq				= 3000000;	//3MHz = 3000000 Hz
 

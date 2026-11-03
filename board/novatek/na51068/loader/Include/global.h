@@ -58,8 +58,8 @@ extern void load_dram_scan(UINT32 addr, UINT32 size)   __attribute__ ((section (
 
 extern UINT32   dma_get_capacity(void);
 #endif
-extern __attribute__((target("thumb2"))) void udelay(UINT32 US)   __attribute__ ((section (".part1")));
-extern __attribute__((target("thumb2"))) void timer0_tm1_init(void)	 __attribute__ ((section (".part1")));
+extern __attribute__((target("thumb"))) void udelay(UINT32 US)   __attribute__ ((section (".part1")));
+extern __attribute__((target("thumb"))) void timer0_tm1_init(void)	 __attribute__ ((section (".part1")));
 
 #define timer_getSysTick()		((*(UINT32 volatile *)(REG_TMR010_BASE + 0x10)) / 16)
 //@}
