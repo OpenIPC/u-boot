@@ -19,7 +19,7 @@
 #include "prj_main.h"
 #include "debug.h"
 
-#define _THUMB2 __attribute__((target("thumb2")))
+#define _THUMB2 __attribute__((target("thumb")))
 
 #if defined(_STORAGEINT_EMMC_NAND_COMBO_)
 #if (CHECK_CARD_EXIST == ENABLE)

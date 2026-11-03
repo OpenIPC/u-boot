@@ -53,7 +53,7 @@ static int m_uboot_status = -2;
 static int m_fdt_status = -1;
 static SCSIOP_FLASH_OP m_flash_op = {0};
 
-__attribute__((target("thumb2"))) static int u2_check_firmware(unsigned int addr)
+__attribute__((target("thumb"))) static int u2_check_firmware(unsigned int addr)
 {
 	NVTPACK_FW_HDR2 *p_hdr = (NVTPACK_FW_HDR2 *)addr;
 	unsigned int size = p_hdr->TotalSize;
@@ -92,7 +92,7 @@ __attribute__((target("thumb2"))) static int u2_check_firmware(unsigned int addr
 	return -1;
 }
 
-__attribute__((target("thumb2"))) static int u2_boot_uboot(unsigned int addr, unsigned int size, U2_FW_TYPE fw_type)
+__attribute__((target("thumb"))) static int u2_boot_uboot(unsigned int addr, unsigned int size, U2_FW_TYPE fw_type)
 {
 	if (fw_type == U2_FW_TYPE_NVTPACK) {
 		UINT32 comp_addr = 0;
@@ -151,7 +151,7 @@ __attribute__((target("thumb2"))) static int u2_boot_uboot(unsigned int addr, un
 	return 0;
 }
 
-__attribute__((target("thumb2"))) static int u2_on_verify(unsigned int p_cmd, unsigned int *p_data, unsigned int *in_size)
+__attribute__((target("thumb"))) static int u2_on_verify(unsigned int p_cmd, unsigned int *p_data, unsigned int *in_size)
 {
 	NVT_SCSI_CBW *p_cbw = (NVT_SCSI_CBW *)p_cmd;
 	int cmd_id = p_cbw->CBWCB[1];
@@ -203,7 +203,7 @@ __attribute__((target("thumb2"))) static int u2_on_verify(unsigned int p_cmd, un
 	return 0;
 }
 
-__attribute__((target("thumb2"))) static int u2_flash_open(unsigned int flash_type)
+__attribute__((target("thumb"))) static int u2_flash_open(unsigned int flash_type)
 {
 	static int is_opened[4] = {0};
 
@@ -261,7 +261,7 @@ __attribute__((target("thumb2"))) static int u2_flash_open(unsigned int flash_ty
 #endif
 }
 
-__attribute__((target("thumb2"))) static int u2_on_vendor(unsigned int p_cmd)
+__attribute__((target("thumb"))) static int u2_on_vendor(unsigned int p_cmd)
 {
 	int er;
 	PSTORAGE_OBJ p_strg = NULL;
@@ -371,7 +371,7 @@ __attribute__((target("thumb2"))) static int u2_on_vendor(unsigned int p_cmd)
 	return 0;
 }
 
-__attribute__((target("thumb2"))) int bl_usb(void)
+__attribute__((target("thumb"))) int bl_usb(void)
 {
 
 	typedef int (*MSDC_Verify_CB)(unsigned int pCmdBuf, unsigned int *pDataBuf, unsigned int *IN_size);
@@ -386,7 +386,7 @@ __attribute__((target("thumb2"))) int bl_usb(void)
 	return 0;
 }
 
-__attribute__((target("thumb2"))) int bl_uart(void)
+__attribute__((target("thumb"))) int bl_uart(void)
 {
 
 	typedef int  (*UART_Verify_CB)(unsigned int pCmdBuf, unsigned int *pDataBuf, unsigned int *IN_size);

@@ -6,7 +6,7 @@
 #include "timer.h"
 
 #define IOADDR_USB_REG_BASE         (0xFF600000)
-#define _THUMB2 __attribute__((target("thumb2")))
+#define _THUMB2 __attribute__((target("thumb")))
 
 
 _THUMB2 void fLib_USB_Update_FW(void);

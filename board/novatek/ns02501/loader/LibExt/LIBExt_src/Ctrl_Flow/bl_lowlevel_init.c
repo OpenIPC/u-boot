@@ -40,7 +40,7 @@
 #error "unknown internal storage type"
 #endif
 
-#define _THUMB2 __attribute__((target("thumb2")))
+#define _THUMB2 __attribute__((target("thumb")))
 
 typedef enum _CFE_TYPE {
 	CFE_TYPE_WRITE = 0,

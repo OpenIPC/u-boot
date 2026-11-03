@@ -52,7 +52,7 @@ PSTORAGE_OBJ int_strg_obj = NULL;
 #define FW_PART1_SIZE_OFFSET64 (CODE_SECTION_OFFSET64 + 0x08) //ref to CodeInfo.S on rtos (addr of _section_01_size)
 //#define TEE_HEADER_SIZE 0x1C // refer to: optee_header_t
 
-#define _THUMB2 __attribute__((target("thumb2")))
+#define _THUMB2 __attribute__((target("thumb")))
 
 #define bl_memcpy   utl_memcpy
 #define bl_memset   utl_memset

@@ -120,7 +120,7 @@
 * Constants used for LZ77 coding
 *************************************************************************/
 #if (_GZIP_ENABLE_API_ == 1)
-__attribute__((target("thumb2"))) unsigned int GZ_Uncompress(UINT8 *in, UINT8 *out, UINT32 insize)
+__attribute__((target("thumb"))) unsigned int GZ_Uncompress(UINT8 *in, UINT8 *out, UINT32 insize)
 {
     UINT32 gz_size;
 	// check BFC's footer
@@ -285,7 +285,7 @@ static int _LZ_WriteVarSize( unsigned int x, unsigned char * buf )
 * bytes depending on value.
 *************************************************************************/
 
-__attribute__((target("thumb2"))) static UINT32 _LZ_ReadVarSize(UINT32 * x, UINT8 * buf )
+__attribute__((target("thumb"))) static UINT32 _LZ_ReadVarSize(UINT32 * x, UINT8 * buf )
 {
     UINT32 y, b, num_bytes;
 
@@ -624,7 +624,7 @@ int LZ_CompressFast( unsigned char *in, unsigned char *out,
 
     @return void
 */
-__attribute__((target("thumb2")))  unsigned int LZ_Uncompress(UINT8 *in, UINT8 *out,
+__attribute__((target("thumb")))  unsigned int LZ_Uncompress(UINT8 *in, UINT8 *out,
     UINT32 insize )
 {
     UINT8 marker, symbol;

@@ -44,7 +44,7 @@
 
 #define IS_BIN_OVERLAP(addr1, size1, addr2, size2) (!(((addr1 + size1 - 1) < addr2) || (addr1 > (addr2 + size2 - 1))))
 
-#define _THUMB2 __attribute__((target("thumb2")))
+#define _THUMB2 __attribute__((target("thumb")))
 
 #define ALIGN_FLOOR(value, base)  ((value) & ~((base)-1))
 #define ALIGN_CEIL(value, base)   ALIGN_FLOOR((value) + ((base)-1), base)

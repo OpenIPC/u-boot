@@ -2,7 +2,7 @@
 #include "arch_timer.h"
 
 
-#define _THUMB2 __attribute__((target("thumb2")))
+#define _THUMB2 __attribute__((target("thumb")))
 #define isb() asm volatile("isb" : : : "memory")
 
 #if (BOOT_LINUX_SUPPORT)

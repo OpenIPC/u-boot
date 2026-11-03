@@ -1,7 +1,7 @@
 #include "time_util.h"
 #include "string.h"
 
-#define _THUMB2 __attribute__((target("thumb2")))
+#define _THUMB2 __attribute__((target("thumb")))
 #define IS_LEAP_YEAR(year) ((((year % 4) == 0) && (((year % 100) != 0) || ((year % 400) == 0))))
 
 _THUMB2 static int calc_month_day(int year, int month)

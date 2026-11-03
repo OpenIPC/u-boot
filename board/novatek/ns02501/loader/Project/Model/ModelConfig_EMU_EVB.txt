@@ -30,7 +30,7 @@ BL_RUN_FWNAME = FW98$(CHIP_SHORT)T.BIN
 #533BC
 #533BD
 #533BE
-CHIP = 533QC
+CHIP = 533QD
 
 # [CHIP_VER] : chip version
 # A
@@ -131,7 +131,7 @@ DRAM_ODT = Normal
 # SpiFlash		>>>[Use SPI NOR flash]
 # EMMC
 # EMMC_NAND_COMBO >>>[eMMC & NandSpi 2 in 1 & STORAGEEXT must choose NONE]<<<
-STORAGEINT = NandSpi
+STORAGEINT = SpiFlash
 
 # [SPI_SETTING] :  SPI pinmux setting (Valid when STORAGEINT is NandSpi or SpiFlash)
 # SPI_NORMAL
