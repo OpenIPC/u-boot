@@ -1,0 +1,925 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * The device tree of the NT9832x SDK's NT98323 NOR EVB
+ * (cfg_98323_DDR4_4GX1_NOR_EVB: one 4 Gb DDR4 die, 512 MiB), with the
+ * OpenIPC boot chain in the nor node: the loader at 0, this tree at
+ * 0x10000, U-Boot at 0x20000.
+ *
+ * The loader reads /nvt_memory_cfg (where U-Boot runs, where this tree
+ * and SHMINFO go) and /nor/partition_uboot. U-Boot hands the tree on to
+ * the kernel, with /memory and /hdal-memory/media split at ${osmem}
+ * (board/novatek/na51068/na51068.c), and takes the Ethernet wiring from
+ * /top@fe030000/eth.
+ */
+
+/ {
+	model = "Novatek NA51068";
+	compatible = "novatek,na51068", "nvt,ca9";
+	interrupt-parent = <0x01>;
+	#address-cells = <0x01>;
+	#size-cells = <0x01>;
+
+	cpus {
+		#address-cells = <0x01>;
+		#size-cells = <0x00>;
+
+		cpu@0 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a9";
+			reg = <0x00>;
+			next-level-cache = <0x02>;
+			clock-frequency = <0x53724e00>;
+			phandle = <0x04>;
+		};
+
+		cpu@1 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a9";
+			reg = <0x01>;
+			cpu-release-addr = <0xfe0b9000>;
+			next-level-cache = <0x02>;
+			clock-frequency = <0x53724e00>;
+			phandle = <0x05>;
+		};
+	};
+
+	cg@fe000000 {
+		compatible = "nvt,core_clk";
+		reg = <0xfe000000 0x1000>;
+	};
+
+	periph_clk {
+		compatible = "nvt,periph_clk";
+		#clock-cells = <0x00>;
+		clock-output-names = "periph_clk";
+		phandle = <0x03>;
+	};
+
+	global_timer@F9C00200 {
+		compatible = "arm,cortex-a9-global-timer";
+		reg = <0xf9c00200 0x20>;
+		interrupts = <0x01 0x0b 0xf01>;
+		clocks = <0x03>;
+	};
+
+	private_timer@f9c00600 {
+		compatible = "arm,cortex-a9-twd-timer";
+		reg = <0xf9c00600 0x20>;
+		interrupts = <0x01 0x0d 0xf01>;
+		clocks = <0x03>;
+	};
+
+	pmu {
+		compatible = "arm,cortex-a9-pmu";
+		interrupts = <0x00 0x70 0x04 0x00 0x71 0x04>;
+		interrupt-affinity = <0x04 0x05>;
+	};
+
+	cache-controller@F9C20000 {
+		compatible = "arm,pl310-cache";
+		reg = <0xf9c20000 0x1000>;
+		interrupts = <0x00 0x61 0x04>;
+		cache-unified;
+		arm,shared-override;
+		cache-level = <0x02>;
+		arm,data-latency = <0x02 0x02 0x02>;
+		arm,tag-latency = <0x02 0x02 0x02>;
+		phandle = <0x02>;
+	};
+
+	interrupt-controller@0xF9C00000 {
+		compatible = "arm,cortex-a9-gic";
+		#interrupt-cells = <0x03>;
+		#address-cells = <0x01>;
+		interrupt-controller;
+		reg = <0xf9c01000 0x1000 0xf9c00100 0x100>;
+		phandle = <0x01>;
+	};
+
+	snoop-control-unit@0xf9c00000 {
+		compatible = "arm,cortex-a9-scu";
+		reg = <0xf9c00000 0x100>;
+	};
+
+	chosen {
+		bootargs = " ";
+	};
+
+	aliases {
+		mmc0 = "/mmc@fa600000";
+	};
+
+	timer@fe8c0000 {
+		compatible = "faraday,fttmr010";
+		reg = <0xfe8c0000 0x1000>;
+		interrupts = <0x00 0x23 0x01>;
+		clock-frequency = <0xb71b00>;
+		ext_clk = <0x01>;
+	};
+
+	uart@fe200000 {
+		compatible = "ns16550a";
+		reg = <0xfe200000 0x1000>;
+		interrupts = <0x00 0x1d 0x04>;
+		baud = <0x1c200>;
+		reg-shift = <0x02>;
+		reg-io-width = <0x04>;
+		no-loopback-test = <0x01>;
+		clock-frequency = <0x2dc6c00>;
+		fifo-size = <0x40>;
+		rx_trig_level = <0x00>;
+		hw_flowctrl = <0x00>;
+	};
+
+	uart@fe220000 {
+		compatible = "ns16550a";
+		reg = <0xfe220000 0x1000>;
+		interrupts = <0x00 0x1e 0x04>;
+		baud = <0x1c200>;
+		reg-shift = <0x02>;
+		reg-io-width = <0x04>;
+		no-loopback-test = <0x01>;
+		clock-frequency = <0x2dc6c00>;
+		fifo-size = <0x40>;
+		rx_trig_level = <0x00>;
+	};
+
+	uart@fe240000 {
+		compatible = "ns16550a";
+		reg = <0xfe240000 0x1000>;
+		interrupts = <0x00 0x38 0x04>;
+		baud = <0x1c200>;
+		reg-shift = <0x02>;
+		reg-io-width = <0x04>;
+		no-loopback-test = <0x01>;
+		clock-frequency = <0x2dc6c00>;
+		fifo-size = <0x40>;
+		rx_trig_level = <0x00>;
+	};
+
+	uart@fe260000 {
+		compatible = "ns16550a";
+		reg = <0xfe260000 0x1000>;
+		interrupts = <0x00 0x43 0x04>;
+		baud = <0x1c200>;
+		reg-shift = <0x02>;
+		reg-io-width = <0x04>;
+		no-loopback-test = <0x01>;
+		clock-frequency = <0x2dc6c00>;
+		fifo-size = <0x40>;
+		rx_trig_level = <0x00>;
+	};
+
+	sata@f9e00000 {
+		compatible = "novatech,nvt_sata100";
+		reg = <0xf9e00000 0x1000 0xfdc00000 0x1000>;
+		interrupts = <0x00 0x0f 0x04>;
+		device-id = <0x00>;
+	};
+
+	sata@f9f00000 {
+		compatible = "novatech,nvt_sata100";
+		reg = <0xf9f00000 0x1000 0xfdd00000 0x1000>;
+		interrupts = <0x00 0x10 0x04>;
+		device-id = <0x01>;
+	};
+
+	gpio@fe400000 {
+		compatible = "faraday,ftgpio010";
+		reg = <0xfe400000 0x1000>;
+		interrupts = <0x00 0x1f 0x04>;
+		pin_base = <0x00>;
+		status = "okay";
+		gpio-controller;
+		#gpio-cells = <0x02>;
+	};
+
+	gpio@fe420000 {
+		compatible = "faraday,ftgpio010";
+		reg = <0xfe420000 0x1000>;
+		interrupts = <0x00 0x36 0x04>;
+		pin_base = <0x20>;
+		status = "okay";
+		gpio-controller;
+		#gpio-cells = <0x02>;
+	};
+
+	gpio@fe440000 {
+		compatible = "faraday,ftgpio010";
+		reg = <0xfe440000 0x1000>;
+		interrupts = <0x00 0x37 0x04>;
+		pin_base = <0x40>;
+		status = "okay";
+		gpio-controller;
+		#gpio-cells = <0x02>;
+	};
+
+	gpio@fe640000 {
+		compatible = "faraday,ftgpio010";
+		reg = <0xfe640000 0x1000>;
+		interrupts = <0x00 0x57 0x04>;
+		pin_base = <0x60>;
+		status = "okay";
+		gpio-controller;
+		#gpio-cells = <0x02>;
+	};
+
+	irdet@fe540000 {
+		compatible = "nvt,nvt_irdet";
+		reg = <0xfe540000 0x1000>;
+		interrupts = <0x00 0x41 0x04>;
+	};
+
+	pwm@fe6c0000 {
+		compatible = "nvt,nvt_pwm";
+		reg = <0xfe6c0000 0x1000>;
+		interrupts = <0x00 0x2b 0x04>;
+	};
+
+	pwr@0x0 {
+		compatible = "nvt,nvt_pwr";
+	};
+
+	pwr@0x1 {
+		compatible = "nvt,nvt_pwr";
+	};
+
+	dma030@fca00000 {
+		compatible = "nvt,ftdmac030";
+		reg = <0xfca00000 0x1000>;
+		interrupts = <0x00 0x0e 0x04>;
+		device-id = <0x00>;
+		nvt,dma-channel-mask = <0x1f>;
+		#dma-cells = <0x03>;
+	};
+
+	cc@f8900000 {
+		compatible = "kdrv_rpc";
+		reg = <0xf8900000 0x300>;
+		interrupts = <0x00 0x00 0x04>;
+	};
+
+	mmc@fa600000 {
+		compatible = "nvt,nvt_ivot_sdc-sdhci";
+		reg = <0xfa600000 0x1000>;
+		interrupts = <0x00 0x40 0x04>;
+		max-frequency = <0xb71b00>;
+		driving = <0x08 0x08 0x08 0x08 0x08 0x08 0x08 0x08 0x08 0x08 0x08 0x08>;
+		pulse-latch = <0x01>;
+		no-1-8-v;
+	};
+
+	nor@fa900000 {
+		#address-cells = <0x02>;
+		#size-cells = <0x02>;
+		compatible = "nvt,nvt_spi020_nor";
+		reg = <0xfa900000 0x1000>;
+		interrupts = <0x00 0x20 0x04>;
+		clock-frequency = <0x2dc6c00>;
+		chip-select = <0x00>;
+		nvt-devname = "spi_nor.0";
+		trace-stdtable = <0x01>;
+
+		partition_loader {
+			label = "loader";
+			reg = <0x00 0x00 0x00 0x10000>;
+		};
+
+		partition_fdt {
+			label = "fdt";
+			reg = <0x00 0x10000 0x00 0x10000>;
+		};
+
+		partition_uboot {
+			label = "uboot";
+			reg = <0x00 0x20000 0x00 0x20000>;
+		};
+
+		/* The loader looks a partition up here by its label */
+		nvtpack {
+			ver = "NVTPACK_FW_INI_16072017";
+			method = <0x01>;
+
+			index {
+
+				id0 {
+					partition_name = "loader";
+				};
+
+				id1 {
+					partition_name = "fdt";
+				};
+
+				id2 {
+					partition_name = "uboot";
+				};
+			};
+		};
+	};
+
+	top@fe030000 {
+		compatible = "nvt,nvt_top";
+		reg = <0xfe030000 0x1000 0xfe040000 0x1000 0xfe400000 0x10000>;
+
+		uart {
+			pinmux = <0x01>;
+		};
+
+		i2c {
+			pinmux = <0x10011>;
+		};
+
+		sdio {
+			pinmux = <0x20>;
+		};
+
+		spi {
+			pinmux = <0x02>;
+		};
+
+		extclk {
+			pinmux = <0x00>;
+		};
+
+		ssp {
+			pinmux = <0x11>;
+		};
+
+		lcd {
+			pinmux = <0x00>;
+		};
+
+		remote {
+			pinmux = <0x00>;
+		};
+
+		vcap {
+			pinmux = <0x00>;
+		};
+
+		eth {
+			pinmux = <0x1201>;
+		};
+
+		misc {
+			pinmux = <0x100066>;
+		};
+
+		pwm {
+			pinmux = <0x11>;
+		};
+
+		vcapint {
+			pinmux = <0x00>;
+		};
+	};
+
+	u2host@f9100000 {
+		compatible = "nvt,ehci-nvtivot";
+		reg = <0xf9100000 0x1000>;
+		phy_reg = <0xfcf00000>;
+		interrupts = <0x00 0x3d 0x04>;
+		channel = <0x00>;
+	};
+
+	gm2d@faa00000 {
+		compatible = "nvt,gm2d";
+		reg = <0xfaa00000 0x2000>;
+		interrupts = <0x00 0x16 0x04>;
+	};
+
+	ssca@fd500000 {
+		compatible = "nvt,ssca";
+		reg = <0xfd500000 0x100>;
+		interrupts = <0x00 0x1c 0x04>;
+	};
+
+	nvt_arb@fc400000 {
+		compatible = "nvt,nvt_arb";
+		reg = <0xfc400000 0xa000 0xfd600000 0xa000>;
+		interrupts = <0x00 0x53 0x04>;
+	};
+
+	u2host@f9200000 {
+		compatible = "nvt,ehci-nvtivot";
+		reg = <0xf9200000 0x1000>;
+		phy_reg = <0xfd000000>;
+		interrupts = <0x00 0x3e 0x04>;
+		channel = <0x01>;
+	};
+
+	ahbc@0xfe840000 {
+		compatible = "nvt,nvt_ahbc";
+		reg = <0xfe840000 0x1000>;
+	};
+
+	dsp@f8800000 {
+		compatible = "nvt,nvt_dsp";
+		reg = <0xf8800000 0x200 0xfb000000 0x800000>;
+		interrupts = <0x00 0x01 0x04>;
+	};
+
+	eth0@fcc00000 {
+		compatible = "nvt,synopsys_eth";
+		reg = <0xfcc00000 0x10000>;
+		interrupts = <0x00 0x3b 0x04>;
+		sp-clk = <0x01>;
+		ref-clk-out = <0x00>;
+		phy-rst = <0x55>;
+	};
+
+	eth1@fcd00000 {
+		compatible = "nvt,synopsys_eth";
+		reg = <0xfcd00000 0x10000>;
+		interrupts = <0x00 0x3c 0x04>;
+		sp-clk = <0x00>;
+		ref-clk-out = <0x00>;
+		phy-rst = <0x31>;
+	};
+
+	rtc@fe880000 {
+		compatible = "nvt,nvt_rtc";
+		reg = <0xfe880000 0x100>;
+		interrupts = <0x00 0x5f 0x04>;
+	};
+
+	wdt@fe8a0000 {
+		compatible = "nvt,nvt_wdt";
+		reg = <0xfe8a0000 0x10000>;
+	};
+
+	vcap316@f9d00000 {
+		compatible = "nvt,vcap316";
+		reg = <0xf9d00000 0x18000>;
+		interrupts = <0x00 0x05 0x04>;
+		host-id = <0x00>;
+	};
+
+	dei321@fd800000 {
+		compatible = "nvt,dei321";
+		reg = <0xfd800000 0x18000>;
+		interrupts = <0x00 0x12 0x04>;
+		host-id = <0x00>;
+	};
+
+	vpe321@fe2a0000 {
+		compatible = "nvt,vpe321";
+		reg = <0xfe2a0000 0x18000>;
+		interrupts = <0x00 0x04 0x04>;
+		host-id = <0x00>;
+	};
+
+	osg@FD100000 {
+		compatible = "nvt,nvt_osg";
+		reg = <0xfd100000 0x300>;
+		interrupts = <0x00 0x17 0x04>;
+	};
+
+	jpg@fac00000 {
+		compatible = "nvt,nvt_jpg";
+		reg = <0xfac00000 0x100000>;
+		interrupts = <0x00 0x1a 0x04>;
+	};
+
+	ai@fecc0000 {
+		compatible = "nvt,kdrv_ai";
+		reg = <0xfecc0000 0x1f8 0xfec20000 0xf4 0xfec40000 0x218>;
+		interrupts = <0x00 0x03 0x04 0x00 0x5e 0x04 0x00 0x02 0x04>;
+	};
+
+	crypto@fec60000 {
+		compatible = "nvt,nvt_crypto";
+		reg = <0xfec60000 0x100>;
+		interrupts = <0x00 0x2c 0x04>;
+		mclk = <0x00>;
+	};
+
+	hash@fec80000 {
+		compatible = "nvt,nvt_hash";
+		reg = <0xfec80000 0x100>;
+		interrupts = <0x00 0x2d 0x04>;
+		mclk = <0x00>;
+	};
+
+	rsa@feca0000 {
+		compatible = "nvt,nvt_rsa";
+		reg = <0xfeca0000 0x100>;
+		interrupts = <0x00 0x2e 0x04>;
+		mclk = <0x00>;
+	};
+
+	drvdump@0 {
+		compatible = "nvt,nvt_drvdump";
+	};
+
+	regulator@0x0 {
+		compatible = "nvt,nvt_regulator";
+	};
+
+	thmal@fe2c0000 {
+		compatible = "nvt,thermal";
+		reg = <0xfe2c0000 0x1000>;
+		default_trim = <0xe7>;
+	};
+
+	nvt_otp@fece0000 {
+		compatible = "nvt,nvt_otp";
+		reg = <0xfece0000 0x70>;
+	};
+
+	busmon@fe000000 {
+		compatible = "nvt,nvt_busmon";
+		reg = <0xfe000000 0x100>;
+	};
+
+	tse@fe6e0000 {
+		compatible = "nvt,nvt_tse";
+		reg = <0xfe6e0000 0x300>;
+		interrupts = <0x00 0x0d 0x04>;
+	};
+
+	pll_preset@0 {
+
+		pll0 {
+			pll_config = <0x00 0x1dcd6500 0x00>;
+		};
+
+		pll1 {
+			pll_config = <0x01 0x00 0x00>;
+		};
+
+		pll2 {
+			pll_config = <0x02 0x23c34600 0x00>;
+		};
+
+		pll3 {
+			pll_config = <0x03 0x00 0x00>;
+		};
+
+		pll4 {
+			pll_config = <0x04 0x00 0x00>;
+		};
+
+		pll5 {
+			pll_config = <0x05 0x00 0x00>;
+		};
+
+		pll6 {
+			pll_config = <0x06 0x00 0x00>;
+		};
+
+		pll7 {
+			pll_config = <0x07 0x00 0x00>;
+		};
+
+		pll8 {
+			pll_config = <0x08 0x1bb75640 0x00>;
+		};
+
+		pll9 {
+			pll_config = <0x09 0x00 0x00>;
+		};
+
+		pll10 {
+			pll_config = <0x0a 0x1017df80 0x00>;
+		};
+
+		pll11 {
+			pll_config = <0x0b 0x00 0x00>;
+		};
+
+		pll12 {
+			pll_config = <0x0c 0x00 0x00>;
+		};
+
+		pll13 {
+			pll_config = <0x0d 0x00 0x00>;
+		};
+
+		pll14 {
+			pll_config = <0x0e 0x00 0x00>;
+		};
+
+		pll15 {
+			pll_config = <0x0f 0x00 0x00>;
+		};
+
+		pll16 {
+			pll_config = <0x10 0x00 0x00>;
+		};
+
+		pll17 {
+			pll_config = <0x11 0x00 0x00>;
+		};
+
+		pll18 {
+			pll_config = <0x12 0x00 0x00>;
+		};
+	};
+
+	i2c0@fe300000 {
+		compatible = "nvt,ftiic010";
+		reg = <0xfe300000 0x100>;
+		interrupts = <0x00 0x15 0x04>;
+		clock-frequency = <0x186a0>;
+		#address-cells = <0x01>;
+		#size-cells = <0x00>;
+	};
+
+	i2c1@fe320000 {
+		compatible = "nvt,ftiic010";
+		reg = <0xfe320000 0x100>;
+		interrupts = <0x00 0x24 0x04>;
+		clock-frequency = <0x186a0>;
+		#address-cells = <0x01>;
+		#size-cells = <0x00>;
+	};
+
+	i2c2@fe340000 {
+		compatible = "nvt,ftiic010";
+		reg = <0xfe340000 0x100>;
+		interrupts = <0x00 0x3f 0x04>;
+		clock-frequency = <0x186a0>;
+		#address-cells = <0x01>;
+		#size-cells = <0x00>;
+	};
+
+	i2c3@fe360000 {
+		compatible = "nvt,ftiic010";
+		reg = <0xfe360000 0x100>;
+		interrupts = <0x00 0x42 0x04>;
+		clock-frequency = <0x186a0>;
+		#address-cells = <0x01>;
+		#size-cells = <0x00>;
+	};
+
+	i2c4@fe380000 {
+		compatible = "nvt,ftiic010";
+		reg = <0xfe380000 0x100>;
+		interrupts = <0x00 0x56 0x04>;
+		clock-frequency = <0x186a0>;
+		#address-cells = <0x01>;
+		#size-cells = <0x00>;
+	};
+
+	i2c5@fe3a0000 {
+		compatible = "nvt,ftiic010";
+		reg = <0xfe3a0000 0x100>;
+		interrupts = <0x00 0x13 0x04>;
+		clock-frequency = <0x186a0>;
+		#address-cells = <0x01>;
+		#size-cells = <0x00>;
+	};
+
+	audio_in_part {
+		ssp = <0x00 0x01 0x10 0x10 0x1f40 0xbb8000 0x1f4000 0x00 0xffffffff 0x06 0x00 0x01 0x10 0x1f40 0xbb8000 0x2ee000 0x01 0xffffffff 0xffffffff 0x00 0x01 0x10 0x1f40 0xbb8000 0x7d000 0x01 0xffffffff 0xffffffff 0x00 0x01 0x10 0x1f40 0xbb8000 0x7d000 0x01 0xffffffff>;
+	};
+
+	audio_out_part {
+		ssp = <0x01 0x01 0xffffffff 0x01 0x06 0xffffffff 0x00 0x01 0xffffffff 0x00 0x01 0xffffffff>;
+	};
+
+	lcd200@fdb00000 {
+		compatible = "nvt,lcd200";
+		reg = <0xfdb00000 0x10000>;
+		interrupts = <0x00 0x0c 0x04>;
+		device-id = <0x00>;
+	};
+
+	lcd300@fda00000 {
+		compatible = "nvt,lcd300";
+		reg = <0xfda00000 0x10000>;
+		interrupts = <0x00 0x0a 0x04>;
+		device-id = <0x00>;
+	};
+
+	hdmi20@0 {
+		compatible = "nvt,hdmi_top";
+		reg = <0xfd900000 0x1000>;
+		interrupts = <0x00 0x08 0x04>;
+		device-id = <0x00>;
+	};
+
+	tve100@0 {
+		compatible = "nvt,tve100";
+		reg = <0xfad00000 0x1000>;
+		interrupts = <0x00 0x21 0x04>;
+		device-id = <0x00>;
+	};
+
+	nvtmpp {
+		compatible = "nvt,nvtmpp";
+	};
+
+	isf_stream {
+		compatible = "nvt,isf_stream";
+	};
+
+	isf_flow {
+		compatible = "nvt,isf_flow";
+	};
+
+	isf_vdocap {
+		compatible = "nvt,isf_vdocap";
+	};
+
+	isf_vdoprc {
+		compatible = "nvt,isf_vdoprc";
+	};
+
+	isf_dummy {
+		compatible = "nvt,isf_dummy";
+	};
+
+	isf_vdoenc {
+		compatible = "nvt,isf_vdoenc";
+	};
+
+	isf_vdodec {
+		compatible = "nvt,isf_vdodec";
+	};
+
+	isf_vdoout {
+		compatible = "nvt,isf_vdoout";
+	};
+
+	dispobj {
+		compatible = "nvt,nvt_dispobj";
+	};
+
+	dispdev {
+		compatible = "nvt,nvt_dispdev";
+	};
+
+	audio {
+		compatible = "nvt,nvt_audio";
+	};
+
+	msdcnvt {
+		compatible = "nvt,msdcnvt";
+	};
+
+	msdcnvt_adj {
+		compatible = "nvt,msdcnvt_adj";
+	};
+
+	msdcnvt_custom_si {
+		compatible = "nvt,msdcnvt_custom_si";
+	};
+
+	wavstudio {
+		compatible = "nvt,wavstudio";
+	};
+
+	isf_audenc {
+		compatible = "nvt,isf_audenc";
+	};
+
+	isf_auddec {
+		compatible = "nvt,isf_auddec";
+	};
+
+	isf_audcap {
+		compatible = "nvt,isf_audcap";
+	};
+
+	isf_audout {
+		compatible = "nvt,isf_audout";
+	};
+
+	nvt_ipc {
+		compatible = "nvt,nvt_ipc";
+	};
+
+	h26xd@fcb00000 {
+		compatible = "nvt,h26xdec";
+		reg = <0xfcb00000 0x4000>;
+		interrupts = <0x00 0x1b 0x04>;
+		device-id = <0x00>;
+	};
+
+	h26xenc@fc600000 {
+		compatible = "nvt,h26xenc";
+		reg = <0xfc600000 0x10000>;
+		interrupts = <0x00 0x07 0x04>;
+		device-id = <0x00>;
+	};
+
+	/*
+	 * What the loader reads: where this tree and SHMINFO go, where it
+	 * runs (loader, up to 0xA00000) and where U-Boot is unpacked and
+	 * stays (uboot, the SDK's, past Linux and its CMA pools).
+	 * core2entry1/2 park the second core for Linux (U-Boot's HEADINFO
+	 * asks for SMP). As the SDK's boards, but for the tree's size.
+	 */
+	nvt_memory_cfg {
+		#address-cells = <0x01>;
+		#size-cells = <0x01>;
+
+		dram {
+			reg = <0x00 0x20000000>;
+		};
+
+		core2entry1 {
+			reg = <0x00 0x80000>;
+		};
+
+		fdt {
+			reg = <0x80000 0x80000>;
+		};
+
+		loader {
+			reg = <0x100000 0x900000>;
+		};
+
+		shmem {
+			reg = <0xa00000 0x100000>;
+		};
+
+		linuxtmp {
+			reg = <0xb00000 0x1d500000>;
+		};
+
+		uboot {
+			reg = <0x1e000000 0x1f80000>;
+		};
+
+		core2entry2 {
+			reg = <0x1ff80000 0x80000>;
+		};
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x00 0xc000000>;
+	};
+
+	reserved-memory {
+		#address-cells = <0x01>;
+		#size-cells = <0x01>;
+		ranges;
+
+		cma0@0x03000000 {
+			compatible = "shared-dma-pool";
+			reusable;
+			reg = <0x3000000 0x1800000>;
+			alignment = <0x400000>;
+			status = "okay";
+			phandle = <0x06>;
+		};
+
+		dsp_cma@0x02000000 {
+			compatible = "shared-dma-pool";
+			reusable;
+			reg = <0x2000000 0x1000000>;
+			alignment = <0x400000>;
+			status = "okay";
+			phandle = <0x07>;
+		};
+	};
+
+	nvt_cma {
+		compatible = "nvt,nvt_cma";
+		memory-region = <0x06>;
+		id = <0x00>;
+	};
+
+	nvt_dsp_cma {
+		compatible = "nvt,nvt_cma";
+		memory-region = <0x07>;
+		id = <0x01>;
+	};
+
+	hdal-memory {
+		#address-cells = <0x01>;
+		#size-cells = <0x01>;
+
+		media {
+			reg = <0xc000000 0x14000000>;
+		};
+	};
+
+	ddr_chip_mapping {
+		mapping = <0x00 0x00 0x00 0x20000000>;
+	};
+
+	nvt_info {
+		BIN_NAME = "FW98323A";
+		BIN_NAME_T = "FW98323T";
+		RTOS_APP_MAIN = "test";
+		EMBMEM_BLK_SIZE = "0x10000";
+		EMBMEM = "EMBMEM_SPI_NOR";
+		NVT_CFG_APP_EXTERNAL = "iperf-3 e2fsprogs";
+		NVT_CFG_APP = "arm_neon_perf mem sw_dbg i2c_access memcpy drystone-2.0";
+		NVT_ROOTFS_ETC = "COMMON";
+		NVT_BINARY_FILE_STRIP = "yes";
+		NVT_CFG_KERNEL_CFG = "na51068_evb_defconfig_nor_release";
+		NVT_CFG_UBOOT_CFG = "nvt-na51068_evb_nor_defconfig";
+		NVT_LINUX_SMP = "NVT_LINUX_SMP_ON";
+		NVT_DEFAULT_NETWORK_BOOT_PROTOCOL = "NVT_DEFAULT_NETWORK_BOOT_PROTOCOL_STATIC_IP";
+		NVT_ROOTFS_TYPE = "NVT_ROOTFS_TYPE_NOR_SQUASH";
+		NVT_ETHERNET = "NVT_ETHERNET_EQOS";
+		NVT_CURL_SSL = "NVT_CURL_SSL_OPENSSL";
+		NVT_UBOOT_ENV_IN_STORG_SUPPORT = "NVT_UBOOT_ENV_IN_STORG_SUPPORT_OFF";
+	};
+};

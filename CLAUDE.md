@@ -40,9 +40,10 @@ Adding or dropping a SoC needs both branches:
 - there: `build-novatek.yml`'s matrices and the README.
 
 The NVR dies NA51103 (NT98332) and NA51090 (NT98633) are supported as
-AArch64 targets behind the board's own loader and BL31; see "The NVR
-dies" below. The other dies of the SDKs (NA51068, NA51102, the NS02xxx
-parts) are not supported.
+AArch64 targets behind the board's own loader and BL31 (see "The NVR
+dies"), and the NA51068 DVR/NVR die (NT98321, NT98323) on SPI NOR (see
+"NA51068"). The other dies of the SDKs (NA51102, the NS02xxx parts) are
+not supported.
 
 ## Relationship to mainline
 
@@ -201,7 +202,7 @@ bash build.sh nt98566       # one or more SoCs (CROSS_COMPILE defaults to arm-li
   `olddefconfig`. There are no `configs/*_defconfig` for these targets.
 - The loader uses `LOADER_CROSS_COMPILE`: `arm-none-eabi-` if there is one,
   else `CROSS_COMPILE` (refused for the NT98528/529).
-- U-Boot is ~233 KiB, ~94 KiB packed, in the 128 KiB slot;
+- U-Boot is ~233 KiB, ~94 KiB packed (NA51068: 242 KiB, 98 KiB), in the 128 KiB slot;
   `nvt-image.py` fails the build if a part does not fit. Check the packed
   size after enabling anything.
 - nt98332 and nt98633 are AArch64: `CROSS_COMPILE_A64`, default
@@ -365,6 +366,54 @@ stand-in loader (`-smp 2` / `-smp 4`). Not checked: the boards' DDR
 contents across a watchdog reset (the boot counter), the controller's
 timing and the NAND's ECC error paths, the PHYs. **On silicon:**
 nothing yet.
+## NA51068
+
+The NT9832x SDK v1.02.024's die: NT98321 (DDR3) and NT98323 (DDR4), two
+Cortex-A9s (MPCore at `0xF9C00000`), Faraday-heritage peripherals,
+external DDR (512 MiB or more on every SDK board). `TARGET_NT98321`,
+`TARGET_NT98323`, `NVT_NA51068`; `board/novatek/na51068`,
+`arch/arm/mach-novatek/na51068.c`, `include/mach/na51068.h`,
+`openipc/na51068.dtsi` (the SDK's `cfg_98323_DDR4_4GX1_NOR_EVB` tree with
+the OpenIPC `/nor` chain; `nt98321.dts` changes what the 321 EVB does).
+
+- **Boot:** as NA51089, same image (`nvt-image.py`): loader 0 (64 KiB),
+  tree 0x10000, BCL1 LZMA U-Boot 0x20000. The loader
+  (`board/novatek/na51068/loader`, `na51068_loader_v1.08.014`) runs from
+  SRAM `0xFE080000` and then from DDR `0x100000`; its mask ROM has no
+  routines, its LZMA decoder is `lzma_inflate()` of its own `Compress.a`
+  (OpenIPC hooks algorithm 11 to it). Models `323_DDR4_4GX1_NOR_EVB` and
+  `321_DDR3_4GX1_NOR_EVB` (SpiFlash, `STORAGEEXT NONE`: with the SD
+  update code the image is over 64 KiB). The tree goes to `0x80000`,
+  SHMINFO `0xA00000`, U-Boot `0x1E000000` (the SDK's), the second core's
+  pen `0x1FF80000` (HEADINFO BinCtrl SMP).
+- **The loader jumps with its MMU on**, page tables in its DDR region:
+  `SKIP_LOWLEVEL_INIT_ONLY` (not `SKIP_LOWLEVEL_INIT`) so that
+  `cpu_init_cp15` turns it off; else writes to `0x100000+` hang.
+- **Timer:** the A9 global timer at PLL16's rate (CG `0x107C0`+0x20..28,
+  12 MHz x ratio / 2^17; an eighth of the CPU). The CPU clock is the
+  loader's: the vendor U-Boot's raise to 1400 MHz needs the core voltage
+  set by PWM from eFuse trim, not ported.
+- **Console** UART0 `0xFE200000`, 48 MHz. **Reset** the watchdog
+  `0xFE8A0000`, as the vendor kernel.
+- **SPI NOR:** FTSPI020 `0xFA900000`, `drivers/mtd/spi/nvt_spi020.c`
+  (`NVT_SPI020`), PIO, single lane, 4-byte opcodes past 16 MiB.
+- **Ethernet:** two `nvt_eqos` MACs (`0xFCC00000` eth0, `0xFCD00000`
+  eth1), each RGMII, RMII or the embedded PHY per `/top@fe030000/eth`
+  pinmux (`0x1201`: MAC0 RGMII, embedded PHY on MAC1). Both registered;
+  `eth_init` moves on to the next without link.
+- **SD:** a standard SDHCI at `0xFA600000`, mainline `sdhci.c` non-DM
+  (`add_sdhci`).
+- **Kernel:** `osmem` 192M (323) / 160M (321) as the SDK boards;
+  `CONFIG_SYS_BOOTMAPSZ` 128 MiB: the SDK's kernel 4.9 hangs silently
+  with the tree and initrd just below 192 MiB.
+- **NAND:** the qemu machine picks NAND for a 128/256 MiB image; NT98321
+  boards usually boot from SPI NAND, which needs a SPI020 NAND driver and
+  a UBI layout: not done.
+- **Verified under qemu** (`-M nt98323` / `nt98321`, real loader): two-boot
+  smoke; `sf` read/erase/write at odd offsets (16 and 32 MiB); `saveenv` +
+  `reset`; dhcp, ping, 3 MB tftp on both MACs; SD `mmc read/write`,
+  `fatls`, recovery of `uImage.<soc>.img`; the SDK's kernel 4.9.118 +
+  NT9852x ramdisk to a shell with `${fdtaddr}`. **On silicon:** nothing.
 
 ## Things to keep
 

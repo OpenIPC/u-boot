@@ -226,13 +226,14 @@ config DWC_ETH_QOS_TEGRA186
 	  configuration used in NVIDIA's Tegra186 chip.
 
 config NVT_EQOS
-	bool "Novatek Ethernet (NA51089, NT9852x, NA51103, NA51090)"
+	bool "Novatek Ethernet (NA51089, NT9852x, NA51068, NA51103, NA51090)"
 	depends on ARCH_NOVATEK && !DM_ETH
 	select PHYLIB
 	help
 	  The Synopsys DWC Ethernet QoS MAC of the Novatek camera and NVR
-	  dies, non-DM. Board code brings up its clocks, pins and the
-	  embedded PHY, and calls nvt_eqos_initialize().
+	  dies (two on NA51068), non-DM. Board code brings up their clocks,
+	  pins and the embedded PHY, and calls nvt_eqos_initialize() or
+	  nvt_eqos_register().
 
 config E1000
 	bool "Intel PRO/1000 Gigabit Ethernet support"

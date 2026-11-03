@@ -52,7 +52,7 @@ build_loader() {
     fi
 }
 
-# Novatek NA51089, NA51055 / NA51084: the mask ROM starts the loader,
+# Novatek NA51089, NA51055 / NA51084, NA51068: the mask ROM starts the loader,
 # which trains the DDR, reads the device tree at 0x10000 and unpacks
 # U-Boot from 0x20000 to its link address.
 #   build_nvt <soc> <loader die> <chip> [loader make variables...]
@@ -175,13 +175,21 @@ build_soc() {
             build_nvr "${soc}" nor "0x10000 0x20000 0x40000" ;;
         nt98633)
             build_nvr "${soc}" nand "0x40000 0xc0000 0x1a0000" ;;
+        # NA51068: the SDK's NAND models with the SPI NOR, its own DDR
+        # profile each (board/novatek/na51068/loader/Project/Model):
+        # NT98321 one 4 Gb DDR3 die at 1066 MHz, NT98323 one 4 Gb DDR4
+        # die at 1200 MHz, as the SDK's cfg_98323_DDR4_4GX1_NOR_EVB.
+        nt98321)
+            build_nvt "${soc}" na51068 321 MODEL=321_DDR3_4GX1_NOR_EVB ;;
+        nt98323)
+            build_nvt "${soc}" na51068 323 MODEL=323_DDR4_4GX1_NOR_EVB ;;
         *)
             echo "unsupported SoC: ${soc}" >&2
             return 1 ;;
     esac
 }
 
-ALL_SOCS="nt98560 nt98561 nt98562 nt98566 nt98520 nt98522 nt98523 nt98525 nt98528 nt98529 nt98332 nt98633"
+ALL_SOCS="nt98560 nt98561 nt98562 nt98566 nt98520 nt98522 nt98523 nt98525 nt98528 nt98529 nt98321 nt98323 nt98332 nt98633"
 
 SOCS="$@"
 [ -z "${SOCS}" ] && SOCS="${ALL_SOCS}"

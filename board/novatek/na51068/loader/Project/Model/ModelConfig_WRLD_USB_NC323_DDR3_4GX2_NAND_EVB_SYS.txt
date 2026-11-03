@@ -1,0 +1,210 @@
+BIN_NAME = LD98$(CHIP_SHORT)A
+BL_UPDATE_FWNAME = FW98$(CHIP_SHORT)A.BIN
+BL_RUN_FWNAME = FW98$(CHIP_SHORT)T.BIN
+BL_RECOVERY_FWNAME = FW98$(CHIP_SHORT)R.BIN
+
+# [CHIP] : main chip ID
+# 321
+# 323
+# 621
+# 623
+# NC321
+CHIP = NC323
+
+# [CHIP_VER] : chip version
+# A
+# B
+#CHIP_VER = A
+
+# [DRAM1_CLK] : DRAM1 clock rate
+# 800
+# 933
+# 1066
+# 1200
+# 1333 (DDR4 only)
+# 1600 (DDR4 only)
+DRAM1_CLK = 1066
+
+# [SDRAM_SIZE] : DRAM Size (unit: Giga bit)
+# 1024
+# 2048
+# 4096
+# 8192
+SDRAM_SIZE = 4096
+
+# [SDRAM2_SIZE] : DRAM2 Size (unit: Giga bit)
+# 0
+# 1024
+# 2048
+# 4096
+# 8192
+SDRAM2_SIZE = 4096
+
+# [DRAM_MUX] : Dram mux
+# FB
+# UBT
+DRAM_MUX = FB
+
+# [DRAM1_POWEROFF_S3] : PCB support powered off S3
+# Normal
+# Enabled
+#DRAM1_POWEROFF_S3 = Enabled
+
+# [DRAM_WIDTH_DETECT] : enable DRAM1 width detect by P_GPIO16 (only valid with 98535)
+# Normal
+# Enabled
+#DRAM_WIDTH_DETECT = Enabled
+
+# [DRAM1_16BIT_MODE] : DRAM1 only connect one ddr chip
+# Normal
+# Enabled
+DRAM1_16BIT_MODE = Normal
+
+# [DRAM_TYPE] : DRAM Type
+# DDR3
+# DDR3L
+# DDR4
+DRAM_TYPE = DDR3
+
+# [DRAM_2ND_TBL_DETECT] : enable DRAM 2nd table detect by GPIO. When gpio high, using 2nd ini table; when gpio low, using original table
+# 0: Normal
+# 1: GPIO0_4
+# 2: GPIO0_26
+# 3: GPIO1_0
+# 4: GPIO1_1
+# 5: GPIO1_10
+DRAM_2ND_TBL_DETECT = 0
+
+# [DRAM1_2ND_CLK] : DRAM1 clock rate
+# 800
+# 933
+# 1066
+# 1200
+# 1333 (DDR4 only)
+# 1600 (DDR4 only)
+DRAM1_2ND_CLK = 1333
+
+# [SDRAM_2ND_SIZE] : DRAM Size (unit: Giga bit)
+# 1024
+# 2048
+# 4096
+# 8192
+SDRAM_2ND_SIZE = 8192
+
+# [SDRAM2_2ND_SIZE] : DRAM2 Size (unit: Giga bit)
+# 0
+# 1024
+# 2048
+# 4096
+# 8192
+SDRAM2_2ND_SIZE = 8192
+
+# [DRAM_2ND_MUX] : Dram mux
+# FB
+# UBT
+DRAM_2ND_MUX = FB
+
+# [DRAM1_2ND_16BIT_MODE] : DRAM1 only connect one ddr chip
+# Normal
+# Enabled
+DRAM1_2ND_16BIT_MODE = Normal
+
+# [DRAM_2ND_TYPE] : DRAM Type
+# DDR3
+# DDR3L
+# DDR4
+DRAM_2ND_TYPE = DDR4
+
+# [DRAM_PLL_SSC] : enable DRAM PLL spread spectrum
+# Normal
+# 1 (0.1%)
+# 2 (0.2%)
+# 3 (0.3%)
+# 4 (0.4%)
+# 5 (0.5%)
+DRAM_SSC_ENABLE = Normal
+
+# [DRAM_HL_SWAP] : ddr high byte low byte swap  (only in heterogeneous mode)
+# for example: ddr 4Gb+2Gb (original) when this option open will change to 2Gb+4Gb
+# Normal: origin(big+small)
+# Enabled: big+small --> small+big
+DRAM_HL_SWAP = Normal
+
+# [DRAM_SA_SWAP] : ddr system address 0x0 mapping to 16bit ddr or 32bit ddr (only in heterogeneous mode)
+# for example: ddr 4Gb+2Gb original mapping address 0x0 to 32bit ddr when this option open will change address 0x0 mapping to 16bit ddr
+# Normal: origin(mapping to 32bit ddr)
+# Enabled: mapping to 16bit ddr
+DRAM_SA_SWAP = Normal
+
+# [STORAGEINT] :  internal storage device
+# NandSpi
+# SpiFlash
+STORAGEINT = NandSpi
+
+# [SPI_SETTING] :  SPI pinmux setting (Valid when STORAGEINT is NandSpi or SpiFlash)
+# SPI_NORMAL
+# SPI_4BITS
+SPI_SETTING = SPI_4BITS
+
+# [STORAGEEXT] : external storage device
+# NONE
+# Sdio1
+# Usb
+# Eth
+# Uart
+STORAGEEXT = Usb
+
+#==============================================================================#
+#							ROM decrypt loader option						   #
+#==============================================================================#
+# [SECUREBOOT] : Secure boot enable or not(Generate loader for secure boot)
+# Normal
+# Secure
+SECUREBOOT = Normal
+
+# [SIGNATUREMETHOD] : Digital signature method (Only valid when SECUREBOOT = Secure )
+# AES128
+# RSA2048
+SIGNATUREMETHOD = RSA2048
+
+# [ENCRYPTIONDATA] : Is data area encrypt ? (Only valid when SECUREBOOT = Secure )
+# Normal
+# AES128
+ENCRYPTDATA = Normal
+# [AES key path] : Set absolute path of AES key configuration file
+ifeq "$(shell uname)" "Linux"
+#AES_KEY_FILE_DIR = /home/nvt00607/NT96680/01_Loader/na51000_loader_smp_crypto_190320_v2/Tools/Bin/aes.txt
+AES_KEY_FILE_DIR = ../../Tools/Bin/aes.txt
+else
+AES_KEY_FILE_DIR = Y:/NT96680/01_Loader/na51000_loader_smp_crypto_190320/Tools/Bin/aes.txt
+endif
+
+# [RSA key path] : Set absolute path of RSA key configuration file
+ifeq "$(shell uname)" "Linux"
+#RSA_KEY_FILE_DIR = /home/nvt00607/NT96680/01_Loader/na51000_loader_smp_crypto_190320_v2/Tools/Bin/aes.txt
+RSA_PUB_KEY_FILE_DIR = ../../Tools/Bin/rsa_pub.txt
+RSA_PRV_KEY_FILE_DIR = ../../Tools/Bin/rsa_priv.txt
+else
+RSA_KEY_FILE_DIR = Y:/NT96680/01_Loader/na51000_loader_smp_crypto_190320/Tools/Bin/aes.txt
+endif
+# [LOADER_DRAM_ADDR] : assign DRAM address used by loader (format 0xABCD)
+# 0x20000
+LOADER_DRAM_ADDR = 0x00100000
+#==============================================================================#
+#                          loader decrypt uboot option                         #
+#==============================================================================#
+# [SECUREBOOT_DECRYPT_UBOOT] : Loader decrypt uboot or not (Depend on uboot build as cypher text or not)
+# Normal
+# Secure
+SECUREBOOT_DECRYPT_UBOOT = Normal
+
+#==============================================================================#
+#                           loader bind uboot                                  #
+#==============================================================================#
+# [UBOOT_BIND]
+# UBOOT_BIND_ON
+# UBOOT_BIND_OFF
+UBOOT_BIND = UBOOT_BIND_OFF
+
+# [UBOOT_PATH] (relative to Model/Makefile)
+UBOOT_PATH = ../../u-boot.lzma.bin

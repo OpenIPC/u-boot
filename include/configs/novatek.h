@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 /*
- * Novatek NA51089, NA51055 / NA51084, NA51103, NA51090: memory map,
- * console and timer. The environment and the rest of the OpenIPC
+ * Novatek NA51089, NA51055 / NA51084, NA51068, NA51103, NA51090: memory
+ * map, console and timer. The environment and the rest of the OpenIPC
  * configuration come from openipc-common.h.
  */
 
@@ -44,6 +44,15 @@
 #endif
 #endif
 
+#ifdef CONFIG_NVT_NA51068
+/*
+ * The device tree and an initrd stay in the first 128 MiB: the SDK's
+ * kernel 4.9 hangs before its first message with them just below
+ * mem=192M, where bootm would put them
+ */
+#define CONFIG_SYS_BOOTMAPSZ		0x08000000
+#endif
+
 /* The loader starts U-Boot at its link address */
 #define CONFIG_SYS_UBOOT_BASE		CONFIG_SYS_TEXT_BASE
 
@@ -57,16 +66,19 @@
 #define CONFIG_SYS_NS16550_MEM32
 #ifdef CONFIG_NVT_NA511XX
 #define CONFIG_SYS_NS16550_CLK		NVT_UART_HZ
+#elif defined(CONFIG_NVT_NA51068)
+#define CONFIG_SYS_NS16550_CLK		48000000
 #else
 #define CONFIG_SYS_NS16550_CLK		24000000
 #endif
 #define CONFIG_SYS_NS16550_COM1		NVT_UART0_BASE
 
-#ifndef CONFIG_ARM64
+#if !defined(CONFIG_ARM64) && !defined(CONFIG_NVT_NA51068)
 /* Timer 0 of the timer block, free running at 1 MHz */
 #define CONFIG_SYS_TIMER_RATE		NVT_TIMER_HZ
 #define CONFIG_SYS_TIMER_COUNTER	NVT_TIMER0_COUNT
 #endif
+/* NA51068: the A9 global timer (arch/arm/mach-novatek/na51068.c) */
 
 #include "openipc-common.h"
 

@@ -83,6 +83,20 @@ config TARGET_NT98633
 	  boards. U-Boot runs in AArch64 at EL2, started by the board's
 	  BL31.
 
+config TARGET_NT98321
+	bool "NT98321"
+	select NVT_NA51068
+	help
+	  NA51068 (DVR/NVR, two Cortex-A9s) with external DDR3, 512 MiB on
+	  the SDK's board, booting from SPI NOR.
+
+config TARGET_NT98323
+	bool "NT98323"
+	select NVT_NA51068
+	help
+	  NA51068 (DVR/NVR, two Cortex-A9s) with external DDR4, 512 MiB on
+	  the SDK's NOR board.
+
 endchoice
 
 config NVT_NA51089
@@ -110,11 +124,14 @@ config NVT_NA51090
 	bool
 	select NVT_NA511XX
 
+config NVT_NA51068
+	bool
+
 config NVT_DDR_SIZE
 	hex
 	default 0x80000000 if TARGET_NT98633
 	default 0x40000000 if TARGET_NT98332
-	default 0x20000000 if TARGET_NT98560
+	default 0x20000000 if TARGET_NT98560 || NVT_NA51068
 	default 0x08000000 if TARGET_NT98566
 	default 0x20000000 if TARGET_NT98520 || TARGET_NT98525
 	default 0x20000000 if TARGET_NT98528 || TARGET_NT98529
@@ -123,12 +140,16 @@ config NVT_DDR_SIZE
 	help
 	  The DDR at 0: the package's, or the board's for a part with
 	  external DDR, as its loader is built. A second DDR die (at
-	  0x40000000 on NA51055 / NA51084) is the media pool's alone.
+	  0x40000000 on NA51055 / NA51084) is the media pool's alone. On NA51068
+	  the loader's device tree (/nvt_memory_cfg/dram) says it; this is
+	  the fallback.
 
 config NVT_OSMEM
 	string
 	default "0x57600000" if NVT_NA51090
 	default "0x15e00000" if NVT_NA51103
+	default "160M" if TARGET_NT98321
+	default "192M" if TARGET_NT98323
 	default "256M" if NVT_DDR_SIZE >= 0x20000000
 	default "64M" if TARGET_NT98523
 	default "32M"
@@ -148,6 +169,7 @@ config SYS_VENDOR
 
 config SYS_BOARD
 	default "na511xx" if NVT_NA511XX
+	default "na51068" if NVT_NA51068
 	default "na51089"
 
 config SYS_CONFIG_NAME

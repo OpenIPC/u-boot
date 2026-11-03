@@ -9,6 +9,8 @@
 
 #if defined(CONFIG_NVT_NA511XX)
 #include <asm/arch/na511xx.h>
+#elif defined(CONFIG_NVT_NA51068)
+#include <asm/arch/na51068.h>
 #else
 #include <asm/arch/na51089.h>
 #endif

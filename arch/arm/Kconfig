@@ -833,6 +833,7 @@ config ARCH_NOVATEK
 	  starts the vendor loader, which trains the DDR, loads U-Boot as
 	  its device tree describes and starts it, on the NVRs through the
 	  board's BL31.
+	  Also the NA51068 DVR/NVR die (NT98321, NT98323), two Cortex-A9s.
 
 config ARCH_OMAP2PLUS
 	bool "TI OMAP2+"
