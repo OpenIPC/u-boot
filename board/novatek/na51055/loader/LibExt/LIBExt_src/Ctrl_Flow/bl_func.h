@@ -204,7 +204,10 @@
 #define COMBINATION_52x					2
 #define COMBINATION_528					3
 
+/* OpenIPC: MakeConfig.txt picks it from CHIP (-DLOADER_TYPE) */
+#ifndef LOADER_TYPE
 #define LOADER_TYPE                     STAND_ALONE_LOADER_52x
+#endif
 
 #define COMBINATION_LOADER_SIZE			0x18000
 

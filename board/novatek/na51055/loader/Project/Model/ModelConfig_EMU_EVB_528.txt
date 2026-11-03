@@ -151,7 +151,7 @@ SDRAM2_2ND_SIZE = 4096
 # SpiFlash
 # EMMC
 # EMMC_NAND_COMBO >>>[eMMC & NandSpi 2 in 1 & STORAGEEXT must choose NONE]<<<
-STORAGEINT = NandSpi
+STORAGEINT = SpiFlash
 
 # [SPI_SETTING] :  SPI pinmux setting (Valid when STORAGEINT is NandSpi or SpiFlash)
 # SPI_NORMAL

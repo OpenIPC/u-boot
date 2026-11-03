@@ -416,6 +416,17 @@ BL_LOADER_FLOW_PARAM = \
 -D_BL_MAIN_SPECIAL_FLOW_=$(BL_LOADER_FLOW)
 
 #------------------------------------------------------------------------------
+# OpenIPC: the NA51084 parts (528, 529) take the stand-alone 528 flow of
+# bl_func.h, as the SDK's make_combo_loader.sh builds them; the others the
+# stand-alone 52x one
+#------------------------------------------------------------------------------
+ifneq "$(filter 528 529,$(CHIP))" ""
+LOADER_TYPE_PARAM = -DLOADER_TYPE=STAND_ALONE_LOADER_528
+else
+LOADER_TYPE_PARAM = -DLOADER_TYPE=STAND_ALONE_LOADER_52x
+endif
+
+#------------------------------------------------------------------------------
 # Select Duty calibration ENABLE / DISABLE
 #------------------------------------------------------------------------------
 DUTY_CALIBRATION = DISABLE
@@ -918,7 +929,7 @@ SECURE_DECRYPT_UBOOT_PARAM = \
 #-------------------------------------------------------------------------------
 ifeq "$(SECUREBOOT_DECRYPT_OPTEE)" "Normal"
   OPTEE_DECRYPT_TYPE = _SECURE_DECRYPT_OPTEE_DISABLE_
-else ifeq "$(SECUREBOOT_DECRYPT_UBOOT)" "Secure"
+else ifeq "$(SECUREBOOT_DECRYPT_OPTEE)" "Secure"
   OPTEE_DECRYPT_TYPE = _SECURE_DECRYPT_OPTEE_ENABLE_
 else
   OPTEE_DECRYPT_TYPE = _SECURE_DECRYPT_OPTEE_DISABLE_

@@ -39,7 +39,7 @@
     Copyright   Novatek Microelectronics Corp. 2011.  All rights reserved.
 */
 #ifndef _BINI_NFO_H
-#define _BIN_INFO_H
+#define _BINI_NFO_H
 
 #define BIN_INFO_VER           0x19062115 ///< YYYY/MM/DD HH
 #if UITRON_FW
