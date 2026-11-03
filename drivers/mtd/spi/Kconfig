@@ -38,7 +38,7 @@ config SPI_FLASH
 
 config NVT_SFLASH
 	bool "Novatek NA51089 SPI NOR"
-	depends on ARCH_NOVATEK && !SPI_FLASH && !DM_SPI_FLASH
+	depends on ARCH_NOVATEK && NVT_NA51089 && !SPI_FLASH && !DM_SPI_FLASH
 	help
 	  The SPI NOR the Novatek NA51089 boots from, on its flash
 	  controller. The driver provides spi_flash_probe() directly,

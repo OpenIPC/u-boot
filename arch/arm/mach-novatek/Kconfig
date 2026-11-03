@@ -28,19 +28,37 @@ config TARGET_NT98566
 	help
 	  NA51089 with 128 MiB of DDR3 in the package.
 
+config TARGET_NT98321
+	bool "NT98321"
+	select NVT_NA51068
+	help
+	  NA51068 (DVR/NVR, two Cortex-A9s) with external DDR3, 512 MiB on
+	  the SDK's board, booting from SPI NOR.
+
+config TARGET_NT98323
+	bool "NT98323"
+	select NVT_NA51068
+	help
+	  NA51068 (DVR/NVR, two Cortex-A9s) with external DDR4, 512 MiB on
+	  the SDK's NOR board.
+
 endchoice
 
 config NVT_NA51089
 	bool
 
+config NVT_NA51068
+	bool
+
 config NVT_DDR_SIZE
 	hex
-	default 0x20000000 if TARGET_NT98560
+	default 0x20000000 if TARGET_NT98560 || NVT_NA51068
 	default 0x08000000 if TARGET_NT98566
 	default 0x04000000
 	help
 	  The DDR at 0: the package's, or the board's for a part with
-	  external DDR.
+	  external DDR. On NA51068 the loader's device tree
+	  (/nvt_memory_cfg/dram) says it; this is the fallback.
 
 config SYS_SOC
 	default "novatek"
@@ -49,6 +67,7 @@ config SYS_VENDOR
 	default "novatek"
 
 config SYS_BOARD
+	default "na51068" if NVT_NA51068
 	default "na51089"
 
 config SYS_CONFIG_NAME

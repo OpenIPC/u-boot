@@ -831,6 +831,7 @@ config ARCH_NOVATEK
 	  Novatek's NT98562 and NT98566: one Cortex-A9 with DDR in the
 	  package. The mask ROM starts the vendor loader, which trains the
 	  DDR, loads U-Boot as its device tree describes and starts it.
+	  Also the NA51068 DVR/NVR die (NT98321, NT98323), two Cortex-A9s.
 
 config ARCH_OMAP2PLUS
 	bool "TI OMAP2+"
