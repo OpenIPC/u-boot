@@ -1,0 +1,349 @@
+BIN_NAME = LD98$(CHIP_SHORT)A
+BL_UPDATE_FWNAME = FW98$(CHIP_SHORT)A.BIN
+BL_RUN_FWNAME = FW98$(CHIP_SHORT)T.BIN
+
+# Ext => DRAM is external die => Need user configuration
+# KGD => DRAM is internal die => Depend on specific chip (force fixed dram size)
+#============+====================+=========================+
+# chip_name  |DDR1 size           | DDR1 clock              |
+#============+====================+=========================+
+# 532/533QB  |512(Mb)             | 666                     |
+#============+====================+=========================+
+# 532QC/QD   |1024/2048(Mb)       | 400,507,666,793,933,1066|
+#============+====================+=========================+
+# 533QC/QD   |1024/2048(Mb)       | 400,507,666,793,933,1066|
+#============+====================+=========================+
+# 532BC/BD/BE|1024/2048/4096(Mb)  | 400,507,666,793,933,1066|
+#============+====================+=========================+
+# 533BC/BD/BE|1024/2048/4096(Mb)  | 400,507,666,793,933,1066|
+#============+====================+=========================+
+# [CHIP] : main chip ID
+#532QB
+#532QC
+#532QD
+#533QB
+#533QC
+#533QD
+#532BC
+#532BD
+#532BE
+#533BC
+#533BD
+#533BE
+CHIP = 533QC
+
+# [CHIP_VER] : chip version
+# A
+# B
+# CHIP_VER = A
+
+# [DRAM1_CLK] : DRAM1(16-bit) clock rate
+# 400
+# 507
+# 666
+# 793
+# 933
+# 1066
+DRAM1_CLK = 1066
+
+# [SDRAM_SIZE] : DRAM Size (unit: Giga bit)(Auto Calculate)
+# 512(Mb)
+# 1024
+# 2048
+# 4096
+# SDRAM_SIZE = 4096
+
+# [DRAM1_POWEROFF_S3] : PCB support powered off S3
+# Normal
+# Enabled
+# DRAM1_POWEROFF_S3 = Normal
+
+# [DRAM_TYPE] : DRAM Type(Auto recognize)
+# DDR2
+# DDR3
+# DDR3L
+# DRAM_TYPE = DDR3
+
+# [DRAM_2ND_TBL_DETECT] : enable DRAM 2nd table detect by GPIO(Not support)
+# Normal (No GPIO detected)
+# 0 (C_GPIO)
+# 1 (HSI_GPI0)
+# 2 (S_GPIO)
+# 3 (P_GPIO)
+# 4 (DSI_GPIO)
+# 5 (L_GPIO)
+# 6 (D_GPIO)
+# 7 (A_GPI0)
+# 8 (Reserved)
+#DRAM_2ND_TBL_DETECT = Normal
+
+# [DRAM_2ND_TBL_DETECT_GPIO_NO] : enable DRAM 2nd table detect by X_GPIO_n(Not support)
+# where
+# C_GPIO --> n=0~24
+# HSI_GPI0 --> n=0~11
+# S_GPIO --> n=0~8
+# P_GPIO --> n=0~25
+# DSI_GPIO --> n=0~10
+# L_GPIO --> n=0~9
+# D_GPIO --> n=0~7
+# A_GPIO --> n=0~3
+#DRAM_2ND_TBL_DETECT_GPIO_NO = 0
+
+# [DRAM1_2ND_CLK] : DRAM1(16-bit) 2nd table clock rate(Not support)
+# 400
+# 507
+# 522
+# 666
+# 760
+# 933
+# 1066
+#DRAM1_2ND_CLK = 933
+
+# [SDRAM_2ND_SIZE] : 2nd table DRAM Size (unit: Giga bit)(Not support)
+# 1024
+# 2048
+# 4096
+# SDRAM_2ND_SIZE = 4096
+
+# [DDR_TREFI] : ddr refresh time select by temparature range
+# Normal(3.9 us)
+# Extend(1.95 us)
+DDR_TREFI = Normal
+
+# [DRAM_PLL_SSC] : enable DRAM PLL spread spectrum(Not support Yet)
+# Normal
+# 1 (0.1%)
+# 2 (0.2%)
+# 3 (0.3%)
+# 4 (0.4%)
+# 5 (0.5%)
+DRAM_SSC_ENABLE = Normal
+
+# [DRAM_ODT] : enable DRAM ODT or not
+# Normal
+# Enable
+# Disable
+DRAM_ODT = Normal
+
+# [STORAGEINT] :  internal storage device
+# NandSpi		>>>[Use SPI-NAND flash ondie ECC]
+# NandEccBCH		>>>[Use SPI-NAND and SoC BCH ECC]
+# SpiFlash		>>>[Use SPI NOR flash]
+# EMMC
+# EMMC_NAND_COMBO >>>[eMMC & NandSpi 2 in 1 & STORAGEEXT must choose NONE]<<<
+STORAGEINT = NandSpi
+
+# [SPI_SETTING] :  SPI pinmux setting (Valid when STORAGEINT is NandSpi or SpiFlash)
+# SPI_NORMAL
+# SPI_4BITS
+SPI_SETTING = SPI_4BITS
+
+# [EMMC_SETTING] :  EMMC pinmux setting (Valid when STORAGEINT is EMMC)
+# EMMC_4BITS
+# EMMC_8BITS
+EMMC_SETTING = EMMC_8BITS
+
+# [STORAGEEXT] : external storage device
+# NONE
+# Sdio1
+# Usb
+# Eth 	>>>[During this option => STORAGEINT MUST not choose @EMMC_NAND_COMBO]<<<
+# Uart
+STORAGEEXT = Sdio1
+
+#==============================================================================#
+#							ROM decrypt loader option						   #
+#==============================================================================#
+# [SECUREBOOT] : Secure boot enable or not(Generate loader for secure boot)
+# Normal
+# Secure
+SECUREBOOT = Normal
+
+# [SIGNATUREMETHOD] : Digital signature method (Only valid when SECUREBOOT = Secure )
+# AES128
+# ECDSA256
+# RSA2048
+# RSA2048PSS
+# RSA2048PKCS1P5
+SIGNATUREMETHOD = ECDSA256
+
+# [ENCRYPTIONDATA] : Is data area encrypt ? (Only valid when SECUREBOOT = Secure )
+# Normal
+# AES128
+ENCRYPTDATA = Normal
+
+# [Bypass simple checksum] : During SIGNATUREMETHOD == RSA or AES and ENCRYPTDATA == Normal
+# Choose ENABLE will let cypher loader(data area MUST be plan text) can run both in normal IC and secure enable IC
+# at the same time
+# DISABLE
+# ENABLE
+BYPASS_SIMPLE_CHKSUM = DISABLE
+
+# [ENCRYPTIONDATA key selection] : Is data area encrypt ? (Only valid when SECUREBOOT = Secure && ENCRYPTDATA == AES128)
+# 1st_key_set (default)
+# 2nd_key_set
+# 3rd_key_set
+# 4th_key_set
+# 5th_key_set
+ENCRYPTDATA_KEY_SEL = 1st_key_set
+
+# [Header signature selection] : Is processing header signature verify?
+# DISABLE(default)
+# ENABLE
+HEADER_SIGNATURE = DISABLE
+
+# [AES key path] : Set absolute path of AES key configuration file
+ifeq "$(shell uname)" "Linux"
+#AES_KEY_FILE_DIR = /home/nvt00607/NT96680/01_Loader/na51000_loader_smp_crypto_190320_v2/Tools/Bin/aes.txt
+AES_KEY_FILE_DIR = ../../Tools/Bin/aes.txt
+else
+AES_KEY_FILE_DIR = Y:/NT96680/01_Loader/na51000_loader_smp_crypto_190320/Tools/Bin/aes.txt
+endif
+
+# [RSA key path] : Set absolute path of RSA key configuration file
+ifeq "$(shell uname)" "Linux"
+#RSA_KEY_FILE_DIR = /home/nvt00607/NT96680/01_Loader/na51000_loader_smp_crypto_190320_v2/Tools/Bin/aes.txt
+ifeq "$(SIGNATUREMETHOD)" "RSA2048"
+RSA_PUB_KEY_FILE_DIR = ../../Tools/Bin/rsa_pub.txt
+RSA_PRV_KEY_FILE_DIR = ../../Tools/Bin/rsa_priv.txt
+else
+    ifeq "$(SIGNATUREMETHOD)" "RSA2048PSS"
+        RSA_PUB_KEY_FILE_DIR = ../../Tools/Bin/rsa_pub.txt
+        RSA_PRV_KEY_FILE_DIR = ../../Tools/Bin/rsa_priv.txt
+    else
+        ifeq "$(SIGNATUREMETHOD)" "RSA2048PKCS1P5"
+            RSA_PUB_KEY_FILE_DIR = ../../Tools/Bin/rsa_pub.txt
+            RSA_PRV_KEY_FILE_DIR = ../../Tools/Bin/rsa_priv.txt
+        else
+            RSA_PUB_KEY_FILE_DIR = ../../Tools/Bin/ecdsa_pub.key
+            RSA_PRV_KEY_FILE_DIR = ../../Tools/Bin/ecdsa_priv.key
+        endif
+    endif
+    endif
+else
+RSA_KEY_FILE_DIR = Y:/NT96680/01_Loader/na51000_loader_smp_crypto_190320/Tools/Bin/aes.txt
+endif
+
+# [LOADER_DRAM_ADDR] : assign DRAM address used by loader (format 0xABCD)
+# 0x1000000
+LOADER_DRAM_ADDR = 0x1000000
+
+#==============================================================================#
+#							loader decrypt uboot option						   #
+#==============================================================================#
+# [SECUREBOOT_DECRYPT_UBOOT] : Loader decrypt uboot or not (Depend on uboot build as cypher text or not)
+# Normal
+# Secure
+SECUREBOOT_DECRYPT_UBOOT = Normal
+
+#==============================================================================#
+#							loader decrypt optee option						   #
+#==============================================================================#
+# [SECUREBOOT_DECRYPT_OPTEE] : Loader decrypt optee or not (Depend on optee build as cypher text or not)
+# Normal
+# Secure
+SECUREBOOT_DECRYPT_OPTEE = Normal
+
+#==============================================================================#
+#    loader decrypt rtos option                                                #
+#==============================================================================#
+# [SECUREBOOT_DECRYPT_RTOS] : Loader decrypt rtos or not
+# Normal
+# Secure
+SECUREBOOT_DECRYPT_RTOS = Normal
+
+#==============================================================================#
+#    loader decrypt fdt option                                                #
+#==============================================================================#
+# [SECUREBOOT_DECRYPT_FDT] : Loader decrypt fdt or not
+# Normal
+# Secure
+SECUREBOOT_DECRYPT_FDT = Normal
+
+#==============================================================================#
+#    loader decrypt linux-kernel option                                                #
+#==============================================================================#
+# [SECUREBOOT_DECRYPT_KERNEL] : Loader decrypt linux-kernel or not
+# Normal
+# Secure
+SECUREBOOT_DECRYPT_KERNEL = Normal
+
+#==============================================================================#
+#	exFAT support(Once customer want to use exFAT, need get license from $MS ) #
+#==============================================================================#
+# [exFAT] : Loader support exFAT or not
+# NONE
+# EXFAT
+EXFAT_FILESYSTEM_SUPPORT = NONE
+
+#==============================================================================#
+#    NOR DTR support(only available while STORAGEINT = SpiFlash && FASTBOOT = ENABLE ENABLE)                                                        #
+#    !!!!! WARNING !!!!! flash, ddr hardware spec must meet requirement !!!!!  #
+#==============================================================================#
+# [NOR_DTR] : use NOR DTR support for fast boot
+# DISABLE
+# ENABLE
+SPINOR_DTR = DISABLE
+
+
+#==============================================================================#
+#    SPI-NAND(NOR)/eMMC use direct mode                                             #
+#==============================================================================#
+# [DIRECT MODE] : Internal storage use direct mode
+# DISABLE : PIO mode
+# ENABLE  : Direct mode
+INT_STRG_DIR_MODE = DISABLE
+
+#==============================================================================#
+#    fastboot support (with fast sensor)                                       #
+#==============================================================================#
+# DISABLE
+# ENABLE
+FASTBOOT = DISABLE
+
+#==============================================================================#
+#    direct boot support                                                       #
+#==============================================================================#
+# [DIRECT_BOOT] : Loader boots Linux directly but conflicts with fastboot
+# DISABLE
+# ENABLE
+DIRECT_BOOT = DISABLE
+
+#==============================================================================#
+#    Low Power support(only support DDR3-800 and use PLL11)                    #
+#==============================================================================#
+# DISABLE
+# ENABLE
+Low_Pwr = DISABLE
+
+#==============================================================================#
+#    DDR SIZE All in one support(auto check 1G/2G/4G size)                     #
+#==============================================================================#
+# DISABLE
+# ENABLE
+DDR_SIZE_ALL_IN_ON = DISABLE
+
+#==============================================================================#
+#    debug loader support                                                      #
+#==============================================================================#
+# [DBG_LD] : enlarge loader size for scan address and dq
+# DISABLE
+# ENABLE
+DBG_LD = DISABLE
+
+
+#==============================================================================#
+#    loader size select                                                        #
+#==============================================================================#
+# [ENLARGE_LD] : enlarge loader size for user coding usage, (the boot time will increase)
+# DISABLE(Origin Size)
+# ENABLE(64KB Max Size)
+ENLARGE_LD = DISABLE
+
+#==============================================================================#
+# [Cipher text encrypt sequence] : (just option for back up)                   #
+# Caution Once selection ENABLE -> Specific SoC's fuse bit need programmed     #
+#==============================================================================#
+# DISABLE(default):                   signature -> encrypt data as cypher text(general usage)
+# ENABLE          : encrypt data as cypher text -> signature
+CIPHER_ENCRYPT_SEQ = DISABLE
