@@ -74,6 +74,8 @@ jobs:
           - { soc: nt98525, image: nor, limit_kb: 256 }
           - { soc: nt98528, image: nor, limit_kb: 256 }
           - { soc: nt98529, image: nor, limit_kb: 256 }
+          - { soc: nt98321, image: nor, limit_kb: 256 }
+          - { soc: nt98323, image: nor, limit_kb: 256 }
           - { soc: nt98332, image: nor, limit_kb: 128 }
           - { soc: nt98633, image: nand, limit_kb: 896 }
 
@@ -204,6 +206,8 @@ jobs:
           - { soc: nt98525, machine: nt98525, qemu: arm, artifact: u-boot-nt98525, file: u-boot-nt98525-nor.bin, mib: 8, args: "" }
           - { soc: nt98528, machine: nt98528, qemu: arm, artifact: u-boot-nt98528, file: u-boot-nt98528-nor.bin, mib: 8, args: "" }
           - { soc: nt98529, machine: nt98529, qemu: arm, artifact: u-boot-nt98529, file: u-boot-nt98529-nor.bin, mib: 8, args: "" }
+          - { soc: nt98321, machine: nt98321, qemu: arm, artifact: u-boot-nt98321, file: u-boot-nt98321-nor.bin, mib: 8, args: "" }
+          - { soc: nt98323, machine: nt98323, qemu: arm, artifact: u-boot-nt98323, file: u-boot-nt98323-nor.bin, mib: 8, args: "" }
           - { soc: nt98332, machine: nt98332, qemu: aarch64, artifact: qemu-image-nt98332, file: u-boot-nt98332-qemu.bin, mib: 16, args: "-smp 2" }
           - { soc: nt98633, machine: nt98633, qemu: aarch64, artifact: qemu-image-nt98633, file: u-boot-nt98633-qemu.bin, mib: 128, args: "-smp 4" }
     steps:

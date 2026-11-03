@@ -24,7 +24,7 @@ own branch:
   `CLAUDE.md` covers the boot headers, the EV330 first stage and the
   drivers.
 - `openipc-novatek`: U-Boot for Novatek's camera dies (NA51089, NA51055,
-  NA51084) and NVR dies (NA51103, NA51090), on
+  NA51084) and DVR/NVR dies (NA51068, NA51103, NA51090), on
   the same mainline release with the same OpenIPC layer, plus the SDK's
   loader, built from source in the tree. CI: `build-novatek.yml`, called
   from that branch's `ci.yml`. Its own `CLAUDE.md` covers the loader, the
@@ -158,7 +158,8 @@ The build logic lives here. Other branches call it:
 
 - It is `build-anyka.yml` for `openipc-novatek`: the same job graph and
   `resolve`/`ref` rules.
-- **Images.** The camera dies (NA51089, NA51055, NA51084) are NOR only:
+- **Images.** The camera dies (NA51089, NA51055, NA51084) and NA51068
+  are NOR only:
   the 256 KiB boot partition holds the loader, the device tree at
   0x10000 and U-Boot at 0x20000. The NVRs (`nt98332`, `nt98633`) release
   U-Boot's slot alone (128 KiB of NOR, 896 KiB of NAND), and build.sh
