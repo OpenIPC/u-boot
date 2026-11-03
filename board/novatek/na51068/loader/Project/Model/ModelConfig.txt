@@ -1,0 +1,18 @@
+#----------------------------------------------------------------------
+# Set model here
+#----------------------------------------------------------------------
+# EMU_EVB
+# DEMO1_EVB
+# 321_DDR3_4Gx1_NAND_SYS
+# 321_DDR4_8GX1_NAND_SYS
+# 323_DDR3_4GX2_NAND_EVB_SYS
+# 323_DDR4_8GX2_NAND_EVB_SYS
+# NC321_DDR3_4GX1_NAND_SYS
+# NC323_DDR3_4GX2_NAND_EVB_SYS
+# WRLD_USB_321_DDR3_4GX1_SYS
+# WRLD_USB_321_DDR4_8GX1_NAND_SYS
+# WRLD_USB_323_DDR3_4GX2_NAND_EVB
+# WRLD_USB_323_DDR4_8GX2_SYS
+# WRLD_USB_NC321_DDR3_4GX1_SYS
+# WRLD_USB_NC323_DDR3_4GX2_NAND_EVB_SYS
+MODEL = EMU_EVB
