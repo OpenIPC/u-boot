@@ -28,6 +28,17 @@
  * BL31 (0x1F00000, secure), where the vendor U-Boot stages them
  */
 #define OPENIPC_BASEADDR		0x02000000
+#ifdef CONFIG_NVT_NA51090
+/*
+ * The board's loader, tree and BL31 stay in the first 768 KiB of the NAND
+ * (loader 0, tree 0x40000, BL31 0x80000); ${ubfile} is U-Boot's slot
+ * alone, 0xC0000..0x1A0000. The environment is the board's uenv
+ * partition (0x1A0000), UBI follows (0x1E0000).
+ */
+#define OPENIPC_UBWRITE			"nand erase 0xc0000 0xe0000; nand write ${baseaddr} 0xc0000 ${filesize}"
+#define OPENIPC_NAND_MTDPARTS		"1664k(boot),256k(env),-(ubi)"
+#define CONFIG_SYS_MAX_NAND_DEVICE	1
+#endif
 #ifdef CONFIG_NVT_NA51103
 /*
  * The board's loader and device tree stay in the first 128 KiB of the

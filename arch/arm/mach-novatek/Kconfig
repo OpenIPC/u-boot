@@ -36,6 +36,14 @@ config TARGET_NT98332
 	  boards. U-Boot runs in AArch64 at EL2, started by the board's
 	  BL31.
 
+config TARGET_NT98633
+	bool "NT98633 (NA51090)"
+	select NVT_NA51090
+	help
+	  NA51090, the NVR die with four Cortex-A53s, 2 GiB of DDR on the
+	  boards. U-Boot runs in AArch64 at EL2, started by the board's
+	  BL31.
+
 endchoice
 
 config NVT_NA51089
@@ -52,8 +60,13 @@ config NVT_NA51103
 	bool
 	select NVT_NA511XX
 
+config NVT_NA51090
+	bool
+	select NVT_NA511XX
+
 config NVT_DDR_SIZE
 	hex
+	default 0x80000000 if TARGET_NT98633
 	default 0x40000000 if TARGET_NT98332
 	default 0x20000000 if TARGET_NT98560
 	default 0x08000000 if TARGET_NT98566

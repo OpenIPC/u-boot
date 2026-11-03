@@ -196,15 +196,30 @@ int nvt_eqos_initialize(phy_interface_t intf);
 #define GPIO_DIR(n)		(NVT_GPIO_BASE + 0x30 + ((n) >> 5) * 4)
 #define GPIO_SET(n)		(NVT_GPIO_BASE + 0x60 + ((n) >> 5) * 4)
 #define GPIO_CLR(n)		(NVT_GPIO_BASE + 0x90 + ((n) >> 5) * 4)
+#ifdef CONFIG_NVT_NA51090
+#define E_GPIO(n)		(0x80 + (n))
+#define S_GPIO(n)		(0xC0 + (n))
+#else
 #define E_GPIO(n)		(0x60 + (n))
+#endif
 
-#ifdef CONFIG_NVT_NA51103
 /* A GPIO as an output, at @val */
 static void nvt_gpio_out(unsigned int n, int val)
 {
 	writel(BIT(n & 31), val ? GPIO_SET(n) : GPIO_CLR(n));
 	setbits_le32(GPIO_DIR(n), BIT(n & 31));
 }
+
+/* The PHY's reset: low for 10 ms, then 50 ms before MDIO, as the vendor */
+static void nvt_phy_reset(unsigned int gpio)
+{
+	nvt_gpio_out(gpio, 0);
+	mdelay(10);
+	nvt_gpio_out(gpio, 1);
+	mdelay(50);
+}
+
+#ifdef CONFIG_NVT_NA51103
 
 /*
  * The embedded PHY's power-on, as eth_na51103.c's eth_phy_poweron() and
@@ -300,16 +315,106 @@ static phy_interface_t nvt_eth_setup(const void *fdt)
 		setbits_le32(TOP(0x0C), BIT(8));
 		clrbits_le32(TOP(0xB0), BIT(0));
 	}
-	if (intf != PHY_INTERFACE_MODE_MII) {
-		/* The PHY's reset, on E_GPIO 1 */
-		nvt_gpio_out(E_GPIO(1), 0);
-		mdelay(10);
-		nvt_gpio_out(E_GPIO(1), 1);
-		mdelay(50);
-	}
+	/* The PHY's reset, on E_GPIO 1 */
+	if (intf != PHY_INTERFACE_MODE_MII)
+		nvt_phy_reset(E_GPIO(1));
 	return intf;
 }
 #endif /* CONFIG_NVT_NA51103 */
+
+#ifdef CONFIG_NVT_NA51090
+#define ETH2_PIN_RGMII		BIT(12)	/* an RGMII PHY on the first pads */
+#define ETH2_PIN_RGMII_2	BIT(13)	/* or on the second */
+#define ETH2_PIN_RMII		BIT(16)
+#define ETH2_PIN_RMII_2		BIT(17)
+#define ETH2_PIN_REFCLK		BIT(20)	/* the PHY's 25 MHz from the SoC */
+
+/* The tree's eth0 node: Xiongmai-style "eth0@2,f0210000", or the SDK's */
+static int nvt_eth_node(const void *fdt)
+{
+	int node = fdt_path_offset(fdt, "/eth0@2,f0210000");
+
+	return node >= 0 ? node : fdt_path_offset(fdt, "/eth1@2,f0210000");
+}
+
+/*
+ * The MAC at 0x2_F021_0000, which the boards' tree calls eth0 and Linux
+ * uses as eth0, as the vendor U-Boot's eth_na51090.c sets up its MAC1:
+ * mac1_pinmux_en(), mac1_clk_en(), extphy1_clk_en(). It has no embedded
+ * PHY. The NT98633 NVR says 0x502501: RGMII on the second pads, the PHY's
+ * clock from the SoC, its reset on S_GPIO 19.
+ */
+static phy_interface_t nvt_eth_setup(const void *fdt)
+{
+	u32 pins = nvt_fdt_u32(fdt, "/top/eth", "pinmux", ETH2_PIN_RGMII);
+	int node = fdt ? nvt_eth_node(fdt) : -1;
+	const fdt32_t *spclk = node >= 0 ?
+			       fdt_getprop(fdt, node, "sp-clk", NULL) : NULL;
+	const fdt32_t *refout = node >= 0 ?
+				fdt_getprop(fdt, node, "ref-clk-out", NULL) : NULL;
+	bool ext_clk = pins & ETH2_PIN_REFCLK ||
+		       (spclk && fdt32_to_cpu(*spclk));
+	int pad = pins & (ETH2_PIN_RGMII_2 | ETH2_PIN_RMII_2) ? 2 : 1;
+	phy_interface_t intf = pins & (ETH2_PIN_RMII | ETH2_PIN_RMII_2) ?
+			       PHY_INTERFACE_MODE_RMII :
+			       PHY_INTERFACE_MODE_RGMII;
+
+	if (intf == PHY_INTERFACE_MODE_RMII) {
+		clrsetbits_le32(TOP(0x0C), 7 << 4, (pad == 1 ? 2 : 4) << 4);
+	} else if (pad == 1) {
+		clrsetbits_le32(PAD(0x98), 0xf, 0x1);
+		clrsetbits_le32(PAD(0x9C), 0xffffff, 0x111111);
+		clrsetbits_le32(TOP(0x0C), 7 << 4, 1 << 4);
+	} else {
+		clrsetbits_le32(PAD(0xA8), 0xf << 8, 0x1 << 8);
+		clrsetbits_le32(PAD(0xAC), 0xffffff << 8, 0x111111 << 8);
+		clrsetbits_le32(TOP(0x0C), 7 << 4, 3 << 4);
+	}
+	clrsetbits_le32(TOP(0x0C), 3 << 20, pad << 20);		/* MDIO */
+	if (pad == 1) {
+		clrbits_le32(TOP(0xB0), intf == PHY_INTERFACE_MODE_RMII ?
+			     0xCE3C0000 : 0xFFFC0000);
+	} else {
+		clrbits_le32(TOP(0xC0), intf == PHY_INTERFACE_MODE_RMII ?
+			     0x38F00000 : 0xFFF00000);
+		clrbits_le32(TOP(0xC4), 0x3);
+	}
+
+	/* PLL7, the MAC's clock, out of reset */
+	setbits_le32(CG(0x00), BIT(7));
+	udelay(10);
+	setbits_le32(CG(0x70), BIT(28));
+	udelay(10);
+	setbits_le32(CG(0x94), BIT(17));
+	udelay(10);
+
+	if (intf == PHY_INTERFACE_MODE_RMII) {
+		u32 v = readl(GLUE(0x14));
+
+		v &= ~(BIT(2) | BIT(4) | 3 << 30);
+		v |= BIT(0) | BIT(5);
+		if (refout && fdt32_to_cpu(*refout))
+			v = (v & ~BIT(0)) | BIT(4);
+		writel(v, GLUE(0x14));
+	} else {
+		writel((readl(GLUE(0x14)) & (3 << 30)) | 1 << 30 | 3 << 4,
+		       GLUE(0x14));
+	}
+	setbits_le32(GLUE(0x04), BIT(4));	/* an external PHY */
+	writel(0x1FF, GLUE(0x0C));
+
+	if (ext_clk) {
+		setbits_le32(CG(0x74), BIT(8));
+		setbits_le32(TOP(0x0C), BIT(16));
+		if (pad == 1)
+			clrbits_le32(TOP(0xB0), BIT(16));
+		else
+			clrbits_le32(TOP(0xC0), BIT(18));
+	}
+	nvt_phy_reset(pad == 1 ? E_GPIO(17) : S_GPIO(19));
+	return intf;
+}
+#endif /* CONFIG_NVT_NA51090 */
 
 int board_eth_init(struct bd_info *bis)
 {

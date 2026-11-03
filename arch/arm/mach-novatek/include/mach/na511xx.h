@@ -23,7 +23,8 @@
 #define NVT_UART0_BASE		NVT_IO(0x280000)
 #ifdef CONFIG_NVT_NA51090
 #define NVT_WDT_BASE		NVT_IO(0x110000)
-#define NVT_ETH_BASE		NVT_IO(0x200000)	/* the vendor's eth0 */
+/* The boards' tree's eth0, Linux's (the vendor U-Boot's MAC1) */
+#define NVT_ETH_BASE		NVT_IO(0x210000)
 #else
 #define NVT_WDT_BASE		NVT_IO(0x060000)
 #define NVT_ETH_BASE		NVT_IO(0x440000)
