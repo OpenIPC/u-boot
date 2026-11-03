@@ -4,18 +4,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this branch is
 
-`openipc-novatek` is OpenIPC's U-Boot for Novatek's NA51089 camera SoCs:
-the NT98562 (64 MiB of DDR in the package) and the NT98566 (128 MiB), one
-Cortex-A9 each. The tree is **mainline U-Boot v2022.10**, the same release
-as `openipc-hisilicon`, `openipc-xm`, `openipc-gk710x` and
-`openipc-anyka`, plus:
+`openipc-novatek` is OpenIPC's U-Boot for Novatek's camera SoCs:
+
+- NA51089, one Cortex-A9: the NT98560 (external DDR), NT98561 and NT98562
+  (64 MiB of DDR in the package) and NT98566 (128 MiB);
+- the NT9852x SDK's two dies, two Cortex-A9s each, NA51089's blocks at
+  NA51089's addresses: NA51055 (NT98520, NT98522, NT98523, NT98525) and
+  NA51084 (NT98528, NT98529); see "The NT9852x dies" below;
+
+and for two NVR dies, NA51103 and NA51090 (see "The NVR dies"). The tree
+is **mainline U-Boot v2022.10**, the same release as `openipc-hisilicon`,
+`openipc-xm`, `openipc-gk710x` and `openipc-anyka`, plus:
 
 - the OpenIPC boot layer, as on `openipc-anyka`;
 - the NA51089 support, written from the vendor sources: the NT9856x Linux
   SDK v1.01.007 (U-Boot 2019.04, kernel 4.19.91), and the device tree of a
-  Xiongmai NT98562 camera;
-- the SDK's loader, which runs before U-Boot, as Novatek ships it
-  (`board/novatek/na51089/loader`), built from its sources.
+  Xiongmai NT98562 camera; the NT9852x support from that SDK's U-Boot
+  2019.04 and board trees;
+- the SDKs' loaders, which run before U-Boot, as Novatek ships them
+  (`board/novatek/na51089/loader`, `board/novatek/na51055/loader`), built
+  from their sources.
 
 CI and user docs live on the `openipc` branch:
 
@@ -33,8 +41,8 @@ Adding or dropping a SoC needs both branches:
 
 The NVR dies NA51103 (NT98332) and NA51090 (NT98633) are supported as
 AArch64 targets behind the board's own loader and BL31; see "The NVR
-dies" below. The other dies of the SDKs (NA51055, NA51068, NA51102, the
-NS02xxx parts) are not supported.
+dies" below. The other dies of the SDKs (NA51068, NA51102, the NS02xxx
+parts) are not supported.
 
 ## Relationship to mainline
 
@@ -89,6 +97,17 @@ DDR. Then, from `LibExt/LIBExt_src/Ctrl_Flow/bl_func.c`:
 4. it checks the HEADINFO at 0x300 into U-Boot: CodeEntry must be
    `/nvt_memory_cfg/uboot`, and the 16-bit words plus their indices must
    sum to 0 over BinLength; then it calls CodeEntry.
+
+**It calls CodeEntry with its MMU and caches on**: SCTLR 0x00c5187d, its
+translation table at 0x1018000 (in its DRAM area, `/nvt_memory_cfg/loader`)
+mapping the DDR write-back write-allocate and the registers as device
+memory. This U-Boot runs with the data cache off and no cache maintenance
+(`SYS_DCACHE_OFF`), so `cpu_init_cp15` has to run: `openipc_config` has
+`SKIP_LOWLEVEL_INIT_ONLY` (no `lowlevel_init`, the loader has the clocks
+and DDR up), not `SKIP_LOWLEVEL_INIT`, which skipped it too. Without it the
+cache stayed live under the MAC's and the flash controller's DMA, and
+anything loaded to 0x1000000 (`${baseaddr}`) overwrote the table. At the
+prompt SCTLR reads 0x00c5187a.
 
 `openipc/nvt-image.py` builds the 256 KiB image the programmer writes at
 offset 0:
@@ -172,7 +191,7 @@ offset 0:
 ## Build
 
 ```sh
-bash build.sh               # both; continues past failures, exits non-zero if any failed
+bash build.sh               # every SoC; continues past failures, exits non-zero if any failed
 bash build.sh nt98566       # one or more SoCs (CROSS_COMPILE defaults to arm-linux-gnueabi-)
 ```
 
@@ -181,7 +200,7 @@ bash build.sh nt98566       # one or more SoCs (CROSS_COMPILE defaults to arm-li
 - `.config` is `openipc/openipc_config`, then `openipc/<soc>_config`, then
   `olddefconfig`. There are no `configs/*_defconfig` for these targets.
 - The loader uses `LOADER_CROSS_COMPILE`: `arm-none-eabi-` if there is one,
-  else `CROSS_COMPILE`.
+  else `CROSS_COMPILE` (refused for the NT98528/529).
 - U-Boot is ~233 KiB, ~94 KiB packed, in the 128 KiB slot;
   `nvt-image.py` fails the build if a part does not fit. Check the packed
   size after enabling anything.
@@ -193,12 +212,13 @@ bash build.sh nt98566       # one or more SoCs (CROSS_COMPILE defaults to arm-li
 
 ## Verification
 
-The emulator is OpenIPC/qemu-hisilicon, machines `nt98562`, `nt98566`
-(`docs/novatek.md` there). `-M <soc>,flash-file=<image>` does the loader's
-job (not the DDR training, so it does not run the loader): it reads the
-device tree at 0x10000, unpacks U-Boot from its BCL1 container (LZMA
-support is newer than the first NT9856x machines), fills SHMINFO and starts
-it.
+The emulator is OpenIPC/qemu-hisilicon (`docs/novatek.md` there), a
+machine per SoC but the NT98520 and NT98522, which run on the NT98525's
+and NT98523's (the same dies). Since OpenIPC/qemu-hisilicon#222,
+`-M <soc>,flash-file=<image>` runs the image's own loader through a mask
+ROM model: the DDR training, the device tree at 0x10000, U-Boot's BCL1
+container, SHMINFO, the jump. (Before, a stand-in did the loader's job
+without running it.)
 
 - **CI smoke:** two boots of an 8 MiB image holding only the image. The
   second must load the environment the first saved.
@@ -221,12 +241,58 @@ it.
   - SD (`-drive if=sd,index=0,format=raw,file=<image>`): `mmc info`,
     `fatls`, `fatload` and `mmc read/write` against the host's CRCs;
     recovery of a changed kernel, and nothing rewritten with the same one.
-- **What qemu does not check:** the loader at all (the DDR parameters, its
-  flash and BCL1 handling: the build is the vendor's, the toolchain is
-  not), the pin, clock, reset and pad set-up of every block, the flash
-  controller's timing, the PHY's power-on order and MDIO clock, the SD
-  host's command and FIFO timing.
+- **What qemu does not check:** the DDR parameters against real DDR (the
+  model's training succeeds), caches, the pin, clock, reset and pad set-up
+  of every block, the flash controller's timing, the PHY's power-on order
+  and MDIO clock, the SD host's command and FIFO timing.
 - **On silicon:** nothing yet.
+
+## The NT9852x dies: NA51055, NA51084
+
+The NT9852x Linux SDK's dies: NA51055 (chip ID 0x4821; NT98520, NT98522,
+NT98523, NT98525) and NA51084 (0x5021; NT98528, NT98529). Two Cortex-A9s
+each, NA51089's blocks at NA51089's addresses; one U-Boot code base with
+NA51089 (`NVT_NA51055`, board `na51089`), told apart at run time by the
+chip ID (`nvt_chip_id()`), as the vendor's U-Boot 2019.04 does.
+
+- **The loader** (`board/novatek/na51055/loader`) is
+  `nt9852x_loader_release_v2.05.013`, the SDK's `na51055_ldr`: the
+  NA51089 loader's toolchain changes, plus
+  - an LZMA decoder (`bl_lzma.c`, U-Boot's `lib/lzma` LzmaDec): its mask
+    ROM has none and its own LZ leaves U-Boot ~176 KiB, past its 128 KiB
+    slot. The image is then the same as NA51089's.
+  - `LOADER_TYPE` follows `CHIP` (the 528/529 flow), through
+    `LibExt/LIBExt_src/Ctrl_Flow/Makefile`, which builds `bl_func.c`.
+  - The image is limited to 32 KiB (64 KiB for the 528 model): the 52x
+    loaders end at ~32.73 KiB; the 528 one is built without its own SD
+    card update (`STORAGEEXT=NONE`).
+  - The 528 model needs a bare-metal toolchain: built with
+    arm-linux-gnueabi it stops after the DDR training (why is open);
+    arm-none-eabi and the SDK's Linaro arm-eabi work. `build.sh` refuses
+    a Linux toolchain for it.
+- **DDR** (`build.sh`): the NT98522/523's in the package (512 Mbit,
+  1 Gbit) with no DDR2; the others' on the board, the SDK boards' 4 Gbit
+  DDR3 dies (NT98520: one; NT98525/528/529: two, the second at
+  0x40000000, the media pool's alone, which `ft_board_setup()` keeps).
+  A board with other DDR needs its own loader build.
+- **Device trees:** `openipc/na51055.dtsi` and `na51084.dtsi` are the
+  SDK's NT98525 and NT98528 NOR boards, flattened, with the OpenIPC chain
+  in `/nor`, U-Boot at 0x03900000 and the loader's scratch below it; the
+  parts' trees change what their SDK boards change. The SDK's NA51055
+  boards describe one CPU, its NA51084 ones two (`cpu-release-addr`
+  0xF07F8000). `osmem`: 64M on the NT98523 (its CMA is at 48 MiB), 256M
+  on the 512 MiB parts.
+- **What differs from NA51089** (vendor `nvt_na51055_a32/clock.c`,
+  `eth_na51055.c`, `nvt_ivot_mmc.c`):
+  - PLL8's ratio at CG+0x1188 (NA51055) / CG+0x47E0 (NA51084); NA51084
+    runs 1000 MHz unless the tree asks for 1200/1350, which only the
+    NT98529 gets.
+  - Ethernet: own pin and LED bits, the external PHY selected by bit 8 of
+    0x3004, NA51084's RMII_2 and RGMII, no PHY PLL reset; the DMA's
+    descriptor skip counts in 4-byte units on NA51055, so the NT9852x
+    targets pack the descriptors (16 bytes; the data cache is off, a
+    build-time check says so); AALE.
+  - SD: NA51055 samples on the internal clock (SRC_CLK_SEL).
 
 ## The NVR dies: NT98332 (NA51103), NT98633 (NA51090)
 
