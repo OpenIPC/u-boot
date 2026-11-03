@@ -9,6 +9,8 @@ cd "$(dirname "$0")"
 
 export ARCH=arm
 export CROSS_COMPILE=${CROSS_COMPILE:-arm-linux-gnueabi-}
+# The NVR dies' U-Boot is an AArch64 one (Debian/Ubuntu: gcc-aarch64-linux-gnu)
+CROSS_COMPILE_A64=${CROSS_COMPILE_A64:-aarch64-linux-gnu-}
 # The loader is bare-metal code linked against Novatek's libraries:
 # a bare-metal toolchain if there is one, else U-Boot's
 if [ -z "${LOADER_CROSS_COMPILE}" ]; then
@@ -81,6 +83,40 @@ build_nvt() {
         "${builddir}/u-boot.bin" "${text}" "output/u-boot-${soc}-nor.bin"
 }
 
+# Novatek NVR dies, AArch64: the board's loader and BL31 stay, the image
+# is U-Boot's slot alone (openipc/nvt-nvr-image.py)
+build_nvr() {
+    soc=$1
+    builddir=${BOOT_SRCDIR}/output/build-${soc}-nor
+    make_opts="-C ${BOOT_SRCDIR} O=${builddir} -j$(nproc) CROSS_COMPILE=${CROSS_COMPILE_A64}"
+
+    rm -rf "${builddir}"
+    mkconfig "${builddir}" openipc/openipc_config openipc/${soc}_config && \
+    make ${make_opts} olddefconfig </dev/null >/dev/null && \
+    make ${make_opts} </dev/null || return 1
+
+    text=$(sed -n 's/^CONFIG_SYS_TEXT_BASE=//p' "${builddir}/.config")
+    python3 openipc/nvt-nvr-image.py "${soc}" "${builddir}/u-boot.bin" \
+        "${text}" "output/u-boot-${soc}-nor.bin" || return 1
+
+    # For the emulator's stand-in loader (CI): no loader, a plain tree at
+    # 0x10000 and the slot, as a 256 KiB boot image
+    [ -f "openipc/${soc}.dts" ] || return 0
+    make ${make_opts} scripts_dtc </dev/null >/dev/null &&
+    "${builddir}/scripts/dtc/dtc" -q -I dts -O dtb \
+        -o "${builddir}/${soc}.dtb" "openipc/${soc}.dts" || return 1
+    python3 - "${builddir}/${soc}.dtb" "output/u-boot-${soc}-nor.bin" \
+        "output/u-boot-${soc}-qemu.bin" <<'EOF'
+import sys
+img = bytearray(b'\xff' * 0x40000)
+dtb = open(sys.argv[1], 'rb').read()
+slot = open(sys.argv[2], 'rb').read()
+img[0x10000:0x10000 + len(dtb)] = dtb
+img[0x20000:0x20000 + len(slot)] = slot
+open(sys.argv[3], 'wb').write(img)
+EOF
+}
+
 build_soc() {
     soc=$1
     case "${soc}" in
@@ -101,13 +137,15 @@ build_soc() {
             build_nvt "${soc}" 562 666 ;;
         nt98566)
             build_nvt "${soc}" 566 933 ;;
+        nt98332)
+            build_nvr "${soc}" ;;
         *)
             echo "unsupported SoC: ${soc}" >&2
             return 1 ;;
     esac
 }
 
-ALL_SOCS="nt98560 nt98561 nt98562 nt98566"
+ALL_SOCS="nt98560 nt98561 nt98562 nt98566 nt98332"
 
 SOCS="$@"
 [ -z "${SOCS}" ] && SOCS="${ALL_SOCS}"

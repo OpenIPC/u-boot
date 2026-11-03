@@ -1,0 +1,16 @@
+CONFIG_TARGET_NT98332=y
+CONFIG_PRODUCT_SOC="nt98332"
+# Where the loader's device tree (/nvt_memory_cfg/uboot) has U-Boot
+# unpacked and BL31 starts it: the HEADINFO's CodeEntry says the same
+CONFIG_SYS_TEXT_BASE=0x1E000000
+# AArch64 runs with the MMU and caches on (arch/arm/mach-novatek/soc.c)
+# CONFIG_SYS_DCACHE_OFF is not set
+# Past BL31 (0x1F00000, secure) and the loader's areas, as the vendor
+CONFIG_SYS_LOAD_ADDR=0x02000000
+# DRAM + 0x1e20000: the other families' 0x1f20000 is in BL31 here
+CONFIG_SYS_BOOTCOUNT_ADDR=0x01E20000
+# No SD slot on the NVRs (and no SDIO driver for these dies)
+# CONFIG_MMC is not set
+# CONFIG_CMD_MMC is not set
+# CONFIG_CMD_FAT is not set
+# CONFIG_FS_FAT is not set

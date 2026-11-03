@@ -1,0 +1,172 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * NT98332 (NA51103) NVR: the part of the board's device tree U-Boot
+ * reads, after Xiongmai's NBD80N36RA-KL (FW98332A). Not flashed to boards:
+ * there the board's own tree stays at 0x10000, behind its loader's
+ * "XMFDT32G" tag, LZMA-packed, and the vendor kernels need all of it.
+ * This one is for the emulator's stand-in loader (qemu-hisilicon
+ * nt98332 with -smp 2), which reads a plain tree at 0x10000 and unpacks
+ * U-Boot from partition_boot: CI's smoke test.
+ */
+
+/dts-v1/;
+
+/ {
+	model = "Novatek NA51103";
+	compatible = "novatek,na51103";
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	cpus {
+		#address-cells = <2>;
+		#size-cells = <0>;
+
+		cpu@0 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53", "arm,armv8";
+			reg = <0x0 0x0>;
+			enable-method = "psci";
+		};
+
+		cpu@1 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53", "arm,armv8";
+			reg = <0x0 0x1>;
+			enable-method = "psci";
+		};
+	};
+
+	psci {
+		compatible = "arm,psci-1.0";
+		method = "smc";
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x0 0x0 0x0 0x15e00000>;
+	};
+
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		atf@0x01F00000 {
+			reg = <0x0 0x1f00000 0x0 0x100000>;
+			no-map;
+		};
+	};
+
+	hdal-memory {
+		#address-cells = <4>;
+		#size-cells = <2>;
+
+		media {
+			reg = <0x0 0x0 0x0 0x15e00000 0x0 0x2a200000>;
+		};
+	};
+
+	nvt_memory_cfg {
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		dram {
+			reg = <0x00000000 0x40000000>;
+		};
+
+		fdt {
+			reg = <0x00100000 0x00100000>;
+		};
+
+		loader {
+			reg = <0x00200000 0x00800000>;
+		};
+
+		shmem {
+			reg = <0x00a00000 0x00100000>;
+		};
+
+		atf {
+			reg = <0x01f00000 0x00100000>;
+		};
+
+		linuxtmp {
+			reg = <0x02000000 0x1c000000>;
+		};
+
+		uboot {
+			reg = <0x1e000000 0x02000000>;
+		};
+	};
+
+	uart@2,f0280000 {
+		compatible = "ns16550a";
+		reg = <0x2 0xf0280000 0x0 0x1000>;
+		reg-shift = <2>;
+		reg-io-width = <4>;
+		clock-frequency = <48000000>;
+	};
+
+	top@2,f0010000 {
+		compatible = "nvt,nvt_top";
+		reg = <0x2 0xf0010000 0x0 0x2000>;
+
+		spi {
+			pinmux = <0x11>;
+		};
+
+		eth {
+			pinmux = <0x701>;
+		};
+	};
+
+	eth0@2,f0440000 {
+		compatible = "nvt,synopsys_eth";
+		reg = <0x2 0xf0440000 0x0 0x10000>;
+		sp-clk = <1>;
+		ref-clk-out = <1>;
+	};
+
+	nor@2,f0180000 {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		compatible = "nvt,nvt_spinor";
+		reg = <0x2 0xf0180000 0x0 0x1000>;
+		clock-frequency = <12000000>;
+		nvt-devname = "spi_nor.0";
+
+		/* OpenIPC's NOR layout; the loader reads only these two */
+		partition_loader {
+			label = "loader";
+			reg = <0x0 0x0 0x0 0x20000>;
+		};
+
+		partition_boot {
+			label = "boot";
+			reg = <0x0 0x20000 0x0 0x20000>;
+		};
+
+		nvtpack {
+			ver = "NVTPACK_FW_INI_16072017";
+			method = <1>;
+
+			index {
+				id0 {
+					partition_name = "loader";
+					source_file = "";
+				};
+
+				id1 {
+					partition_name = "boot";
+					source_file = "u-boot.bin";
+				};
+			};
+		};
+	};
+
+	nvt_info {
+		BIN_NAME = "FW98332A";
+		EMBMEM = "EMBMEM_SPI_NOR";
+		NVT_LINUX_SMP = "NVT_LINUX_SMP_ON";
+	};
+};
