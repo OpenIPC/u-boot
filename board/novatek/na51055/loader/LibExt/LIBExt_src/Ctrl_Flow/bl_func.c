@@ -34,6 +34,7 @@
 #include "crypto.h"
 #include "nand.h"
 #include "nor.h"
+#include "bl_lzma.h"
 
 
 #if (LOADER_TYPE == STAND_ALONE_LOADER_528) || (LOADER_TYPE == COMBINATION_528)
@@ -1846,6 +1847,16 @@ _THUMB2 static int bl_load_uboot_from_flash(unsigned char *p_fdt, unsigned char 
 				debug_err_var("bl_load_uboot_from_flash_comp,er=", er); // read bfc-uboot failed
 				bl_displayErrMsg(RWErrorMsg);
 			}
+			/* OpenIPC: algorithm 11, LZMA, as NA51089's loader takes it */
+			if ((cpu_to_be32(pBfc->uiAlgorithm) & 0xFF) == 11) {
+				if (bl_lzma_inflate(p_tmp + sizeof(NVTPACK_BFC_HDR), size_comp_le,
+						(unsigned char *)p_dram_partition->uboot_addr,
+						invertEndian(pBfc->uiSizeUnComp)) < 0) {
+					debug_err("lzma\r\n");
+					return -1;
+				}
+				debug_msg("lzma ");
+			} else
 			LZ_Uncompress(p_tmp + sizeof(NVTPACK_BFC_HDR), (unsigned char *)p_dram_partition->uboot_addr, size_comp_le);
 		}
 		else

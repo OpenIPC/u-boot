@@ -19,6 +19,8 @@ SRC = \
 	main.c \
 	nand_ids.c\
 	spi_nor_ids.c\
+	bl_lzma.c\
+	LzmaDec.c\
 
 
 
