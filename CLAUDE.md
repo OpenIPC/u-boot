@@ -23,7 +23,8 @@ own branch:
   CI: `build-anyka.yml`, called from that branch's `ci.yml`. Its own
   `CLAUDE.md` covers the boot headers, the EV330 first stage and the
   drivers.
-- `openipc-novatek`: U-Boot for Novatek NT98562/NT98566 (NA51089), on
+- `openipc-novatek`: U-Boot for Novatek's camera dies (NA51089, NA51055,
+  NA51084) and NVR dies (NA51103, NA51090), on
   the same mainline release with the same OpenIPC layer, plus the SDK's
   loader, built from source in the tree. CI: `build-novatek.yml`, called
   from that branch's `ci.yml`. Its own `CLAUDE.md` covers the loader, the
@@ -156,16 +157,30 @@ The build logic lives here. Other branches call it:
 ## `build-novatek.yml`
 
 - It is `build-anyka.yml` for `openipc-novatek`: the same job graph and
-  `resolve`/`ref` rules, NOR only (256 KiB boot partition: the loader,
-  the device tree at 0x10000 and U-Boot at 0x20000).
-- The build legs also install `gcc-arm-none-eabi`, for the loader.
-- **No `hold`:** both SoCs have qemu-hisilicon machines (`nt98562`,
-  `nt98566`). Their stand-in for the loader must unpack an LZMA BCL1
-  container (algorithm 11), which qemu-hisilicon needs for this smoke
-  test.
-- **Smoke test:** two boots of an 8 MiB flash image holding only the
-  image. It passes on `Hit Ctrl-C`, and fails if the second boot reports
-  a bad environment CRC.
+  `resolve`/`ref` rules.
+- **Images.** The camera dies (NA51089, NA51055, NA51084) are NOR only:
+  the 256 KiB boot partition holds the loader, the device tree at
+  0x10000 and U-Boot at 0x20000. The NVRs (`nt98332`, `nt98633`) release
+  U-Boot's slot alone (128 KiB of NOR, 896 KiB of NAND), and build.sh
+  also writes `u-boot-<soc>-qemu.bin`, a boot area for the emulator's
+  stand-in loader. That one is uploaded as `qemu-image-<soc>`, outside
+  the release's `u-boot-*` pattern, and never released.
+- The build legs also install `gcc-arm-none-eabi` (the loaders; the
+  NT98528/529 one needs a bare-metal toolchain, build.sh refuses a Linux
+  one) and `gcc-aarch64-linux-gnu` (the NVRs).
+- **Partition fit:** each leg checks its released image against
+  `limit_kb`, its slot.
+- **No `hold`:** every SoC has a qemu-hisilicon machine, but the NT98520
+  and NT98522, which run on the NT98525's and NT98523's (the same dies).
+  The camera machines run the image's own loader through their mask ROM
+  model; the NVR legs run the stand-in image (`-smp 2`, `-smp 4`). The
+  machines beyond `nt98562`/`nt98566` need OpenIPC/qemu-hisilicon#222 on
+  its master, which the `qemu` job builds (qemu-system-arm and
+  qemu-system-aarch64).
+- **Smoke test:** two boots of a flash image holding only the image (8
+  MiB NOR; 16 MiB for `nt98332`, 128 MiB of NAND for `nt98633`). It
+  passes on `Hit Ctrl-C`, and fails if the second boot reports a bad
+  environment CRC.
 - **Release and publish:**
   - `release` uploads to the `novatek` tag.
   - `publish` shares the `publish-firmware-latest` concurrency group and
