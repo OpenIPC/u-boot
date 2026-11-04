@@ -181,6 +181,15 @@ swapped back.
   tree and BL31; the image is U-Boot's slot alone (NT98332: NOR
   `0x20000`, 128 KiB; NT98633: NAND `0xC0000`, 896 KiB), and
   `${ubwrite}` writes only that.
+- **Recovery.** `novatek-recovery.tar.gz` on the
+  [novatek release](../../releases/tag/novatek) has a folder per SoC and
+  flash, `recovery-<soc>-<flash>/`, for a board whose flash has no valid
+  loader (not the NVRs). The mask ROM falls back to Ethernet by itself,
+  or the boot straps select it. Run a DHCP and TFTP server with that
+  folder as its root: the ROM should fetch `loader.bin`, which fetches
+  `FW98<part>T.BIN` and starts U-Boot from RAM, writing nothing to flash.
+  Then reflash from U-Boot. `wrloader.bin` is the same for a serial host;
+  no tool drives it yet. Tested under QEMU only.
 - OpenIPC kernels carry no device tree: U-Boot passes them the loader's.
 - Building needs `arm-none-eabi-` for the loaders (`LOADER_CROSS_COMPILE`;
   the NT98528/529 one does not boot when built with a Linux toolchain) and
