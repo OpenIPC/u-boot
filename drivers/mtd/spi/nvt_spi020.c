@@ -191,12 +191,10 @@ static int fc_xfer(u8 cmd, u32 addr, unsigned int alen, void *in,
 	return ret;
 }
 
-static u8 sf_read_reg(u8 cmd)
+/* A status register, or the transfer's error: *v is left alone on one */
+static int sf_read_reg(u8 cmd, u8 *v)
 {
-	u8 v = 0xff;
-
-	fc_xfer(cmd, 0, 0, NULL, NULL, 0, XFER_STATUS, &v, 100);
-	return v;
+	return fc_xfer(cmd, 0, 0, NULL, NULL, 0, XFER_STATUS, v, 100);
 }
 
 /* Until the flash is no longer busy: the controller polls SR1 */
@@ -208,10 +206,13 @@ static int sf_wait_ready(ulong ms)
 static int sf_write_enable(void)
 {
 	int ret = fc_xfer(CMD_WREN, 0, 0, NULL, NULL, 0, XFER_NORMAL, NULL, 100);
+	u8 sr;
 
+	if (!ret)
+		ret = sf_read_reg(CMD_RDSR, &sr);
 	if (ret)
 		return ret;
-	if (!(sf_read_reg(CMD_RDSR) & SR1_WEL)) {
+	if (!(sr & SR1_WEL)) {
 		printf("SF: write enable does not stick\n");
 		return -EIO;
 	}
@@ -236,10 +237,12 @@ static int sf_write_sr(const u8 *sr, unsigned int len)
  */
 static int sf_unprotect(u8 mfr)
 {
-	u8 sr[2] = { sf_read_reg(CMD_RDSR) };
+	u8 sr[2];
 	u8 bp = SR1_BP_OTHER;
-	int ret;
+	int ret = sf_read_reg(CMD_RDSR, &sr[0]);
 
+	if (ret)
+		return ret;
 	if (sr[0] == 0xff)
 		return 0;
 	if (mfr == MFR_GIGADEVICE || mfr == MFR_WINBOND || mfr == MFR_XMC ||
@@ -252,12 +255,14 @@ static int sf_unprotect(u8 mfr)
 	sr[0] &= ~bp;
 	if (bp == SR1_BP) {
 		/* QE lives in SR2, written as WRSR's second byte: keep it */
-		sr[1] = sf_read_reg(CMD_RDSR2);
-		ret = sf_write_sr(sr, 2);
+		ret = sf_read_reg(CMD_RDSR2, &sr[1]);
+		if (!ret)
+			ret = sf_write_sr(sr, 2);
 	} else {
 		ret = sf_write_sr(sr, 1);
 	}
-	sr[0] = sf_read_reg(CMD_RDSR);
+	if (!ret)
+		ret = sf_read_reg(CMD_RDSR, &sr[0]);
 	if (ret || sr[0] & bp) {
 		printf("SF: block protection stays (SR1 %02x): writes refused\n",
 		       sr[0]);
@@ -416,7 +421,7 @@ struct spi_flash *spi_flash_probe(unsigned int bus, unsigned int cs,
 	 * The last ID byte is log2 of the size, as the vendor driver takes it
 	 * (trace-stdtable in the SDK's trees)
 	 */
-	if (id[2] >= 0x10 && id[2] <= 0x1a) {
+	if (id[2] >= 0x10 && id[2] <= 0x1c) {
 		size = 1 << id[2];
 	} else {
 		size = SZ_8M;
