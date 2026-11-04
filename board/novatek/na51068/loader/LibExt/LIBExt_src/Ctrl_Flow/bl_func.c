@@ -1226,6 +1226,14 @@ static _THUMB2 int bl_load_uboot_from_flash(unsigned char *p_fdt, unsigned char 
 			 * to its mask ROM
 			 */
 			if ((cpu_to_be32(pBfc->uiAlgorithm) & 0xFF) == 11) {
+#if (STORAGE_EXT_TYPE == STORAGE_EXT_ETH)
+				/*
+				 * OpenIPC: no decoder in the recovery loader, it
+				 * would not fit: that one runs the pack's plain U-Boot
+				 */
+				debug_err("lzma\r\n");
+				return -1;
+#else
 				extern char _lzma_tmp_start[];
 				extern char _lzma_tmp_end[];
 
@@ -1241,6 +1249,7 @@ static _THUMB2 int bl_load_uboot_from_flash(unsigned char *p_fdt, unsigned char 
 					debug_err("lzma\r\n");
 					return -1;
 				}
+#endif
 			} else
 			LZ_Uncompress(p_tmp + sizeof(NVTPACK_BFC_HDR), (unsigned char *)p_dram_partition->uboot_addr, size_comp_le);
 		}
@@ -1836,7 +1845,11 @@ _THUMB2 UINT32 bl_mainFlow(void)
 	set_usb_suspend();
 #endif
 
-	if(utl_get_bootsrc() == BOOT_SOURCE_UART)
+	/*
+	 * OpenIPC: a UART build always serves UART: the ROM's auto-boot gets
+	 * here with the straps still saying flash
+	 */
+	if ((STORAGE_EXT_TYPE == STORAGE_EXT_UART) || (utl_get_bootsrc() == BOOT_SOURCE_UART))
 	{
 #if UART_UPDATE
 		debug_msg("Boot from UART ...\r\n");

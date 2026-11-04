@@ -75,6 +75,17 @@ extern void  core1_reset(void);
 // Function from Timer.c
 //extern UINT32 timer_getLdrElapse(void);
 
+/*
+ * OpenIPC: over Ethernet this is the recovery loader, which runs
+ * FW<part>T.BIN from DRAM and never writes the flash: it does not ask for
+ * the update files. (The library also hangs on TFTP's "file not found".)
+ */
+#if (STORAGE_EXT_TYPE == STORAGE_EXT_ETH)
+#define bl_open_update_file(name)	FALSE
+#else
+#define bl_open_update_file(name)	fat_open_rootfile(name)
+#endif
+
 // Define in MakeConfig.txt
 static UINT8 UPDATE_FW_NAME[]     = {"FW98520A.BIN"};
 static UINT8 UPDATE_LOADER_NAME[] = {"LD98520A.BIN"};
@@ -1853,6 +1864,14 @@ _THUMB2 static int bl_load_uboot_from_flash(unsigned char *p_fdt, unsigned char 
 					debug_err_var("uboot_size", invertEndian(pBfc->uiSizeUnComp));
 					return -1;
 				}
+#if (STORAGE_EXT_TYPE == STORAGE_EXT_ETH)
+				/*
+				 * OpenIPC: no decoder in the recovery loader, it
+				 * would not fit: that one runs the pack's plain U-Boot
+				 */
+				debug_err("lzma\r\n");
+				return -1;
+#else
 				if (bl_lzma_inflate(p_tmp + sizeof(NVTPACK_BFC_HDR), size_comp_le,
 						(unsigned char *)p_dram_partition->uboot_addr,
 						invertEndian(pBfc->uiSizeUnComp)) < 0) {
@@ -1860,6 +1879,7 @@ _THUMB2 static int bl_load_uboot_from_flash(unsigned char *p_fdt, unsigned char 
 					return -1;
 				}
 				debug_msg("lzma ");
+#endif
 			} else
 			LZ_Uncompress(p_tmp + sizeof(NVTPACK_BFC_HDR), (unsigned char *)p_dram_partition->uboot_addr, size_comp_le);
 		}
@@ -3044,7 +3064,7 @@ _THUMB2 UINT32 bl_mainFlow(void)
 			} else { // exclude others update if FUNC_RUN_WRBIN is existing.
 #endif
 				// Update loader or not, loader is fixed to 16 KB
-				if (fat_open_rootfile(UPDATE_LOADER_NAME) == TRUE) {
+				if (bl_open_update_file(UPDATE_LOADER_NAME) == TRUE) {
 					// Read byte count specified in file directory entry
 					fat_read_rootfile((UINT8 *)uiUpdateBootloaderBufAddr, FAT_READ_TOTAL_FILE_LENGTH);
 					fat_close_rootfile();
@@ -3054,7 +3074,7 @@ _THUMB2 UINT32 bl_mainFlow(void)
 				}
 				// "Update FW" or "Run FW" function
 				//  Update FW has higher priority
-				if (fat_open_rootfile(UPDATE_FW_NAME) == TRUE) {
+				if (bl_open_update_file(UPDATE_FW_NAME) == TRUE) {
 					NVTPACK_MEM mem_in ;
 					fat_read_rootfile((UINT8 *)uiUpdateMainBinBufAddr, SIZE_PRELOAD);
 					mem_in.p_data = (void *)uiUpdateMainBinBufAddr;
