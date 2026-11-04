@@ -413,14 +413,14 @@ config NAND_MXC
 	  i.MX27 / i.MX31 / i.MX5 processors.
 
 config NAND_NVT_SPI
-	bool "Novatek NA51090 SPI NAND"
-	depends on NVT_NA511XX
+	bool "Novatek SPI NAND"
+	depends on NVT_NA511XX || NVT_NA51089 || NVT_NA51055
 	select SYS_NAND_SELF_INIT
 	imply CMD_NAND
 	help
-	  The SPI NAND the Novatek NA51090 boots from, on its flash
-	  controller run as a plain SPI master, with the chip's on-die
-	  ECC. Non-DM.
+	  The SPI NAND the Novatek NA51090, NA51089 and NT9852x dies boot
+	  from, on their flash controller run as a plain SPI master, with
+	  the chip's on-die ECC. Non-DM.
 
 config NAND_MXS
 	bool "MXS NAND support"
