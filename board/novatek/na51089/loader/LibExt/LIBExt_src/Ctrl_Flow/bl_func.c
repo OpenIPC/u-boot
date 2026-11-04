@@ -75,6 +75,17 @@ extern void  core1_reset(void);
 // Function from Timer.c
 //extern UINT32 timer_getLdrElapse(void);
 
+/*
+ * OpenIPC: over Ethernet this is the recovery loader, which runs
+ * FW<part>T.BIN from DRAM and never writes the flash: it does not ask for
+ * the update files. (The library also hangs on TFTP's "file not found".)
+ */
+#if (STORAGE_EXT_TYPE == STORAGE_EXT_ETH)
+#define bl_open_update_file(name)	FALSE
+#else
+#define bl_open_update_file(name)	fat_open_rootfile(name)
+#endif
+
 // Define in MakeConfig.txt
 static UINT8 UPDATE_FW_NAME[]     = {"FW98520A.BIN"};
 static UINT8 UPDATE_LOADER_NAME[] = {"LD98520A.BIN"};
@@ -2860,7 +2871,11 @@ _THUMB2 UINT32 bl_mainFlow(void)
 	set_usb_suspend();
 #endif
 
-	if(utl_get_bootsrc() == BOOT_SOURCE_UART)
+	/*
+	 * OpenIPC: a UART build always serves UART: the ROM's auto-boot gets
+	 * here with the straps still saying flash
+	 */
+	if ((STORAGE_EXT_TYPE == STORAGE_EXT_UART) || (utl_get_bootsrc() == BOOT_SOURCE_UART))
 	{
 #if UART_UPDATE
 		debug_msg("Boot from UART ...\r\n");
@@ -2932,7 +2947,7 @@ _THUMB2 UINT32 bl_mainFlow(void)
 			} else { // exclude others update if FUNC_RUN_WRBIN is existing.
 #endif
 				// Update loader or not, loader is fixed to 16 KB
-				if (fat_open_rootfile(UPDATE_LOADER_NAME) == TRUE) {
+				if (bl_open_update_file(UPDATE_LOADER_NAME) == TRUE) {
 					// Read byte count specified in file directory entry
 					fat_read_rootfile((UINT8 *)uiUpdateBootloaderBufAddr, FAT_READ_TOTAL_FILE_LENGTH);
 					fat_close_rootfile();
@@ -2942,7 +2957,7 @@ _THUMB2 UINT32 bl_mainFlow(void)
 				}
 				// "Update FW" or "Run FW" function
 				//  Update FW has higher priority
-				if (fat_open_rootfile(UPDATE_FW_NAME) == TRUE) {
+				if (bl_open_update_file(UPDATE_FW_NAME) == TRUE) {
 					NVTPACK_MEM mem_in ;
 					fat_read_rootfile((UINT8 *)uiUpdateMainBinBufAddr, SIZE_PRELOAD);
 					mem_in.p_data = (void *)uiUpdateMainBinBufAddr;
