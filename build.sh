@@ -118,6 +118,9 @@ fdt, slot, size = (int(x, 0) for x in sys.argv[4:7])
 img = bytearray(b'\xff' * size)
 dtb = open(sys.argv[1], 'rb').read()
 ub = open(sys.argv[2], 'rb').read()
+if fdt + len(dtb) > slot or slot + len(ub) > size:
+    sys.exit('qemu image: tree %d B at 0x%x, U-Boot %d B at 0x%x, in 0x%x'
+             % (len(dtb), fdt, len(ub), slot, size))
 img[fdt:fdt + len(dtb)] = dtb
 img[slot:slot + len(ub)] = ub
 open(sys.argv[3], 'wb').write(img)
