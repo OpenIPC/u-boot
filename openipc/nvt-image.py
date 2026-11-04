@@ -24,8 +24,17 @@
 # copy (fdt.restore) at 0x80000, U-Boot at 0xC0000. The image ends with
 # U-Boot's last block; its partition runs to the environment at 0x2C0000.
 #
-# usage: nvt-image.py [--fdt-lzma] [--nand] LOADER DTB U-BOOT.BIN TEXT_BASE
-#                     OUTPUT
+# With --pack FILE it also writes the recovery pack: a Novatek all-in-one
+# image (NVTPACK_FW_HDR2, the SDK's version 16072017) of the plain device
+# tree (partition 1, where the loader always takes it) and plain U-Boot.
+# A loader with no valid flash boots it without writing anything: the
+# file its Ethernet build fetches by TFTP, its SD card build reads, and
+# the one openipc/nvt-uart-boot.py sends (FW<part>T.BIN to the loader,
+# its "run" name, bl_process_all_in_one() with FUNC_RUN_CARD). U-Boot is
+# plain for the NT9852x loaders, whose all-in-one path has no LZMA.
+#
+# usage: nvt-image.py [--fdt-lzma] [--nand] [--pack FILE] LOADER DTB
+#                     U-BOOT.BIN TEXT_BASE OUTPUT
 
 import lzma
 import struct
@@ -41,6 +50,15 @@ HI_BIN_LENGTH = HEADINFO + 0x68
 HI_CHECKSUM = HEADINFO + 0x6C
 
 BCL1_LZMA = 11
+
+# NVTPACK_FW_HDR2's GUID {D6012E07-10BC-4F91-B28A-352F82261A50}
+PACK_GUID = bytes.fromhex('072e01d6bc10914fb28a352f82261a50')
+PACK_VERSION = 0x16071515
+PACK_HDR_SIZE = 128
+PACK_CHK_VALUE = 0x24
+PACK_FDT_ID = 1
+# The boards' /<flash>/nvtpack/index: NOR's id2, after NAND's fdt.restore id3
+PACK_UBOOT_ID = {False: 2, True: 3}
 
 
 def nvt_sum(data):
@@ -88,20 +106,54 @@ def bcl1_lzma(data, flash_block):
     return bytes(bcl)
 
 
+def nvtpack(parts):
+    """
+    The all-in-one image of (partition id, data) parts: the header, a
+    table of (offset, size, id), the data at 4-byte offsets. The Novatek
+    sum over the whole file must come to 0: uiChkValue makes it so.
+    """
+    table = PACK_HDR_SIZE + 12 * len(parts)
+    offset = table
+    entries = b''
+    body = b''
+    for pid, data in parts:
+        entries += struct.pack('<III', offset, len(data), pid)
+        pad = bytes(-len(data) & 3)
+        body += data + pad
+        offset += len(data) + len(pad)
+    pack = bytearray(PACK_GUID + struct.pack(
+        '<IIIIII', PACK_VERSION, PACK_HDR_SIZE, len(parts), offset, 0, 0))
+    pack += bytes(PACK_HDR_SIZE - len(pack))
+    pack += entries + body
+    struct.pack_into('<I', pack, PACK_CHK_VALUE, -nvt_sum(pack) & 0xffff)
+    assert nvt_sum(pack) == 0
+    return bytes(pack)
+
+
 def main():
     args = sys.argv[1:]
     fdt_lzma = '--fdt-lzma' in args
     nand = '--nand' in args
     args = [a for a in args if a not in ('--fdt-lzma', '--nand')]
+    pack_file = None
+    if '--pack' in args:
+        i = args.index('--pack')
+        pack_file = args[i + 1]
+        del args[i:i + 2]
     if len(args) != 5:
-        sys.exit('usage: nvt-image.py [--fdt-lzma] [--nand] LOADER DTB '
-                 'U-BOOT.BIN TEXT_BASE OUTPUT')
+        sys.exit('usage: nvt-image.py [--fdt-lzma] [--nand] [--pack FILE] '
+                 'LOADER DTB U-BOOT.BIN TEXT_BASE OUTPUT')
     block, fdt_off, fdt2_off, uboot_off, end = NAND if nand else NOR
     loader = open(args[0], 'rb').read()
     dtb = open(args[1], 'rb').read()
     uboot = open(args[2], 'rb').read()
     text_base = int(args[3], 0)
     dtb_len = len(dtb)
+    if pack_file:
+        with open(pack_file, 'wb') as f:
+            f.write(nvtpack([(PACK_FDT_ID, dtb),
+                             (PACK_UBOOT_ID[nand],
+                              headinfo(uboot, text_base))]))
     if fdt_lzma:
         dtb = bcl1_lzma(dtb, block)
 

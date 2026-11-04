@@ -94,9 +94,28 @@ build_nvt() {
     build_loader "${loaderdir}" "${die}" CHIP="${chip}" "$@" || return 1
 
     text=$(sed -n 's/^CONFIG_SYS_TEXT_BASE=//p' "${builddir}/.config")
-    python3 openipc/nvt-image.py ${image_opts} "${loader}" \
+    # The recovery set, for a board whose flash has no valid loader
+    # (openipc/nvt-image.py, CLAUDE.md): what the ROM takes by TFTP or
+    # serial, under the names the ROM and the loaders use
+    recovery=output/recovery-${soc}-${flash}
+    rm -rf "${recovery}"
+    mkdir -p "${recovery}"
+    python3 openipc/nvt-image.py ${image_opts} \
+        --pack "${recovery}/FW98${part}T.BIN" "${loader}" \
         "${builddir}/${soc}.dtb" "${builddir}/u-boot.bin" "${text}" \
-        "output/u-boot-${soc}-${flash}.bin"
+        "output/u-boot-${soc}-${flash}.bin" || return 1
+    # (build_loader sets loaderdir)
+    base=${loaderdir}
+    build_loader "${base}-eth" "${die}" CHIP="${chip}" "$@" \
+        STORAGEEXT=Eth || return 1
+    cp "${base}-eth/Project/Model/Loader${chip}_Data/Release/loader.bin" \
+        "${recovery}/loader.bin" || return 1
+    # NA51055's SDK has no UART loader
+    [ "${die}" = na51055 ] && return 0
+    build_loader "${base}-uart" "${die}" CHIP="${chip}" "$@" \
+        STORAGEEXT=Uart || return 1
+    cp "${base}-uart/Project/Model/Loader${chip}_Data/Release/LD98${part}A.bin" \
+        "${recovery}/wrloader.bin"
 }
 
 # Novatek NVR dies, AArch64: the board's loader and BL31 stay, the image
