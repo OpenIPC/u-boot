@@ -418,6 +418,7 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 #define ETH_PLL_RSTN		(NVT_ETH_BASE + 0x84)	/* [31:30] */
 #define ETH_PHY_SEL		(NVT_ETH_BASE + 0x3004)
 #define PHY_SEL_EXT		BIT(4)
+#define PHY_SEL_EXT_MASK	(3 << 4)	/* NA51089, NS02501 */
 #define PHY_SEL_EXT_52X		BIT(8)
 #define CG_PLL16		BIT(16)
 #define ETH_LED_CTRL		(NVT_ETH_BASE + 0x300C)
@@ -686,7 +687,12 @@ static int nvt_eth_init_ns02501(const void *fdt, u32 pins)
 				(ref_out ? RMII_REF_OUT : RMII_REF_IN));
 		setbits_le32(ETH_PHY_SEL, PHY_SEL_EXT);
 	} else {
-		clrbits_le32(ETH_PHY_SEL, PHY_SEL_EXT_52X);
+		/*
+		 * The vendor sets bit 4 for the external PHY (as on NA51089)
+		 * but clears bit 8 (as on NT9852x) for the embedded one:
+		 * clear both
+		 */
+		clrbits_le32(ETH_PHY_SEL, PHY_SEL_EXT_MASK | PHY_SEL_EXT_52X);
 		nvt_eth_phy_on(0x312);
 	}
 	if (phy_clk) {
