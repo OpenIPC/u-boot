@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Novatek NA51089 camera board: the device tree the loader hands over,
- * and the memory split the vendor kernels expect in it.
+ * Novatek NA51089, NA51055, NA51084 and NS02501 camera boards: the device
+ * tree the loader hands over, and the memory split the vendor kernels
+ * expect in it.
  */
 
 #include <common.h>
@@ -38,8 +39,26 @@ DECLARE_GLOBAL_DATA_PTR;
 #define CG_PLL8			BIT(8)		/* the CPU's PLL */
 #define CG_CLK_SWITCH		(NVT_CG_BASE + 0xA0)
 #define CG_CLKEN_70		(NVT_CG_BASE + 0x70)
-#define CG_PLL8_RATIO(n)	(NVT_CG_BASE + 0x4420 + 4 * (n))
 #define OTP_TIMING		0xF0660010
+#define OTP_TIMING_120		0xFF6050	/* at a 120 MHz APB */
+#define CG_OTP_RSTN		BIT(28)		/* NS02501, in RSTN0 */
+
+/*
+ * PLL8's ratio, three bytes in three words: only where they are differs
+ * between the dies (NT9852x SDK: arch/arm/mach-novatek/nvt_na51055_a32/
+ * clock.c, CPU_CLOCK_RATE_RATIO*_OFS and *_528_OFS).
+ */
+static ulong nvt_pll8_ratio(void)
+{
+	switch (nvt_chip_id()) {
+	case NVT_CHIP_NA51055:
+		return NVT_CG_BASE + 0x1188;
+	case NVT_CHIP_NA51084:
+		return NVT_CG_BASE + 0x47E0;
+	default:
+		return NVT_CG_BASE + 0x4420;
+	}
+}
 
 /* Wait 100 ms for (reg & mask) != 0; the vendor waits for ever */
 static int nvt_wait_set(ulong reg, u32 mask)
@@ -64,12 +83,40 @@ static void nvt_cpu_clk_sel(u32 sel)
 	writel(0x28, CG_CLK_SWITCH);
 }
 
-/* The vendor's nvt_cpu_freq: 80, 480, or anything else as 960 MHz */
+/*
+ * PLL8's ratio for a CPU clock, 12 MHz * ratio / 2^17: NA51084's own
+ * rates (1000 MHz unless the tree asks for 1200 or 1350, which only the
+ * NT98529 is cleared for; the vendor checks that in the eFuse, here the
+ * target does), else 960 MHz.
+ */
+static u32 nvt_pll8_for(u32 mhz)
+{
+	if (nvt_chip_id() != NVT_CHIP_NA51084)
+		return 0xA00000;
+	if (!IS_ENABLED(CONFIG_TARGET_NT98529) && mhz > 1000)
+		mhz = 1000;
+	switch (mhz) {
+	case 1200:
+		return 0x190000;
+	case 1350:
+		return 0x1C2000;
+	default:
+		return 0x14D555;
+	}
+}
+
+/*
+ * The vendor's nvt_cpu_freq: 480 MHz (and 80 on NA51089) from fixed
+ * sources, anything else from PLL8 (nvt_pll8_for())
+ */
 static void nvt_set_cpu_mhz(u32 mhz)
 {
 	u32 sel = readl(CG_SYSCLK) & SYSCLK_CPU;
+	ulong ratio = nvt_pll8_ratio();
+	u32 pll8;
 
-	if (mhz == 80 || mhz == 480) {
+	if (mhz == 480 ||
+	    (mhz == 80 && nvt_chip_id() == NVT_CHIP_NA51089)) {
 		u32 want = mhz == 80 ? SYSCLK_CPU_80 : SYSCLK_CPU_480;
 
 		if (sel == want)
@@ -87,10 +134,10 @@ static void nvt_set_cpu_mhz(u32 mhz)
 		}
 		nvt_cpu_clk_sel(SYSCLK_CPU_PLL8);
 	}
-	/* 960 MHz: 12 MHz * 0xA00000 / 2^17 */
-	writel(0x00, CG_PLL8_RATIO(0));
-	writel(0x00, CG_PLL8_RATIO(1));
-	writel(0xA0, CG_PLL8_RATIO(2));
+	pll8 = nvt_pll8_for(mhz);
+	writel(pll8 & 0xff, ratio);
+	writel((pll8 >> 8) & 0xff, ratio + 4);
+	writel(pll8 >> 16, ratio + 8);
 }
 
 /* The eFuse controller's timing for the APB clock it runs at */
@@ -134,14 +181,39 @@ static void nvt_set_clocks(void)
 	val = fdt_getprop(fdt, node, "clock-frequency", NULL);
 	if (val)
 		nvt_set_cpu_mhz(fdt32_to_cpu(*val) / 1000000);
-	/* Sic, as the vendor spells it */
-	val = fdt_getprop(fdt, node, "apb-frequenccy", NULL);
+	/* The NT9852x SDK's spelling, or NA51089's vendor U-Boot's */
+	val = fdt_getprop(fdt, node, "apb-frequency", NULL);
+	if (!val)
+		val = fdt_getprop(fdt, node, "apb-frequenccy", NULL);
 	if (val)
 		nvt_set_apb_mhz(fdt32_to_cpu(*val) / 1000000);
 }
 
+/*
+ * NS02501 (the NT98532/533 SDK's ns02501_hw_init.c, nvt-otp.c): the eFuse
+ * controller's 120 MHz timing and its reset held, the AXI bridge
+ * timeouts. Its otp_init() then waits 800 ms for a customer's eFuse
+ * power-down, not done; its USB PHY set-up is compiled out, and its pad
+ * power set-up reads /top nodes these trees do not have. The CPU clock
+ * stays as the loader set it: the vendor's nvt_cpu_freq caps it at
+ * 800 MHz unless an eFuse code allows more, and the trees ask for 800
+ * (and for no APB clock).
+ */
+static void nvt_ns02501_init(void)
+{
+	writel(OTP_TIMING_120, OTP_TIMING);
+	clrbits_le32(NVT_CG_RSTN0, CG_OTP_RSTN);
+	writel(0x7c, 0xF0012018);
+	writel(0x7c, 0xF0013018);
+}
+
 int board_init(void)
 {
+	if (IS_ENABLED(CONFIG_NVT_NS02501)) {
+		nvt_ns02501_init();
+		return 0;
+	}
+
 	/* nvt_ivot_hw_init_early() */
 	nvt_otp_timing();
 	clrbits_le32(CG_CLKEN_70, BIT(16));
@@ -262,13 +334,17 @@ void board_lmb_reserve(struct lmb *lmb)
 /*
  * As the vendor U-Boot's nvt_boot: Linux gets the first ${osmem} of the
  * DDR, and the media pool of the vendor modules (/hdal-memory/media) the
- * rest.
+ * rest. A second DDR die the tree gives the pool (NA51055 / NA51084:
+ * <0x40000000 ...> after the first range) stays the pool's. The ranges
+ * are in /hdal-memory's cells: one each on NA51089 and NA51055; on
+ * NS02501 two address cells, [DDR id][address], so <0 address size>.
  */
 int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	ulong osmem = nvt_osmem();
-	fdt32_t media[2];
-	int node, ret;
+	const fdt32_t *old;
+	fdt32_t media[16] = { 0 };
+	int node, len, i, j, ac, sc, w, n, ret;
 
 	ret = fdt_fixup_memory(blob, NVT_DDR_BASE, osmem);
 	if (ret)
@@ -277,19 +353,39 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 	node = fdt_path_offset(blob, "/hdal-memory/media");
 	if (node < 0)
 		return 0;
-	media[0] = cpu_to_fdt32(NVT_DDR_BASE + osmem);
-	media[1] = cpu_to_fdt32(gd->ram_size - osmem);
-	return fdt_setprop(blob, node, "reg", media, sizeof(media));
+	ac = fdt_address_cells(blob, fdt_parent_offset(blob, node));
+	sc = fdt_size_cells(blob, fdt_parent_offset(blob, node));
+	w = ac + sc;
+	if (ac < 1 || sc < 1 || w > 4)
+		return -FDT_ERR_BADNCELLS;
+	media[ac - 1] = cpu_to_fdt32(NVT_DDR_BASE + osmem);
+	media[w - 1] = cpu_to_fdt32(gd->ram_size - osmem);
+	n = w;
+	old = fdt_getprop(blob, node, "reg", &len);
+	for (i = 0; old && i + w <= len / 4 && n + w <= ARRAY_SIZE(media);
+	     i += w) {
+		/* The first die's range: replaced by the one above */
+		for (j = 0; j < ac - 1 && !old[i + j]; j++)
+			;
+		if (j == ac - 1 &&
+		    fdt32_to_cpu(old[i + ac - 1]) < NVT_DDR_BASE + gd->ram_size)
+			continue;
+		memcpy(&media[n], &old[i], w * sizeof(media[0]));
+		n += w;
+	}
+	return fdt_setprop(blob, node, "reg", media, n * sizeof(media[0]));
 }
 
 #ifdef CONFIG_NVT_EQOS
 /*
  * Ethernet: the pins, clocks and embedded PHY around the MAC
- * (drivers/net/nvt_eqos.c), set up as by the vendor U-Boot's
- * eth_na51089.c. How the board is wired comes from the loader's device
+ * (drivers/net/nvt_eqos.c), set up as by the vendor U-Boots'
+ * eth_na51089.c and, on the NT9852x dies, eth_na51055.c, on NS02501
+ * eth_ns02501.c. How the board is wired comes from the loader's device
  * tree, which the vendor kernels read too: /top@f0010000/eth pinmux.
- * Xiongmai boards say 0x22, the embedded PHY with its LEDs on the second
- * pads.
+ * Xiongmai NT98562 boards say 0x22, the embedded PHY with its LEDs on the
+ * second pads; the NT9852x SDK's boards 0x12, on the first; the NS02501
+ * SDK's boards 0, the embedded PHY.
  */
 #define ETH_PIN_RMII		BIT(0)	/* an external PHY on the LCD pads */
 #define ETH_PIN_INTERNAL	BIT(1)	/* the embedded PHY */
@@ -297,12 +393,17 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 #define ETH_PIN_LED2		BIT(5)	/* or the second */
 #define ETH_PIN_RMII_2		BIT(6)	/* an external PHY on the P pads */
 #define ETH_PIN_LED_ONLY	(3 << 10) /* one LED: the pair's 1st, 2nd */
+/* The NT9852x dies' bits where they differ (eth_na51055.c PIN_ETH_CFG_*) */
+#define ETH52X_RGMII		BIT(7)	/* NA51084 */
+#define ETH52X_LED_ONLY		(3 << 8)
 
+#define TOP_PINMUX_ETH84	(NVT_TOP_BASE + 0x10)	/* NA51084 [9:8] */
 #define TOP_PINMUX_ETH		(NVT_TOP_BASE + 0x14)	/* RMII [3:2] [31:30] */
 #define TOP_PINMUX_MISC		(NVT_TOP_BASE + 0x18)
 #define MISC_PHY_LED(n)		((n) << 13)	/* LED pair 1, 2 */
 #define MISC_PHY_CLK		BIT(28)		/* 25 MHz out to a PHY */
 #define TOP_GPIO_P		(NVT_TOP_BASE + 0xA8)	/* pads as GPIO */
+#define TOP_GPIO_L		(NVT_TOP_BASE + 0xB8)	/* NT9852x: the MAC's */
 #define TOP_GPIO_DSI		(NVT_TOP_BASE + 0xD0)
 #define TOP_GPIO_LCD		(NVT_TOP_BASE + 0xE8)
 #define TOP_SRAM_SD		(NVT_TOP_BASE + 0x1000)
@@ -317,6 +418,9 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 #define ETH_PLL_RSTN		(NVT_ETH_BASE + 0x84)	/* [31:30] */
 #define ETH_PHY_SEL		(NVT_ETH_BASE + 0x3004)
 #define PHY_SEL_EXT		BIT(4)
+#define PHY_SEL_EXT_MASK	(3 << 4)	/* NA51089, NS02501 */
+#define PHY_SEL_EXT_52X		BIT(8)
+#define CG_PLL16		BIT(16)
 #define ETH_LED_CTRL		(NVT_ETH_BASE + 0x300C)
 #define LED_INV			(3 << 8)
 #define ETH_RMII_CLK		(NVT_ETH_BASE + 0x3014)
@@ -324,10 +428,15 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 #define RMII_REF_OUT		BIT(4)
 #define RMII_REF_CLK_I		BIT(5)
 #define RMII_TXD_SRC		(3 << 30)
+#define TXD_SRC_RGMII		(1 << 30)
 #define PHY(off)		(NVT_ETH_PHY_BASE + (off))
 #define PHY_CTRL		PHY(0x000)
 #define PHY_SW_RESET		BIT(1)
 #define PHY_PLLREGWR		BIT(3)
+#define PHY_MDIO_ADDR		PHY(0x01C)
+#define PHY_TRIM_SEL		PHY(0x368)	/* [7:5] RX, [4:2] TX */
+#define PHY_TRIM_ROUT		PHY(0x374)	/* [5:3]; [2:0] T22 */
+#define PHY_TRIM_DAC		PHY(0x378)	/* [4:0] */
 
 int nvt_eqos_initialize(phy_interface_t intf);
 
@@ -379,14 +488,19 @@ static void nvt_eth_rmii(const void *fdt, u32 pins)
 	/* The vendor resets the PHY on an EVB GPIO here, not done */
 }
 
-/* The embedded PHY: PLL out of reset, power on, then its own reset */
+/*
+ * The embedded PHY: on NA51089 its PLL out of reset first; power on, then
+ * its own reset
+ */
 static void nvt_eth_phy_on(u32 led)
 {
-	mdelay(20);
-	clrbits_le32(ETH_PLL_RSTN, 3 << 30);
-	mdelay(20);
-	setbits_le32(ETH_PLL_RSTN, 3 << 30);
-	mdelay(20);
+	if (nvt_chip_id() == NVT_CHIP_NA51089) {
+		mdelay(20);
+		clrbits_le32(ETH_PLL_RSTN, 3 << 30);
+		mdelay(20);
+		setbits_le32(ETH_PLL_RSTN, 3 << 30);
+		mdelay(20);
+	}
 
 	setbits_le32(PHY(0xF8), BIT(7));
 	udelay(20);
@@ -399,6 +513,24 @@ static void nvt_eth_phy_on(u32 led)
 	setbits_le32(PHY(0xDC), BIT(0));
 	clrbits_le32(PHY(0x9C), BIT(0));
 
+	/*
+	 * NS02501 (eth_ns02501.c extphy0_clk_en()): the PHY's MDIO
+	 * address, 1, and its analog trims. The vendor takes the trims
+	 * from the eFuse through its closed reader; these are its
+	 * defaults for a part without them (TX ROUT 0, DAC 0, SEL RX and
+	 * TX 3), and its "best setting" T22 of 5. Linux's driver keeps
+	 * what it finds there.
+	 */
+	if (IS_ENABLED(CONFIG_NVT_NS02501)) {
+		setbits_le32(PHY_CTRL, PHY_SW_RESET);
+		setbits_le32(PHY_MDIO_ADDR, 1);
+		clrbits_le32(PHY_CTRL, PHY_SW_RESET);
+		clrbits_le32(PHY_TRIM_ROUT, 7 << 3);
+		clrbits_le32(PHY_TRIM_DAC, 0x1f);
+		clrsetbits_le32(PHY_TRIM_SEL, 0xfc, 3 << 5 | 3 << 2);
+		clrsetbits_le32(PHY_TRIM_ROUT, 7, 5);
+	}
+
 	setbits_le32(PHY_CTRL, PHY_SW_RESET);
 	/* The break-link timer, and the LED mode, as the vendor */
 	writel(0x53, PHY(0x288));
@@ -410,12 +542,190 @@ static void nvt_eth_phy_on(u32 led)
 	clrsetbits_le32(PHY_CTRL, PHY_SW_RESET, PHY_PLLREGWR);
 }
 
+/* The NT9852x dies' (eth_na51055.c: its pin, clock and PHY set-up) */
+static int nvt_eth_init_52x(const void *fdt, u32 pins)
+{
+	bool na51084 = nvt_chip_id() == NVT_CHIP_NA51084;
+	u32 ext = ETH_PIN_RMII |
+		  (na51084 ? ETH_PIN_RMII_2 | ETH52X_RGMII : 0);
+	bool phy_clk = nvt_fdt_u32(fdt, "/eth@f02b0000", "sp-clk", 0);
+	u32 led = 0x312, pads = 3;	/* both LEDs, blinking */
+	int n = pins & ETH_PIN_LED1 ? 1 : pins & ETH_PIN_LED2 ? 2 : 0;
+	phy_interface_t intf = PHY_INTERFACE_MODE_MII;
+
+	if (!(pins & (ext | ETH_PIN_INTERNAL)))
+		return 0;
+
+	if (n) {
+		if (pins & ETH52X_LED_ONLY) {
+			pads = pins & BIT(8) ? 1 : 2;
+			led = 0x300;
+		}
+		clrbits_le32(TOP_GPIO_DSI, n == 1 ? pads : pads << 5);
+		clrsetbits_le32(TOP_PINMUX_MISC, MISC_PHY_LED(3),
+				MISC_PHY_LED(n));
+	}
+	if (nvt_fdt_u32(fdt, "/phy@f02b3800", "led-inv", 0))
+		led &= ~LED_INV;
+
+	/* mac_pinmux_en() */
+	if (!na51084) {
+		if (pins & ETH_PIN_RMII) {
+			setbits_le32(TOP_PINMUX_MISC, 0x3000);
+			clrbits_le32(TOP_GPIO_L, 0x40077f);
+		}
+	} else if (pins & ETH_PIN_RMII) {
+		setbits_le32(TOP_PINMUX_ETH84, 0x100);
+		clrbits_le32(TOP_GPIO_L, 0x40077f);
+	} else if (pins & ETH_PIN_RMII_2) {
+		setbits_le32(TOP_PINMUX_ETH84, 0x200);
+		clrbits_le32(TOP_GPIO_L, 0x18f3800);
+	} else if (pins & ETH52X_RGMII) {
+		setbits_le32(TOP_PINMUX_ETH84, 0x300);
+		clrbits_le32(TOP_GPIO_L, 0x1fff800);
+	}
+	if (pins & ETH_PIN_INTERNAL) {
+		clrbits_le32(TOP_PINMUX_MISC, MISC_PHY_CLK);
+	} else if (phy_clk) {
+		setbits_le32(TOP_PINMUX_MISC, MISC_PHY_CLK);
+		if (na51084 && !(pins & ETH_PIN_RMII))
+			clrbits_le32(TOP_GPIO_DSI, BIT(0));
+		else
+			clrbits_le32(TOP_GPIO_L, BIT(7));
+	}
+
+	/* mac_clk_en(): NA51084's embedded PHY runs from 480 MHz */
+	if (!na51084)
+		setbits_le32(CG_PLL_EN, CG_PLL6);
+	else if (!(pins & ETH_PIN_INTERNAL))
+		setbits_le32(CG_PLL_EN, CG_PLL16);
+	udelay(10);
+	setbits_le32(NVT_CG_CLKEN0, CG_ETH);
+	udelay(10);
+	setbits_le32(NVT_CG_RSTN0, CG_ETH);
+	udelay(10);
+	clrbits_le32(TOP_SRAM_SD, SRAM_SD_ETH);
+
+	/* extphy_clk_en() */
+	if (pins & ETH52X_RGMII & ext) {
+		clrsetbits_le32(ETH_RMII_CLK, RMII_TXD_SRC,
+				RMII_REF_OUT | TXD_SRC_RGMII);
+		intf = PHY_INTERFACE_MODE_RGMII;
+	} else if (pins & ext) {
+		clrsetbits_le32(ETH_RMII_CLK,
+				RMII_REF_IN | RMII_REF_OUT |
+				(na51084 ? RMII_TXD_SRC : 0),
+				RMII_REF_CLK_I |
+				(nvt_fdt_u32(fdt, "/eth@f02b0000", "ref-clk-out",
+					     0) ? RMII_REF_OUT : RMII_REF_IN));
+		intf = PHY_INTERFACE_MODE_RMII;
+	}
+	if (pins & ext) {
+		setbits_le32(ETH_PHY_SEL, PHY_SEL_EXT_52X);
+		if (phy_clk) {
+			setbits_le32(CG_CLKEN2, CG_ETH_PHY_CLK);
+			setbits_le32(TOP_PINMUX_MISC, MISC_PHY_CLK);
+			clrbits_le32(TOP_GPIO_L, BIT(7));
+		}
+		/* The vendor resets the PHY on an EVB GPIO here, not done */
+	} else {
+		clrbits_le32(ETH_PHY_SEL, PHY_SEL_EXT_52X);
+	}
+	/* Powered either way, as by eqos_probe_hwinit() */
+	nvt_eth_phy_on(led);
+
+	return nvt_eqos_initialize(intf);
+}
+
+/*
+ * NS02501 (eth_ns02501.c: mac0_pinmux_en(), mac0_clk_en(),
+ * extphy0_clk_en()). Its pinmux bits are its own: RMII on the DSI pads
+ * (0x1) or the P pads (0x2), the PHY's 25 MHz from the SoC (0x100);
+ * anything else is the embedded PHY. The vendor muxes no LED pins and
+ * has no RGMII on this die.
+ */
+#define ETH02501_RMII_1		BIT(0)
+#define ETH02501_RMII_2		BIT(1)
+#define ETH02501_EXTPHYCLK	BIT(8)
+#define TOP_GPIO_DSI_02501	(NVT_TOP_BASE + 0xC8)
+#define PAD_DRV_DSI_02501	(NVT_PAD_BASE + 0x44)
+#define PAD_DRV_P_02501		(NVT_PAD_BASE + 0x30)
+#define RMII_REF_PAD		BIT(2)
+
+static int nvt_eth_init_ns02501(const void *fdt, u32 pins)
+{
+	int rmii = pins & ETH02501_RMII_1 ? 1 : pins & ETH02501_RMII_2 ? 2 : 0;
+	bool phy_clk = nvt_fdt_u32(fdt, "/eth0@f02b0000", "sp-clk", 0) ||
+		       (pins & ETH02501_EXTPHYCLK);
+	bool ref_out = nvt_fdt_u32(fdt, "/eth0@f02b0000", "ref-clk-out", 0);
+
+	/* The RMII pins, their drive at level 1 */
+	if (rmii == 1) {
+		/* PHYCLK, TXCTL, TXD0, TXD1, RXCLK */
+		clrsetbits_le32(PAD_DRV_DSI_02501, 0x3fcc00, 0x154400);
+		clrsetbits_le32(TOP_PINMUX_ETH, 3 << 30, 1 << 30);
+		clrbits_le32(TOP_GPIO_DSI_02501, 0x3bf);
+	} else if (rmii == 2) {
+		clrsetbits_le32(PAD_DRV_P_02501, 0xc3003f, 0x410015);
+		clrsetbits_le32(TOP_PINMUX_ETH, 3 << 30, 2 << 30);
+		clrbits_le32(TOP_GPIO_P, 0x73f);
+	}
+
+	setbits_le32(CG_PLL_EN, CG_PLL6);
+	udelay(10);
+	setbits_le32(NVT_CG_CLKEN0, CG_ETH);
+	udelay(10);
+	setbits_le32(NVT_CG_RSTN0, CG_ETH);
+	udelay(10);
+
+	if (rmii) {
+		/* The reference clock from the pad, or out to the PHY */
+		clrsetbits_le32(ETH_RMII_CLK,
+				RMII_REF_IN | RMII_REF_OUT | RMII_REF_PAD |
+				RMII_TXD_SRC,
+				RMII_REF_CLK_I |
+				(ref_out ? RMII_REF_OUT : RMII_REF_IN));
+		setbits_le32(ETH_PHY_SEL, PHY_SEL_EXT);
+	} else {
+		/*
+		 * The vendor sets bit 4 for the external PHY (as on NA51089)
+		 * but clears bit 8 (as on NT9852x) for the embedded one:
+		 * clear both
+		 */
+		clrbits_le32(ETH_PHY_SEL, PHY_SEL_EXT_MASK | PHY_SEL_EXT_52X);
+		nvt_eth_phy_on(0x312);
+	}
+	if (phy_clk) {
+		setbits_le32(CG_CLKEN2, CG_ETH_PHY_CLK);
+		if (rmii) {
+			setbits_le32(TOP_PINMUX_MISC, MISC_PHY_CLK);
+			setbits_le32(TOP_PINMUX_ETH, rmii << 2);
+			if (rmii == 1)
+				clrbits_le32(TOP_GPIO_DSI_02501, BIT(10));
+			else
+				clrbits_le32(TOP_GPIO_P, BIT(11));
+		}
+	}
+	/*
+	 * The vendor resets an external PHY on DSI_GPIO 6 (RMII_1) or
+	 * P_GPIO 7 (RMII_2) here, its EVB's wiring: not done
+	 */
+
+	return nvt_eqos_initialize(rmii ? PHY_INTERFACE_MODE_RMII :
+				   PHY_INTERFACE_MODE_MII);
+}
+
 int board_eth_init(struct bd_info *bis)
 {
 	const void *fdt = (const void *)env_get_hex("fdtaddr", 0);
 	u32 pins = nvt_fdt_u32(fdt, "/top@f0010000/eth", "pinmux",
 			       ETH_PIN_INTERNAL);
 	bool rmii = pins & (ETH_PIN_RMII | ETH_PIN_RMII_2);
+
+	if (IS_ENABLED(CONFIG_NVT_NS02501))
+		return nvt_eth_init_ns02501(fdt, pins);
+	if (nvt_chip_id() != NVT_CHIP_NA51089)
+		return nvt_eth_init_52x(fdt, pins);
 	u32 led = 0x312, pads = 3;	/* both LEDs, blinking */
 	int n = pins & ETH_PIN_LED1 ? 1 : pins & ETH_PIN_LED2 ? 2 : 0;
 

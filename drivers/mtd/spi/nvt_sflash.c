@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * SPI NOR behind the flash controller of the Novatek NA51089.
+ * SPI NOR behind the flash controller of the Novatek NA51089 (and the
+ * NT9852x dies), NS02501, NA51103 and NA51090 (the same controller; only
+ * its clock, reset, pins and PHY timing differ, and the NVR dies' FIFO is
+ * 128 bytes, not 64).
  *
  * The controller runs one operation at a time: software loads COMMAND,
  * ROWADDR (sent MSB first, as many bytes as MODULE0 says) and DATALEN,
@@ -10,8 +13,8 @@
  * command with an address, a block erase that polls the status itself,
  * an automatic status poll, and N bytes in or out. Reads and programs
  * hold the chip selected by hand across the command-and-address operation
- * and the data one. Data goes through a 64-byte FIFO, a word at a time,
- * or by DMA.
+ * and the data one. Data goes through the FIFO, a word at a time, or by
+ * DMA.
  *
  * After the vendor U-Boot 2019.04 (drivers/mtd/nvt_flash_spi/ and
  * drivers/mtd/spiflash/spinor.c), single lane, as it reads at 48 MHz.
@@ -28,9 +31,10 @@
 #include <asm/cache.h>
 #include <asm/io.h>
 #include <asm/unaligned.h>
-#include <asm/arch/na51089.h>
+#include <asm/arch/hardware.h>
 #include <linux/delay.h>
 #include <linux/mtd/mtd.h>
+#include <linux/libfdt.h>
 #include <linux/sizes.h>
 
 #define FL_MODULE0		(NVT_FLASH_BASE + 0x00)
@@ -64,6 +68,8 @@
 #define DLL1_SRC_CLK_SEL	BIT(3)
 #define DLL1_PAD_CLK_SEL	BIT(20)
 /* DLL2 */
+#define DLL2_OUTDLY(n)		((n) << 16)
+#define DLL2_OUTDLY_MASK	DLL2_OUTDLY(0x3f)
 #define DLL2_INDLY(n)		((n) << 24)
 #define DLL2_INDLY_MASK		DLL2_INDLY(0x3f)
 /* SPI_CFG */
@@ -86,6 +92,7 @@
 #define FIFO_CNT_MASK		0x1f			/* words */
 #define FIFO_EMPTY		BIT(8)
 #define FIFO_FULL		BIT(9)
+/* What a PIO transfer moves per FIFO check: the smaller FIFO, NA51089's */
 #define FIFO_BYTES		64
 
 /* Operations */
@@ -98,17 +105,39 @@
 #define OP_WRITE_N		0x19
 #define OP_AUTO_STATUS		0x1D
 
+#ifdef CONFIG_NVT_NS02501
+/* 480 MHz / 2 (the NS02501 U-Boot's nvt_flash_spi_int.h) */
+#define NVT_FLASH_SRC_HZ	240000000
+#else
+#define NVT_FLASH_SRC_HZ	480000000
+#endif
+#define NVT_TOP_FLASH_EN	(NVT_TOP_BASE + 0x04)
+#define NVT_TOP_GPIO_C		(NVT_TOP_BASE + 0xA0)	/* pads as GPIO */
+#ifdef CONFIG_NVT_NA511XX
+#define NVT_CG_FLASH_CLKEN	(NVT_CG_BASE + 0x74)
+#define CG_FLASH_CLKEN		BIT(10)
+#define NVT_CG_FLASH_RSTN	(NVT_CG_BASE + 0x98)
+#define CG_FLASH_RSTN		BIT(1)
+#define NVT_CG_FLASH_DIV	(NVT_CG_BASE + 0x48)	/* [21:16] */
+#define CG_FLASH_DIV_SHIFT	16
+#define NVT_PAD_FLASH_DRV	(NVT_PAD_BASE + 0x50)
+/* The boards' trees ask for 12 MHz (/nor clock-frequency), as the vendor */
+#define SF_HZ			12000000
+#else
+#ifdef CONFIG_NVT_NS02501
+#define NVT_PAD_FLASH_DRV	(NVT_PAD_BASE + 0x50)	/* 4 bits a pin */
+#else
 /* The clock gate that would stop the controller with the chip selected */
 #define NVT_CG_AUTOGATE		(NVT_CG_BASE + 0xB0)
 #define CG_AUTOGATE_FLASH	BIT(19)
-#define NVT_CG_FLASH_DIV	(NVT_CG_BASE + 0x40)	/* [17:12] */
-#define NVT_FLASH_SRC_HZ	480000000
-#define NVT_TOP_FLASH_EN	(NVT_TOP_BASE + 0x04)
-#define NVT_TOP_GPIO_C		(NVT_TOP_BASE + 0xA0)	/* pads as GPIO */
 #define NVT_TOP_SRAM_SD		(NVT_TOP_BASE + 0x1000)	/* SRAM shut down */
 #define NVT_PAD_FLASH_DRV	(NVT_PAD_BASE + 0x40)
+#endif
+#define NVT_CG_FLASH_DIV	(NVT_CG_BASE + 0x40)	/* [17:12] */
+#define CG_FLASH_DIV_SHIFT	12
 
 #define SF_HZ			48000000
+#endif
 #define SZ_PAGE			256
 #define SZ_SECTOR		SZ_64K
 /* The vendor U-Boot gives every operation this long */
@@ -198,6 +227,26 @@ static int fl_wait_fifo(u32 bits, u32 val)
 	return 0;
 }
 
+/*
+ * Wait for at least @n bytes in the FIFO. A full one counts: the count
+ * field holds 31 words, and the NVR dies' FIFO takes 32.
+ */
+static int fl_wait_fifo_in(unsigned int n)
+{
+	ulong start = get_timer(0);
+	u32 sts;
+
+	for (;;) {
+		sts = readl(FL_FIFO_STS);
+		if (sts & FIFO_FULL || (sts & FIFO_CNT_MASK) >= DIV_ROUND_UP(n, 4))
+			return 0;
+		if (get_timer(start) > OP_TIMEOUT_MS) {
+			printf("SF: the flash FIFO timed out\n");
+			return -ETIMEDOUT;
+		}
+	}
+}
+
 /* The words of a PIO read, as the FIFO fills */
 static int fl_pio_in(u8 *buf, unsigned int len)
 {
@@ -207,10 +256,7 @@ static int fl_pio_in(u8 *buf, unsigned int len)
 		unsigned int n = min_t(unsigned int, len, FIFO_BYTES);
 		unsigned int i;
 
-		if (n == FIFO_BYTES)
-			ret = fl_wait_fifo(FIFO_FULL, FIFO_FULL);
-		else
-			ret = fl_wait_fifo(FIFO_CNT_MASK, DIV_ROUND_UP(n, 4));
+		ret = fl_wait_fifo_in(n);
 		if (ret)
 			return ret;
 		for (i = 0; i < n; i += 4) {
@@ -264,14 +310,18 @@ static int fl_pio_out(const u8 *buf, unsigned int len)
 static void fl_cs_manual(bool on)
 {
 	if (on) {
+#ifdef NVT_CG_AUTOGATE
 		clrbits_le32(NVT_CG_AUTOGATE, CG_AUTOGATE_FLASH);
+#endif
 		setbits_le32(FL_SPI_CFG, CFG_CS_HIGH);
 		setbits_le32(FL_SPI_CFG, CFG_CS_MANUAL);
 		clrbits_le32(FL_SPI_CFG, CFG_CS_HIGH);
 	} else {
 		setbits_le32(FL_SPI_CFG, CFG_CS_HIGH);
 		clrbits_le32(FL_SPI_CFG, CFG_CS_MANUAL);
+#ifdef NVT_CG_AUTOGATE
 		setbits_le32(NVT_CG_AUTOGATE, CG_AUTOGATE_FLASH);
+#endif
 	}
 }
 
@@ -506,6 +556,111 @@ static int nvt_sf_erase(struct mtd_info *mtd, struct erase_info *instr)
 	return 0;
 }
 
+#if defined(CONFIG_NVT_NA511XX) || defined(CONFIG_NVT_NS02501)
+/* A u32 property of the loader's device tree */
+static u32 fl_fdt_u32(const char *path, const char *prop, u32 def)
+{
+	const void *fdt = nvt_loader_fdt();
+	const fdt32_t *val = NULL;
+	int node;
+
+	if (fdt) {
+		node = fdt_path_offset(fdt, path);
+		if (node >= 0)
+			val = fdt_getprop(fdt, node, prop, NULL);
+	}
+	return val ? fdt32_to_cpu(*val) : def;
+}
+#endif
+
+#ifdef CONFIG_NVT_NA511XX
+/*
+ * Clock, reset, pins, timing and PHY, as the vendor's nvt_spinor_reset()
+ * and nand_phy_config() do on the NVR dies, at the clock the board's
+ * tree asks for
+ */
+static void fl_hw_init(void)
+{
+	u32 hz = fl_fdt_u32("/nor", "clock-frequency", SF_HZ);
+	u32 pins = 3, drv = 0, time2 = 0x5f51;
+
+	if (hz < NVT_FLASH_SRC_HZ / 64)
+		hz = NVT_FLASH_SRC_HZ / 64;
+	if (IS_ENABLED(CONFIG_NVT_NA51090) && hz > 80000000)
+		hz = 80000000;
+	setbits_le32(NVT_CG_FLASH_CLKEN, CG_FLASH_CLKEN);
+	setbits_le32(NVT_CG_FLASH_RSTN, CG_FLASH_RSTN);
+	writel(0x06002222, FL_TIME0);
+	writel(0x7f0f, FL_TIME1);
+	/* The pins, and the second chip select's if the tree says so */
+	if (fl_fdt_u32("/top/spi", "pinmux", 0) & 0x20)
+		pins |= BIT(2);
+	setbits_le32(NVT_TOP_FLASH_EN, pins);
+	clrbits_le32(NVT_TOP_GPIO_C, 0x3f | (pins & BIT(2) ? BIT(6) : 0));
+	clrsetbits_le32(NVT_CG_FLASH_DIV, 0x3f << CG_FLASH_DIV_SHIFT,
+			(NVT_FLASH_SRC_HZ / hz - 1) << CG_FLASH_DIV_SHIFT);
+	if (IS_ENABLED(CONFIG_NVT_NA51090))
+		drv = hz <= 24000000 ? 0x0111101 :
+		      hz <= 60000000 ? 0x0222202 : 0x0222203;
+	else if (hz > 48000000)
+		drv = 0x0111101;
+	clrsetbits_le32(NVT_PAD_FLASH_DRV, 0xfffffff, drv);
+	setbits_le32(FL_MODULE0, MOD_NOR);
+	/* NA51103 wants a CS low to clock time (TSLCH) of 3 at least */
+	if (IS_ENABLED(CONFIG_NVT_NA51103))
+		time2 = (time2 & ~0xf) | 3;
+	writel(time2, FL_TIME2);
+
+	clrsetbits_le32(FL_DLL1, DLL1_SRC_CLK_SEL,
+			DLL1_SAMPCLK_INV | DLL1_PAD_CLK_SEL);
+	clrsetbits_le32(FL_DLL2, DLL2_INDLY_MASK,
+			DLL2_INDLY(IS_ENABLED(CONFIG_NVT_NA51090) ? 8 : 0));
+	setbits_le32(FL_DLL1, DLL1_SW_RESET);
+	while (readl(FL_DLL1) & DLL1_SW_RESET)
+		;
+	/* Chip select 0 (SPI_CFG bit 3 selects the second) */
+	clrsetbits_le32(FL_SPI_CFG, CFG_BUS_WIDTH_MASK | BIT(3), CFG_PULL_WPHLD);
+}
+#elif defined(CONFIG_NVT_NS02501)
+/*
+ * NS02501, as its vendor U-Boot's nvt_flash_spi.c (built without its
+ * pinctrl driver, as the SDK's NOR config is) and nand_phy_config(): the
+ * flash pins in TOP+0x04 [13:12] (1: SPI NOR) and off GPIO, the clock
+ * the tree asks for (the SDK's: 12 MHz) from 240 MHz, the pads' fixed
+ * drive (data level 3, clock 5, chip select 3), and from 48 MHz an
+ * output delay of 3. No SRAM shut-down bit, no clock auto-gating here.
+ */
+static void fl_hw_init(void)
+{
+	u32 hz = fl_fdt_u32("/nor", "clock-frequency", SF_HZ);
+
+	if (hz < NVT_FLASH_SRC_HZ / 64)
+		hz = NVT_FLASH_SRC_HZ / 64;
+	if (hz > SF_HZ)
+		hz = SF_HZ;
+	setbits_le32(NVT_CG_CLKEN0, NVT_CG_FLASH);
+	setbits_le32(NVT_CG_RSTN0, NVT_CG_FLASH);
+	writel(0x06002222, FL_TIME0);
+	writel(0x7f0f, FL_TIME1);
+	clrsetbits_le32(NVT_TOP_FLASH_EN, 3 << 12, 1 << 12);
+	clrbits_le32(NVT_TOP_GPIO_C, 0x140f);
+	clrsetbits_le32(NVT_CG_FLASH_DIV, 0x3f << CG_FLASH_DIV_SHIFT,
+			(NVT_FLASH_SRC_HZ / hz - 1) << CG_FLASH_DIV_SHIFT);
+	writel(0x33333333, NVT_PAD_FLASH_DRV);
+	clrsetbits_le32(NVT_PAD_FLASH_DRV + 4, 0xf0f00, 0x30500);
+	setbits_le32(FL_MODULE0, MOD_NOR);
+	writel(0x9f51, FL_TIME2);
+
+	clrsetbits_le32(FL_DLL1, DLL1_SRC_CLK_SEL,
+			DLL1_SAMPCLK_INV | DLL1_PAD_CLK_SEL);
+	clrsetbits_le32(FL_DLL2, DLL2_INDLY_MASK | DLL2_OUTDLY_MASK,
+			DLL2_OUTDLY(hz >= 48000000 ? 3 : 0));
+	setbits_le32(FL_DLL1, DLL1_SW_RESET);
+	while (readl(FL_DLL1) & DLL1_SW_RESET)
+		;
+	clrsetbits_le32(FL_SPI_CFG, CFG_BUS_WIDTH_MASK, CFG_PULL_WPHLD);
+}
+#else
 /* Clock, reset, pins, timing and PHY, as the vendor's nvt_spinor_reset() */
 static void fl_hw_init(void)
 {
@@ -515,8 +670,8 @@ static void fl_hw_init(void)
 	writel(0x7f0f, FL_TIME1);
 	setbits_le32(NVT_TOP_FLASH_EN, BIT(13));
 	clrbits_le32(NVT_TOP_GPIO_C, 0x50f);
-	clrsetbits_le32(NVT_CG_FLASH_DIV, 0x3f << 12,
-			(NVT_FLASH_SRC_HZ / SF_HZ - 1) << 12);
+	clrsetbits_le32(NVT_CG_FLASH_DIV, 0x3f << CG_FLASH_DIV_SHIFT,
+			(NVT_FLASH_SRC_HZ / SF_HZ - 1) << CG_FLASH_DIV_SHIFT);
 	clrbits_le32(NVT_TOP_SRAM_SD, BIT(17));
 	clrsetbits_le32(NVT_PAD_FLASH_DRV, 0x3f00ff, 0x150055);
 	setbits_le32(FL_MODULE0, MOD_NOR);
@@ -530,6 +685,7 @@ static void fl_hw_init(void)
 		;
 	clrsetbits_le32(FL_SPI_CFG, CFG_BUS_WIDTH_MASK, CFG_PULL_WPHLD);
 }
+#endif
 
 static struct spi_flash nvt_flash;
 static int nvt_announced;

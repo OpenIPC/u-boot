@@ -37,16 +37,24 @@ config SPI_FLASH
 	  If unsure, say N
 
 config NVT_SFLASH
-	bool "Novatek NA51089 SPI NOR"
-	depends on ARCH_NOVATEK && !SPI_FLASH && !DM_SPI_FLASH
+	bool "Novatek SPI NOR (NA51089, NT9852x, NS02501, NA51103, NA51090)"
+	depends on ARCH_NOVATEK && !NVT_NA51068 && !SPI_FLASH && !DM_SPI_FLASH
 	help
-	  The SPI NOR the Novatek NA51089 boots from, on its flash
-	  controller. The driver provides spi_flash_probe() directly,
-	  without the SPI and spi-nor layers.
+	  The SPI NOR the Novatek camera dies and the NA51103 boot from, on
+	  their flash controller (NA51090's too). The driver provides
+	  spi_flash_probe() directly, without the SPI and spi-nor layers.
+
+config NVT_SPI020
+	bool "Novatek NA51068 SPI NOR (FTSPI020)"
+	depends on ARCH_NOVATEK && NVT_NA51068 && !SPI_FLASH && !DM_SPI_FLASH
+	help
+	  The SPI NOR the Novatek NA51068 (NT98321, NT98323) boots from, on
+	  its Faraday FTSPI020 flash controller. The driver provides
+	  spi_flash_probe() directly, without the SPI and spi-nor layers.
 
 config SF_DEFAULT_BUS
 	int "SPI Flash default bus identifier"
-	depends on SPI_FLASH || DM_SPI_FLASH || NVT_SFLASH
+	depends on SPI_FLASH || DM_SPI_FLASH || NVT_SFLASH || NVT_SPI020
 	default 0
 	help
 	  The default bus may be provided by the platform
@@ -55,7 +63,7 @@ config SF_DEFAULT_BUS
 
 config SF_DEFAULT_CS
 	int "SPI Flash default Chip-select"
-	depends on SPI_FLASH || DM_SPI_FLASH || NVT_SFLASH
+	depends on SPI_FLASH || DM_SPI_FLASH || NVT_SFLASH || NVT_SPI020
 	default 0
 	help
 	  The default chip select may be provided by the platform
@@ -64,7 +72,7 @@ config SF_DEFAULT_CS
 
 config SF_DEFAULT_MODE
 	hex "SPI Flash default mode (see include/spi.h)"
-	depends on SPI_FLASH || DM_SPI_FLASH || NVT_SFLASH
+	depends on SPI_FLASH || DM_SPI_FLASH || NVT_SFLASH || NVT_SPI020
 	default 0x0
 	help
 	  The default mode may be provided by the platform
@@ -76,7 +84,7 @@ config SF_DEFAULT_MODE
 
 config SF_DEFAULT_SPEED
 	int "SPI Flash default speed in Hz"
-	depends on SPI_FLASH || DM_SPI_FLASH || NVT_SFLASH
+	depends on SPI_FLASH || DM_SPI_FLASH || NVT_SFLASH || NVT_SPI020
 	default 1000000
 	help
 	  The default speed may be provided by the platform

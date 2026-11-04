@@ -6,7 +6,13 @@ CONFIG_ARCH_NOVATEK=y
 # Where the loader's device tree (/nvt_memory_cfg/uboot) has U-Boot
 # unpacked and started: the HEADINFO's CodeEntry must say the same
 CONFIG_SYS_TEXT_BASE=0x03900000
-CONFIG_SKIP_LOWLEVEL_INIT=y
+# The loader has the clocks and the DDR up: no lowlevel_init. But it
+# starts U-Boot with its MMU and caches on (its table at 0x1018000 maps
+# the DDR write-back), and this U-Boot runs with the data cache off and
+# no cache maintenance: cpu_init_cp15 turns them off, as the vendor
+# U-Boot's start does.
+# CONFIG_SKIP_LOWLEVEL_INIT is not set
+CONFIG_SKIP_LOWLEVEL_INIT_ONLY=y
 CONFIG_CC_OPTIMIZE_FOR_SIZE=y
 # CONFIG_DM is not set
 CONFIG_SYS_DCACHE_OFF=y

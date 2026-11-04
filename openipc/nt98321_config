@@ -1,0 +1,11 @@
+CONFIG_TARGET_NT98321=y
+CONFIG_PRODUCT_SOC="nt98321"
+# NA51068: the SPI NOR on the FTSPI020, the SD card on a standard SDHCI
+CONFIG_NVT_SPI020=y
+CONFIG_MMC_SDHCI=y
+# The loader jumps here with its MMU on, its page tables in DDR (in its
+# region, 0x100000-0xA00000): cpu_init_cp15 turns the MMU off
+# CONFIG_SKIP_LOWLEVEL_INIT is not set
+CONFIG_SKIP_LOWLEVEL_INIT_ONLY=y
+# /nvt_memory_cfg/uboot in openipc/na51068.dtsi, the SDK boards'
+CONFIG_SYS_TEXT_BASE=0x1E000000

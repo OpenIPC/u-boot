@@ -1,0 +1,32 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * NT98529: the NT98528's tree with what the SDK's NT98529 board
+ * (cfg_529_IPCAM1_RAMDISK_EVB) changes for the part: the CPUs at
+ * 1.2 GHz, PLL15 at 400 MHz.
+ */
+/dts-v1/;
+
+/include/ "na51084.dtsi"
+
+/ {
+	cpus {
+		cpu@0 {
+			clock-frequency = <0x47868c00>;
+		};
+
+		cpu@1 {
+			clock-frequency = <0x47868c00>;
+		};
+	};
+
+	pll_preset@0 {
+		pll15 {
+			pll_config = <0x0f 0x17d78400 0x01>;
+		};
+	};
+
+	nvt_info {
+		BIN_NAME = "FW98529A";
+		BIN_NAME_T = "FW98529T";
+	};
+};

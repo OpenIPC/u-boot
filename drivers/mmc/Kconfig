@@ -78,11 +78,12 @@ config MMC_SPI_CRC_ON
 	  If unsure, say N.
 
 config MMC_NVT
-	bool "Novatek NA51089 SD card (SDIO1)"
-	depends on ARCH_NOVATEK && MMC && !DM_MMC
+	bool "Novatek NA51089 / NT9852x / NS02501 SD card (SDIO1)"
+	depends on (NVT_NA51089 || NVT_NA51055 || NVT_NS02501) && MMC && !DM_MMC
 	help
-	  SDIO1 of the Novatek NA51089 (NT98562, NT98566), 4-bit, PIO
-	  through its FIFO.
+	  SDIO1 of the Novatek NA51089 (NT98560/561/562/566), of the
+	  NT9852x dies, NA51055 and NA51084 (NT98520/522/523/525/528/529),
+	  and of NS02501 (NT98532/533), 4-bit, PIO through its FIFO.
 
 config ARM_PL180_MMCI
 	bool "ARM AMBA Multimedia Card Interface and compatible support"

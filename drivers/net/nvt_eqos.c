@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Ethernet MAC of the Novatek NA51089: a Synopsys DWC Ethernet QoS
- * (GMAC 4.x) core, run polled with one Tx and one Rx descriptor ring.
+ * Ethernet MACs of the Novatek dies: one on NA51089, NA51055, NA51084,
+ * NS02501, NA51103 and NA51090, two on NA51068 (at 0xFCC00000 and
+ * 0xFCD00000): a Synopsys DWC Ethernet QoS (GMAC 4.x) core, run polled
+ * with one Tx and one Rx descriptor ring each.
  *
  * The block has the MAC at 0x0000, the MTL (the FIFOs) at 0x0D00 and the
  * DMA, channel 0 from 0x1100, at 0x1000; Novatek's glue (interface and
  * clock selection, LEDs) at 0x3000 and the embedded PHY's analog part at
  * 0x3800. Board code sets those last two up before this driver runs
- * (board/novatek/na51089), and the order matters: the DMA software reset
- * only completes once the PHY feeds the MAC its Rx clock.
+ * (board/novatek/na51089, na51068, na511xx), and the order matters: the DMA
+ * software reset only completes once the PHY feeds the MAC its Rx clock.
  *
  * Descriptors are four words, OWN in DES3 bit 31, each padded to a cache
  * line; the DMA skips the padding (DSL). The DMA works through a ring up
@@ -30,10 +32,10 @@
 #include <phy.h>
 #include <asm/cache.h>
 #include <asm/io.h>
-#include <asm/arch/na51089.h>
 #include <linux/delay.h>
+#include <asm/arch/hardware.h>
 
-#define EQ(off)			(NVT_ETH_BASE + (off))
+#define EQ(off)			(eqos->base + (off))
 
 /* MAC */
 #define MAC_CFG			EQ(0x000)
@@ -95,6 +97,7 @@
 #define DMA_SWR			BIT(0)
 /* DMA_SYSBUS_MODE: outstanding AXI reads, as the vendor driver */
 #define SYSBUS_RD_OSR_LMT(n)	((n) << 16)
+#define SYSBUS_AALE		BIT(10)	/* automatic AXI low-power entry */
 /* DMA_CH_CTRL */
 #define CH_PBLX8		BIT(16)
 #define CH_DSL(n)		((n) << 18)	/* skip, in 8-byte units */
@@ -111,10 +114,29 @@
 #define DES3_ES			BIT(15)		/* write-back, Rx */
 #define DES3_LEN(v)		((v) & 0x7fff)
 
-/* The core's own descriptor, padded to a cache line */
+/*
+ * The core's own descriptor, padded to a cache line on NA51089. The DMA
+ * skips the padding (DSL) in units of its bus width, 3 bits' worth: 8
+ * bytes on NA51089, NA51084 and NS02501, but 4 on NA51055 (the vendor's
+ * eth_na51055.c), where no skip reaches a 64-byte line. The NT9852x
+ * targets therefore pack the descriptors, no skip: this port runs with
+ * the data cache off (SYS_DCACHE_OFF), so no cache line is shared with
+ * the DMA.
+ */
+#ifdef CONFIG_NVT_NA51055
+#if !CONFIG_IS_ENABLED(SYS_DCACHE_OFF)
+#error "packed descriptors need the data cache off"
+#endif
+#define DESC_SIZE		16
+#else
+#define DESC_SIZE		ARCH_DMA_MINALIGN
+#endif
+
 struct eqos_desc {
 	u32 des0, des1, des2, des3;
-	u8 pad[ARCH_DMA_MINALIGN - 16];
+#if DESC_SIZE > 16
+	u8 pad[DESC_SIZE - 16];
+#endif
 };
 
 #define TX_DESCS		4
@@ -122,28 +144,24 @@ struct eqos_desc {
 /* A frame with a VLAN tag fits, a cache-line multiple */
 #define PKT_SIZE		ALIGN(1568, ARCH_DMA_MINALIGN)
 
-/* What the CSR clock (CG+0x10 [9:8]) is, as an MDC divider (CR) */
-#define NVT_CG_SYSCLK		(NVT_CG_BASE + 0x10)
-static const u8 mdio_cr[4] = {
-	3,	/* 48 MHz: CR 35-60 MHz, /26 */
-	0,	/* 60 MHz: CR 60-100 MHz, /42 */
-	0,	/* 80 MHz */
-	1,	/* 120 MHz: CR 100-150 MHz, /62 */
-};
+#define NVT_EQOS_MAX		2
 
-static struct eqos_desc tx_descs[TX_DESCS] __aligned(ARCH_DMA_MINALIGN);
-static struct eqos_desc rx_descs[RX_DESCS] __aligned(ARCH_DMA_MINALIGN);
-static u8 tx_buf[PKT_SIZE] __aligned(ARCH_DMA_MINALIGN);
-static u8 rx_bufs[RX_DESCS][PKT_SIZE] __aligned(ARCH_DMA_MINALIGN);
-
-static struct {
+struct nvt_eqos {
+	struct eqos_desc tx_descs[TX_DESCS];
+	struct eqos_desc rx_descs[RX_DESCS];
+	u8 tx_buf[PKT_SIZE];
+	u8 rx_bufs[RX_DESCS][PKT_SIZE];
 	struct eth_device dev;
 	struct mii_dev *mii;
 	struct phy_device *phy;
 	phy_interface_t intf;
+	ulong base;
 	u32 cr;
 	int tx_idx, rx_idx;
-} eqos;
+} __aligned(ARCH_DMA_MINALIGN);
+
+static struct nvt_eqos eqos_devs[NVT_EQOS_MAX];
+static int eqos_count;
 
 static void eqos_flush(void *p, size_t len)
 {
@@ -167,16 +185,18 @@ static int eqos_wait(ulong reg, u32 mask, ulong ms)
 	return 0;
 }
 
-static int eqos_mdio(int addr, int reg, u32 goc)
+static int eqos_mdio(struct nvt_eqos *eqos, int addr, int reg, u32 goc)
 {
-	writel(MDIO_PA(addr) | MDIO_RDA(reg) | MDIO_CR(eqos.cr) | goc | MDIO_GB,
+	writel(MDIO_PA(addr) | MDIO_RDA(reg) | MDIO_CR(eqos->cr) | goc | MDIO_GB,
 	       MAC_MDIO_ADDR);
 	return eqos_wait(MAC_MDIO_ADDR, MDIO_GB, 10);
 }
 
 static int eqos_mdio_read(struct mii_dev *bus, int addr, int devad, int reg)
 {
-	if (eqos_mdio(addr, reg, MDIO_GOC_READ))
+	struct nvt_eqos *eqos = bus->priv;
+
+	if (eqos_mdio(eqos, addr, reg, MDIO_GOC_READ))
 		return -ETIMEDOUT;
 	return readl(MAC_MDIO_DATA) & 0xffff;
 }
@@ -184,12 +204,15 @@ static int eqos_mdio_read(struct mii_dev *bus, int addr, int devad, int reg)
 static int eqos_mdio_write(struct mii_dev *bus, int addr, int devad, int reg,
 			   u16 val)
 {
+	struct nvt_eqos *eqos = bus->priv;
+
 	writel(val, MAC_MDIO_DATA);
-	return eqos_mdio(addr, reg, MDIO_GOC_WRITE);
+	return eqos_mdio(eqos, addr, reg, MDIO_GOC_WRITE);
 }
 
 static int eqos_write_hwaddr(struct eth_device *dev)
 {
+	struct nvt_eqos *eqos = dev->priv;
 	const u8 *a = dev->enetaddr;
 
 	writel(a[4] | a[5] << 8, MAC_ADDR0_HI);
@@ -199,18 +222,21 @@ static int eqos_write_hwaddr(struct eth_device *dev)
 
 static int eqos_start(struct eth_device *dev, struct bd_info *bis)
 {
+	struct nvt_eqos *eqos = dev->priv;
+	struct eqos_desc *tx_descs = eqos->tx_descs;
+	struct eqos_desc *rx_descs = eqos->rx_descs;
 	struct phy_device *phy;
 	u32 cfg, hwf1;
 	int i, ret;
 
-	if (!eqos.phy) {
-		phy = phy_connect(eqos.mii, -1, dev, eqos.intf);
+	if (!eqos->phy) {
+		phy = phy_connect(eqos->mii, -1, dev, eqos->intf);
 		if (!phy)
 			return -ENODEV;
 		phy_config(phy);
-		eqos.phy = phy;
+		eqos->phy = phy;
 	}
-	phy = eqos.phy;
+	phy = eqos->phy;
 	ret = phy_startup(phy);
 	if (ret)
 		return ret;
@@ -247,23 +273,30 @@ static int eqos_start(struct eth_device *dev, struct bd_info *bis)
 	writel(RXQ0_EN, MAC_RXQ_CTRL0);
 	eqos_write_hwaddr(dev);
 
-	/* Bursts of 16 x 8 beats, as the vendor driver */
-	writel(CH_PBLX8 | CH_DSL((ARCH_DMA_MINALIGN - 16) / 8), DMA_CH_CTRL);
+	/*
+	 * Bursts of 16 x 8 beats, as the vendor drivers; the NT9852x and
+	 * NS02501 ones also let the AXI master idle into low power (AALE).
+	 */
+	writel(CH_PBLX8 | CH_DSL((DESC_SIZE - 16) / 8), DMA_CH_CTRL);
 	writel(CH_PBL(16) | CH_TX_OSP, DMA_CH_TX_CTRL);
 	writel(CH_PBL(16) | CH_RBSZ(PKT_SIZE), DMA_CH_RX_CTRL);
-	writel(SYSBUS_RD_OSR_LMT(2), DMA_SYSBUS_MODE);
+	/* The NT9852x vendor driver also sets AALE */
+	writel(SYSBUS_RD_OSR_LMT(2) |
+	       (IS_ENABLED(CONFIG_NVT_NA51055) ||
+		IS_ENABLED(CONFIG_NVT_NS02501) ? SYSBUS_AALE : 0),
+	       DMA_SYSBUS_MODE);
 
-	memset(tx_descs, 0, sizeof(tx_descs));
-	memset(rx_descs, 0, sizeof(rx_descs));
+	memset(tx_descs, 0, sizeof(eqos->tx_descs));
+	memset(rx_descs, 0, sizeof(eqos->rx_descs));
 	for (i = 0; i < RX_DESCS; i++) {
-		rx_descs[i].des0 = (ulong)rx_bufs[i];
+		rx_descs[i].des0 = (ulong)eqos->rx_bufs[i];
 		rx_descs[i].des3 = DES3_OWN | DES3_BUF1V;
 	}
-	eqos_flush(tx_descs, sizeof(tx_descs));
-	eqos_flush(rx_descs, sizeof(rx_descs));
-	eqos_inval(rx_bufs, sizeof(rx_bufs));
-	eqos.tx_idx = 0;
-	eqos.rx_idx = 0;
+	eqos_flush(tx_descs, sizeof(eqos->tx_descs));
+	eqos_flush(rx_descs, sizeof(eqos->rx_descs));
+	eqos_inval(eqos->rx_bufs, sizeof(eqos->rx_bufs));
+	eqos->tx_idx = 0;
+	eqos->rx_idx = 0;
 	writel((ulong)tx_descs, DMA_CH_TXDESC_LIST);
 	writel(TX_DESCS - 1, DMA_CH_TXDESC_RING_LEN);
 	writel((ulong)rx_descs, DMA_CH_RXDESC_LIST);
@@ -282,6 +315,8 @@ static int eqos_start(struct eth_device *dev, struct bd_info *bis)
 
 static void eqos_halt(struct eth_device *dev)
 {
+	struct nvt_eqos *eqos = dev->priv;
+
 	/* Let what is queued go out, and what came in drain */
 	clrbits_le32(DMA_CH_TX_CTRL, CH_ST_SR);
 	eqos_wait(MTL_TXQ0_DEBUG, TXQ_BUSY, 10);
@@ -292,21 +327,22 @@ static void eqos_halt(struct eth_device *dev)
 
 static int eqos_send(struct eth_device *dev, void *packet, int len)
 {
-	struct eqos_desc *d = &tx_descs[eqos.tx_idx];
+	struct nvt_eqos *eqos = dev->priv;
+	struct eqos_desc *d = &eqos->tx_descs[eqos->tx_idx];
 	ulong start;
 
-	memcpy(tx_buf, packet, len);
-	eqos_flush(tx_buf, ALIGN(len, ARCH_DMA_MINALIGN));
+	memcpy(eqos->tx_buf, packet, len);
+	eqos_flush(eqos->tx_buf, ALIGN(len, ARCH_DMA_MINALIGN));
 
-	d->des0 = (ulong)tx_buf;
+	d->des0 = (ulong)eqos->tx_buf;
 	d->des1 = 0;
 	d->des2 = len;
 	mb();
 	d->des3 = DES3_OWN | DES3_FD | DES3_LD | len;
 	eqos_flush(d, sizeof(*d));
 
-	eqos.tx_idx = (eqos.tx_idx + 1) % TX_DESCS;
-	writel((ulong)&tx_descs[eqos.tx_idx], DMA_CH_TXDESC_TAIL);
+	eqos->tx_idx = (eqos->tx_idx + 1) % TX_DESCS;
+	writel((ulong)&eqos->tx_descs[eqos->tx_idx], DMA_CH_TXDESC_TAIL);
 
 	/* The buffer is reused: wait for the DMA to have read it */
 	start = get_timer(0);
@@ -321,8 +357,9 @@ static int eqos_send(struct eth_device *dev, void *packet, int len)
 
 static int eqos_recv(struct eth_device *dev)
 {
-	struct eqos_desc *d = &rx_descs[eqos.rx_idx];
-	u8 *buf = rx_bufs[eqos.rx_idx];
+	struct nvt_eqos *eqos = dev->priv;
+	struct eqos_desc *d = &eqos->rx_descs[eqos->rx_idx];
+	u8 *buf = eqos->rx_bufs[eqos->rx_idx];
 	u32 des3;
 	int len;
 
@@ -346,34 +383,44 @@ static int eqos_recv(struct eth_device *dev)
 	d->des3 = DES3_OWN | DES3_BUF1V;
 	eqos_flush(d, sizeof(*d));
 	writel((ulong)d, DMA_CH_RXDESC_TAIL);
-	eqos.rx_idx = (eqos.rx_idx + 1) % RX_DESCS;
+	eqos->rx_idx = (eqos->rx_idx + 1) % RX_DESCS;
 	return len;
 }
 
 /*
- * Register the MAC; the board has its clocks running, the pins muxed and
- * the PHY powered, @intf says which PHY that is.
+ * Register the MAC at @base as @name; the board has its clocks running,
+ * the pins muxed and the PHY powered, @intf says which PHY that is, @cr
+ * is the MDC divider for the CSR clock (MAC_MDIO_ADDR CR).
  */
-int nvt_eqos_initialize(phy_interface_t intf)
+int nvt_eqos_register(const char *name, ulong base, phy_interface_t intf,
+		      u32 cr)
 {
-	struct eth_device *dev = &eqos.dev;
+	struct nvt_eqos *eqos;
+	struct eth_device *dev;
 	struct mii_dev *mii;
 
-	eqos.intf = intf;
-	eqos.cr = mdio_cr[(readl(NVT_CG_SYSCLK) >> 8) & 3];
+	if (eqos_count >= NVT_EQOS_MAX)
+		return -ENOSPC;
+	eqos = &eqos_devs[eqos_count++];
+	dev = &eqos->dev;
+	eqos->base = base;
+	eqos->intf = intf;
+	eqos->cr = cr;
 
 	mii = mdio_alloc();
 	if (!mii)
 		return -ENOMEM;
-	strcpy(mii->name, "eqos");
+	strlcpy(mii->name, name, sizeof(mii->name));
 	mii->read = eqos_mdio_read;
 	mii->write = eqos_mdio_write;
+	mii->priv = eqos;
 	if (mdio_register(mii))
 		return -EIO;
-	eqos.mii = mii;
+	eqos->mii = mii;
 
-	strcpy(dev->name, "eqos");
-	dev->iobase = NVT_ETH_BASE;
+	strlcpy(dev->name, name, sizeof(dev->name));
+	dev->iobase = base;
+	dev->priv = eqos;
 	dev->init = eqos_start;
 	dev->halt = eqos_halt;
 	dev->send = eqos_send;
@@ -381,3 +428,23 @@ int nvt_eqos_initialize(phy_interface_t intf)
 	dev->write_hwaddr = eqos_write_hwaddr;
 	return eth_register(dev);
 }
+
+#ifndef CONFIG_NVT_NA51068
+#ifndef NVT_ETH_MDIO_CR
+/* What the CSR clock (CG+0x10 [9:8]) is, as an MDC divider (CR) */
+#define NVT_CG_SYSCLK		(NVT_CG_BASE + 0x10)
+static const u8 mdio_cr[4] = {
+	3,	/* 48 MHz: CR 35-60 MHz, /26 */
+	0,	/* 60 MHz: CR 60-100 MHz, /42 */
+	0,	/* 80 MHz */
+	1,	/* 120 MHz: CR 100-150 MHz, /62 */
+};
+#define NVT_ETH_MDIO_CR		mdio_cr[(readl(NVT_CG_SYSCLK) >> 8) & 3]
+#endif
+
+/* The one MAC of the other dies */
+int nvt_eqos_initialize(phy_interface_t intf)
+{
+	return nvt_eqos_register("eqos", NVT_ETH_BASE, intf, NVT_ETH_MDIO_CR);
+}
+#endif

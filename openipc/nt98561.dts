@@ -1,0 +1,16 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * NT98561: the NT98562's die and 64 MiB DDR2 package; the SDK's
+ * cfg_561_IPCAM1_EVB differs from cfg_562_IPCAM1_EVB in the firmware's
+ * name alone.
+ */
+/dts-v1/;
+
+/include/ "na51089.dtsi"
+
+/ {
+	nvt_info {
+		BIN_NAME = "FW98561A";
+		BIN_NAME_T = "FW98561T";
+	};
+};

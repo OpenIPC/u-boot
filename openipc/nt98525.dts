@@ -1,0 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * NT98525: the NA51055 tree as the SDK's cfg_IPCAM1_NOR_EVB has it, two
+ * external DDR3 dies of 512 MiB, the second the media pool's.
+ */
+/dts-v1/;
+
+/include/ "na51055.dtsi"

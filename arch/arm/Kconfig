@@ -824,13 +824,16 @@ config ARCH_K3
 	select FIT
 
 config ARCH_NOVATEK
-	bool "Novatek NA51089 IP camera SoCs"
-	select CPU_V7A
+	bool "Novatek IP camera and NVR SoCs"
+	select CPU_V7A if !ARM64
 	select CREATE_ARCH_SYMLINK
 	help
-	  Novatek's NT98562 and NT98566: one Cortex-A9 with DDR in the
-	  package. The mask ROM starts the vendor loader, which trains the
-	  DDR, loads U-Boot as its device tree describes and starts it.
+	  Novatek's NA51089 cameras (one Cortex-A9) and NA51103 / NA51090
+	  NVRs (Cortex-A53s, AArch64; the SoC selects ARM64). The mask ROM
+	  starts the vendor loader, which trains the DDR, loads U-Boot as
+	  its device tree describes and starts it, on the NVRs through the
+	  board's BL31.
+	  Also the NA51068 DVR/NVR die (NT98321, NT98323), two Cortex-A9s.
 
 config ARCH_OMAP2PLUS
 	bool "TI OMAP2+"
