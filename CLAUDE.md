@@ -137,8 +137,15 @@ offset 0:
   `openipc/<soc>-nand.dts` is the board's tree plus `openipc/nvt-nand.dtsi`
   (the partitions and nvtpack index in `/nand`, `/nor` disabled and
   emptied, `nvt_info` EMBMEM). `nvt-image.py --nand` writes both tree
-  copies and ends the image at U-Boot's last block (1 MiB); `${ubwrite}`
-  erases the 2816 KiB boot area and writes it at 0. The NT98525's NAND
+  copies and ends the image at U-Boot's last block (1 MiB). `${ubwrite}`
+  erases the 2816 KiB boot area and writes each part at its partition's
+  start, only as long as it is (loader block 0, each tree one block,
+  U-Boot its blocks): `nand write` skips a bad block, so every partition
+  keeps a spare one (`nvt-image.py` checks) and one bad block never moves
+  a part into the next partition. The loader skips it too: under qemu,
+  with block 0x40000 or 0xC0000 marked bad (an image with its OOB,
+  2112-byte pages), `run ub` and `reset` boot. It refuses an image of
+  0xC0000 bytes or less (a NOR one). The NT98525's NAND
   loader is 34.5 KiB with the SD card update: `STORAGEEXT=NONE`, as the
   528 model. U-Boot: `openipc/nand_config` after the SoC's fragment
   (`nvt_spinand.c`, UBI, UBIFS, an 8 MiB malloc), the NAND env in

@@ -23,6 +23,9 @@
 # (openipc/nvt-nand.dtsi): the loader at 0, the tree at 0x40000 and its
 # copy (fdt.restore) at 0x80000, U-Boot at 0xC0000. The image ends with
 # U-Boot's last block; its partition runs to the environment at 0x2C0000.
+# ${ubwrite} writes each part at its partition's start (a bad block is
+# skipped), so every part must leave its partition a spare block: the
+# loader and each tree one block of two, U-Boot all but one of sixteen.
 #
 # usage: nvt-image.py [--fdt-lzma] [--nand] LOADER DTB U-BOOT.BIN TEXT_BASE
 #                     OUTPUT
@@ -106,10 +109,11 @@ def main():
         dtb = bcl1_lzma(dtb, block)
 
     bcl = bcl1_lzma(headinfo(uboot, text_base), block)
-    for name, blob, room in (('loader', loader, fdt_off),
+    spare = block if nand else 0
+    for name, blob, room in (('loader', loader, fdt_off - spare),
                              ('device tree', dtb,
-                              (fdt2_off or uboot_off) - fdt_off),
-                             ('U-Boot', bcl, end - uboot_off)):
+                              (fdt2_off or uboot_off) - fdt_off - spare),
+                             ('U-Boot', bcl, end - uboot_off - spare)):
         if len(blob) > room:
             sys.exit('%s is %d bytes, %d too many' %
                      (name, len(blob), len(blob) - room))

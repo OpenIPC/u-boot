@@ -49,9 +49,26 @@
  * The NA51089 / NT9852x cameras on SPI NAND (openipc/nvt-nand.dtsi): the
  * loader 0, the tree 0x40000 and its copy 0x80000, U-Boot 0xC0000; the
  * environment at 0x2C0000, UBI from 0x300000. ${ubfile} is the boot
- * image from the loader on, as on NOR.
+ * image from the loader on, as on NOR, in that layout.
+ *
+ * nand write skips a bad block and goes on in the next one, so each part
+ * is written at its own partition's start, and only as long as it is:
+ * the loader its block 0 (the mask ROM's, which must be good), each tree
+ * one block, U-Boot its own blocks. Every partition keeps a spare block
+ * (openipc/nvt-image.py checks), so one bad block shifts a part inside
+ * its partition and never into the next one.
  */
-#define OPENIPC_UBWRITE			"nand erase 0x0 0x2c0000; nand write ${baseaddr} 0x0 ${filesize}"
+#define OPENIPC_UBWRITE \
+	"itest ${filesize} -gt 0xc0000 && " \
+	"nand erase 0x0 0x2c0000 && " \
+	"nand write ${baseaddr} 0x0 0x20000 && " \
+	"setexpr ubpart ${baseaddr} + 0x40000 && " \
+	"nand write ${ubpart} 0x40000 0x20000 && " \
+	"setexpr ubpart ${baseaddr} + 0x80000 && " \
+	"nand write ${ubpart} 0x80000 0x20000 && " \
+	"setexpr ubpart ${baseaddr} + 0xc0000 && " \
+	"setexpr ubsize ${filesize} - 0xc0000 && " \
+	"nand write ${ubpart} 0xc0000 ${ubsize}"
 #define OPENIPC_NAND_MTDPARTS		"2816k(boot),256k(env),-(ubi)"
 #define CONFIG_SYS_MAX_NAND_DEVICE	1
 #endif
