@@ -19,17 +19,21 @@
 # NS02501 trees (~95 KiB) do not fit their 64 KiB plain, and that loader
 # (board/novatek/ns02501/loader) unpacks one.
 #
-# usage: nvt-image.py [--fdt-lzma] LOADER DTB U-BOOT.BIN TEXT_BASE OUTPUT
+# With --nand the layout is the SPI NAND one, in 128 KiB blocks
+# (openipc/nvt-nand.dtsi): the loader at 0, the tree at 0x40000 and its
+# copy (fdt.restore) at 0x80000, U-Boot at 0xC0000. The image ends with
+# U-Boot's last block; its partition runs to the environment at 0x2C0000.
+#
+# usage: nvt-image.py [--fdt-lzma] [--nand] LOADER DTB U-BOOT.BIN TEXT_BASE
+#                     OUTPUT
 
 import lzma
 import struct
 import sys
 
-FDT_OFFSET = 0x10000
-UBOOT_OFFSET = 0x20000
-IMAGE_SIZE = 0x40000
-# The loader reads a partition in whole flash blocks
-FLASH_BLOCK = 0x10000
+# SPI NOR: (block, tree, tree copy, U-Boot, end of U-Boot's room)
+NOR = (0x10000, 0x10000, None, 0x20000, 0x40000)
+NAND = (0x20000, 0x40000, 0x80000, 0xC0000, 0x2C0000)
 
 HEADINFO = 0x300
 HI_CODE_ENTRY = HEADINFO + 0x00
@@ -60,7 +64,7 @@ def headinfo(uboot, text_base):
     return bytes(img)
 
 
-def bcl1_lzma(data):
+def bcl1_lzma(data, flash_block):
     """
     BCL1 container, as the SDK's bfc writes it: the FourCC, the checksum
     (u16 LE, over the whole container), the algorithm (u16 BE), the
@@ -74,8 +78,8 @@ def bcl1_lzma(data):
     struct.pack_into('<Q', packed, 5, len(data))
     # The loader reads the packed size, rounded up to whole flash blocks,
     # from the start of the container: the 16-byte header must fit too.
-    if len(packed) % FLASH_BLOCK == 0 or \
-            len(packed) % FLASH_BLOCK > FLASH_BLOCK - 16:
+    if len(packed) % flash_block == 0 or \
+            len(packed) % flash_block > flash_block - 16:
         packed += bytes(16)
     bcl = bytearray(b'BCL1' + struct.pack('>HHII', 0, BCL1_LZMA,
                                          len(data), len(packed)))
@@ -86,32 +90,39 @@ def bcl1_lzma(data):
 
 def main():
     args = sys.argv[1:]
-    fdt_lzma = args[:1] == ['--fdt-lzma']
-    if fdt_lzma:
-        args = args[1:]
+    fdt_lzma = '--fdt-lzma' in args
+    nand = '--nand' in args
+    args = [a for a in args if a not in ('--fdt-lzma', '--nand')]
     if len(args) != 5:
-        sys.exit(__doc__ or 'usage: nvt-image.py [--fdt-lzma] LOADER DTB '
+        sys.exit('usage: nvt-image.py [--fdt-lzma] [--nand] LOADER DTB '
                  'U-BOOT.BIN TEXT_BASE OUTPUT')
+    block, fdt_off, fdt2_off, uboot_off, end = NAND if nand else NOR
     loader = open(args[0], 'rb').read()
     dtb = open(args[1], 'rb').read()
     uboot = open(args[2], 'rb').read()
     text_base = int(args[3], 0)
     dtb_len = len(dtb)
     if fdt_lzma:
-        dtb = bcl1_lzma(dtb)
+        dtb = bcl1_lzma(dtb, block)
 
-    bcl = bcl1_lzma(headinfo(uboot, text_base))
-    for name, blob, room in (('loader', loader, FDT_OFFSET),
-                             ('device tree', dtb, UBOOT_OFFSET - FDT_OFFSET),
-                             ('U-Boot', bcl, IMAGE_SIZE - UBOOT_OFFSET)):
+    bcl = bcl1_lzma(headinfo(uboot, text_base), block)
+    for name, blob, room in (('loader', loader, fdt_off),
+                             ('device tree', dtb,
+                              (fdt2_off or uboot_off) - fdt_off),
+                             ('U-Boot', bcl, end - uboot_off)):
         if len(blob) > room:
             sys.exit('%s is %d bytes, %d too many' %
                      (name, len(blob), len(blob) - room))
 
-    img = bytearray(b'\xff' * IMAGE_SIZE)
+    size = end
+    if nand:
+        size = uboot_off + -(-len(bcl) // block) * block
+    img = bytearray(b'\xff' * size)
     img[0:len(loader)] = loader
-    img[FDT_OFFSET:FDT_OFFSET + len(dtb)] = dtb
-    img[UBOOT_OFFSET:UBOOT_OFFSET + len(bcl)] = bcl
+    img[fdt_off:fdt_off + len(dtb)] = dtb
+    if fdt2_off:
+        img[fdt2_off:fdt2_off + len(dtb)] = dtb
+    img[uboot_off:uboot_off + len(bcl)] = bcl
     open(args[4], 'wb').write(img)
     print('%s: loader %d, device tree %d%s, U-Boot %d packed (%d)' %
           (args[4], len(loader), len(dtb),

@@ -1,0 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
+/* NT98560 on SPI NAND: its tree with the NAND boot chain */
+/include/ "nt98560.dts"
+/include/ "nvt-nand.dtsi"

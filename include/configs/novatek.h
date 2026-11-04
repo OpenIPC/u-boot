@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Novatek NA51089, NA51055 / NA51084, NS02501, NA51068, NA51103, NA51090: memory
- * map, console and timer. The environment and the rest of the OpenIPC
+ * map, console, timer, and the SPI NAND layout. The environment and the rest of the OpenIPC
  * configuration come from openipc-common.h.
  */
 
@@ -42,6 +42,18 @@
  */
 #define OPENIPC_UBWRITE			"sf probe 0; sf erase 0x20000 0x20000; sf write ${baseaddr} 0x20000 ${filesize}"
 #endif
+#endif
+
+#if defined(CONFIG_ENV_IS_IN_NAND) && !defined(CONFIG_NVT_NA511XX)
+/*
+ * The NA51089 / NT9852x cameras on SPI NAND (openipc/nvt-nand.dtsi): the
+ * loader 0, the tree 0x40000 and its copy 0x80000, U-Boot 0xC0000; the
+ * environment at 0x2C0000, UBI from 0x300000. ${ubfile} is the boot
+ * image from the loader on, as on NOR.
+ */
+#define OPENIPC_UBWRITE			"nand erase 0x0 0x2c0000; nand write ${baseaddr} 0x0 ${filesize}"
+#define OPENIPC_NAND_MTDPARTS		"2816k(boot),256k(env),-(ubi)"
+#define CONFIG_SYS_MAX_NAND_DEVICE	1
 #endif
 
 #ifdef CONFIG_NVT_NA51068

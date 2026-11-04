@@ -56,35 +56,47 @@ build_loader() {
 # NS02501: the mask ROM starts the loader, which trains the DDR, reads the device tree at 0x10000 and
 # unpacks U-Boot from 0x20000 to its link address. The NS02501 trees are
 # packed too (nvt-image.py --fdt-lzma).
+# FLASH (env, default nor): nand for the SPI NAND image, u-boot-<soc>-nand.bin
+# (openipc/nand_config, openipc/<soc>-nand.dts, a loader with
+# STORAGEINT=NandSpi).
 #   build_nvt <soc> <loader die> <chip> [loader make variables...]
 build_nvt() {
     soc=$1
     die=$2
     chip=$3
     shift 3
-    builddir=${BOOT_SRCDIR}/output/build-${soc}-nor
-    loaderdir=${BOOT_SRCDIR}/output/build-${soc}-loader
+    flash=${FLASH:-nor}
+    builddir=${BOOT_SRCDIR}/output/build-${soc}-${flash}
+    loaderdir=${BOOT_SRCDIR}/output/build-${soc}-${flash}-loader
     # The binary is named after the part (LD98533A for CHIP 533QD)
     part=$(echo "${chip}" | cut -c1-3)
     loader=${loaderdir}/Project/Model/Loader${chip}_Data/Release/LD98${part}A.bin
     image_opts=
     [ "${die}" = ns02501 ] && image_opts=--fdt-lzma
     make_opts="-C ${BOOT_SRCDIR} O=${builddir} -j$(nproc)"
+    dts=openipc/${soc}.dts
+    configs="openipc/openipc_config openipc/${soc}_config"
+    if [ "${flash}" = nand ]; then
+        dts=openipc/${soc}-nand.dts
+        configs="${configs} openipc/nand_config"
+        image_opts="${image_opts} --nand"
+        set -- "$@" STORAGEINT=NandSpi
+    fi
 
     rm -rf "${builddir}"
-    mkconfig "${builddir}" openipc/openipc_config openipc/${soc}_config && \
+    mkconfig "${builddir}" ${configs} && \
     make ${make_opts} olddefconfig </dev/null >/dev/null && \
     make ${make_opts} </dev/null && \
     make ${make_opts} scripts_dtc </dev/null >/dev/null || return 1
 
     "${builddir}/scripts/dtc/dtc" -q -I dts -O dtb \
-        -o "${builddir}/${soc}.dtb" "openipc/${soc}.dts" || return 1
+        -o "${builddir}/${soc}.dtb" "${dts}" || return 1
     build_loader "${loaderdir}" "${die}" CHIP="${chip}" "$@" || return 1
 
     text=$(sed -n 's/^CONFIG_SYS_TEXT_BASE=//p' "${builddir}/.config")
     python3 openipc/nvt-image.py ${image_opts} "${loader}" \
         "${builddir}/${soc}.dtb" "${builddir}/u-boot.bin" "${text}" \
-        "output/u-boot-${soc}-nor.bin"
+        "output/u-boot-${soc}-${flash}.bin"
 }
 
 # Novatek NVR dies, AArch64: the board's loader and BL31 stay, the image
@@ -161,9 +173,12 @@ build_soc() {
         nt98522|nt98523)
             build_nvt "${soc}" na51055 "${soc#nt98}" DRAM2_CLK=0 \
                 SDRAM2_SIZE=0 ;;
+        # On SPI NAND its loader is 1.7 KiB past its 32 KiB with its SD
+        # card update, as the 528 model's with the LZMA decoder: without.
         nt98525)
             build_nvt "${soc}" na51055 525 DRAM1_CLK=933 SDRAM_SIZE=4096 \
-                DRAM2_CLK=933 SDRAM2_SIZE=4096 ;;
+                DRAM2_CLK=933 SDRAM2_SIZE=4096 \
+                ${FLASH:+$([ "${FLASH}" = nand ] && echo STORAGEEXT=NONE)} ;;
         nt98528|nt98529)
             # A Linux toolchain's build of the 528 flow stops after the
             # DDR training (arm-linux-gnueabi 12/13 under qemu-hisilicon's
@@ -209,14 +224,32 @@ build_soc() {
     esac
 }
 
+# The cameras that also boot from SPI NAND: <soc>-nand builds
+# u-boot-<soc>-nand.bin (the NT98633 is SPI NAND only, as nt98633)
+NAND_SOCS="nt98560 nt98562 nt98566 nt98525"
 ALL_SOCS="nt98560 nt98561 nt98562 nt98566 nt98520 nt98522 nt98523 nt98525 nt98528 nt98529 nt98532 nt98533 nt98321 nt98323 nt98332 nt98633"
+for soc in ${NAND_SOCS}; do
+    ALL_SOCS="${ALL_SOCS} ${soc}-nand"
+done
 
 SOCS="$@"
 [ -z "${SOCS}" ] && SOCS="${ALL_SOCS}"
 
 rc=0
-for soc in ${SOCS}; do
-    build_soc "${soc}" || { echo "build failed for ${soc}" >&2; rc=1; }
+for target in ${SOCS}; do
+    FLASH=
+    soc=${target}
+    case "${target}" in
+        *-nand)
+            soc=${target%-nand}
+            case " ${NAND_SOCS} " in
+                *" ${soc} "*) FLASH=nand ;;
+                *) echo "no SPI NAND build for ${soc}" >&2
+                   rc=1; continue ;;
+            esac ;;
+    esac
+    build_soc "${soc}" || { echo "build failed for ${target}" >&2; rc=1; }
 done
+FLASH=
 
 exit ${rc}
