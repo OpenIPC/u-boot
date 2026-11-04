@@ -14,8 +14,8 @@
  */
 
 / {
-	model = "Novatek NA51055";
-	compatible = "novatek,na51055", "nvt,ca9";
+	model = "Novatek NA51084";
+	compatible = "novatek,na51084", "novatek,na51055", "nvt,ca9";
 	interrupt-parent = <&gic>;
 	#address-cells = <0x01>;
 	#size-cells = <0x01>;
