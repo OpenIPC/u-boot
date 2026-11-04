@@ -127,6 +127,22 @@ offset 0:
   packed size, rounded up to whole flash blocks, from the start of the
   container: `nvt-image.py` pads the stream when the 16-byte header would
   push its end past that.
+- **SPI NAND** (`<soc>-nand`: NT98560/562/566, NT98525). The SDKs' NAND
+  boards' layout, 128 KiB blocks: loader `0x0`, tree `0x40000`, its copy
+  (`fdt.restore`) `0x80000`, U-Boot `0xC0000` (a 2 MiB partition),
+  environment `0x2C0000` (two blocks for one bad), UBI from `0x300000`:
+  `spi_nand.0:2816k(boot),256k(env),-(ubi)`. The loader is built with
+  `STORAGEINT=NandSpi` (the libraries' `STRGINT_NandSpi.a`) and reads the
+  tree from block 2 and its partitions from `/nand`:
+  `openipc/<soc>-nand.dts` is the board's tree plus `openipc/nvt-nand.dtsi`
+  (the partitions and nvtpack index in `/nand`, `/nor` disabled and
+  emptied, `nvt_info` EMBMEM). `nvt-image.py --nand` writes both tree
+  copies and ends the image at U-Boot's last block (1 MiB); `${ubwrite}`
+  erases the 2816 KiB boot area and writes it at 0. The NT98525's NAND
+  loader is 34.5 KiB with the SD card update: `STORAGEEXT=NONE`, as the
+  528 model. U-Boot: `openipc/nand_config` after the SoC's fragment
+  (`nvt_spinand.c`, UBI, UBIFS, an 8 MiB malloc), the NAND env in
+  `include/configs/openipc-common.h` and the offsets in `novatek.h`.
 - `CONFIG_SYS_TEXT_BASE` is `/nvt_memory_cfg/uboot`; the HEADINFO's
   CodeEntry is the same constant (`arch/arm/mach-novatek/soc.c`).
 - **The device tree** is a Xiongmai NT98562 camera's
@@ -195,10 +211,12 @@ offset 0:
 ```sh
 bash build.sh               # every SoC; continues past failures, exits non-zero if any failed
 bash build.sh nt98566       # one or more SoCs (CROSS_COMPILE defaults to arm-linux-gnueabi-)
+bash build.sh nt98566-nand  # the SPI NAND image (NAND_SOCS: nt98560 nt98562 nt98566 nt98525)
 ```
 
-- The output is `output/u-boot-<soc>-nor.bin`, built out of tree in
-  `output/build-<soc>-nor/` and `output/build-<soc>-loader/`.
+- The output is `output/u-boot-<soc>-nor.bin` (`-nand.bin`), built out of
+  tree in `output/build-<soc>-nor/` and `output/build-<soc>-nor-loader/`
+  (`-nand`, `-nand-loader`).
 - `.config` is `openipc/openipc_config`, then `openipc/<soc>_config`, then
   `olddefconfig`. There are no `configs/*_defconfig` for these targets.
 - The loader uses `LOADER_CROSS_COMPILE`: `arm-none-eabi-` if there is one,
@@ -223,7 +241,9 @@ container, SHMINFO, the jump. (Before, a stand-in did the loader's job
 without running it.)
 
 - **CI smoke:** two boots of an 8 MiB image holding only the image. The
-  second must load the environment the first saved.
+  second must load the environment the first saved. The `-nand` images
+  boot from a 128 MiB one (the machine's W25N01; its mask ROM model reads
+  the loader from NAND block 0).
 - **Checks run by hand** (all passed under qemu-hisilicon):
   - An 8 MiB image with `uImage` at 0x50000 and rootfs at 0x250000 from
     the OpenIPC/firmware `nt98562_lite` and `nt98566_lite` releases boots
@@ -240,6 +260,10 @@ without running it.)
     `failsafe`.
   - `dhcp`, `ping`, a 3 MB `tftpboot` with matching `crc32`; Linux's
     driver gets its own lease after U-Boot used the MAC.
+  - SPI NAND (each `-nand` image): `nand write/read` of 3 MB with a
+    matching `cmp`; `ubi part ubi`, `ubi create/write/read` of 2 MB;
+    `run ub` (the image from TFTP, `${ubwrite}`), then `reset` boots the
+    rewritten image through its loader and the volume is still there.
   - SD (`-drive if=sd,index=0,format=raw,file=<image>`): `mmc info`,
     `fatls`, `fatload` and `mmc read/write` against the host's CRCs;
     recovery of a changed kernel, and nothing rewritten with the same one.
