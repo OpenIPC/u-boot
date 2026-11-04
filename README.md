@@ -145,14 +145,14 @@ swapped back.
 
 | SoC | CPU | RAM | Flash | Notes |
 | --- | --- | --- | --- | --- |
-| `nt98560` | Cortex-A9 | 512 MiB DDR3, external | NOR | NA51089 |
+| `nt98560` | Cortex-A9 | 512 MiB DDR3, external | NOR, SPI NAND | NA51089 |
 | `nt98561` | Cortex-A9 | 64 MiB | NOR | NA51089 |
-| `nt98562` | Cortex-A9 | 64 MiB | NOR | NA51089 |
-| `nt98566` | Cortex-A9 | 128 MiB | NOR | NA51089 |
+| `nt98562` | Cortex-A9 | 64 MiB | NOR, SPI NAND | NA51089 |
+| `nt98566` | Cortex-A9 | 128 MiB | NOR, SPI NAND | NA51089 |
 | `nt98520` | 2x Cortex-A9 | 512 MiB DDR3, external | NOR | NA51055 |
 | `nt98522` | 2x Cortex-A9 | 64 MiB | NOR | NA51055 |
 | `nt98523` | 2x Cortex-A9 | 128 MiB | NOR | NA51055 |
-| `nt98525` | 2x Cortex-A9 | 2x 512 MiB DDR3, external | NOR | NA51055 |
+| `nt98525` | 2x Cortex-A9 | 2x 512 MiB DDR3, external | NOR, SPI NAND | NA51055 |
 | `nt98528` | 2x Cortex-A9 | 2x 512 MiB DDR3, external | NOR | NA51084 |
 | `nt98529` | 2x Cortex-A9 | 2x 512 MiB DDR3, external | NOR | NA51084, 1.2 GHz |
 | `nt98532` | 2x Cortex-A32 | 256 MiB | NOR | NS02501 (532BD package) |
@@ -165,6 +165,13 @@ swapped back.
 - **Cameras.** The image contains Novatek's loader, built from SDK source.
   It sits at offset 0, the device tree at `0x10000` and U-Boot (LZMA) at
   `0x20000`, in the 256 KiB boot partition.
+- **Cameras on SPI NAND** (NT98560/562/566, NT98525: `u-boot-<soc>-nand.bin`).
+  The SDKs' NAND layout in 128 KiB blocks: loader at 0, device tree at
+  `0x40000` and its copy at `0x80000`, U-Boot at `0xC0000`, the
+  environment at `0x2C0000`, UBI from `0x300000`
+  (`spi_nand.0:2816k(boot),256k(env),-(ubi)`). The NT98525's NAND loader
+  leaves out its own SD card update to fit 32 KiB; U-Boot's SD recovery
+  stays.
 - **External DDR.** Where the DDR is not in the package (NT98560,
   NT98520, NT98525, NT98528/529, NT98321/323), the loader is built for the
   SDK board's DDR: 4 Gbit DDR3 dies at 933 MHz (1066 MHz on NT98528/529

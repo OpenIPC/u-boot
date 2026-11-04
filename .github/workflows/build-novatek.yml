@@ -61,8 +61,10 @@ jobs:
       matrix:
         # image: the file released; limit_kb: the slot it is written to
         # (the camera dies' whole 256 KiB boot partition, loader and device
-        # tree included; on the NVRs U-Boot's slot in the board's own
-        # layout, behind the board's loader and BL31).
+        # tree included; on SPI NAND their 2816 KiB boot area before the
+        # environment; on the NVRs U-Boot's slot in the board's own
+        # layout, behind the board's loader and BL31). target: what
+        # build.sh is asked for, when not the SoC (<soc>-nand).
         include:
           - { soc: nt98560, image: nor, limit_kb: 256 }
           - { soc: nt98561, image: nor, limit_kb: 256 }
@@ -80,6 +82,10 @@ jobs:
           - { soc: nt98323, image: nor, limit_kb: 256 }
           - { soc: nt98332, image: nor, limit_kb: 128 }
           - { soc: nt98633, image: nand, limit_kb: 896 }
+          - { soc: nt98560, target: nt98560-nand, image: nand, limit_kb: 2816 }
+          - { soc: nt98562, target: nt98562-nand, image: nand, limit_kb: 2816 }
+          - { soc: nt98566, target: nt98566-nand, image: nand, limit_kb: 2816 }
+          - { soc: nt98525, target: nt98525-nand, image: nand, limit_kb: 2816 }
 
     steps:
       - name: Checkout
@@ -110,8 +116,8 @@ jobs:
             sleep $((i*10))
           done
 
-      - name: Build ${{ matrix.soc }}
-        run: bash build.sh ${{ matrix.soc }}
+      - name: Build ${{ matrix.target || matrix.soc }}
+        run: bash build.sh ${{ matrix.target || matrix.soc }}
 
       - name: Check partition fit
         run: |
@@ -131,7 +137,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: u-boot-${{ matrix.soc }}
+          name: u-boot-${{ matrix.target || matrix.soc }}
           path: output/u-boot-${{ matrix.soc }}-${{ matrix.image }}.bin
           if-no-files-found: error
 
@@ -140,7 +146,7 @@ jobs:
       # emulator's stand-in loader starts, for the smoke test only (never
       # released: its artifact name is outside the release's u-boot-*).
       - name: Upload the emulator image
-        if: ${{ hashFiles(format('output/u-boot-{0}-qemu.bin', matrix.soc)) != '' }}
+        if: ${{ !matrix.target && hashFiles(format('output/u-boot-{0}-qemu.bin', matrix.soc)) != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: qemu-image-${{ matrix.soc }}
@@ -214,6 +220,12 @@ jobs:
           - { soc: nt98323, machine: nt98323, qemu: arm, artifact: u-boot-nt98323, file: u-boot-nt98323-nor.bin, mib: 8, args: "" }
           - { soc: nt98332, machine: nt98332, qemu: aarch64, artifact: qemu-image-nt98332, file: u-boot-nt98332-qemu.bin, mib: 16, args: "-smp 2" }
           - { soc: nt98633, machine: nt98633, qemu: aarch64, artifact: qemu-image-nt98633, file: u-boot-nt98633-qemu.bin, mib: 128, args: "-smp 4" }
+          # SPI NAND: a 128 MiB image is a W25N01 to the machine, and its
+          # mask ROM model runs the image's NandSpi loader from block 0
+          - { soc: nt98560-nand, machine: nt98560, qemu: arm, artifact: u-boot-nt98560-nand, file: u-boot-nt98560-nand.bin, mib: 128, args: "" }
+          - { soc: nt98562-nand, machine: nt98562, qemu: arm, artifact: u-boot-nt98562-nand, file: u-boot-nt98562-nand.bin, mib: 128, args: "" }
+          - { soc: nt98566-nand, machine: nt98566, qemu: arm, artifact: u-boot-nt98566-nand, file: u-boot-nt98566-nand.bin, mib: 128, args: "" }
+          - { soc: nt98525-nand, machine: nt98525, qemu: arm, artifact: u-boot-nt98525-nand, file: u-boot-nt98525-nand.bin, mib: 128, args: "" }
     steps:
       - name: Download qemu
         uses: actions/download-artifact@v4
