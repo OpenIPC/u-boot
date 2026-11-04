@@ -1,0 +1,73 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * The SPI NAND boot chain of the NA51089 and NT9852x cameras, included
+ * after a board's tree (<soc>-nand.dts): the SDKs' NAND boards'
+ * (cfg_*_IPCAM1_EVB) fixed partitions, in 128 KiB blocks. The loader at
+ * 0 (the mask ROM reads it from block 0), this tree at 0x40000 and its
+ * copy at 0x80000, U-Boot at 0xC0000 (a 2 MiB partition, room for bad
+ * blocks), then OpenIPC's environment at 0x2C0000 (the SDK's uenv) and
+ * UBI after it (include/configs/novatek.h).
+ *
+ * A loader built with STORAGEINT=NandSpi looks its partitions up in the
+ * /nand node; the NOR one goes.
+ */
+
+&{/nor@f0400000} {
+	status = "disabled";
+	/delete-node/ partition_loader;
+	/delete-node/ partition_fdt;
+	/delete-node/ partition_uboot;
+	/delete-node/ nvtpack;
+};
+
+&{/nand@f0400000} {
+	partition_loader {
+		label = "loader";
+		reg = <0x00 0x00 0x00 0x40000>;
+	};
+
+	partition_fdt {
+		label = "fdt";
+		reg = <0x00 0x40000 0x00 0x40000>;
+	};
+
+	partition_fdt.restore {
+		label = "fdt.restore";
+		reg = <0x00 0x80000 0x00 0x40000>;
+	};
+
+	partition_uboot {
+		label = "uboot";
+		reg = <0x00 0xc0000 0x00 0x200000>;
+	};
+
+	/* The loader looks a partition up here by its label */
+	nvtpack {
+		ver = "NVTPACK_FW_INI_16072017";
+		method = <0x01>;
+
+		index {
+
+			id0 {
+				partition_name = "loader";
+			};
+
+			id1 {
+				partition_name = "fdt";
+			};
+
+			id2 {
+				partition_name = "fdt.restore";
+			};
+
+			id3 {
+				partition_name = "uboot";
+			};
+		};
+	};
+};
+
+&{/nvt_info} {
+	EMBMEM_BLK_SIZE = "0x20000";
+	EMBMEM = "EMBMEM_SPI_NAND";
+};

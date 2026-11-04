@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * SPI NAND behind the flash controller of the Novatek NA51090 (and
- * NA51103, NA51089: the same controller).
+ * SPI NAND behind the flash controller of the Novatek NA51090, NA51089
+ * and the NT9852x dies (NA51055 / NA51084): the same controller, its
+ * clock, reset, pins and PHY set up as each die's vendor U-Boot does.
  *
  * The controller is run as for SPI NOR (drivers/mtd/spi/nvt_sflash.c):
  * one operation at a time, a command with up to four address bytes, then
@@ -98,10 +99,25 @@
 #define NVT_PAD_FLASH_DRV	(NVT_PAD_BASE + 0x50)
 #define NVT_TOP_FLASH_EN	(NVT_TOP_BASE + 0x04)
 #define NVT_TOP_GPIO_C		(NVT_TOP_BASE + 0xA0)
-#endif
-#define NVT_FLASH_SRC_HZ	480000000
 /* The NT98633 NVR's tree: /nand clock-frequency 24 MHz */
 #define SNAND_HZ		24000000
+#define SNAND_MAX_HZ		80000000
+#else
+/* NA51089, NA51055: the controller's clock and reset in CLKEN0 / RSTN0 */
+#define NVT_TOP_FLASH_EN	(NVT_TOP_BASE + 0x04)
+#define TOP_FLASH_EN		BIT(13)
+#define NVT_TOP_GPIO_C		(NVT_TOP_BASE + 0xA0)	/* pads as GPIO */
+#define NVT_TOP_SRAM_SD		(NVT_TOP_BASE + 0x1000)	/* SRAM shut down */
+#define TOP_SRAM_SD_FLASH	BIT(17)
+#define NVT_PAD_FLASH_DRV	(NVT_PAD_BASE + 0x40)
+#define NVT_CG_FLASH_DIV	(NVT_CG_BASE + 0x40)	/* [17:12] */
+#define CG_FLASH_DIV_SHIFT	12
+/* The camera SDKs' trees: /nand clock-frequency 40 MHz */
+#define SNAND_HZ		40000000
+/* Past 96 MHz NA51055 wants another sampling clock and delay */
+#define SNAND_MAX_HZ		96000000
+#endif
+#define NVT_FLASH_SRC_HZ	480000000
 
 /* SPI NAND commands */
 #define SN_RESET		0xFF
@@ -561,6 +577,7 @@ static u32 sn_fdt_u32(const char *path, const char *prop, u32 def)
 	return val ? fdt32_to_cpu(*val) : def;
 }
 
+#ifdef CONFIG_NVT_NA511XX
 /*
  * Clock, reset, pins and PHY, as the vendor's spinand.c drv_nand_reset()
  * and nand_phy_config() do on NA51090, at the tree's clock
@@ -570,7 +587,7 @@ static void sn_hw_init(void)
 	u32 hz = sn_fdt_u32("/nand", "clock-frequency", SNAND_HZ);
 	u32 pins = 3, drv;
 
-	hz = clamp_t(u32, hz, NVT_FLASH_SRC_HZ / 64, 80000000);
+	hz = clamp_t(u32, hz, NVT_FLASH_SRC_HZ / 64, SNAND_MAX_HZ);
 	setbits_le32(NVT_CG_FLASH_CLKEN, CG_FLASH_CLKEN);
 	setbits_le32(NVT_CG_FLASH_RSTN, CG_FLASH_RSTN);
 	writel(0x06002222, FL_TIME0);
@@ -596,6 +613,47 @@ static void sn_hw_init(void)
 	clrsetbits_le32(FL_SPI_CFG, CFG_BUS_WIDTH_MASK | CFG_CS_SEL,
 			CFG_PULL_WPHLD);
 }
+#else
+/*
+ * NA51089 and NA51055, as their vendor U-Boot's spinand.c
+ * drv_nand_reset() ("52x, 560") and nand_phy_config() do: the pins in
+ * TOP+0x04 bit 13 and off GPIO, the controller's SRAM on, the pads'
+ * drive, and the sampling delay NA51089 wants (NA51055: none up to
+ * 96 MHz)
+ */
+static void sn_hw_init(void)
+{
+	u32 hz = sn_fdt_u32("/nand", "clock-frequency", SNAND_HZ);
+
+	hz = clamp_t(u32, hz, NVT_FLASH_SRC_HZ / 64, SNAND_MAX_HZ);
+	setbits_le32(NVT_CG_CLKEN0, NVT_CG_FLASH);
+	setbits_le32(NVT_CG_RSTN0, NVT_CG_FLASH);
+	writel(0x06002222, FL_TIME0);
+	writel(0x7f0f, FL_TIME1);
+	setbits_le32(NVT_TOP_FLASH_EN, TOP_FLASH_EN);
+	clrbits_le32(NVT_TOP_GPIO_C, 0x50f);
+	clrsetbits_le32(NVT_CG_FLASH_DIV, 0x3f << CG_FLASH_DIV_SHIFT,
+			(NVT_FLASH_SRC_HZ / hz - 1) << CG_FLASH_DIV_SHIFT);
+	clrbits_le32(NVT_TOP_SRAM_SD, TOP_SRAM_SD_FLASH);
+	clrsetbits_le32(NVT_PAD_FLASH_DRV, 0x3f00ff, 0x150055);
+	setbits_le32(FL_MODULE0, MOD_NOR);
+	writel(0x9f51, FL_TIME2);
+
+	if (IS_ENABLED(CONFIG_NVT_NA51055)) {
+		clrsetbits_le32(FL_DLL1, DLL1_SRC_CLK_SEL, DLL1_SAMPCLK_INV);
+		clrbits_le32(FL_DLL2, DLL2_INDLY_MASK);
+	} else {
+		clrsetbits_le32(FL_DLL1, DLL1_SRC_CLK_SEL,
+				DLL1_SAMPCLK_INV | DLL1_PAD_CLK_SEL);
+		clrsetbits_le32(FL_DLL2, DLL2_INDLY_MASK, DLL2_INDLY(5));
+	}
+	setbits_le32(FL_DLL1, DLL1_SW_RESET);
+	while (readl(FL_DLL1) & DLL1_SW_RESET)
+		;
+	clrsetbits_le32(FL_SPI_CFG, CFG_BUS_WIDTH_MASK | CFG_CS_SEL,
+			CFG_PULL_WPHLD);
+}
+#endif
 
 void board_nand_init(void)
 {

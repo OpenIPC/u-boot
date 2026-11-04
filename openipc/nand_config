@@ -1,0 +1,26 @@
+# SPI NAND instead of SPI NOR, for the NA51089 and NT9852x cameras
+# (build.sh appends it after the SoC's fragment for <soc>-nand): the
+# loader, tree and U-Boot in the first 2.75 MiB (openipc/nvt-nand.dtsi),
+# the environment at 0x2C0000 (two blocks, for one bad), UBI after it
+# (include/configs/novatek.h)
+# CONFIG_NVT_SFLASH is not set
+# CONFIG_CMD_SF is not set
+# CONFIG_ENV_IS_IN_SPI_FLASH is not set
+CONFIG_MTD=y
+CONFIG_MTD_RAW_NAND=y
+CONFIG_NAND_NVT_SPI=y
+CONFIG_CMD_NAND=y
+CONFIG_CMD_NAND_TRIMFFS=y
+CONFIG_ENV_IS_IN_NAND=y
+CONFIG_ENV_OFFSET=0x2C0000
+CONFIG_ENV_SIZE=0x20000
+CONFIG_ENV_RANGE=0x40000
+CONFIG_MTD_PARTITIONS=y
+CONFIG_CMD_MTDPARTS=y
+CONFIG_CMD_UBI=y
+CONFIG_CMD_UBIFS=y
+CONFIG_MTD_UBI=y
+# CONFIG_MTD_UBI_FASTMAP is not set
+CONFIG_LZO=y
+# UBI's attach and UBIFS's mount want more than the NOR builds' 4 MiB
+CONFIG_SYS_MALLOC_LEN=0x800000
