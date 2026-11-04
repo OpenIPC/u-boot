@@ -59,9 +59,27 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # image: the file released; limit_kb: the slot it is written to
+        # (the camera dies' whole 256 KiB boot partition, loader and device
+        # tree included; on the NVRs U-Boot's slot in the board's own
+        # layout, behind the board's loader and BL31).
         include:
-          - { soc: nt98562, files: "output/u-boot-nt98562-*.bin" }
-          - { soc: nt98566, files: "output/u-boot-nt98566-*.bin" }
+          - { soc: nt98560, image: nor, limit_kb: 256 }
+          - { soc: nt98561, image: nor, limit_kb: 256 }
+          - { soc: nt98562, image: nor, limit_kb: 256 }
+          - { soc: nt98566, image: nor, limit_kb: 256 }
+          - { soc: nt98520, image: nor, limit_kb: 256 }
+          - { soc: nt98522, image: nor, limit_kb: 256 }
+          - { soc: nt98523, image: nor, limit_kb: 256 }
+          - { soc: nt98525, image: nor, limit_kb: 256 }
+          - { soc: nt98528, image: nor, limit_kb: 256 }
+          - { soc: nt98529, image: nor, limit_kb: 256 }
+          - { soc: nt98532, image: nor, limit_kb: 256 }
+          - { soc: nt98533, image: nor, limit_kb: 256 }
+          - { soc: nt98321, image: nor, limit_kb: 256 }
+          - { soc: nt98323, image: nor, limit_kb: 256 }
+          - { soc: nt98332, image: nor, limit_kb: 128 }
+          - { soc: nt98633, image: nand, limit_kb: 896 }
 
     steps:
       - name: Checkout
@@ -82,7 +100,7 @@ jobs:
             sudo timeout 180 apt-get update && \
             sudo timeout 240 apt-get install -y --no-install-recommends \
               build-essential gcc-arm-linux-gnueabi gcc-arm-none-eabi \
-              device-tree-compiler \
+              gcc-aarch64-linux-gnu device-tree-compiler \
               bison flex bc libssl-dev python3
           }
           for i in 1 2 3 4; do
@@ -97,41 +115,36 @@ jobs:
 
       - name: Check partition fit
         run: |
-          # The boot partition from this tree's mtdparts: NOR boot = 256 KiB
-          # (env at 0x40000). An image larger than it overflows into env and
-          # bricks the device on upgrade. The image includes the loader
-          # and the device tree it reads.
-          soc='${{ matrix.soc }}'
-          rc=0
-          check_kind() {
-            kind=$1
-            limit_kb=$2
-            pattern=$3
-            found=0
-            for f in $pattern; do
-              [ -f "$f" ] || continue
-              found=1
-              # Compare bytes: rounding down to KiB would pass an image up
-              # to 1023 bytes into the environment.
-              size=$(stat -c %s "$f")
-              limit=$((limit_kb * 1024))
-              echo "- $f: [${size}/${limit} bytes]"
-              if [ "$size" -gt "$limit" ]; then
-                echo "-- size exceeded by: $((size - limit)) bytes" >&2
-                rc=1
-              fi
-            done
-            [ "$found" = 1 ] || { echo "missing ${kind} image for ${soc} (${pattern})" >&2; rc=1; }
-          }
-          check_kind nor 256 "output/*${soc}*-nor.bin"
-          exit $rc
+          # An image larger than its slot overflows into what follows (the
+          # environment) and bricks the device on upgrade. Compare bytes:
+          # rounding down to KiB would pass an image up to 1023 bytes over.
+          f='output/u-boot-${{ matrix.soc }}-${{ matrix.image }}.bin'
+          test -f "$f" || { echo "missing $f" >&2; exit 1; }
+          size=$(stat -c %s "$f")
+          limit=$(( ${{ matrix.limit_kb }} * 1024 ))
+          echo "- $f: [${size}/${limit} bytes]"
+          if [ "$size" -gt "$limit" ]; then
+            echo "-- size exceeded by: $((size - limit)) bytes" >&2
+            exit 1
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: u-boot-${{ matrix.soc }}
-          path: ${{ matrix.files }}
+          path: output/u-boot-${{ matrix.soc }}-${{ matrix.image }}.bin
           if-no-files-found: error
+
+      # The NVR images are U-Boot's slot alone and need the board's own
+      # loader and BL31 around them; build.sh also writes a boot area the
+      # emulator's stand-in loader starts, for the smoke test only (never
+      # released: its artifact name is outside the release's u-boot-*).
+      - name: Upload the emulator image
+        if: ${{ hashFiles(format('output/u-boot-{0}-qemu.bin', matrix.soc)) != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: qemu-image-${{ matrix.soc }}
+          path: output/u-boot-${{ matrix.soc }}-qemu.bin
 
   # Build qemu-system-arm once and share it with every smoke leg.
   qemu:
@@ -146,20 +159,23 @@ jobs:
             libglib2.0-dev libpixman-1-dev libfdt-dev zlib1g-dev \
             libslirp-dev python3 python3-venv
 
-      - name: Build qemu-system-arm
+      - name: Build qemu-system-arm and qemu-system-aarch64
         run: |
           git clone --depth 1 --branch master \
-            https://github.com/widgetii/qemu-hisilicon qemu-hisilicon
+            https://github.com/OpenIPC/qemu-hisilicon qemu-hisilicon
           cd qemu-hisilicon
           bash qemu/setup.sh
           cp qemu-src/build/qemu-system-arm "$GITHUB_WORKSPACE/qemu-arm"
-          chmod +x "$GITHUB_WORKSPACE/qemu-arm"
+          cp qemu-src/build/qemu-system-aarch64 "$GITHUB_WORKSPACE/qemu-aarch64"
+          chmod +x "$GITHUB_WORKSPACE"/qemu-arm "$GITHUB_WORKSPACE"/qemu-aarch64
 
-      - name: Upload qemu-arm
+      - name: Upload qemu
         uses: actions/upload-artifact@v4
         with:
           name: qemu-arm
-          path: qemu-arm
+          path: |
+            qemu-arm
+            qemu-aarch64
 
   # QEMU smoke test -- boots each freshly-built image from flash through
   # qemu-hisilicon's nt98562/nt98566 machines, which do the loader's job
@@ -177,28 +193,49 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        soc: [nt98562, nt98566]
+        # machine: the qemu-hisilicon machine (the NT98520 and NT98522
+        # have none: they run on the NT98525's and NT98523's, the same
+        # dies); qemu: arm or aarch64; artifact/file: the image; mib: the
+        # flash it sits at the start of; args: extra qemu arguments.
+        include:
+          - { soc: nt98560, machine: nt98560, qemu: arm, artifact: u-boot-nt98560, file: u-boot-nt98560-nor.bin, mib: 8, args: "" }
+          - { soc: nt98561, machine: nt98561, qemu: arm, artifact: u-boot-nt98561, file: u-boot-nt98561-nor.bin, mib: 8, args: "" }
+          - { soc: nt98562, machine: nt98562, qemu: arm, artifact: u-boot-nt98562, file: u-boot-nt98562-nor.bin, mib: 8, args: "" }
+          - { soc: nt98566, machine: nt98566, qemu: arm, artifact: u-boot-nt98566, file: u-boot-nt98566-nor.bin, mib: 8, args: "" }
+          - { soc: nt98520, machine: nt98525, qemu: arm, artifact: u-boot-nt98520, file: u-boot-nt98520-nor.bin, mib: 8, args: "" }
+          - { soc: nt98522, machine: nt98523, qemu: arm, artifact: u-boot-nt98522, file: u-boot-nt98522-nor.bin, mib: 8, args: "" }
+          - { soc: nt98523, machine: nt98523, qemu: arm, artifact: u-boot-nt98523, file: u-boot-nt98523-nor.bin, mib: 8, args: "" }
+          - { soc: nt98525, machine: nt98525, qemu: arm, artifact: u-boot-nt98525, file: u-boot-nt98525-nor.bin, mib: 8, args: "" }
+          - { soc: nt98528, machine: nt98528, qemu: arm, artifact: u-boot-nt98528, file: u-boot-nt98528-nor.bin, mib: 8, args: "" }
+          - { soc: nt98529, machine: nt98529, qemu: arm, artifact: u-boot-nt98529, file: u-boot-nt98529-nor.bin, mib: 8, args: "" }
+          - { soc: nt98532, machine: nt98532, qemu: arm, artifact: u-boot-nt98532, file: u-boot-nt98532-nor.bin, mib: 8, args: "" }
+          - { soc: nt98533, machine: nt98533, qemu: arm, artifact: u-boot-nt98533, file: u-boot-nt98533-nor.bin, mib: 8, args: "" }
+          - { soc: nt98321, machine: nt98321, qemu: arm, artifact: u-boot-nt98321, file: u-boot-nt98321-nor.bin, mib: 8, args: "" }
+          - { soc: nt98323, machine: nt98323, qemu: arm, artifact: u-boot-nt98323, file: u-boot-nt98323-nor.bin, mib: 8, args: "" }
+          - { soc: nt98332, machine: nt98332, qemu: aarch64, artifact: qemu-image-nt98332, file: u-boot-nt98332-qemu.bin, mib: 16, args: "-smp 2" }
+          - { soc: nt98633, machine: nt98633, qemu: aarch64, artifact: qemu-image-nt98633, file: u-boot-nt98633-qemu.bin, mib: 128, args: "-smp 4" }
     steps:
-      - name: Download qemu-arm
+      - name: Download qemu
         uses: actions/download-artifact@v4
         with:
           name: qemu-arm
 
-      - name: Download u-boot artifact
+      - name: Download the image
         uses: actions/download-artifact@v4
         with:
-          name: u-boot-${{ matrix.soc }}
+          name: ${{ matrix.artifact }}
 
       - name: Install QEMU runtime deps
         run: |
-          # qemu-arm is built once in the `qemu` job and downloaded here,
-          # so this leg needs the shared libraries it links against.
+          # qemu is built once in the `qemu` job and downloaded here, so
+          # this leg needs the shared libraries it links against.
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends \
             libglib2.0-0 libpixman-1-0 libfdt1 zlib1g libslirp0
-          if ldd ./qemu-arm | grep -qi 'not found'; then
-            echo "qemu-arm has unresolved libraries:" >&2
-            ldd ./qemu-arm >&2
+          chmod +x ./qemu-arm ./qemu-aarch64
+          if ldd ./qemu-${{ matrix.qemu }} | grep -qi 'not found'; then
+            echo "qemu-${{ matrix.qemu }} has unresolved libraries:" >&2
+            ldd ./qemu-${{ matrix.qemu }} >&2
             exit 1
           fi
 
@@ -206,24 +243,23 @@ jobs:
         timeout-minutes: 3
         run: |
           soc='${{ matrix.soc }}'
-          UBOOT="u-boot-${soc}-nor.bin"
+          UBOOT='${{ matrix.file }}'
           test -f "$UBOOT"
-          echo "booting $UBOOT"
-          # 8 MiB NOR, U-Boot at 0, the rest erased
-          python3 - "$UBOOT" /tmp/flash.bin <<'PY'
+          echo "booting $UBOOT on ${{ matrix.machine }}"
+          # The image at the start of the flash, the rest erased
+          python3 - "$UBOOT" /tmp/flash.bin ${{ matrix.mib }} <<'PY'
           import sys
-          img = bytearray(b'\xff' * (8 << 20))
+          img = bytearray(b'\xff' * (int(sys.argv[3]) << 20))
           u = open(sys.argv[1], 'rb').read()
           img[:len(u)] = u
           open(sys.argv[2], 'wb').write(img)
           PY
-          FLASH="-M ${soc},flash-file=/tmp/flash.bin"
-          chmod +x ./qemu-arm
+          FLASH="-M ${{ matrix.machine }},flash-file=/tmp/flash.bin ${{ matrix.args }}"
           # Two boots: the first finds an erased environment and saves the
           # default one; the second must load it back.
           for boot in 1 2; do
             mkfifo /tmp/uart.in /tmp/uart.out
-            ./qemu-arm $FLASH \
+            ./qemu-${{ matrix.qemu }} $FLASH \
               -nographic -serial pipe:/tmp/uart \
               -monitor none > /tmp/qemu.log 2>&1 &
             QEMU_PID=$!

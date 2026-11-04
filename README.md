@@ -145,15 +145,41 @@ swapped back.
 
 | SoC | CPU | RAM | Flash | Notes |
 | --- | --- | --- | --- | --- |
+| `nt98560` | Cortex-A9 | 512 MiB DDR3, external | NOR | NA51089 |
+| `nt98561` | Cortex-A9 | 64 MiB | NOR | NA51089 |
 | `nt98562` | Cortex-A9 | 64 MiB | NOR | NA51089 |
 | `nt98566` | Cortex-A9 | 128 MiB | NOR | NA51089 |
+| `nt98520` | 2x Cortex-A9 | 512 MiB DDR3, external | NOR | NA51055 |
+| `nt98522` | 2x Cortex-A9 | 64 MiB | NOR | NA51055 |
+| `nt98523` | 2x Cortex-A9 | 128 MiB | NOR | NA51055 |
+| `nt98525` | 2x Cortex-A9 | 2x 512 MiB DDR3, external | NOR | NA51055 |
+| `nt98528` | 2x Cortex-A9 | 2x 512 MiB DDR3, external | NOR | NA51084 |
+| `nt98529` | 2x Cortex-A9 | 2x 512 MiB DDR3, external | NOR | NA51084, 1.2 GHz |
+| `nt98532` | 2x Cortex-A32 | 256 MiB | NOR | NS02501 (532BD package) |
+| `nt98533` | 2x Cortex-A32 | 256 MiB | NOR | NS02501 (533QD package) |
+| `nt98321` | 2x Cortex-A9 | 512 MiB DDR3, external | NOR | NA51068, DVR/NVR |
+| `nt98323` | 2x Cortex-A9 | 512 MiB DDR4, external | NOR | NA51068, DVR/NVR |
+| `nt98332` | 2x Cortex-A53 | 1 GiB | NOR | NA51103, NVR: U-Boot's slot only |
+| `nt98633` | 4x Cortex-A53 | 2 GiB | SPI NAND | NA51090, NVR: U-Boot's slot only |
 
-- The image contains Novatek's loader, built from SDK source. It sits at
-  offset 0, the device tree at `0x10000` and U-Boot (LZMA) at `0x20000`.
+- **Cameras.** The image contains Novatek's loader, built from SDK source.
+  It sits at offset 0, the device tree at `0x10000` and U-Boot (LZMA) at
+  `0x20000`, in the 256 KiB boot partition.
+- **External DDR.** Where the DDR is not in the package (NT98560,
+  NT98520, NT98525, NT98528/529, NT98321/323), the loader is built for the
+  SDK board's DDR: 4 Gbit DDR3 dies at 933 MHz (1066 MHz on NT98528/529
+  and NT98321), two of them on NT98525/528/529; one 4 Gbit DDR4 die at
+  1200 MHz on NT98323. A board with other DDR needs its own loader build.
+- **NVRs.** The NT98332 and NT98633 keep the board's own loader, device
+  tree and BL31; the image is U-Boot's slot alone (NT98332: NOR
+  `0x20000`, 128 KiB; NT98633: NAND `0xC0000`, 896 KiB), and
+  `${ubwrite}` writes only that.
 - OpenIPC kernels carry no device tree: U-Boot passes them the loader's.
-- Building needs `arm-none-eabi-` for the loader (`LOADER_CROSS_COMPILE`).
-- SD recovery takes only these file names: `uImage.<soc>.img` (or
-  `fitImage.<soc>.img`) and `rootfs.squashfs.<soc>.img`.
+- Building needs `arm-none-eabi-` for the loaders (`LOADER_CROSS_COMPILE`;
+  the NT98528/529 one does not boot when built with a Linux toolchain) and
+  `aarch64-linux-gnu-` for the NVRs (`CROSS_COMPILE_A64`).
+- SD recovery (cameras) takes only these file names: `uImage.<soc>.img`
+  (or `fitImage.<soc>.img`) and `rootfs.squashfs.<soc>.img`.
 
 ### Allwinner
 
