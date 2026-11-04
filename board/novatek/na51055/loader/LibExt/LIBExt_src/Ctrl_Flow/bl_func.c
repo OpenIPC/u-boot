@@ -1849,6 +1849,10 @@ _THUMB2 static int bl_load_uboot_from_flash(unsigned char *p_fdt, unsigned char 
 			}
 			/* OpenIPC: algorithm 11, LZMA, as NA51089's loader takes it */
 			if ((cpu_to_be32(pBfc->uiAlgorithm) & 0xFF) == 11) {
+				if (invertEndian(pBfc->uiSizeUnComp) > p_dram_partition->uboot_size) {
+					debug_err_var("uboot_size", invertEndian(pBfc->uiSizeUnComp));
+					return -1;
+				}
 				if (bl_lzma_inflate(p_tmp + sizeof(NVTPACK_BFC_HDR), size_comp_le,
 						(unsigned char *)p_dram_partition->uboot_addr,
 						invertEndian(pBfc->uiSizeUnComp)) < 0) {

@@ -2048,6 +2048,10 @@ _THUMB2 static int bl_load_uboot_from_flash(unsigned char *p_fdt, unsigned char 
 				bl_displayErrMsg(RWErrorMsg);
 			}
 			if ((cpu_to_be32(pBfc->uiAlgorithm) & 0xFF) == 11) {
+				if (invertEndian(pBfc->uiSizeUnComp) > p_dram_partition->uboot_size) {
+					debug_err_var("uboot_size", invertEndian(pBfc->uiSizeUnComp));
+					return -1;
+				}
 #if (_ROM_PUBLIC_API_ == 1)
 				UINT32 lzma_addr = *(UINT32 *)ROM_LZMA_POSITION;
 				UINT32 size_comp_le = invertEndian(pBfc->uiSizeComp);

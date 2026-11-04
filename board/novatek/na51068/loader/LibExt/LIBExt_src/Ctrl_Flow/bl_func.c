@@ -1229,6 +1229,10 @@ static _THUMB2 int bl_load_uboot_from_flash(unsigned char *p_fdt, unsigned char 
 				extern char _lzma_tmp_start[];
 				extern char _lzma_tmp_end[];
 
+				if (invertEndian(pBfc->uiSizeUnComp) > p_dram_partition->uboot_size) {
+					debug_err_var("uboot_size", invertEndian(pBfc->uiSizeUnComp));
+					return -1;
+				}
 				if (lzma_inflate(p_tmp + sizeof(NVTPACK_BFC_HDR), size_comp_le,
 						(UINT8 *)p_dram_partition->uboot_addr,
 						invertEndian(pBfc->uiSizeUnComp),
