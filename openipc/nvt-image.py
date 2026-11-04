@@ -29,8 +29,8 @@
 # tree (partition 1, where the loader always takes it) and plain U-Boot.
 # A loader with no valid flash boots it without writing anything: the
 # file its Ethernet build fetches by TFTP, its SD card build reads, and
-# the one openipc/nvt-uart-boot.py sends (FW<part>T.BIN to the loader,
-# its "run" name, bl_process_all_in_one() with FUNC_RUN_CARD). U-Boot is
+# a host sends its UART build (FW<part>T.BIN to the loader, its "run"
+# name, bl_process_all_in_one() with FUNC_RUN_CARD). U-Boot is
 # plain for the NT9852x loaders, whose all-in-one path has no LZMA.
 #
 # usage: nvt-image.py [--fdt-lzma] [--nand] [--pack FILE] LOADER DTB

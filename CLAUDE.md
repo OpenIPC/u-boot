@@ -191,16 +191,19 @@ Nothing here writes the flash:
   files that would be flashed, and the library hangs on TFTP's "file not
   found" anyway. So serve `FW98xxxT.BIN` or it never returns. Host:
   `dnsmasq --port=0 --enable-tftp --tftp-root=<set> --dhcp-range=...`.
-- **UART:** `openipc/nvt-uart-boot.py PORT FW98xxxT.BIN` speaks to a
-  running `wrloader.bin` (`uart_upgrade.c`, `scsi_op.h`): 16-byte commands,
-  the pack by `0x04` to the loader's temp address, `0x87`, `0x82`. A UART
-  build serves UART whatever the straps say (the stock one only did with
-  BS = 0xC, and took USB under the ROM's auto-boot). 4 KiB a command: a
-  reply within the timeout is the only progress there is.
+- **UART:** the host's side is OpenIPC/defib's, not this repository's. A
+  running `wrloader.bin` (`uart_upgrade.c`, `scsi_op.h`) takes 16-byte
+  commands: the pack by `0x04` to the loader's temp address, 4 KiB a
+  command (a reply is the only sign of progress), then `0x87`, `0x82`. A
+  UART build serves UART whatever the straps say (the stock one only did
+  with BS = 0xC, and took USB under the ROM's auto-boot).
 - **Not done: the ROM's half of UART.** Baud rate, handshake and load
-  address of `wrloader.bin` are in no SDK document; the tool cannot send
-  it yet. Nor is `Eth`'s file name, DHCP options or BS[9:8] checked on
-  silicon. NA51068's embedded PHY is MAC1.
+  address of `wrloader.bin` are in no SDK document. Nor are `Eth`'s file
+  name, DHCP options or BS[9:8] checked on silicon. NA51068's embedded
+  PHY is MAC1.
+- **Distribution:** one archive, `novatek-recovery.tar.gz` on this
+  repository's `novatek` release (`build-novatek.yml`), these folders
+  inside: no per-SoC release files.
 - **Size:** the `Eth` loaders of NA51055 and NA51068 have no LZMA decoder,
   to fit (they run the plain pack; a flash boot from them stops at "lzma").
 
@@ -208,7 +211,7 @@ Under qemu-hisilicon the ROM's fetch is a host file:
 `-M <soc>,flash-file=<blank>,boot-file=<set>/loader.bin,boot-strap=4
 -nic user,tftp=<set>` (NA51068: strap 3, and `-nic user` twice, MAC1 is
 the second), the real loader and library on from there; with
-`boot-file=<set>/wrloader.bin` and `-serial tcp:...` for the UART tool.
+`boot-file=<set>/wrloader.bin` and `-serial tcp:...` for a UART host.
 
 ## Hand-off to the kernel
 
