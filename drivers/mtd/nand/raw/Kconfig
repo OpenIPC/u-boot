@@ -414,7 +414,7 @@ config NAND_MXC
 
 config NAND_NVT_SPI
 	bool "Novatek NA51090 SPI NAND"
-	depends on ARCH_NOVATEK
+	depends on NVT_NA511XX
 	select SYS_NAND_SELF_INIT
 	imply CMD_NAND
 	help
