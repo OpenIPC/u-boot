@@ -166,6 +166,50 @@ offset 0:
 - The image is in CPU byte order, as `sf write` stores it and an external
   programmer writes it.
 
+## Recovery
+
+For a board whose flash has no valid loader. Novatek's mask ROM falls
+through flash, SD, Ethernet (DHCP and TFTP), USB, UART, or the straps
+pick one (BS[3:0]; NT9856x: 4 Ethernet, 0xC UART; NT9832x BS[2:0]: 3, 4).
+From any of them it takes a loader into SRAM, nothing more: see the SDKs'
+"Boot ROM code User Guide" and "PCTOOL User Guide".
+
+`build.sh` writes `output/recovery-<soc>-<flash>/` for every target with
+a loader in the tree (not the NVRs: no loader source):
+
+| File | What it is |
+| --- | --- |
+| `loader.bin` | the loader built `STORAGEEXT=Eth`, under the name an `Eth` build gets (the library's own string): the name the ROM fetches is inferred from that, no document says so |
+| `wrloader.bin` | the loader built `STORAGEEXT=Uart`. Not on NA51055 / NA51084: no UART library, no boot-source API, no ROM guide in that SDK |
+| `FW98<part>T.BIN` | the pack: an all-in-one image (`nvt-image.py --pack`) of the plain tree and plain U-Boot, the loader's "run" file (`bl_process_all_in_one()`, `FUNC_RUN_CARD`) |
+
+Nothing here writes the flash:
+
+- **Ethernet:** the library (`STRGEXT_Eth.a`) registers TFTP as the
+  loader's filesystem. OpenIPC's change: `bl_open_update_file()` keeps an
+  `Eth` loader from asking for `LD98xxxA.BIN` and `FW98xxxA.BIN`, the
+  files that would be flashed, and the library hangs on TFTP's "file not
+  found" anyway. So serve `FW98xxxT.BIN` or it never returns. Host:
+  `dnsmasq --port=0 --enable-tftp --tftp-root=<set> --dhcp-range=...`.
+- **UART:** `openipc/nvt-uart-boot.py PORT FW98xxxT.BIN` speaks to a
+  running `wrloader.bin` (`uart_upgrade.c`, `scsi_op.h`): 16-byte commands,
+  the pack by `0x04` to the loader's temp address, `0x87`, `0x82`. A UART
+  build serves UART whatever the straps say (the stock one only did with
+  BS = 0xC, and took USB under the ROM's auto-boot). 4 KiB a command: a
+  reply within the timeout is the only progress there is.
+- **Not done: the ROM's half of UART.** Baud rate, handshake and load
+  address of `wrloader.bin` are in no SDK document; the tool cannot send
+  it yet. Nor is `Eth`'s file name, DHCP options or BS[9:8] checked on
+  silicon. NA51068's embedded PHY is MAC1.
+- **Size:** the `Eth` loaders of NA51055 and NA51068 have no LZMA decoder,
+  to fit (they run the plain pack; a flash boot from them stops at "lzma").
+
+Under qemu-hisilicon the ROM's fetch is a host file:
+`-M <soc>,flash-file=<blank>,boot-file=<set>/loader.bin,boot-strap=4
+-nic user,tftp=<set>` (NA51068: strap 3, and `-nic user` twice, MAC1 is
+the second), the real loader and library on from there; with
+`boot-file=<set>/wrloader.bin` and `-serial tcp:...` for the UART tool.
+
 ## Hand-off to the kernel
 
 - OpenIPC uImages carry no device tree. `misc_init_r()` copies the
@@ -217,6 +261,7 @@ bash build.sh nt98566-nand  # the SPI NAND image (NAND_SOCS: nt98560 nt98562 nt9
 - The output is `output/u-boot-<soc>-nor.bin` (`-nand.bin`), built out of
   tree in `output/build-<soc>-nor/` and `output/build-<soc>-nor-loader/`
   (`-nand`, `-nand-loader`).
+  `output/recovery-<soc>-<flash>/` is the recovery set (see Recovery).
 - `.config` is `openipc/openipc_config`, then `openipc/<soc>_config`, then
   `olddefconfig`. There are no `configs/*_defconfig` for these targets.
 - The loader uses `LOADER_CROSS_COMPILE`: `arm-none-eabi-` if there is one,
