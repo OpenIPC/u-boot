@@ -982,6 +982,10 @@ int fmc100_spi_nor_init(struct fmc_host *host)
 #define SPI_NOR_SR1_WARN_MASK	0x7c	/* BP4..BP0 */
 #define SPI_NOR_SR2_WARN_MASK	0x40	/* CMP */
 
+/* Macronix has one status register: bit 6 is QE, BP stops at BP3. */
+#define SPI_NOR_MXIC_SR_CLEAR_MASK	0xbc	/* SRWD | BP3..BP0 */
+#define SPI_NOR_MXIC_SR_WARN_MASK	0x3c	/* BP3..BP0 */
+
 static void fmc100_send_cmd(struct fmc_host *host, struct fmc_spi *spi,
 			    unsigned char cmd)
 {
@@ -1025,6 +1029,43 @@ static void fmc100_write_status_reg(struct fmc_host *host, struct fmc_spi *spi,
 	spi->driver->wait_ready(spi);
 }
 
+/*
+ * Macronix does not share the Winbond register map the general path assumes,
+ * and its opcodes mean something else: 0x35 is EQIO (enter QPI), 0x15 is
+ * RDCR, whose bit 2 is ODS2 (set by default, so it reads as WPS), and 0x11
+ * does not exist. WREN followed by that 0x11 leaves WEL set for Linux, whose
+ * QE write then fails its read-back ("spi nor register fail!", -EIO).
+ * Use the opcodes this family has. GBULK only acts with the OTP WPSEL set.
+ */
+static void fmc100_mxic_unlock(struct fmc_host *host)
+{
+	struct fmc_spi *spi = host->spi;
+	unsigned char sr, cr;
+
+	sr = spi_general_get_flash_register_raw(spi, SPI_CMD_RDSR);
+	cr = spi_general_get_flash_register_raw(spi, SPI_CMD_RDCR_MX);
+
+	printf("SPI Nor: SR=0x%02x CR=0x%02x\n", sr, cr);
+
+	spi->driver->write_enable(spi);
+	fmc100_send_cmd(host, spi, SPI_CMD_GBULK);
+	spi->driver->wait_ready(spi);
+
+	if (sr != 0xff && (sr & SPI_NOR_MXIC_SR_CLEAR_MASK)) {
+		printf("SPI Nor: unlocked SR 0x%02x -> 0x%02x\n", sr,
+		       sr & ~SPI_NOR_MXIC_SR_CLEAR_MASK);
+		fmc100_write_status_reg(host, spi, SPI_CMD_WRSR,
+					sr & ~SPI_NOR_MXIC_SR_CLEAR_MASK);
+	}
+
+	fmc100_send_cmd(host, spi, SPI_CMD_WRDI);
+
+	sr = spi_general_get_flash_register_raw(spi, SPI_CMD_RDSR);
+	if (sr != 0xff && (sr & SPI_NOR_MXIC_SR_WARN_MASK))
+		printf("SPI Nor: still protected (SR=0x%02x), erase and write"
+		       " will be discarded\n", sr);
+}
+
 /* Try to remove whatever write protection the part came with, whatever
  * the vendor: WPS/per-block locks, the status register locks and the
  * BP/CMP fields. */
@@ -1047,6 +1088,11 @@ void fmc100_global_unlock(struct fmc_host *host)
 	reg = fmc_read(host, FMC_GLOBAL_CFG);
 	if (reg & FMC_GLOBAL_CFG_WP_ENABLE)
 		fmc_write(host, FMC_GLOBAL_CFG, reg & ~FMC_GLOBAL_CFG_WP_ENABLE);
+
+	if (host->spi_nor_info->ids[0] == MID_MXIC) {
+		fmc100_mxic_unlock(host);
+		return;
+	}
 
 	/* FMC_STATUS carries more than the flash status byte, so read the
 	 * registers through the plain command path. */
@@ -1086,6 +1132,9 @@ void fmc100_global_unlock(struct fmc_host *host)
 		fmc100_write_status_reg(host, spi, SPI_CMD_WRSR2,
 					sr2 & ~SPI_NOR_SR2_CLEAR_MASK);
 	}
+
+	/* An opcode the part does not have leaves WEL set for Linux. */
+	fmc100_send_cmd(host, spi, SPI_CMD_WRDI);
 
 	/*
 	 * None of the writes above can report a refusal, and a part that

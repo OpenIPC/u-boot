@@ -449,7 +449,7 @@ static struct spi_nor_info fmc_spi_nor_info_table[] = {
 		&spi_driver_mx25l25635e,
 	},
 
-	/* MXIC 3.3V MX25L12845GM2I-08G/MX25L12845GM2I-10G/MX25L12833FM2I-10G/MX25L12835FM2I-10G
+	/* MXIC 3.3V MX25L12845GM2I-08G/MX25L12845GM2I-10G/MX25L12833FM2I-10G/MX25L12835FM2I-10G/KH25L12833FM2I-10G
 	   The suffix "45G" indicates the flash supporting DTR mode */
 	{
 		"MX25L12835F/45G", {0xc2, 0x20, 0x18}, 3, _16M, _64K, 3,
