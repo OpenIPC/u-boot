@@ -157,7 +157,8 @@ IPL_CUST at `0x10000`, the uImage at `0x20000`.
 
 The layout and environment of openipc-hisilicon (`include/configs/openipc-common.h`,
 `openipc/nand_config`): `768k(boot),256k(env),-(ubi)`, the environment at
-`0xC0000` (256 KiB, range 256 KiB), one UBI device from `0x100000` whose UBIFS
+`0xC0000` (128 KiB in the 256 KiB range, so one bad block there leaves the
+other; openipc-hisilicon's is 256 KiB in 256), one UBI device from `0x100000` whose UBIFS
 `rootfs` volume holds the kernel as `/boot/fitImage` or `/boot/uImage`, and
 `rootfs_data` on the rest; `root=ubi0:rootfs rootfstype=ubifs ubi.mtd=2,2048`.
 `common/openipc.c` is the common one (openipc-ingenic's, `OPENIPC_SPI_NAND`
@@ -185,6 +186,15 @@ copy of every stage, a stage a block:
 - A page load holds the chip select by QSPI's burst bit, and OUT_SIZE counts one
   more than BDMA sends. Whole page and spare go by BDMA; the vendor sends those
   through the FSP, so a spare write takes a path it never does.
+- Where this branch is ahead of the other vendor branches (Qodo on
+  OpenIPC/u-boot#109; they follow later): `ubwrite` writes only an image
+  that fits the boot partition, checked before the erase, and into the
+  partition, so a bad block cannot push it into `env`; recovery takes a
+  NAND image only if it fits the free RAM, on NOR only files whose name
+  carries this SoC as a word (`uImage.ssc337.img` is not `ssc337de`'s);
+  a saved `altbootcmd` is migrated before recovery may run it. A bad block
+  in blocks 1-5 still moves the stages off the blocks the PNI names: one
+  copy each is what 768 KiB holds.
 - Not compatible with OpenIPC/u-boot-sigmastar's NAND layout (UBI at
   `0x240000`, a `kernel` volume and a squashfs `rootfs`): a camera moving to
   this U-Boot takes the firmware's `rootfs.ubifs` too, as HiSilicon's do.
