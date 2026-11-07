@@ -157,8 +157,8 @@ IPL_CUST at `0x10000`, the uImage at `0x20000`.
 
 The layout and environment of openipc-hisilicon (`include/configs/openipc-common.h`,
 `openipc/nand_config`): `768k(boot),256k(env),-(ubi)`, the environment at
-`0xC0000` (128 KiB in the 256 KiB range, so one bad block there leaves the
-other; openipc-hisilicon's is 256 KiB in 256), one UBI device from `0x100000` whose UBIFS
+`0xC0000` (256 KiB, range 256 KiB, as openipc-hisilicon's and the
+firmware's `fw_env.config`), one UBI device from `0x100000` whose UBIFS
 `rootfs` volume holds the kernel as `/boot/fitImage` or `/boot/uImage`, and
 `rootfs_data` on the rest; `root=ubi0:rootfs rootfstype=ubifs ubi.mtd=2,2048`.
 `common/openipc.c` is the common one (openipc-ingenic's, `OPENIPC_SPI_NAND`
