@@ -1,0 +1,2 @@
+# MERCURY6: what the vendor U-Boot passes on infinity6c, not INFINITY6C
+CONFIG_MACH_TYPE=1399

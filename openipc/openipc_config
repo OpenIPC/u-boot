@@ -1,5 +1,5 @@
-# OpenIPC base configuration for the SigmaStar infinity3 targets. build.sh
-# appends the per-SoC fragment and runs olddefconfig, so a later line
+# OpenIPC base configuration for the SigmaStar targets. build.sh
+# appends the per-die and per-SoC fragments and runs olddefconfig, so a later line
 # overrides an earlier one.
 CONFIG_ARM=y
 CONFIG_ARCH_SIGMASTAR=y

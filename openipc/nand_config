@@ -1,0 +1,21 @@
+# On SPI NAND, in place of the SPI NOR of openipc_config. The layout and the
+# environment are OpenIPC/u-boot-sigmastar's: boot0, boot1, env at 2 MiB, ubi.
+# CONFIG_MS_SFLASH is not set
+# CONFIG_CMD_SF is not set
+# CONFIG_ENV_IS_IN_SPI_FLASH is not set
+CONFIG_ENV_IS_IN_NAND=y
+CONFIG_ENV_OFFSET=0x200000
+CONFIG_ENV_SIZE=0x20000
+CONFIG_ENV_SECT_SIZE=0x20000
+CONFIG_ENV_RANGE=0x40000
+CONFIG_MTD=y
+CONFIG_MTD_RAW_NAND=y
+CONFIG_NAND_MS_SPINAND=y
+CONFIG_CMD_NAND=y
+CONFIG_MTD_UBI=y
+CONFIG_CMD_UBI=y
+CONFIG_CMD_MTDPARTS=y
+CONFIG_MTDIDS_DEFAULT="nand0=nand0"
+CONFIG_MTDPARTS_DEFAULT="mtdparts=nand0:1024k(boot0),1024k(boot1),256k(env),-(ubi)"
+# The firmware's kernel is in a UBI volume, the rootfs a squashfs
+CONFIG_OPENIPC_NAND_KERNEL_VOLUME=y

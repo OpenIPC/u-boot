@@ -1,0 +1,9 @@
+# Ifliegen: what its SDK's U-Boot passes (MACH_TYPE_IFACKEL); the kernel
+# takes a device tree
+CONFIG_MACH_TYPE=5120
+# UART0 out of the URDMA's DMA mode before the console
+CONFIG_BOARD_EARLY_INIT_F=y
+# The SD host is not modelled yet and not checked against the SDK
+# CONFIG_MMC is not set
+# CONFIG_MMC_MS_SDMMC is not set
+# CONFIG_CMD_MMC is not set

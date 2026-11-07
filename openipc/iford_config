@@ -1,0 +1,2 @@
+# Iford: its kernel takes a device tree, the machine number is not looked at
+CONFIG_MACH_TYPE=1399
