@@ -48,11 +48,13 @@ static int check_squashfs(void *buf) {
 }
 
 #ifdef CONFIG_ENV_IS_IN_NAND
+#ifndef CONFIG_OPENIPC_NAND_KERNEL_VOLUME
 #define UBIFS_SB_MAGIC 0x06101831
 
 static int check_ubifs(void *buf) {
   return get_unaligned_le32(buf) == UBIFS_SB_MAGIC;
 }
+#endif
 
 /* Check for the UBI marker without attaching: attaching an empty MTD
  * would create a fresh UBI on flash. */
@@ -212,6 +214,10 @@ static int recovery_mount(const char *ifname) {
 }
 
 #ifdef CONFIG_ENV_IS_IN_NAND
+#ifndef OPENIPC_KERNEL_VOLUME_SIZE
+#define OPENIPC_KERNEL_VOLUME_SIZE "0x300000"
+#endif
+
 static int recovery_ensure_volume(const char *name, const char *size) {
   struct ubi_volume_desc *desc;
   char cmd[64];
@@ -332,7 +338,7 @@ static int recovery_write(const char *name, int type) {
 
     printf("Recovery: wrote %s (%lu bytes) to rootfs volume\n", name, size);
   } else {
-    ret = recovery_recreate_volume("kernel", "0x300000", false);
+    ret = recovery_recreate_volume("kernel", OPENIPC_KERNEL_VOLUME_SIZE, false);
     if (ret) {
       printf("Recovery: cannot recreate kernel volume (%d)\n", ret);
       return -1;
@@ -479,7 +485,8 @@ static int recovery_try(void) {
   if (recovery_run_script("script.txt"))
     return 1;
 
-#ifndef CONFIG_ENV_IS_IN_NAND
+#if !defined(CONFIG_ENV_IS_IN_NAND) || \
+    defined(CONFIG_OPENIPC_NAND_KERNEL_VOLUME)
   /* Kernel: uImage preferred, FIT fallback */
   sprintf(name, "uImage.%s.img", CONFIG_PRODUCT_SOC);
   ret = recovery_write(name, RECOVERY_KERNEL);
@@ -495,7 +502,8 @@ static int recovery_try(void) {
 
   /* Rootfs. On NAND it carries the kernel (/boot), its volume is sized
    * to the image and rootfs_data takes the rest. */
-#ifdef CONFIG_ENV_IS_IN_NAND
+#if defined(CONFIG_ENV_IS_IN_NAND) && \
+    !defined(CONFIG_OPENIPC_NAND_KERNEL_VOLUME)
   sprintf(name, "rootfs.ubifs.%s.img", CONFIG_PRODUCT_SOC);
 #else
   sprintf(name, "rootfs.squashfs.%s.img", CONFIG_PRODUCT_SOC);
@@ -565,6 +573,21 @@ int firmware_scan(void) {
     return 0;
   }
 
+#ifdef CONFIG_OPENIPC_NAND_KERNEL_VOLUME
+  /* The kernel in its volume, a squashfs rootfs in its own */
+  ret = ubi_volume_read("kernel", (char *)buf, sizeof(buf));
+  if (ret || !check_kernel(buf)) {
+    printf("Firmware is absent/corrupt (kernel volume)\n");
+    env_set("bootfail", "1");
+    return 0;
+  }
+  ret = ubi_volume_read("rootfs", (char *)buf, sizeof(buf));
+  if (ret || !check_squashfs(buf)) {
+    printf("Firmware is absent/corrupt (rootfs volume)\n");
+    env_set("bootfail", "1");
+    return 0;
+  }
+#else
   /* The kernel is a file in the UBIFS rootfs (/boot/fitImage or
    * /boot/uImage): there is no kernel volume to check. */
   ret = ubi_volume_read("rootfs", (char *)buf, sizeof(buf));
@@ -588,6 +611,7 @@ int firmware_scan(void) {
     env_set("bootfail", "1");
     return 0;
   }
+#endif
 
   env_set("bootfail", NULL);
 
