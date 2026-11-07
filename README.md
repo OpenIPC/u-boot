@@ -139,8 +139,8 @@ swapped back.
 - Vendor uImages have entry = load + 0x40, which this U-Boot does not
   run. Repack them with `mkimage -e <load address>`.
 - SD recovery `.img` files: on NOR a uImage whose load address is the flash
-  offset (`mkimage -a 0x50000`, `-a 0x250000`); on NAND `rootfs.ubifs.<soc>.img`,
-  the UBIFS rootfs with its kernel, as on HiSilicon.
+  offset (`mkimage -a 0x50000`, `-a 0x250000`); on NAND the raw kernel and
+  squashfs.
 - SD recovery takes only these file names: `uImage.<soc>.img` (or
   `fitImage.<soc>.img`) and `rootfs.squashfs.<soc>.img`.
 
@@ -299,10 +299,11 @@ Every infinity2m, infinity6, 6b0, 6e and 6c part also builds for SPI NAND,
 - Vendor kernels are xz-compressed uImages that only the vendor U-Boot
   unpacks.
 - SD recovery `.img` files: on NOR a uImage whose load address is the flash
-  offset (`mkimage -a 0x50000`, `-a 0x250000`); on NAND the raw kernel and
-  squashfs.
-- SD recovery takes only these file names: `uImage.<soc>.img` (or
-  `fitImage.<soc>.img`) and `rootfs.squashfs.<soc>.img`.
+  offset (`mkimage -a 0x50000`, `-a 0x250000`); on NAND `rootfs.ubifs.<soc>.img`,
+  the UBIFS rootfs with its kernel, as on HiSilicon.
+- SD recovery takes only these file names: on NOR `uImage.<soc>.img` (or
+  `fitImage.<soc>.img`) and `rootfs.squashfs.<soc>.img`; on NAND
+  `rootfs.ubifs.<soc>.img`.
 
 ### Ingenic
 
