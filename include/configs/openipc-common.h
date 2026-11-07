@@ -201,8 +201,9 @@
 #define OPENIPC_NAND_MTDPARTS "768k(boot),256k(env),-(ubi)"
 
 /* Environment lives in the NAND 'env' partition: CONFIG_ENV_OFFSET 0xc0000,
- * CONFIG_ENV_SIZE and CONFIG_ENV_RANGE 0x40000 (openipc/nand_config), as
- * on openipc-hisilicon. */
+ * CONFIG_ENV_RANGE 0x40000 as on openipc-hisilicon, CONFIG_ENV_SIZE 0x20000
+ * so that a bad block in the partition leaves room for it
+ * (openipc/nand_config). */
 
 #define CONFIG_BOOTARGS OPENIPC_MEMARGS_HEAD "console=ttyS0,115200 panic=20 init=/init root=ubi0:rootfs rootfstype=ubifs ubi.mtd=2,2048 mtdparts=\\${mtdparts}" OPENIPC_MEMARGS_TAIL " \\${extras}"
 
@@ -224,7 +225,7 @@
 #define OPENIPC_ENV_MEDIUM \
 	"ubfile=u-boot-" CONFIG_PRODUCT_SOC "-nand.bin\0" \
 	"urfile=rootfs.ubifs." CONFIG_PRODUCT_SOC "\0" \
-	"ubwrite=nand erase 0x0 0xc0000; nand write ${baseaddr} 0x0 ${filesize}\0" \
+	"ubwrite=if itest ${filesize} -gt 0 && itest ${filesize} -le 0xc0000; then nand erase.part boot; nand write ${baseaddr} boot ${filesize}; else echo ubwrite: ${filesize} bytes do not fit the 768 KiB boot partition, nothing written; fi\0" \
 	"urwrite=ubi part ubi; ubi check rootfs && ubi remove rootfs; if ubi create rootfs ${filesize} d; then ubi check rootfs; else ubi remove rootfs_data; ubi create rootfs ${filesize} d; fi; ubi check rootfs_data || ubi create rootfs_data 0 d; ubi write ${baseaddr} rootfs ${filesize}\0" \
 	"loadkernel=" OPENIPC_LOADKERNEL "\0" \
 	"mtdids=nand0=" SFC "\0" \
