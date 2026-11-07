@@ -342,6 +342,11 @@ static int recovery_write(const char *name, int type) {
       return -1;
     }
     size = fsize;
+    if (size > recovery_ram_room()) {
+      printf("Recovery: %s (%lu bytes) does not fit the free RAM\n", name,
+             size);
+      return -1;
+    }
   } else {
     /* Kernel: uImage or FIT, written to the kernel volume */
     ret = rfs_read(name, (ulong)&hdr, 0, sizeof(hdr), &actread);
@@ -507,9 +512,25 @@ struct recovery_file {
   loff_t size;
 };
 
-/* Every *.img in the root of the medium, in the order the directory lists
- * them. The names are collected first: reading a file closes the
- * filesystem under an open directory stream. */
+/* Whether a file is this SoC's: its name carries CONFIG_PRODUCT_SOC as a
+ * whole word between '.' or '-' (uImage.ssc337.img, not ssc337de's), so a
+ * card holding several cameras' images flashes only this one's. */
+static int recovery_name_is_ours(const char *name) {
+  const char *soc = CONFIG_PRODUCT_SOC, *p = name;
+  size_t n = strlen(soc);
+
+  while ((p = strstr(p, soc))) {
+    if ((p == name || p[-1] == '.' || p[-1] == '-') &&
+        (p[n] == '.' || p[n] == '-'))
+      return 1;
+    p++;
+  }
+  return 0;
+}
+
+/* Every *.img of this SoC in the root of the medium, in the order the
+ * directory lists them. The names are collected first: reading a file
+ * closes the filesystem under an open directory stream. */
 static int recovery_images(void) {
   struct recovery_file *files = NULL, *more;
   struct fs_dir_stream *dirs;
@@ -527,6 +548,11 @@ static int recovery_images(void) {
     if (d->type != FS_DT_REG || l < 5 || l >= sizeof(files->name) ||
         strcasecmp(d->name + l - 4, ".img"))
       continue;
+    if (!recovery_name_is_ours(d->name)) {
+      printf("Recovery: %s is not for %s, skipped\n", d->name,
+             CONFIG_PRODUCT_SOC);
+      continue;
+    }
     more = realloc(files, (n + 1) * sizeof(*files));
     if (!more)
       break;
@@ -1131,6 +1157,10 @@ int openipc_helper(void) {
   nor_split_fwsize();
 #endif
 
+  /* A saved environment's retired commands are replaced first: a
+   * script.txt that runs them would otherwise get the old ones */
+  altbootcmd_migrate();
+
   /* Recovery checks what it runs: a board may already have set verify=n
    * (so that the split scan below can clear it), and source would then run
    * a wrapped script.txt without its data CRC. Drop it for recovery only
@@ -1144,7 +1174,6 @@ int openipc_helper(void) {
     env_set("verify", saved);
     free(saved);
   }
-  altbootcmd_migrate();
 
   /* Persist the default environment on first start (or after a bad env);
    * only if the device env area is still blank so we never overwrite
