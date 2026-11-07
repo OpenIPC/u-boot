@@ -1,3 +1,0 @@
-# The SDK's layout: the CIS, BOOT, BOOT_BAK, then the environment
-CONFIG_ENV_OFFSET=0x4C0000
-CONFIG_MTDPARTS_DEFAULT="mtdparts=nand0:1280k(cis),1792k(boot0),1792k(boot1),256k(env),-(ubi)"

@@ -1,4 +1,0 @@
-# The Ifliegen SDK's layout (spinand.squashfs.tfa.partition.config): CIS,
-# BOOT and BOOT_BAK of 0x1E0000 each, the environment at 0x500000, then ubi
-CONFIG_ENV_OFFSET=0x500000
-CONFIG_MTDPARTS_DEFAULT="mtdparts=nand0:1280k(cis),1920k(boot0),1920k(boot1),256k(env),-(ubi)"

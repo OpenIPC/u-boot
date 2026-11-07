@@ -1,4 +1,0 @@
-# Its PNI: the environment in blocks 34-36
-CONFIG_ENV_OFFSET=0x440000
-CONFIG_ENV_RANGE=0x60000
-CONFIG_MTDPARTS_DEFAULT="mtdparts=nand0:4352k(boot),384k(env),-(ubi)"

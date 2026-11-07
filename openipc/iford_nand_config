@@ -1,3 +1,0 @@
-# The Iford SDK's layout: CIS, BOOT0, BOOT1, the environment, then ubi
-CONFIG_ENV_OFFSET=0x580000
-CONFIG_MTDPARTS_DEFAULT="mtdparts=nand0:1280k(cis),2176k(boot0),2176k(boot1),256k(env),-(ubi)"
