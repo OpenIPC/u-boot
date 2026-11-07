@@ -28,7 +28,7 @@ release as `openipc-hisilicon`, `openipc-xm`, `openipc-gk710x` and
 | Iford | `ssc029a` `ssc029b` `ssc029c` | Iford SDK IMD00V2.1.0 boot.bin, `board/iford/boot/nor/ipl` | **no silicon**; only `ssc029c` boots in qemu |
 | Ifado | `ssc375` | Dahua IPC-HDW1433V-A-IL2 NOR (IPL, CIS, IPL_CUST) | **no silicon**; qemu `ssc375`, to the vendor kernel's userspace |
 | Ifliegen | `ssc034a` `ssc034b`, NOR and SPI NAND | Ifliegen SDK ILSSV01C12 `board/ifliegen/boot` (IPL, IPL_CUST, TF-A `u-bl32.bin`, flash.nri/flash.sni, flash lists) | **no silicon**; qemu `ssc034a`/`ssc034b`, to the SDK kernel's shell |
-| SPI NAND | `<soc>-nand` for every infinity2m, 6, 6b0, 6e, 6c part | published images, i2m and Maruko SDKs | **no silicon**; qemu |
+| SPI NAND | `<soc>-nand` for every infinity2m, 6, 6b0, 6e, 6c part, `ssc029a`, `ssc034a/b` | the dies' NAND IPLs (published images, i2m, Maruko, Iford and Ifliegen SDKs) | **no silicon**; qemu, openipc-hisilicon's 768k/256k/UBIFS layout |
 
 OpenIPC/u-boot-sigmastar, the vendor's U-Boot 2015.01 with OpenIPC's
 environment, is what OpenIPC ships for the infinity6 dies today, and it
@@ -155,39 +155,39 @@ IPL_CUST at `0x10000`, the uImage at `0x20000`.
 
 ### SPI NAND
 
-`./build.sh <soc>-nand` adds `openipc/nand_config` and gives
-`output/u-boot-<soc>-nand.bin`, the 2 MiB of `make_boot_spinand.sh`: SNI at `0`,
-PNI at `0x800`, IPL at `0x40000` and `0x80000`, IPL_CUST at `0xC0000` and
-`0x100000`, the same uImage at `0x140000` and `0x1A0000`. The stages are the NOR
-images' own: the published NAND images hold the same bytes, and
-`openipc/<die>-nand-{sni,pni}.bin` are the vendor's `GCIS.bin`, `PARTINFO.pni`.
+The layout and environment of openipc-hisilicon (`include/configs/openipc-common.h`,
+`openipc/nand_config`): `768k(boot),256k(env),-(ubi)`, the environment at
+`0xC0000` (256 KiB, range 256 KiB), one UBI device from `0x100000` whose UBIFS
+`rootfs` volume holds the kernel as `/boot/fitImage` or `/boot/uImage`, and
+`rootfs_data` on the rest; `root=ubi0:rootfs rootfstype=ubifs ubi.mtd=2,2048`.
+`common/openipc.c` is the common one (openipc-ingenic's, `OPENIPC_SPI_NAND`
+taking `CONFIG_NAND_MS_SPINAND` too): the scan checks the UBI marker in the
+first good eraseblock, the rootfs volume's UBIFS and its `/boot` kernel; `ur`
+installs `rootfs.ubifs.<soc>`, sized to the image, keeping `rootfs_data`.
 
-- Environment at `0x200000`, 128 KiB, in a 256 KiB range, as a saved one sits.
-- UBI after it, as the firmware's `rootfs.ubi` lays it out: volumes `kernel`,
-  `rootfs` (a squashfs, not UBIFS), `rootfs_data`, `other`.
-  `CONFIG_OPENIPC_NAND_KERNEL_VOLUME` makes `common/openipc.c` check and
-  recover those, and not `/boot/fitImage` as on HiSilicon.
-- `ms_spinand` takes geometry from the SNI, since the published images carry one
-  generic SNI whose ID is `0xEE`. The bad-block table stays in memory, like the
-  vendor's: nothing is written to the last blocks, which UBI owns.
+`./build.sh <soc>-nand` gives `output/u-boot-<soc>-nand.bin`, the boot
+partition as far as it holds data (no `0xFF` padding, as the NOR images), one
+copy of every stage, a stage a block:
+
+- infinity6, 6b0, 6e, infinity2m (the SNI's `MSTARSEMIUSFDCIS` form and the
+  older PNI, `(start block, blocks, type, backups)` records, a byte sum from
+  offset 4): block 0 the SNI (page 0) and PNI (page 1), IPL in block 1
+  (BL0PBA 1, BL1PBA 0: infinity2m's IPL loses IPL_CUST with a BL1PBA set),
+  IPL_CUST in 2, U-Boot in 3-5. SNI byte `0x2E` is 2: infinity6's IPL_CUST
+  looks for U-Boot from the block after it; the other IPLs read the PNI.
+- Ifliegen: block 0 the CIS (SNIB with the flash list's W25N01GV SNIF,
+  record 57, BL0PBA 1, one copy; the name-record PNI; the flash list), IPL,
+  IPL_CUST, TF-A's SP_MIN in blocks 1-3, U-Boot in 4-5.
+- `ms_spinand` takes geometry from the SNI. The bad-block table stays in
+  memory, like the vendor's: nothing is written to the last blocks, which UBI
+  owns. A part whose SNI gives a spare other than 64 or 128 bytes is refused:
+  the core has no layout for it.
 - A page load holds the chip select by QSPI's burst bit, and OUT_SIZE counts one
   more than BDMA sends. Whole page and spare go by BDMA; the vendor sends those
   through the FSP, so a spare write takes a path it never does.
-- No infinity6c or infinity2m NAND is published to compare against. Run
-  instead (qemu): `ssc377-nand` with mstar-06's Maruko kernel, the UBI
-  written by `run ur` over TFTP (`nand erase`/`write` through infinity6c's
-  software chip select), booted to `login:` with the `ubiblock` override;
-  `ssd202d-nand` with the i2m SDK kernel from a UBI, its UBIFS root mounted.
-  A part whose SNI gives a spare other than 64 or 128 bytes is refused: the
-  core has no layout for it.
-- `root=` follows the partition count (`OPENIPC_NAND_ROOTDEV`): the published
-  kernels have gluebi, which makes each UBI volume an MTD after the partitions,
-  `kernel` then `rootfs`. So `mtdblock5` behind the default four partitions,
-  `mtdblock6` on infinity6c and Iford (five), `mtdblock4` on infinity2m (three).
-  A kernel without gluebi (Maruko's, the i2m and Iford SDKs') takes
-  `extras='ubi.block=0,rootfs root=/dev/ubiblock0_1 rootfstype=squashfs'`
-  (the later `root=` wins), or `root=ubi0:rootfs rootfstype=ubifs` for a
-  UBIFS rootfs.
+- Not compatible with OpenIPC/u-boot-sigmastar's NAND layout (UBI at
+  `0x240000`, a `kernel` volume and a squashfs `rootfs`): a camera moving to
+  this U-Boot takes the firmware's `rootfs.ubifs` too, as HiSilicon's do.
 
 ### Iford
 
@@ -259,13 +259,10 @@ not Iford's MCM write at bank `0x1132`), with:
 - SD: SD0, the board's mmc0 (`mmc_host/src/ifliegen`): PADGPIO pads from
   `0x0F`, card detect at `0x16`, power on PAD_FUART_RTS (`0x34`), the clock
   as Iford's but SC_GP_CTRL at bank `0x1133`, the host's MCG off.
-- SPI NAND (`ssc034a-nand`, `ssc034b-nand`): `--ifliegen-sni` builds the CIS
-  in ten blocks (SNIB and SNIF, the PNI, the flash list, with snigenerator's
-  boot blocks 10 and 25 and CRCs), BOOT at `0x140000` (IPL and IPL_CUST three
-  blocks each, SP_MIN, a 1 MiB UBOOT), BOOT_BAK at `0x320000`, the
-  environment at `0x500000`, UBI from `0x540000`. The IPL takes its
-  timeouts from the SNIF: the CIS carries the flash list's W25N01GV, record
-  57; the SDK's generic record has none and the IPL fails to load.
+- SPI NAND (`ssc034a-nand`, `ssc034b-nand`): `--ifliegen-sni`, in OpenIPC's
+  768 KiB (see "SPI NAND"). The IPL takes its timeouts from the SNIF: the CIS
+  carries the flash list's W25N01GV, record 57; the SDK's generic record has
+  none and the IPL fails to load.
 
 The SGS kernels (Iford, Ifliegen, Ifado: `drivers/sgs_common/flash/nor`) name
 the NOR `nor0`, not the older `NOR_FLASH`: `SFC` in
@@ -278,31 +275,29 @@ write and read-back. NAND: the chain, `nand` erase/write/read against the
 raw file, env across reset, the SDK kernel from an OpenIPC UBI to a shell
 with the `ubiblock` override.
 
-### Iford SPI NAND
+### SPI NAND on infinity6c and Iford
 
-`ssc029a-nand` only: the one SDK spinand set for a part with plain Linux
-(`ipc_iford.spinand...ssc029a.512.bga12_ddr4_optee`). Its `cis.bin` in the ten
-CIS blocks (SNIB header, page 0; the SNIF of `flash_list-fb.sni` record 1,
-W25N01JW, in place of the empty generic one; PNI, page 1), its IPL, IPL_CUST
-and OP-TEE from `0x140000`, our uImage in UBOOT at `0x260000`, the environment at
-`0x580000`. U-Boot runs after OP-TEE. `ms_spinand` reads the SNIB's geometry and
-turns a W25N's buffer mode back on, which this IPL leaves off. qemu `ssc029a`:
-the chain, `nand` erase/write/read against the raw file, env across reset.
-Its `mtdparts` are `1280k(cis),2176k(boot0),2176k(boot1),256k(env),-(ubi)`:
-each boot copy is IPL, IPL_CUST, OP-TEE (`0x60000` each) and UBOOT
-(`0x100000`), so `env` lands at `0x580000` and `ubi` at `0x5C0000`, where
-U-Boot keeps them. The SDK's 5.10 kernel, from a UBI of its `kernel` and
-`rootfs.sqfs`, lists those five partitions and, without gluebi, mounts the
-squashfs through the `ubiblock` override (qemu `ssc029a`).
-029b and 029c have only RTOS/dual-OS NAND sets in the SDK; not built.
+Both read the name-record PNI, as Ifliegen does, and need more than a block a
+stage allows:
 
-### SPI NAND on infinity2m and infinity6c
-
-Nothing is published, so the layouts are the SDKs': infinity2m by its PNI
-(stages repeated over their blocks, `writecis ... 10 0 0 5`: part record 2 in
-blocks 0-8); infinity6c by Maruko's `spinand.squashfs` config, the SNI from its
-flash list (record 1, GD5F1GQ4UEYIH) in all ten CIS blocks. A board with another
-part needs its own record in page 0, as the SDK's `nand probe` writes it.
+- infinity6c: its IPL reads a CIS copy past block 0, so the CIS is in blocks
+  0 and 1 (the SNI the flash list's record 1, GD5F1GQ4UEYIH, BL0PBA 2, one
+  copy, its CRC32), IPL in block 2, IPL_CUST in 3, U-Boot in 4-5. The
+  generic `EE EE` SNI is refused. With the copy elsewhere (block 5) IPL_CUST
+  loads but reads U-Boot back failing its CRC; why, not found.
+- Iford (`ssc029a-nand`, the one SDK spinand set with plain Linux, an OP-TEE
+  one): its IPL takes IPL_CUST, OP-TEE, then UBOOT by name, at any 2 KiB
+  page, which is what lets the 338 KB OP-TEE in: the CIS (the SDK cis.bin's
+  SNIB with W25N01JW's SNIF, BL0PBA 1, one copy, its CRCs; the PNI; its flash
+  list) in block 0, IPL at `0x20000`, IPL_CUST, OP-TEE and our uImage each
+  from the next page, U-Boot ending near `0xB8000`. Block-aligned, they would
+  need 1 MiB. `ms_spinand` turns a W25N's buffer mode back on, which this IPL
+  leaves off. 029b and 029c have only RTOS/dual-OS NAND sets in the SDK; not
+  built.
+- A board with another part needs that part's record in page 0, as the SDK's
+  `nand probe` writes it: the IPLs take their timing from it.
+- infinity6c's IPL reads the environment partition too and prints "env bad
+  CRC" for the format it expects; U-Boot's own environment is unaffected.
 
 ## Hand-off to the kernel
 
@@ -528,13 +523,25 @@ upstream at the time). **Nothing here has run on silicon.**
   back to its 64 MiB values; this takes the largest row under the size
   (256 MiB), as for any size a table lacks. The other parts of these dies reach their
   prompts, and `ssd201`/`ssd202d` pass SD at `0x1410`.
-- SPI NAND, on the same branch: `ssc325de`, `ssc337de` and `ssc338q` boot the
-  published `rootfs.ubi` to `login:`, also after `saveenv` + `reset`; `ssc30kq`,
-  with no firmware published, to U-Boot. On `ssc337de`: `nand` erase, write and
-  read against the raw file; an environment the vendor's U-Boot saved; a factory
-  bad block and `markbad`, surviving a reboot, UBI seeing both; an injected
-  uncorrectable read (-74), a corrected one and a failed erase; TFTP recovery
-  from blank; SD recovery from a FAT card, also on NOR (`ssc337`).
+- SPI NAND, in the 768k/256k/UBIFS layout: from a blank flash, the scan
+  finds no UBI, `fwupd` takes `rootfs.ubifs.<soc>` over TFTP into a new
+  `rootfs` volume (and `rootfs_data`), the next scan finds `/boot/uImage`,
+  and the kernel mounts `root=ubi0:rootfs` to `login:`, again after `saveenv`
+  and `reset`: `ssc325de`, `ssc337de`, `ssc338q` with the published firmware's
+  kernel and rootfs (repacked as UBIFS, the kernel in `/boot`), `ssc377` with
+  mstar-06's Maruko kernel. A test UBIFS needs a journal its volume can hold
+  (`mkfs.ubifs -j`), or U-Boot refuses its superblock. That Maruko kernel has
+  no overlayfs, so `/init` leaves `/` the UBIFS rootfs and inittab remounts it
+  read-write; killed then, its journal is dirty and U-Boot's read-only UBIFS
+  cannot recover the master node, so the scan sends it to recovery, as on
+  HiSilicon. Earlier, in the vendor layout, on `ssc337de`: `nand` erase,
+  write and read against the raw file; a factory bad block and `markbad`,
+  surviving a reboot, UBI seeing both; an injected uncorrectable read (-74), a
+  corrected one and a failed erase; SD recovery from a FAT card, also on NOR
+  (`ssc337`). A bad first eraseblock in `ubi` still finds the marker.
+- Every image, NOR and NAND, as CI's smoke test runs it (two boots to the
+  autoboot prompt, the second loading the environment the first saved), on
+  its own machine: 52 of 52.
 - **Not run on any machine:** media (ISP, encoders); `ssc378*` kernels; 4 KiB page
   NAND; the infinity2m card power pad as a real pad (PAD_TTL0, taken as already
   GPIO). A `ssc338q` at bond 0 (QFN88) boots U-Boot, but both the vendor's and
