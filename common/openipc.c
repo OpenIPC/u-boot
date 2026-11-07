@@ -57,12 +57,15 @@ static int check_ubifs(void *buf) {
 #endif
 
 /* Check for the UBI marker without attaching: attaching an empty MTD
- * would create a fresh UBI on flash. */
+ * would create a fresh UBI on flash. UBI writes an EC header to every
+ * good eraseblock, so the first good one tells; a corrected read
+ * (-EUCLEAN) still holds the data. */
 static int ubi_marker_present(void) {
   struct mtd_info *mtd;
   u8 buf[4];
-  size_t retlen;
-  int ret;
+  size_t retlen = 0;
+  loff_t off;
+  int ret = -ENODEV;
 
   /* Register the mtdparts partitions before looking one up by name */
   mtd_probe_devices();
@@ -70,10 +73,15 @@ static int ubi_marker_present(void) {
   if (IS_ERR(mtd))
     return 0;
 
-  ret = mtd_read(mtd, 0, sizeof(buf), &retlen, buf);
+  for (off = 0; off < mtd->size; off += mtd->erasesize) {
+    if (mtd_block_isbad(mtd, off) > 0)
+      continue;
+    ret = mtd_read(mtd, off, sizeof(buf), &retlen, buf);
+    break;
+  }
   put_mtd_device(mtd);
 
-  return !ret && retlen == sizeof(buf) &&
+  return (!ret || ret == -EUCLEAN) && retlen == sizeof(buf) &&
          get_unaligned_be32(buf) == UBI_EC_HDR_MAGIC;
 }
 #endif
