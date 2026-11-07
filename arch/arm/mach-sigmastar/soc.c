@@ -184,7 +184,9 @@ void ss_set_mem_env(void)
 	unsigned int mib = gd->ram_size / SZ_1M;
 	const struct ss_mem_row *row = ss_mem_table;
 
-	while (row->mib && row->mib != mib)
+	/* The row for this size, or the largest below it: a size the vendor
+	 * has no row for keeps to memory it has */
+	while (row->mib && row->mib > mib)
 		row++;
 	env_set("memlx", row->memlx);
 	env_set("memsz", row->memsz);
