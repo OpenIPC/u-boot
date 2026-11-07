@@ -201,9 +201,8 @@
 #define OPENIPC_NAND_MTDPARTS "768k(boot),256k(env),-(ubi)"
 
 /* Environment lives in the NAND 'env' partition: CONFIG_ENV_OFFSET 0xc0000,
- * CONFIG_ENV_RANGE 0x40000 as on openipc-hisilicon, CONFIG_ENV_SIZE 0x20000
- * so that a bad block in the partition leaves room for it
- * (openipc/nand_config). */
+ * CONFIG_ENV_SIZE and CONFIG_ENV_RANGE 0x40000 (openipc/nand_config), as
+ * on openipc-hisilicon. */
 
 #define CONFIG_BOOTARGS OPENIPC_MEMARGS_HEAD "console=ttyS0,115200 panic=20 init=/init root=ubi0:rootfs rootfstype=ubifs ubi.mtd=2,2048 mtdparts=\\${mtdparts}" OPENIPC_MEMARGS_TAIL " \\${extras}"
 
