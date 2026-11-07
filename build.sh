@@ -151,6 +151,29 @@ build_ifliegen() {
         --out "output/u-boot-${soc}-nor.bin"
 }
 
+# Ifliegen on SPI NAND: the CIS and both boot copies built from the SDK's
+build_ifliegen_nand() {
+    soc=$1
+    builddir=${BOOT_SRCDIR}/output/build-${soc}-nand
+    make_opts="-C ${BOOT_SRCDIR} O=${builddir} -j$(nproc)"
+
+    rm -rf "${builddir}"
+    mkconfig "${builddir}" openipc/openipc_config openipc/ifliegen_config \
+        openipc/${soc}_config openipc/nand_config \
+        openipc/ifliegen_nand_config && \
+    make ${make_opts} olddefconfig </dev/null >/dev/null && \
+    make ${make_opts} </dev/null || return 1
+
+    python3 openipc/sigmastar-image.py --ipl openipc/ifliegen-nand-ipl.bin \
+        --ipl-cust openipc/ifliegen-nand-ipl-cust.bin \
+        --ifliegen-tfa openipc/ifliegen-tf-a.bin \
+        --ifliegen-sni openipc/ifliegen-nand-sni.bin \
+        --ifliegen-sni-list openipc/ifliegen-nand-sni-list.bin \
+        --sni-part 57 --tag IFLG \
+        --uboot "${builddir}/u-boot.bin" --soc "${soc}" \
+        --out "output/u-boot-${soc}-nand.bin"
+}
+
 build_iford_nand() {
     soc=$1
     builddir=${BOOT_SRCDIR}/output/build-${soc}-nand
@@ -196,6 +219,8 @@ build_soc() {
             build_ifliegen "${soc}" ;;
         ssc029a-nand)
             build_iford_nand ssc029a ;;
+        ssc034a-nand|ssc034b-nand)
+            build_ifliegen_nand "${soc%-nand}" ;;
         ssd201-nand|ssd202d-nand|ssr621q-nand)
             build_nand "${soc%-nand}" infinity2m I2M \
                 "--pni-layout --nand-i2m --sni-part 2 --sni-list openipc/infinity2m-nand-sni-list.bin" ;;
@@ -222,7 +247,7 @@ NAND_SOCS="ssd201 ssd202d ssr621q ssc325 ssc325de ssc327de ssc333 ssc335
     ssc335de ssc337 ssc337de ssc30kd ssc30kq ssc338q ssc377 ssc377d ssc377de
     ssc377qe ssc378de ssc378qe"
 ALL_SOCS="${NOR_SOCS} $(for s in ${NAND_SOCS}; do echo "${s}-nand"; done)
-    ssc029a-nand"
+    ssc029a-nand ssc034a-nand ssc034b-nand"
 
 SOCS="$@"
 [ -z "${SOCS}" ] && SOCS="${ALL_SOCS}"

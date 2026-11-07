@@ -126,6 +126,13 @@
 #define OPENIPC_NAND_ROOTADDR 0x4A0000
 #define OPENIPC_NAND_ROOTSIZE 0x7B60000
 #define OPENIPC_NAND_ROOTDEV "mtdblock4"
+#elif defined(CONFIG_SS_IFLIEGEN)
+/* The Ifliegen SDK's: CIS, BOOT and BOOT_BAK, the environment at 0x500000 */
+#define OPENIPC_NAND_MTDPARTS "nand0:1280k(cis),1920k(boot0),1920k(boot1),256k(env),-(ubi)"
+#define OPENIPC_NAND_BOOTSIZE 0x500000
+#define OPENIPC_NAND_ROOTADDR 0x540000
+#define OPENIPC_NAND_ROOTSIZE 0x7AC0000
+#define OPENIPC_NAND_ROOTDEV "mtdblock6"
 #elif defined(CONFIG_SS_IFORD)
 /* The Iford SDK's: CIS, BOOT and its copy, the environment at 0x580000, ubi */
 #define OPENIPC_NAND_MTDPARTS "nand0:1280k(cis),2176k(boot0),2176k(boot1),256k(env),-(ubi)"

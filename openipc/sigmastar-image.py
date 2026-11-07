@@ -176,6 +176,110 @@ def ifliegen(args, ipl, cust):
     print("%s: UBOOT %u of %u bytes" % (args.out, len(img), 0x1C000))
 
 
+def bdma_crc32(buf, crc=0xFFFFFFFF, poly=0xEDB88320):
+    """snigenerator's FLASH_IMPL_BDMA_SW_CRC32, the SNIB's own."""
+    for b in buf:
+        for i in range(8):
+            if ((crc >> 31) ^ (b >> i)) & 1:
+                crc = (((crc << 1) & 0xFFFFFFFF) >> 1) ^ (poly >> 1)
+                crc = ((crc << 1) | 1) & 0xFFFFFFFF
+            else:
+                crc = (crc << 1) & 0xFFFFFFFF
+    return crc
+
+
+def snigen(data, bl0, bl1, page=0, spare=0):
+    """What the SDK's snigenerator does to each 1 KiB SNI record: the boot
+    blocks BL0PBA and BL1PBA (and one block per image, three backups one
+    apart) in the SNIB and every SNIF, then their CRCs."""
+    boot = bytes([bl0, bl1, 0, 3, 1])
+    out = bytearray()
+    for i in range(0, len(data) - 1023, 1024):
+        r = bytearray(data[i:i + 1024])
+        if r[0x100:0x104] != b"SNIF":
+            break
+        snib = r[0:4] == b"SNIB"
+        if snib:
+            r[0x3F:0x44] = boot
+            if page:
+                struct.pack_into("<H", r, 0x36, page)
+            if spare:
+                struct.pack_into("<H", r, 0x34, spare)
+        r[0x127:0x12C] = boot
+        if page:
+            struct.pack_into("<H", r, 0x11A, page)
+        if spare:
+            struct.pack_into("<H", r, 0x118, spare)
+        struct.pack_into("<I", r, 0x104, zlib.crc32(bytes(r[0x108:0x400])))
+        if snib:
+            struct.pack_into("<I", r, 4, bdma_crc32(bytes(r[8:0x80])))
+        out += r
+    return bytes(out)
+
+
+def ifliegen_nand(args):
+    """
+    Ifliegen's SPI NAND (2048+64, 64 pages a block), as its SDK's image.mk
+    and spinand.squashfs.tfa.partition.config lay it out: the CIS in each
+    of the ten CIS blocks (page 0 the SNIB and the part's SNIF, page 1 the
+    PNI, then the flash list), BOOT from 0x140000 (IPL and IPL_CUST three
+    blocks each, a copy in each, TF-A's SP_MIN one block, UBOOT 0x100000
+    with our uImage), BOOT_BAK the same from 0x320000, the environment at
+    0x500000. The IPL takes its timeouts from the SNIF, so the CIS carries
+    a real part's: the flash list's record --sni-part (57, a W25N01GV).
+    """
+    blk = 0x20000
+    payload = lzma.compress(read(args.uboot), format=lzma.FORMAT_XZ,
+                            check=lzma.CHECK_CRC64, preset=6)
+    tag = ("MVX4##%-4s" % args.tag).replace(" ", "#") + "openIPC#CM_UBT2110#XVM"
+    img = uimage(payload, tag[:32], 0x23E00000)
+    # name, room, data, copies in the room; flags as pnigenerator writes them
+    stages = (("IPL", 3 * blk, read(args.ipl), 3),
+              ("IPL_CUST", 3 * blk, read(args.ipl_cust), 3),
+              ("TF_A", blk, read(args.ifliegen_tfa), 1),
+              ("UBOOT", 0x100000, img, 1))
+    cis_size = 10 * blk
+    boot_size = sum(room for _, room, _, _ in stages)
+    env_off = cis_size + 2 * boot_size
+    bl0, bl1 = cis_size // blk, (cis_size + boot_size) // blk
+    out = bytearray(b"\xff" * env_off)
+    parts = [("CIS", 0, cis_size, (0, 1, 1, 0))]
+    for copy, base in enumerate((cis_size, cis_size + boot_size)):
+        off = base
+        for name, room, data, copies in stages:
+            parts.append((name, off, room,
+                          (0, 1, 1, 1) if copy == 0 else (1, 0, 0, 2)))
+            step = room // copies
+            if len(data) > step:
+                sys.exit("%s: %u bytes, it has %u" % (name, len(data), step))
+            for c in range(copies):
+                out[off + c * step:off + c * step + len(data)] = data
+            off += room
+    parts.append(("ENV", env_off, 0x40000, (0, 1, 1, 0)))
+    parts.append(("ubi", env_off + 0x40000, 0x8000000 - env_off - 0x40000,
+                  (0, 1, 1, 0)))
+    recs = b"".join(name.encode().ljust(16, b"\0") + bytes(flags) +
+                    struct.pack("<III", off, size, 0)
+                    for name, off, size, flags in parts)
+    body = struct.pack("<I", len(recs)) + recs
+    pni = b"SSTARSEMICIS0001" + struct.pack("<I", sum(body)) + body
+    sni = bytearray(snigen(read(args.ifliegen_sni), bl0, bl1, 2048, 64))
+    flist = snigen(read(args.ifliegen_sni_list), bl0, bl1)
+    rec = args.sni_part * 1024
+    sni[0x100:0x400] = flist[rec + 0x100:rec + 0x400]
+    cis = bytearray(b"\xff" * 0x1000)
+    cis[0:len(sni)] = sni
+    cis[0x800:0x800 + len(pni)] = pni
+    cis = bytes(cis) + flist
+    if len(cis) > blk:
+        sys.exit("Ifliegen NAND: the CIS does not fit a block")
+    for b in range(10):
+        out[b * blk:b * blk + len(cis)] = cis
+    with open(args.out, "wb") as f:
+        f.write(out)
+    print("%s: UBOOT %u of %u bytes" % (args.out, len(img), 0x100000))
+
+
 def iford_nand(args):
     """
     Iford's SPI NAND, as the SDK's OnebinnandBurnImgConfig.cfg writes it: its
@@ -220,6 +324,8 @@ def main():
     ap.add_argument("--ifliegen-tfa", help="Ifliegen: TF-A's u-bl32.bin")
     ap.add_argument("--ifliegen-nri", help="Ifliegen: flash.nri")
     ap.add_argument("--ifliegen-list", help="Ifliegen: flash_list.nri")
+    ap.add_argument("--ifliegen-sni", help="Ifliegen NAND: flash.sni")
+    ap.add_argument("--ifliegen-sni-list", help="Ifliegen NAND: flash_list.sni")
     ap.add_argument("--iford-nand-cis", help="Iford NAND: the SDK's cis.bin")
     ap.add_argument("--iford-nand-boot",
                     help="Iford NAND: IPL, IPL_CUST, OP-TEE from 0x140000")
@@ -239,6 +345,8 @@ def main():
 
     if args.iford_nand_cis:
         return iford_nand(args)
+    if args.ifliegen_sni:
+        return ifliegen_nand(args)
     ipl, cust = read(args.ipl), read(args.ipl_cust)
     if args.iford_cis:
         return iford(args, ipl, cust)
