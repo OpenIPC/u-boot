@@ -27,7 +27,7 @@ release as `openipc-hisilicon`, `openipc-xm`, `openipc-gk710x` and
 | infinity6 | `ssc325de` `ssc327de` | as `ssc325` | **no silicon**; qemu per-part machine |
 | Iford | `ssc029a` `ssc029b` `ssc029c` | Iford SDK IMD00V2.1.0 boot.bin, `board/iford/boot/nor/ipl` | **no silicon**; only `ssc029c` boots in qemu |
 | Ifado | `ssc375` | Dahua IPC-HDW1433V-A-IL2 NOR (IPL, CIS, IPL_CUST) | **no silicon**; qemu `ssc375`, to the vendor kernel's userspace |
-| Ifliegen | `ssc034a` `ssc034b` | Ifliegen SDK ILSSV01C12 `board/ifliegen/boot` (IPL, IPL_CUST, TF-A `u-bl32.bin`, flash.nri, flash list) | **no silicon**; qemu `ssc034a`/`ssc034b`, to the SDK kernel's shell |
+| Ifliegen | `ssc034a` `ssc034b`, NOR and SPI NAND | Ifliegen SDK ILSSV01C12 `board/ifliegen/boot` (IPL, IPL_CUST, TF-A `u-bl32.bin`, flash.nri/flash.sni, flash lists) | **no silicon**; qemu `ssc034a`/`ssc034b`, to the SDK kernel's shell |
 | SPI NAND | `<soc>-nand` for every infinity2m, 6, 6b0, 6e, 6c part | published images, i2m and Maruko SDKs | **no silicon**; qemu |
 
 OpenIPC/u-boot-sigmastar, the vendor's U-Boot 2015.01 with OpenIPC's
@@ -56,8 +56,7 @@ Adding or dropping a SoC needs both branches:
 
 Not covered: the dies with no OpenIPC use or no IPL in the SDKs at hand
 (infinity5, infinity7, pioneer3, mercury6, souffle); Iford's 029b/029c SPI
-NAND (only RTOS/dual-OS sets in the SDK); Ifliegen's SPI NAND and SD (not
-modelled yet).
+NAND (only RTOS/dual-OS sets in the SDK); Mercury6 (no IPL at hand).
 
 ## Relationship to mainline
 
@@ -174,7 +173,13 @@ images' own: the published NAND images hold the same bytes, and
 - A page load holds the chip select by QSPI's burst bit, and OUT_SIZE counts one
   more than BDMA sends. Whole page and spare go by BDMA; the vendor sends those
   through the FSP, so a spare write takes a path it never does.
-- No infinity6c or infinity2m NAND: nothing is published to compare against.
+- No infinity6c or infinity2m NAND is published to compare against. Run
+  instead (qemu): `ssc377-nand` with mstar-06's Maruko kernel, the UBI
+  written by `run ur` over TFTP (`nand erase`/`write` through infinity6c's
+  software chip select), booted to `login:` with the `ubiblock` override;
+  `ssd202d-nand` with the i2m SDK kernel from a UBI, its UBIFS root mounted.
+  A part whose SNI gives a spare other than 64 or 128 bytes is refused: the
+  core has no layout for it.
 - `root=` follows the partition count (`OPENIPC_NAND_ROOTDEV`): the published
   kernels have gluebi, which makes each UBI volume an MTD after the partitions,
   `kernel` then `rootfs`. So `mtdblock5` behind the default four partitions,
@@ -251,7 +256,16 @@ not Iford's MCM write at bank `0x1132`), with:
 - `memlx`/`memsz`: the SDK's set_config, `0x7FE0000`/`0x5000000` at 128 MiB,
   `0x3FE0000`/`0x2000000` at 64 MiB. Machine 5120 (MACH_TYPE_IFACKEL, its
   U-Boot's); the 4.9 kernel turns the ATAGs into its built-in DT.
-- No SD (not modelled), no SPI NAND yet.
+- SD: SD0, the board's mmc0 (`mmc_host/src/ifliegen`): PADGPIO pads from
+  `0x0F`, card detect at `0x16`, power on PAD_FUART_RTS (`0x34`), the clock
+  as Iford's but SC_GP_CTRL at bank `0x1133`, the host's MCG off.
+- SPI NAND (`ssc034a-nand`, `ssc034b-nand`): `--ifliegen-sni` builds the CIS
+  in ten blocks (SNIB and SNIF, the PNI, the flash list, with snigenerator's
+  boot blocks 10 and 25 and CRCs), BOOT at `0x140000` (IPL and IPL_CUST three
+  blocks each, SP_MIN, a 1 MiB UBOOT), BOOT_BAK at `0x320000`, the
+  environment at `0x500000`, UBI from `0x540000`. The IPL takes its
+  timeouts from the SNIF: the CIS carries the flash list's W25N01GV, record
+  57; the SDK's generic record has none and the IPL fails to load.
 
 The SGS kernels (Iford, Ifliegen, Ifado: `drivers/sgs_common/flash/nor`) name
 the NOR `nor0`, not the older `NOR_FLASH`: `SFC` in
@@ -259,7 +273,10 @@ the NOR `nor0`, not the older `NOR_FLASH`: `SFC` in
 write/read and the raw file, env across reset, ping, TFTP CRC, the SDK's
 4.9.84 kernel (mstar-06's build) from OpenIPC's NOR layout, both CPUs by
 PSCI, the six partitions, squashfs root to a shell (`extras=init=/linuxrc`
-for its rootfs).
+for its rootfs). SD (mstar-06's model): detect, 4-bit, FAT load CRC, raw
+write and read-back. NAND: the chain, `nand` erase/write/read against the
+raw file, env across reset, the SDK kernel from an OpenIPC UBI to a shell
+with the `ubiblock` override.
 
 ### Iford SPI NAND
 
@@ -507,7 +524,9 @@ upstream at the time). **Nothing here has run on silicon.**
   compared; `saveenv`, `reset`; ping and TFTP; SD; an OpenIPC kernel to `login:`
   (not past it, so no shell-side checks); a saved vendor environment upgraded.
   `memlx` and `memsz` per RAM size match the vendor's on 6 and 6b0 (64-256),
-  6e (128-1024) and 6c (64-512). The other parts of these dies reach their
+  6e (128-1024) and 6c (64-256). At 512 MiB the vendor's infinity6c falls
+  back to its 64 MiB values; this takes the largest row under the size
+  (256 MiB), as for any size a table lacks. The other parts of these dies reach their
   prompts, and `ssd201`/`ssd202d` pass SD at `0x1410`.
 - SPI NAND, on the same branch: `ssc325de`, `ssc337de` and `ssc338q` boot the
   published `rootfs.ubi` to `login:`, also after `saveenv` + `reset`; `ssc30kq`,
