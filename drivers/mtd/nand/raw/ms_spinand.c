@@ -274,6 +274,8 @@ static void bdma_start(u16 path, u32 src, u32 dst, u32 len)
 {
 	writew(0, BDMA_CTRL);
 	writew(path, BDMA_PATH);
+	/* channel 0 to MIU0: 0 on every die, as the vendor's SPI NAND driver
+	 * (drvSPINAND_common_hal.c) writes it, unlike its NOR flash_isp */
 	writew(0, BDMA_PATH2);
 	writew(src & 0xffff, BDMA_SRC_L);
 	writew(src >> 16, BDMA_SRC_H);
@@ -714,7 +716,9 @@ void board_nand_init(void)
 		printf("NAND: no SPI NAND with an SNI\n");
 		return;
 	}
+	/* 64 bytes take ms_ecclayout, 128 the core's; it has none for others */
 	if (ms->page_size + ms->spare_size > SZ_16K ||
+	    (ms->spare_size != 64 && ms->spare_size != 128) ||
 	    !ms->page_size || !ms->blk_pages || !ms->blocks) {
 		printf("NAND: SNI says %u+%u bytes, %u pages, %u blocks\n",
 		       ms->page_size, ms->spare_size, ms->blk_pages,
