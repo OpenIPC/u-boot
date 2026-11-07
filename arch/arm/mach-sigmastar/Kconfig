@@ -24,10 +24,226 @@ config TARGET_MSC316DM
 	  infinity3, QFN, 128 MiB of DDR in the package (the SDK's QFN128M
 	  board).
 
+config TARGET_SSC325
+	bool "SSC325"
+	select SS_INFINITY6
+	help
+	  infinity6. The IPL sets up the DDR; dram_init() reads its size
+	  from the MIU.
+
+config TARGET_SSC325DE
+	bool "SSC325DE"
+	select SS_INFINITY6
+	help
+	  infinity6, as the SSC325. OpenIPC ships it on SPI NAND.
+
+config TARGET_SSC327DE
+	bool "SSC327DE"
+	select SS_INFINITY6
+	help
+	  infinity6, as the SSC325.
+
+config TARGET_SSR621Q
+	bool "SSR621Q"
+	select SS_INFINITY2M
+	help
+	  infinity2m with 256 MiB of DDR, on Xiongmai's NVRs.
+
+config TARGET_SSC375
+	bool "SSC375"
+	select SS_IFADO
+	help
+	  Ifado (SSC032B), QFN88 with 128 MiB of DDR3, in Dahua cameras.
+	  The infinity2m map with infinity6c's FSP-QSPI.
+
+config TARGET_SSC029A
+	bool "SSC029A"
+	select SS_IFORD
+	help
+	  Iford, BGA with 512 MiB of DDR4.
+
+config TARGET_SSC029B
+	bool "SSC029B"
+	select SS_IFORD
+	help
+	  Iford, BGA with 256 MiB of DDR3.
+
+config TARGET_SSC029C
+	bool "SSC029C"
+	select SS_IFORD
+	help
+	  Iford, QFN128 with 128 MiB of DDR3.
+
+config TARGET_SSC034A
+	bool "SSC034A"
+	select SS_IFLIEGEN
+	help
+	  Ifliegen, QFN128 with 128 MiB of DDR3.
+
+config TARGET_SSC034B
+	bool "SSC034B"
+	select SS_IFLIEGEN
+	help
+	  Ifliegen, QFN88 with 64 MiB of DDR3.
+
+config TARGET_SSC333
+	bool "SSC333"
+	select SS_INFINITY6B0
+	help
+	  infinity6b0. The IPL sets up the DDR; dram_init() reads its size
+	  from the MIU.
+
+config TARGET_SSC335
+	bool "SSC335"
+	select SS_INFINITY6B0
+	help
+	  infinity6b0. The IPL sets up the DDR; dram_init() reads its size
+	  from the MIU.
+
+config TARGET_SSC335DE
+	bool "SSC335DE"
+	select SS_INFINITY6B0
+	help
+	  infinity6b0. The IPL sets up the DDR; dram_init() reads its size
+	  from the MIU.
+
+config TARGET_SSC337
+	bool "SSC337"
+	select SS_INFINITY6B0
+	help
+	  infinity6b0. The IPL sets up the DDR; dram_init() reads its size
+	  from the MIU.
+
+config TARGET_SSC337DE
+	bool "SSC337DE"
+	select SS_INFINITY6B0
+	help
+	  infinity6b0. The IPL sets up the DDR; dram_init() reads its size
+	  from the MIU.
+
+config TARGET_SSC30KD
+	bool "SSC30KD"
+	select SS_INFINITY6E
+	help
+	  infinity6e. The IPL sets up the DDR; dram_init() reads its size
+	  from the MIU.
+
+config TARGET_SSC30KQ
+	bool "SSC30KQ"
+	select SS_INFINITY6E
+	help
+	  infinity6e. The IPL sets up the DDR; dram_init() reads its size
+	  from the MIU.
+
+config TARGET_SSC338Q
+	bool "SSC338Q"
+	select SS_INFINITY6E
+	help
+	  infinity6e. The IPL sets up the DDR; dram_init() reads its size
+	  from the MIU.
+
+config TARGET_SSC377
+	bool "SSC377"
+	select SS_INFINITY6C
+	help
+	  infinity6c. The IPL sets up the DDR; dram_init() reads its size
+	  from the MIU.
+
+config TARGET_SSC377D
+	bool "SSC377D"
+	select SS_INFINITY6C
+	help
+	  infinity6c. The IPL sets up the DDR; dram_init() reads its size
+	  from the MIU.
+
+config TARGET_SSC377DE
+	bool "SSC377DE"
+	select SS_INFINITY6C
+	help
+	  infinity6c. The IPL sets up the DDR; dram_init() reads its size
+	  from the MIU.
+
+config TARGET_SSC377QE
+	bool "SSC377QE"
+	select SS_INFINITY6C
+	help
+	  infinity6c. The IPL sets up the DDR; dram_init() reads its size
+	  from the MIU.
+
+config TARGET_SSC378DE
+	bool "SSC378DE"
+	select SS_INFINITY6C
+	help
+	  infinity6c. The IPL sets up the DDR; dram_init() reads its size
+	  from the MIU.
+
+config TARGET_SSC378QE
+	bool "SSC378QE"
+	select SS_INFINITY6C
+	help
+	  infinity6c. The IPL sets up the DDR; dram_init() reads its size
+	  from the MIU.
+
+config TARGET_SSD201
+	bool "SSD201"
+	select SS_INFINITY2M
+	help
+	  infinity2m, 64 MiB of DDR in the package.
+
+config TARGET_SSD202D
+	bool "SSD202D"
+	select SS_INFINITY2M
+	help
+	  infinity2m, 128 MiB of DDR in the package.
+
 endchoice
 
 config SS_INFINITY3
 	bool
+
+config SS_INFINITY2M
+	bool
+
+config SS_INFINITY6
+	bool
+
+config SS_INFINITY6B0
+	bool
+
+config SS_INFINITY6E
+	bool
+
+config SS_INFINITY6C
+	bool
+
+config SS_IFORD
+	bool
+
+config SS_IFADO
+	bool
+
+config SS_IFLIEGEN
+	bool
+
+# Iford and Ifliegen: the FSP at 0x100D, BDMA from MIU by channel 1, no MIU
+# write pipe to flush
+config SS_IFORD_FAMILY
+	def_bool SS_IFORD || SS_IFLIEGEN
+
+# What infinity6c, Iford and Ifliegen share: the boot flash's chip select in
+# software, the Ethernet PHY at bank 0x1518 (and, but on Ifliegen, the DDR
+# size in bank 0x1659)
+config SS_I6C_FAMILY
+	def_bool SS_INFINITY6C || SS_IFORD || SS_IFLIEGEN
+
+# The FSP-QSPI whose chip select the boot flash's driver holds in software
+config SS_FSP_SW_CS
+	def_bool SS_I6C_FAMILY || SS_IFADO
+
+# The dies booted with OpenIPC's LX_MEM/mma_heap arguments, whose values
+# depend on the DDR size
+config SS_MMA_BOOTARGS
+	def_bool SS_INFINITY2M || SS_INFINITY6 || SS_INFINITY6B0 || SS_INFINITY6E || SS_I6C_FAMILY || SS_IFADO
 
 config SYS_SOC
 	default "sigmastar"
@@ -36,7 +252,7 @@ config SYS_VENDOR
 	default "sigmastar"
 
 config SYS_BOARD
-	default "infinity3"
+	default "ipc"
 
 config SYS_CONFIG_NAME
 	default "sigmastar"

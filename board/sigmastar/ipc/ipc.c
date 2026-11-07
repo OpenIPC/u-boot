@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * SigmaStar infinity3 camera board, after the vendor U-Boot 2015.01
- * (arch/arm/cpu/armv7/infinity3/board.c).
+ * SigmaStar camera board, after the vendor U-Boot 2015.01
+ * (arch/arm/cpu/armv7/<die>/board.c).
  */
 
 #include <common.h>
@@ -16,12 +16,15 @@ DECLARE_GLOBAL_DATA_PTR;
 
 int board_init(void)
 {
-	gd->bd->bi_boot_params = SS_DDR_BASE + 0x100;
+	gd->bd->bi_boot_params = SS_BOOT_PARAMS;
 	return 0;
 }
 
 int misc_init_r(void)
 {
+#ifdef CONFIG_SS_MMA_BOOTARGS
+	ss_set_mem_env();
+#endif
 	return openipc_helper();
 }
 
