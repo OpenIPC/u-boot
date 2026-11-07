@@ -286,8 +286,10 @@ Every infinity2m, infinity6, 6b0, 6e and 6c part also builds for SPI NAND,
   partition table at `0x3000`, the vendor IPL at `0x4000`, IPL_CUST at
   `0x10000`, and U-Boot (xz uImage) at `0x20000`. From infinity2m on, the
   IPL is at `0` and the table at `0xF000` (infinity6c: `0x9000`).
-- The infinity6, Iford, Ifado and Ifliegen images have **not run on silicon**, only under qemu,
-  and are only in this repository's `sigmastar` release. Cameras get `u-boot-ssc*` from OpenIPC/u-boot-sigmastar.
+- The infinity6, Iford, Ifado and Ifliegen images have **not run on silicon**. They
+  were booted under qemu's per-die machines during development; CI boots only the
+  infinity3 and infinity2m legs and builds and fit-checks the rest. They are only in
+  this repository's `sigmastar` release. Cameras get `u-boot-ssc*` from OpenIPC/u-boot-sigmastar.
 - The SPI NAND images are 2 MiB: SNI at `0`, PNI at `0x800`, IPL, IPL_CUST
   and U-Boot twice each from `0x40000`, the environment at `0x200000`, then
   UBI, whose volumes `kernel` and `rootfs` hold the firmware.

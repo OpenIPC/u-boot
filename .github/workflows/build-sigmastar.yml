@@ -172,8 +172,18 @@ jobs:
             done
             [ "$found" = 1 ] || { echo "missing ${kind} image for ${soc} (${pattern})" >&2; rc=1; }
           }
+          # SPI NAND: the boot area ends where the die's environment
+          # starts (include/configs/openipc-common.h on openipc-sigmastar):
+          # 0x200000, infinity2m 0x440000, infinity6c 0x4C0000, Iford
+          # 0x580000.
           case "${soc}" in
-            *-nand) check_kind nand 8192 "output/u-boot-${soc}.bin" ;;
+            ssd201-nand|ssd202d-nand|ssr621q-nand)
+              check_kind nand 4352 "output/u-boot-${soc}.bin" ;;
+            ssc377*-nand|ssc378*-nand)
+              check_kind nand 4864 "output/u-boot-${soc}.bin" ;;
+            ssc029a-nand)
+              check_kind nand 5632 "output/u-boot-${soc}.bin" ;;
+            *-nand) check_kind nand 2048 "output/u-boot-${soc}.bin" ;;
             *) check_kind nor 256 "output/u-boot-${soc}-nor.bin" ;;
           esac
           exit $rc

@@ -132,9 +132,7 @@ The build logic lives here. Other branches call it:
     environment CRC.
 - **Release and publish:**
   - `release` uploads to the `gk710x` tag.
-  - `publish` is commented out for now: SigmaStar images go only to the
-    `sigmastar` release. When it returns, it shares the
-    `publish-firmware-latest` concurrency group and
+  - `publish` shares the `publish-firmware-latest` concurrency group and
     reports a `uboot-gk710x-…` build id.
   - openipc.org accepts the report only from workflows it allowlists
     (OpenIPC/website `service/internal/builds/verify.go`). `build-gk710x.yml`
@@ -268,9 +266,11 @@ The build logic lives here. Other branches call it:
 ## `build-sigmastar.yml`
 
 - It is `build-anyka.yml` for `openipc-sigmastar`: the same job graph and
-  `resolve`/`ref` rules, NOR only (256 KiB boot partition: MXP table,
-  the vendor IPL and IPL_CUST, U-Boot in the 128 KiB MXP partition
-  `UBOOT`).
+  `resolve`/`ref` rules, NOR and SPI NAND. A NOR image is the 256 KiB
+  boot partition (the vendor's IPL, IPL_CUST and on Ifliegen TF-A, the
+  die's flash table, U-Boot). A SPI NAND one is the boot area up to the
+  die's environment, as the fit check limits it: 2 MiB, 4352 KiB on
+  infinity2m, 4864 KiB on infinity6c, 5632 KiB on Iford.
 - **Images are not machines:** the infinity3 legs, the MSC316 ones too,
   boot on `-M msc313e` (#213 or later); the MSC316 IPL sizes its 64 MiB.
   `ssd201` and `ssd202d` boot on their own machines. The other legs are
@@ -283,8 +283,10 @@ The build logic lives here. Other branches call it:
   `Hit Ctrl-C`, and fails if the second boot reports a bad environment CRC.
 - **Release and publish:**
   - `release` uploads to the `sigmastar` tag.
-  - `publish` shares the `publish-firmware-latest` concurrency group and
-    reports a `uboot-sigmastar-…` build id. No other repository
+  - `publish` is commented out for now, with its input: SigmaStar images
+    go only to the `sigmastar` release. When it returns, it shares the
+    `publish-firmware-latest` concurrency group and reports a
+    `uboot-sigmastar-…` build id. No other repository
     publishes `u-boot-msc31*` names to `latest`, and `PUBLISH_GLOB` keeps
     `publish` to those: `u-boot-ssc*` in `latest` are
     OpenIPC/u-boot-sigmastar's vendor U-Boot, which cameras flash, and the
