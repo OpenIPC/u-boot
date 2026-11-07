@@ -48,7 +48,9 @@
 #define OPENIPC_ROOTADDR	0x250000
 #define OPENIPC_ROOTSIZE	0x500000
 
-#define OPENIPC_FW_FILE		"firmware.${soc}"
+/* the split package's image, firmware.bin.<soc>; spelled out here, as
+ * urfile is: U-Boot does not expand a variable inside another's value */
+#define OPENIPC_FW_FILE		"firmware.bin." CONFIG_PRODUCT_SOC
 
 /*
  * What the kernel is told about memory: mem= on infinity3; LX_MEM and the
@@ -111,79 +113,9 @@
 	"fwrecovery=if env exists bootfail; then run fwupd; sleep 5; reset; fi\0" \
 	"bootflash=run fwrecovery; setenv setargs setenv bootargs ${bootargs}; run setargs; run loadkernel; bootm ${baseaddr}; reset\0"
 
-#ifdef CONFIG_ENV_IS_IN_NAND
+#ifndef CONFIG_NAND_MS_SPINAND
 
-/*
- * SPI NAND, in the layout of OpenIPC/u-boot-sigmastar, whose saved
- * environments have to keep working: the boot partitions, the environment
- * and one UBI device, with the kernel and a squashfs rootfs in volumes of
- * their own. "mtdparts" holds the kernel argument whole.
- */
-#ifdef CONFIG_SS_INFINITY2M
-/* Its PNI puts the stages further up: env in blocks 34-36, then ubi */
-#define OPENIPC_NAND_MTDPARTS "nand0:4352k(boot),384k(env),-(ubi)"
-#define OPENIPC_NAND_BOOTSIZE 0x440000
-#define OPENIPC_NAND_ROOTADDR 0x4A0000
-#define OPENIPC_NAND_ROOTSIZE 0x7B60000
-#define OPENIPC_NAND_ROOTDEV "mtdblock4"
-#elif defined(CONFIG_SS_IFLIEGEN)
-/* The Ifliegen SDK's: CIS, BOOT and BOOT_BAK, the environment at 0x500000 */
-#define OPENIPC_NAND_MTDPARTS "nand0:1280k(cis),1920k(boot0),1920k(boot1),256k(env),-(ubi)"
-#define OPENIPC_NAND_BOOTSIZE 0x500000
-#define OPENIPC_NAND_ROOTADDR 0x540000
-#define OPENIPC_NAND_ROOTSIZE 0x7AC0000
-#define OPENIPC_NAND_ROOTDEV "mtdblock6"
-#elif defined(CONFIG_SS_IFORD)
-/* The Iford SDK's: CIS, BOOT and its copy, the environment at 0x580000, ubi */
-#define OPENIPC_NAND_MTDPARTS "nand0:1280k(cis),2176k(boot0),2176k(boot1),256k(env),-(ubi)"
-#define OPENIPC_NAND_BOOTSIZE 0x580000
-#define OPENIPC_NAND_ROOTADDR 0x5C0000
-#define OPENIPC_NAND_ROOTSIZE 0x7A40000
-#define OPENIPC_NAND_ROOTDEV "mtdblock6"
-#elif defined(CONFIG_SS_I6C_FAMILY)
-/* The SDK's: the CIS, BOOT and BOOT_BAK, the environment, ubi */
-#define OPENIPC_NAND_MTDPARTS "nand0:1280k(cis),1792k(boot0),1792k(boot1),256k(env),-(ubi)"
-#define OPENIPC_NAND_BOOTSIZE 0x4C0000
-#define OPENIPC_NAND_ROOTADDR 0x500000
-#define OPENIPC_NAND_ROOTSIZE 0x7B00000
-#define OPENIPC_NAND_ROOTDEV "mtdblock6"
-#else
-#define OPENIPC_NAND_MTDPARTS "nand0:1024k(boot0),1024k(boot1),256k(env),-(ubi)"
-#define OPENIPC_NAND_BOOTSIZE 0x200000
-#define OPENIPC_NAND_ROOTADDR 0x240000
-#define OPENIPC_NAND_ROOTSIZE 0x7DC0000
-#define OPENIPC_NAND_ROOTDEV "mtdblock5"
-#endif
-/*
- * The rootfs volume as the OpenIPC kernels number it: gluebi makes each
- * UBI volume an MTD after the partitions, kernel then rootfs. A kernel
- * without gluebi takes extras="ubi.block=0,rootfs root=/dev/ubiblock0_1
- * rootfstype=squashfs", the later root= winning.
- */
-
-/* As the firmware's own volume holds it, 34 LEBs of 126976 bytes */
-#define OPENIPC_KERNEL_VOLUME_SIZE "0x400000"
-
-#define CONFIG_BOOTARGS "console=ttyS0,115200 panic=20 root=/dev/" OPENIPC_NAND_ROOTDEV " init=/init ubi.mtd=ubi \\${mtdparts}" OPENIPC_MEMARGS_TAIL " \\${extras}"
-
-/* rootfs.ubi carries the kernel volume too */
-#define OPENIPC_FWUPD "fwupd=run ur\0"
-
-#define OPENIPC_LOADKERNEL "ubi part ubi; ubi read ${baseaddr} kernel"
-#define OPENIPC_ENV_MEDIUM \
-	"ubfile=u-boot-" CONFIG_PRODUCT_SOC "-nand.bin\0" \
-	"urfile=rootfs.ubi." CONFIG_PRODUCT_SOC "\0" \
-	"rootaddr=" __stringify(OPENIPC_NAND_ROOTADDR) "\0" \
-	"rootsize=" __stringify(OPENIPC_NAND_ROOTSIZE) "\0" \
-	"ubwrite=nand erase 0x0 " __stringify(OPENIPC_NAND_BOOTSIZE) "; nand write ${baseaddr} 0x0 ${filesize}\0" \
-	"ukwrite=ubi part ubi; ubi write ${baseaddr} kernel ${filesize}\0" \
-	"urwrite=nand erase ${rootaddr} ${rootsize}; nand write ${baseaddr} ${rootaddr} ${filesize}\0" \
-	"loadkernel=" OPENIPC_LOADKERNEL "\0" \
-	"mtdids=nand0=nand0\0" \
-	"mtdparts=mtdparts=" OPENIPC_NAND_MTDPARTS "\0" \
-	"bootargs=" CONFIG_BOOTARGS
-
-#else /* !CONFIG_ENV_IS_IN_NAND */
+/* ---------- SPI NOR ---------- */
 
 /*
  * The flash's MTD name in the vendor kernels: drivers/mstar/flash_isp's
@@ -199,8 +131,44 @@
 
 #define CONFIG_BOOTARGS OPENIPC_MEMARGS_HEAD "console=ttyS0,115200 panic=20 root=/dev/mtdblock3 rootfstype=squashfs init=/init mtdparts=\\${mtdparts}" OPENIPC_MEMARGS_TAIL " \\${extras}"
 
-/* Recovery: the rootfs is fetched first so its size selects the NOR schema */
-#define OPENIPC_FWUPD "fwupd=run ur; run uk\0"
+/*
+ * Recovery: the rootfs is fetched first so its size selects the NOR schema.
+ * It starts from the lite layout, not from what the scan found: on a camera
+ * that still holds its vendor firmware the scan reports the vendor's
+ * offsets, and writing OpenIPC there left the kernel write erasing the
+ * start of the new rootfs.
+ */
+#ifdef CONFIG_OPENIPC_NOR_SPLIT
+/*
+ * The split layout: the whole firmware file, written
+ * where the firmware starts, when the server has one that fits the firmware
+ * area; else -- none, an empty one, or one too big for the chip -- the
+ * fixed-slot pair as before. common/openipc.c turns a saved fwupd of exactly the
+ * legacy form into this one.
+ */
+#define OPENIPC_FWUPD_SPLIT_CMD \
+	"if ${source} ${baseaddr} ${fwfile} && itest ${filesize} -gt 0 && itest ${filesize} -le ${fwsize}; " \
+	"then run fwwrite; else run mtdslite; run ur; run uk; fi"
+#define OPENIPC_FWUPD_LEGACY_CMD "run mtdslite; run ur; run uk"
+/*
+ * The whole firmware area (the scan sets fwsize to the end of the chip), and
+ * only for a file that fits it: an oversized download must not erase the
+ * firmware it cannot replace.
+ */
+#define OPENIPC_FWWRITE_SPLIT_CMD \
+	"sf probe 0; if itest ${filesize} -gt 0; then if itest ${filesize} -le ${fwsize}; then " \
+	"sf erase ${kernaddr} ${fwsize}; sf write ${baseaddr} ${kernaddr} ${filesize}; " \
+	"else echo fwwrite: ${filesize} bytes do not fit ${fwsize} from ${kernaddr}, nothing written; fi; " \
+	"else echo fwwrite: empty file, nothing written; fi"
+#define OPENIPC_FWUPD \
+	"fwfile=" OPENIPC_FW_FILE "\0" \
+	"fwupd=" OPENIPC_FWUPD_SPLIT_CMD "\0"
+#define OPENIPC_FWWRITE "fwwrite=" OPENIPC_FWWRITE_SPLIT_CMD "\0"
+#else
+#define OPENIPC_FWUPD "fwupd=run mtdslite; run ur; run uk\0"
+#define OPENIPC_FWWRITE \
+	"fwwrite=sf probe 0; sf erase ${kernaddr} ${filesize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0"
+#endif
 
 #define OPENIPC_LOADKERNEL "sf probe 0; sf read ${baseaddr} ${kernaddr} ${kernsize}"
 #define OPENIPC_ENV_MEDIUM \
@@ -210,19 +178,62 @@
 	"kernsize=" __stringify(OPENIPC_KERNSIZE) "\0" \
 	"rootaddr=" __stringify(OPENIPC_ROOTADDR) "\0" \
 	"rootsize=" __stringify(OPENIPC_ROOTSIZE) "\0" \
-	"mtdslite=setenv kernsize 0x200000; setenv rootaddr 0x250000; setenv rootsize 0x500000\0" \
+	"mtdslite=setenv kernaddr " __stringify(OPENIPC_KERNADDR) "; setenv kernsize 0x200000; setenv rootaddr 0x250000; setenv rootsize 0x500000\0" \
 	"mtdsultimate=setenv kernsize 0x300000; setenv rootaddr 0x350000; setenv rootsize 0xa00000\0" \
 	"ubwrite=sf probe 0; sf erase 0x0 ${kernaddr}; sf write ${baseaddr} 0x0 ${filesize}\0" \
 	"ukwrite=sf probe 0; sf erase ${kernaddr} ${kernsize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0" \
 	"urwrite=sf probe 0; if itest ${filesize} -gt 500000; then run mtdsultimate; fi; sf erase ${rootaddr} ${rootsize}; sf write ${baseaddr} ${rootaddr} ${filesize}\0" \
-	"fwwrite=sf probe 0; sf erase ${kernaddr} ${filesize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0" \
+	OPENIPC_FWWRITE \
 	"loadkernel=" OPENIPC_LOADKERNEL "\0" \
 	"mtdids=" SFC "\0" \
 	"mtds=" OPENIPC_MTDPARTS "\0" \
 	"mtdparts=" SFC ":" OPENIPC_MTDPARTS "\0" \
 	"bootargs=" CONFIG_BOOTARGS
 
-#endif /* CONFIG_ENV_IS_IN_NAND */
+#else /* CONFIG_NAND_MS_SPINAND */
+
+/* ---------- SPI NAND ---------- */
+
+/* The flash's MTD name in the vendor kernels (mtdparts=nand0:...) */
+#define SFC "nand0"
+
+/* NAND partition list; composed the same way. */
+#define OPENIPC_NAND_MTDPARTS "768k(boot),256k(env),-(ubi)"
+
+/* Environment lives in the NAND 'env' partition: CONFIG_ENV_OFFSET 0xc0000,
+ * CONFIG_ENV_RANGE 0x40000 as on openipc-hisilicon, CONFIG_ENV_SIZE 0x20000
+ * so that a bad block in the partition leaves room for it
+ * (openipc/nand_config). */
+
+#define CONFIG_BOOTARGS OPENIPC_MEMARGS_HEAD "console=ttyS0,115200 panic=20 init=/init root=ubi0:rootfs rootfstype=ubifs ubi.mtd=2,2048 mtdparts=\\${mtdparts}" OPENIPC_MEMARGS_TAIL " \\${extras}"
+
+/*
+ * The NAND layout is one UBI device after boot and env, holding the UBIFS
+ * rootfs with the kernel inside it -- /boot/fitImage, or /boot/uImage on a
+ * build without a FIT -- and rootfs_data on the rest. No flash is set aside
+ * for a kernel: the rootfs volume is sized to its image. This is the layout
+ * of openipc-hisilicon's NAND images.
+ *
+ * Recovery rewrites the rootfs volume only, sized to the image, with
+ * rootfs_data taking the rest. Only a rootfs that grew beyond what the old
+ * volume could give costs the data volume, as U-Boot cannot resize UBI
+ * volumes; else rootfs_data is preserved.
+ */
+#define OPENIPC_FWUPD "fwupd=run ur\0"
+
+#define OPENIPC_LOADKERNEL "ubi part ubi; ubifsmount ubi0:rootfs; ubifsload ${baseaddr} /boot/fitImage || ubifsload ${baseaddr} /boot/uImage"
+#define OPENIPC_ENV_MEDIUM \
+	"ubfile=u-boot-" CONFIG_PRODUCT_SOC "-nand.bin\0" \
+	"urfile=rootfs.ubifs." CONFIG_PRODUCT_SOC "\0" \
+	"ubwrite=if itest ${filesize} -gt 0 && itest ${filesize} -le 0xc0000; then nand erase.part boot; nand write ${baseaddr} boot ${filesize}; else echo ubwrite: ${filesize} bytes do not fit the 768 KiB boot partition, nothing written; fi\0" \
+	"urwrite=ubi part ubi; ubi check rootfs && ubi remove rootfs; if ubi create rootfs ${filesize} d; then ubi check rootfs; else ubi remove rootfs_data; ubi create rootfs ${filesize} d; fi; ubi check rootfs_data || ubi create rootfs_data 0 d; ubi write ${baseaddr} rootfs ${filesize}\0" \
+	"loadkernel=" OPENIPC_LOADKERNEL "\0" \
+	"mtdids=nand0=" SFC "\0" \
+	"mtds=" OPENIPC_NAND_MTDPARTS "\0" \
+	"mtdparts=" SFC ":" OPENIPC_NAND_MTDPARTS "\0" \
+	"bootargs=" CONFIG_BOOTARGS
+
+#endif /* CONFIG_NAND_MS_SPINAND */
 
 #define CONFIG_BOOTCOMMAND "run bootflash"
 

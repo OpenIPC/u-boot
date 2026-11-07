@@ -1014,14 +1014,6 @@ config OPENIPC
 	  (common/openipc.c), driven from the board's misc_init_r(), with the
 	  default environment in include/configs/openipc-common.h.
 
-config OPENIPC_NAND_KERNEL_VOLUME
-	bool "NAND firmware keeps the kernel in its own UBI volume"
-	depends on OPENIPC
-	help
-	  The layout of OpenIPC's SigmaStar NAND images: UBI volumes kernel
-	  and rootfs, a squashfs. Without it, the kernel is a file in the
-	  UBIFS rootfs.
-
 config PRODUCT_SOC
 	string "Product SoC name"
 	default SYS_CONFIG_NAME
@@ -1035,3 +1027,13 @@ config PRODUCT_SOCMODEL
 	help
 	  Optional board/binning model exposed as 'socmodel=' in the default
 	  environment.
+
+config OPENIPC_NOR_SPLIT
+	bool "OpenIPC: recognise the split NOR layout (uImage + squashfs in one partition)"
+	help
+	  A uImage at the NOR kernel offset with the root squashfs at the next
+	  64 KiB block after it is taken for the split layout: one "firmware"
+	  partition the kernel divides at boot. The
+	  kernel is told nothing about it: the fixed-slot mtdparts and root=
+	  of a saved environment are dropped, and bootm checks the uImage CRC.
+	  Only for boards whose kernel knows the layout.

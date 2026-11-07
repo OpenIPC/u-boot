@@ -19,12 +19,10 @@ named by the 32-byte MVX tag. It unpacks it to where U-Boot is linked,
   sigmastar-image.py --ipl F --ipl-cust F (--mxp F | --gcis F)
                      --tag TAG --uboot u-boot.bin --soc SOC --out F
 
-On SPI NAND (--nand), the SNI (--gcis) in page 0 and the PNI (--pni) in page 1,
-then make_boot_spinand.sh's 2 MiB: IPL at 0x40000 and 0x80000, IPL_CUST at
-0xC0000 and 0x100000, U-Boot at 0x140000 and 0x1A0000. That is what OpenIPC
-publishes, whatever the PNI says: infinity6's table has its stages further up
-and its images boot regardless. Nothing is published for infinity2m, so
---pni-layout puts each stage where its SDK's PNI says.
+On SPI NAND (--nand), OpenIPC's 768k(boot),256k(env),-(ubi): the SNI (--gcis,
+or for infinity2m --sni-list's record) in page 0 and the PNI (--pni, its
+records rewritten) in page 1 of block 0, IPL in block 1, IPL_CUST in block 2,
+U-Boot in blocks 3-5, one copy each; the environment at 0xC0000.
 """
 
 import argparse
@@ -39,26 +37,11 @@ GCIS_OFF, MXP_OFF = 0x9000, 0xF000
 CUST_OFF, CUST_SIZE = 0x10000, 0xF000
 UBOOT_OFF, UBOOT_SIZE = 0x20000, 0x20000
 
-NAND_BOOT_SIZE = 0x200000
-NAND_IPL_OFFS = (0x40000, 0x80000)
-NAND_CUST_OFFS = (0xC0000, 0x100000)
-NAND_UBOOT_OFFS = (0x140000, 0x1A0000)
+# OpenIPC's SPI NAND: 768k(boot),256k(env),-(ubi)
+NAND_ENV_OFF, NAND_UBI_OFF = 0xC0000, 0x100000
 
 # The PNI's partition types
 PNI_IPL_CUST, PNI_IPL, PNI_UBOOT, PNI_ENV = 1, 3, 6, 13
-
-
-def pni_layout(pni):
-    """Each partition's copies, in bytes, from the IPL's own table."""
-    spare, page, pages, blocks, count, unit = struct.unpack_from("<6H", pni, 4)
-    block = page * pages
-    recs = [struct.unpack_from("<4H", pni, 16 + i * 8) for i in range(count)]
-    parts = {}
-    for start, cnt, kind, backup in recs:
-        # a partition holds its piece once per cnt blocks, backups included
-        for k in range((cnt + backup) // cnt if cnt else 1):
-            parts.setdefault(kind, []).append((start + k * cnt) * block)
-    return parts
 
 
 def uimage(data, name, load=0):
@@ -93,8 +76,7 @@ def iford(args, ipl, cust):
     boot[0xE000:0xE000 + len(cis)] = cis
     boot[0x18000:0x18000 + len(cust)] = cust
     boot[0x1F000:0x1F000 + len(img)] = img
-    with open(args.out, "wb") as f:
-        f.write(boot)
+    write_image(args.out, boot)
     print("%s: UBOOT %u of %u bytes" % (args.out, len(img), 0x21000))
 
 
@@ -121,8 +103,7 @@ def ifado(args, ipl, cust):
     boot[0x8000:0x8000 + len(cis)] = cis
     boot[0x10000:0x10000 + len(cust)] = cust
     boot[0x20000:0x20000 + len(img)] = img
-    with open(args.out, "wb") as f:
-        f.write(boot)
+    write_image(args.out, boot)
     print("%s: UBOOT %u of %u bytes" % (args.out, len(img), 0x20000))
 
 
@@ -171,8 +152,7 @@ def ifliegen(args, ipl, cust):
         if len(data) > room:
             sys.exit("%s: %u bytes, it has %u" % (name, len(data), room))
         boot[off:off + len(data)] = data
-    with open(args.out, "wb") as f:
-        f.write(boot)
+    write_image(args.out, boot)
     print("%s: UBOOT %u of %u bytes" % (args.out, len(img), 0x1C000))
 
 
@@ -219,91 +199,141 @@ def snigen(data, bl0, bl1, page=0, spare=0):
 
 def ifliegen_nand(args):
     """
-    Ifliegen's SPI NAND (2048+64, 64 pages a block), as its SDK's image.mk
-    and spinand.squashfs.tfa.partition.config lay it out: the CIS in each
-    of the ten CIS blocks (page 0 the SNIB and the part's SNIF, page 1 the
-    PNI, then the flash list), BOOT from 0x140000 (IPL and IPL_CUST three
-    blocks each, a copy in each, TF-A's SP_MIN one block, UBOOT 0x100000
-    with our uImage), BOOT_BAK the same from 0x320000, the environment at
-    0x500000. The IPL takes its timeouts from the SNIF, so the CIS carries
-    a real part's: the flash list's record --sni-part (57, a W25N01GV).
+    Ifliegen's SPI NAND (2048+64, 64 pages a block) in OpenIPC's 768 KiB
+    boot area, one copy of everything: the CIS in block 0 (page 0 the SNIB
+    and the part's SNIF, page 1 the PNI, then the flash list, with the boot
+    block fields as snigenerator sets them: BL0PBA 1, no backup IPL), IPL in
+    block 1, IPL_CUST in 2, TF-A's SP_MIN in 3, our uImage in 4 and 5; the
+    environment at 0xC0000, UBI from 0x100000. The IPL takes its timeouts
+    from the SNIF, so the CIS carries a real part's: the flash list's record
+    --sni-part (57, a W25N01GV).
     """
-    blk = 0x20000
     payload = lzma.compress(read(args.uboot), format=lzma.FORMAT_XZ,
                             check=lzma.CHECK_CRC64, preset=6)
     tag = ("MVX4##%-4s" % args.tag).replace(" ", "#") + "openIPC#CM_UBT2110#XVM"
     img = uimage(payload, tag[:32], 0x23E00000)
-    # name, room, data, copies in the room; flags as pnigenerator writes them
-    stages = (("IPL", 3 * blk, read(args.ipl), 3),
-              ("IPL_CUST", 3 * blk, read(args.ipl_cust), 3),
-              ("TF_A", blk, read(args.ifliegen_tfa), 1),
-              ("UBOOT", 0x100000, img, 1))
-    cis_size = 10 * blk
-    boot_size = sum(room for _, room, _, _ in stages)
-    env_off = cis_size + 2 * boot_size
-    bl0, bl1 = cis_size // blk, (cis_size + boot_size) // blk
-    out = bytearray(b"\xff" * env_off)
-    parts = [("CIS", 0, cis_size, (0, 1, 1, 0))]
-    for copy, base in enumerate((cis_size, cis_size + boot_size)):
-        off = base
-        for name, room, data, copies in stages:
-            parts.append((name, off, room,
-                          (0, 1, 1, 1) if copy == 0 else (1, 0, 0, 2)))
-            step = room // copies
-            if len(data) > step:
-                sys.exit("%s: %u bytes, it has %u" % (name, len(data), step))
-            for c in range(copies):
-                out[off + c * step:off + c * step + len(data)] = data
-            off += room
-    parts.append(("ENV", env_off, 0x40000, (0, 1, 1, 0)))
-    parts.append(("ubi", env_off + 0x40000, 0x8000000 - env_off - 0x40000,
-                  (0, 1, 1, 0)))
-    recs = b"".join(name.encode().ljust(16, b"\0") + bytes(flags) +
-                    struct.pack("<III", off, size, 0)
-                    for name, off, size, flags in parts)
-    body = struct.pack("<I", len(recs)) + recs
-    pni = b"SSTARSEMICIS0001" + struct.pack("<I", sum(body)) + body
-    sni = bytearray(snigen(read(args.ifliegen_sni), bl0, bl1, 2048, 64))
-    flist = snigen(read(args.ifliegen_sni_list), bl0, bl1)
+    blk = 0x20000
+    stages = (("IPL", blk, blk, read(args.ipl)),
+              ("IPL_CUST", 2 * blk, blk, read(args.ipl_cust)),
+              ("TF_A", 3 * blk, blk, read(args.ifliegen_tfa)),
+              ("UBOOT", 4 * blk, 2 * blk, img))
+    flist = snigen(read(args.ifliegen_sni_list), 1, 0)
+    sni = bytearray(snigen(read(args.ifliegen_sni), 1, 0, 2048, 64))
     rec = args.sni_part * 1024
     sni[0x100:0x400] = flist[rec + 0x100:rec + 0x400]
+    sni = snib_fix(sni[:0x400], 1, 0)
+    write_image(args.out, nand_cis_boot(args, sni, flist, stages))
+
+
+def snib_fix(r, bl0, bl1):
+    """A SNIB or SNIF record with one IPL at block bl0 and its copy at bl1,
+    no further backups, and its CRCs again."""
+    r = bytearray(r)
+    boot = bytes([bl0, bl1, 0, 1, 1])
+    if r[0:4] == b"SNIB":
+        r[0x3F:0x44] = boot
+    r[0x127:0x12C] = boot
+    struct.pack_into("<I", r, 0x104, zlib.crc32(bytes(r[0x108:0x400])))
+    if r[0:4] == b"SNIB":
+        struct.pack_into("<I", r, 4, bdma_crc32(bytes(r[8:0x80])))
+    return bytes(r)
+
+
+def nand_cis_boot(args, sni, tail, stages, cis_copies=()):
+    """
+    The 768 KiB boot area of the dies whose PNI names its partitions
+    (pnigenerator's SSTARSEMICIS0001): the CIS in block 0, page 0 the SNI,
+    page 1 the PNI, the flash list after, and a copy of that block at each
+    of cis_copies; each stage (name, offset, PNI size or None for its own
+    rounded to a 2 KiB page, data) where its IPL looks it up by name, ahead
+    of the environment at 0xC0000.
+    """
+    blk = 0x20000
+    boot = bytearray(b"\xff" * NAND_ENV_OFF)
+    parts = [("CIS", 0, blk, (0, 1, 1, 0))]
+    spans = [(0, blk)] + [(o, o + blk) for o in cis_copies]
+    for name, off, size, data in stages:
+        size = size or (len(data) + 0x7FF) // 0x800 * 0x800
+        if len(data) > size or off + size > NAND_ENV_OFF:
+            sys.exit("%s: %u bytes at 0x%x do not fit" % (name, len(data), off))
+        parts.append((name, off, size, (0, 1, 1, 1)))
+        spans.append((off, off + size))
+        boot[off:off + len(data)] = data
+    spans.sort()
+    for (_, end), (start, _) in zip(spans, spans[1:]):
+        if end > start:
+            sys.exit("NAND: the boot stages overlap at 0x%x" % start)
+    parts += [("ENV", NAND_ENV_OFF, 0x40000, (0, 1, 1, 0)),
+              ("UBI", NAND_UBI_OFF, 0x8000000 - NAND_UBI_OFF, (0, 1, 1, 0))]
+    recs = b"".join(name.encode().ljust(16, b"\0") + bytes(flags) +
+                    struct.pack("<III", o, size, 0)
+                    for name, o, size, flags in parts)
+    body = struct.pack("<I", len(recs)) + recs
+    pni = b"SSTARSEMICIS0001" + struct.pack("<I", sum(body)) + body
     cis = bytearray(b"\xff" * 0x1000)
     cis[0:len(sni)] = sni
     cis[0x800:0x800 + len(pni)] = pni
-    cis = bytes(cis) + flist
+    cis = bytes(cis) + bytes(tail)
     if len(cis) > blk:
-        sys.exit("Ifliegen NAND: the CIS does not fit a block")
-    for b in range(10):
-        out[b * blk:b * blk + len(cis)] = cis
-    with open(args.out, "wb") as f:
-        f.write(out)
-    print("%s: UBOOT %u of %u bytes" % (args.out, len(img), 0x100000))
+        sys.exit("NAND: the CIS does not fit its block")
+    for o in (0,) + tuple(cis_copies):
+        boot[o:o + len(cis)] = cis
+    name, off, size, _ = parts[len(stages)]
+    print("%s: %s %u of %u bytes" % (args.out, name, len(stages[-1][3]),
+                                     size))
+    return boot
+
+
+def infinity6c_nand(args, ipl, cust, img):
+    """
+    infinity6c's SPI NAND in OpenIPC's 768 KiB: the CIS in blocks 0 and 1
+    (its IPL reads a copy past block 0; the SNI the flash list's record
+    --sni-part, with BL0PBA 2, no backup IPL, and its CRC32), IPL in block 2,
+    IPL_CUST in 3, U-Boot in 4-5.
+    """
+    sni_list = read(args.sni_list)
+    sni = bytearray(sni_list[args.sni_part * 512:(args.sni_part + 1) * 512])
+    sni[0x2F:0x34] = bytes((2, 0, 0, 1, 1))
+    struct.pack_into("<I", sni, 0x1DC, zlib.crc32(bytes(sni[:0x1DC])))
+    blk = 0x20000
+    stages = (("IPL", 2 * blk, blk, ipl), ("IPL_CUST", 3 * blk, blk, cust),
+              ("UBOOT", 4 * blk, 2 * blk, img))
+    write_image(args.out, nand_cis_boot(args, sni, sni_list, stages, (blk,)))
 
 
 def iford_nand(args):
     """
-    Iford's SPI NAND, as the SDK's OnebinnandBurnImgConfig.cfg writes it: its
-    cis.bin in each of the ten CIS blocks (page 0 SNIB with the part's SNIF,
-    page 1 the PNI), then its boot.bin from 0x140000, IPL, IPL_CUST and
-    OP-TEE three blocks each, with our uImage in UBOOT at 0x260000. The
-    second boot copy stays empty, as the SDK leaves it.
+    Iford's SPI NAND in OpenIPC's 768 KiB: its IPL takes every stage by
+    name from the PNI, at any 2 KiB page, which is what lets OP-TEE (338 KB)
+    in. The CIS in block 0 (the SDK cis.bin's SNIB and SNIF with BL0PBA 1, no
+    backup IPL, their CRCs again; the PNI; its flash list), then IPL from
+    0x20000, IPL_CUST, OP-TEE and our uImage each from the next page after
+    the last, U-Boot ending near 0xB8000. The stages are the SDK boot.bin's
+    first copies: IPL at 0, IPL_CUST at 0x60000, OP-TEE over 0xC0000-0x120000.
     """
     cis = read(args.iford_nand_cis)
-    stages = read(args.iford_nand_boot)
+    stages_bin = read(args.iford_nand_boot)
     payload = lzma.compress(read(args.uboot), format=lzma.FORMAT_XZ,
                             check=lzma.CHECK_CRC64, preset=6)
     tag = ("MVX4##%-4s" % args.tag).replace(" ", "#") + "openIPC#CM_UBT2110#XVM"
     img = uimage(payload, tag[:32], 0x23E00000)
-    if len(img) > 0x100000 or len(stages) > 0x120000:
-        sys.exit("Iford NAND: a stage does not fit")
-    boot = bytearray(b"\xff" * 0x580000)
-    for blk in range(10):
-        boot[blk * 0x20000:blk * 0x20000 + len(cis)] = cis
-    boot[0x140000:0x140000 + len(stages)] = stages
-    boot[0x260000:0x260000 + len(img)] = img
-    with open(args.out, "wb") as f:
-        f.write(boot)
-    print("%s: UBOOT %u of %u bytes" % (args.out, len(img), 0x100000))
+    pieces = (("IPL", stages_bin[0:0x20000]),
+              ("IPL_CUST", stages_bin[0x60000:0x80000]),
+              ("OPTEE", stages_bin[0xC0000:0x120000]), ("UBOOT", img))
+    stages, off = [], 0x20000
+    for name, data in pieces:
+        data = data.rstrip(b"\xff") if name != "UBOOT" else data
+        stages.append((name, off, None, data))
+        off += (len(data) + 0x7FF) // 0x800 * 0x800
+    sni = snib_fix(cis[:0x400], 1, 0)
+    write_image(args.out, nand_cis_boot(args, sni, cis[0x1000:], stages))
+
+
+def write_image(path, boot):
+    """The boot area as far as it holds data: what follows is erased flash,
+    and the image is no bigger than what it carries, as OpenIPC's others."""
+    with open(path, "wb") as f:
+        f.write(bytes(boot).rstrip(b"\xff"))
 
 
 def read(path):
@@ -331,10 +361,9 @@ def main():
                     help="Iford NAND: IPL, IPL_CUST, OP-TEE from 0x140000")
     ap.add_argument("--nand", action="store_true")
     ap.add_argument("--pni", help="partition table, with --nand")
-    ap.add_argument("--pni-layout", action="store_true")
     ap.add_argument("--sni-list", help="flash table for infinity6c, page 2")
-    ap.add_argument("--nand-6c", action="store_true")
     ap.add_argument("--nand-i2m", action="store_true")
+    ap.add_argument("--nand-6c", action="store_true")
     ap.add_argument("--sni-part", type=int, default=1,
                     help="infinity6c: the flash list's record for page 0")
     ap.add_argument("--tag", required=True, help="die in the MVX tag, 4 chars")
@@ -360,65 +389,47 @@ def main():
     tag = ("MVX4##%-4s" % args.tag).replace(" ", "#") + "openIPC#CM_UBT1501#XVM"
     img = uimage(payload, tag[:32])
 
+    if args.nand and args.nand_6c:
+        return infinity6c_nand(args, ipl, cust, img)
     if args.nand:
-        pni = read(args.pni)
-        parts = {PNI_IPL: NAND_IPL_OFFS, PNI_IPL_CUST: NAND_CUST_OFFS,
-                 PNI_UBOOT: NAND_UBOOT_OFFS, PNI_ENV: (NAND_BOOT_SIZE,)}
-        if args.pni_layout:
-            parts = pni_layout(pni)
-        if args.nand_6c:
-            # image/configs/general/spinand.*: three copies of each stage,
-            # one block apart, then U-Boot, and the same again for BOOT_BAK
-            ipls = [0x140000 + i * 0x20000 for i in range(3)]
-            custs = [0x1A0000 + i * 0x20000 for i in range(3)]
-            parts = {PNI_IPL: ipls + [o + 0x1C0000 for o in ipls],
-                     PNI_IPL_CUST: custs + [o + 0x1C0000 for o in custs],
-                     PNI_UBOOT: (0x200000, 0x3C0000), PNI_ENV: (0x4C0000,)}
-        size = parts[PNI_ENV][0]
-        uboot = parts[PNI_UBOOT]
-        limit = min(uboot[1] - uboot[0], 0x100000)
-        for what, have, room in (("SNI", len(tab), 0x800),
-                                 ("PNI", len(pni), 0x800),
-                                 ("UBOOT", len(img), limit)):
-            if have > room:
-                sys.exit("%s: %u bytes, it has %u" % (what, have, room))
-        boot = bytearray(b"\xff" * size)
-        boot[:len(tab)] = tab
-        boot[0x800:0x800 + len(pni)] = pni
-        if args.sni_list and args.nand_6c:
-            sni_list = read(args.sni_list)
-            boot[0x1000:0x1000 + len(sni_list)] = sni_list
-        if args.nand_6c:
-            # infinity6c's IPL wants a part's own SNI in page 0 (the SDK's
-            # "nand probe" writes it from the list), with its boot block
-            # fields and CRC32, and the CIS in each of the ten CIS blocks
-            rec = bytearray(sni_list[args.sni_part * 512:
-                                     (args.sni_part + 1) * 512])
-            rec[0x2F:0x34] = tab[0x2F:0x34]
-            struct.pack_into("<I", rec, 0x1DC, zlib.crc32(bytes(rec[:0x1DC])))
-            boot[0:0x800] = bytes(rec).ljust(0x800, b"\xff")
-            cis = bytes(boot[:0x1000 + len(sni_list)])
-            for blk in range(1, 10):
-                boot[blk * 0x20000:blk * 0x20000 + len(cis)] = cis
-        for kind, data in ((PNI_IPL, ipl), (PNI_IPL_CUST, cust),
-                           (PNI_UBOOT, img)):
-            for off in parts[kind]:
-                boot[off:off + len(data)] = data
+        # OpenIPC's 768 KiB boot area, one copy of everything: the SNI in
+        # page 0 of block 0 and the PNI in page 1, IPL in block 1 (BL0PBA 1,
+        # no backup IPL), IPL_CUST in 2, U-Boot in 3-5 up to the environment
+        # at 0xC0000. SNI byte 0x2E is where infinity6's IPL_CUST starts its
+        # search for U-Boot, the block after it; the later IPLs take the
+        # PNI's records.
+        blk = 0x20000
         if args.nand_i2m:
-            # the i2m SDK's "writecis ... 10 0 0 5": the part's record with
-            # BL0PBA 10, BL1PBA and UBOOTPBA 0, and the PNI, in blocks 0-8
-            sni_list = read(args.sni_list)
-            rec = bytearray(sni_list[args.sni_part * 512:
-                                     (args.sni_part + 1) * 512])
-            rec[0x2E], rec[0x2F], rec[0x30] = 0, 10, 0
-            struct.pack_into("<I", rec, 0x1DC, zlib.crc32(bytes(rec[:0x1DC])))
-            for blk in range(0, 10, 2):
-                o = blk * 0x20000
-                boot[o:o + 0x800] = bytes(rec).ljust(0x800, b"\xff")
-                boot[o + 0x800:o + 0x800 + len(pni)] = pni
-        with open(args.out, "wb") as f:
-            f.write(boot)
-        print("%s: UBOOT %u of %u bytes" % (args.out, len(img), limit))
+            # the part's record of the i2m flash list, with its CRC32
+            sni = bytearray(read(args.sni_list)[args.sni_part * 512:
+                                                (args.sni_part + 1) * 512])
+        else:
+            sni = bytearray(tab[:0x200])
+        sni[0x2E], sni[0x2F], sni[0x30] = 2, 1, 0
+        if args.nand_i2m:
+            struct.pack_into("<I", sni, 0x1DC,
+                             zlib.crc32(bytes(sni[:0x1DC])))
+        # (start block, blocks, type, backups), the PNI header the SDK's
+        recs = ((0, 1, 32, 0), (1, 1, PNI_IPL, 0), (2, 1, PNI_IPL_CUST, 0),
+                (3, 3, PNI_UBOOT, 0), (6, 2, PNI_ENV, 0))
+        pni = bytearray(read(args.pni)[:16])
+        struct.pack_into("<H", pni, 12, len(recs))
+        for r in recs:
+            pni += struct.pack("<4H", *r)
+        pni = pni.ljust(0x200, b"\0")
+        struct.pack_into("<I", pni, 0, sum(pni[4:]))
+        boot = bytearray(b"\xff" * NAND_ENV_OFF)
+        boot[0:len(sni)] = sni
+        boot[0x800:0x800 + len(pni)] = pni
+        for start, data in ((1, ipl), (2, cust), (3, img)):
+            room = (NAND_ENV_OFF if start == 3 else (start + 1) * blk) - \
+                start * blk
+            if len(data) > room:
+                sys.exit("NAND: %u bytes at block %u, it has %u" %
+                         (len(data), start, room))
+            boot[start * blk:start * blk + len(data)] = data
+        write_image(args.out, boot)
+        print("%s: UBOOT %u of %u bytes" % (args.out, len(img), 3 * blk))
         return
 
     tab_off = GCIS_OFF if args.gcis else MXP_OFF
@@ -434,8 +445,7 @@ def main():
     boot[tab_off:tab_off + len(tab)] = tab
     boot[CUST_OFF:CUST_OFF + len(cust)] = cust
     boot[UBOOT_OFF:UBOOT_OFF + len(img)] = img
-    with open(args.out, "wb") as f:
-        f.write(boot)
+    write_image(args.out, boot)
     print("%s: UBOOT %u of %u bytes" % (args.out, len(img), UBOOT_SIZE))
 
 

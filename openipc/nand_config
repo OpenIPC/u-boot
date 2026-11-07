@@ -1,21 +1,31 @@
-# On SPI NAND, in place of the SPI NOR of openipc_config. The layout and the
-# environment are OpenIPC/u-boot-sigmastar's: boot0, boot1, env at 2 MiB, ubi.
+# SPI NAND on the FSP-QSPI, appended to a NOR target's fragments for its
+# NAND image, as openipc-hisilicon's nand_config: the environment is in the
+# NAND 'env' partition and the firmware is one UBI device
+# (768k(boot),256k(env),-(ubi)) with the kernel inside the UBIFS rootfs.
 # CONFIG_MS_SFLASH is not set
 # CONFIG_CMD_SF is not set
 # CONFIG_ENV_IS_IN_SPI_FLASH is not set
-CONFIG_ENV_IS_IN_NAND=y
-CONFIG_ENV_OFFSET=0x200000
-CONFIG_ENV_SIZE=0x20000
-CONFIG_ENV_SECT_SIZE=0x20000
-CONFIG_ENV_RANGE=0x40000
 CONFIG_MTD=y
 CONFIG_MTD_RAW_NAND=y
 CONFIG_NAND_MS_SPINAND=y
 CONFIG_CMD_NAND=y
-CONFIG_MTD_UBI=y
-CONFIG_CMD_UBI=y
+CONFIG_CMD_NAND_TRIMFFS=y
+# CONFIG_CMD_NAND_TORTURE is not set
+CONFIG_ENV_IS_IN_NAND=y
+CONFIG_ENV_OFFSET=0xc0000
+# 128 KiB in the 256 KiB partition: one bad block there leaves the other
+CONFIG_ENV_SIZE=0x20000
+CONFIG_ENV_RANGE=0x40000
+CONFIG_MTD_PARTITIONS=y
 CONFIG_CMD_MTDPARTS=y
 CONFIG_MTDIDS_DEFAULT="nand0=nand0"
-CONFIG_MTDPARTS_DEFAULT="mtdparts=nand0:1024k(boot0),1024k(boot1),256k(env),-(ubi)"
-# The firmware's kernel is in a UBI volume, the rootfs a squashfs
-CONFIG_OPENIPC_NAND_KERNEL_VOLUME=y
+CONFIG_MTDPARTS_DEFAULT="mtdparts=nand0:768k(boot),256k(env),-(ubi)"
+CONFIG_CMD_UBI=y
+CONFIG_CMD_UBIFS=y
+CONFIG_MTD_UBI=y
+CONFIG_MTD_UBI_WL_THRESHOLD=4096
+CONFIG_MTD_UBI_BEB_LIMIT=20
+# CONFIG_MTD_UBI_FASTMAP is not set
+CONFIG_RBTREE=y
+CONFIG_FIT=y
+CONFIG_SHA1=y
