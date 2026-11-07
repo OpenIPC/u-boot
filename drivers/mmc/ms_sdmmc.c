@@ -144,11 +144,11 @@
 #define SD_CLKGEN_MASK		0x3f
 #define SD_CLKGEN_BOOT		0
 #define SCGP_SD_BOOTCLK		BIT(3)
-#elif defined(CONFIG_SS_IFORD)
+#elif defined(CONFIG_SS_IFORD_FAMILY)
 /*
- * Iford's hal_card_platform.c: bit 7 set once at init; each clock change
- * clears the gate and the select and sets bit 6, the glitch-free select,
- * again
+ * Iford's and Ifliegen's hal_card_platform.c: bit 7 set once at init;
+ * each clock change clears the gate and the select and sets bit 6, the
+ * glitch-free select, again
  */
 #define SD_CLKGEN		SS_REG(SS_BANK_CLKGEN0, 0x43)
 #define SD_CLKGEN_MASK		0x7f
@@ -466,6 +466,72 @@ static void sd_power(bool on, unsigned int ms)
 		else
 			setbits_le16(PADTOP(regs[i]), SD6E_OUT);
 	}
+	mdelay(ms);
+}
+
+#elif defined(CONFIG_SS_IFLIEGEN)
+
+/*
+ * Ifliegen's SD0 (mmc_host/src/ifliegen, IP_SD and PAD_SD_MD1, the
+ * board's mmc0): PADGPIO CLK at 0x0F, CMD, D0-D3 from 0x10, card detect
+ * at 0x16 (PAD_PM_SD_CDZ), the mode in PADTOP 0x61 (its cdz-pad given:
+ * SD and CDZ mode, bits 0 and 4), the card powered from PAD_FUART_RTS,
+ * PADGPIO 0x34, low active. SC_GP_CTRL is bank 0x1133 here.
+ */
+#define SDLG_PAD_CLK		0x0F
+#define SDLG_PAD_FIRST		0x10	/* CMD, D0, D1, D2, D3 */
+#define SDLG_PAD_LAST		0x14
+#define SDLG_PULL		BIT(4)
+#define SDLG_DRV		BIT(7)
+#define SDLG_CDZ		0x16
+#define SDLG_CDZ_IN		BIT(0)
+#define SDLG_CDZ_OEN		BIT(2)
+#define SDLG_MODE		0x61
+#define SDLG_MODE_MASK		(BIT(12) | BIT(9) | BIT(8) | BIT(4) | BIT(0))
+#define SDLG_MODE_SD		BIT(0)
+#define SDLG_MODE_CDZ		BIT(4)
+#define SDLG_POWER		0x34
+#define SDLG_POWER_GPIO		BIT(3)
+#define SDLG_POWER_OEN		BIT(2)
+#define SDLG_POWER_OUT		BIT(1)
+#define SD_CLK_EN_REG		SD_REG(0x3E)
+#define SD_MCG_OFF		BIT(14)
+
+static int sd_card_in(void)
+{
+	setbits_le16(PADGPIO(SDLG_CDZ), SDLG_CDZ_OEN);
+	return !(readw(PADGPIO(SDLG_CDZ)) & SDLG_CDZ_IN);
+}
+
+static void sd_plat_init(void)
+{
+	unsigned int r;
+
+	setbits_le16(SD_CLK_EN_REG, SD_MCG_OFF);
+	/* The SD clock off the 12 MHz boot clock */
+	setbits_le16(SCGP_SD_CLK, SCGP_SD_BOOTCLK);
+	clrsetbits_le16(SD_CLKGEN, 0xff, SD_CLKGEN_ON);
+	setbits_le16(PADGPIO(SDLG_CDZ), BIT(5) | BIT(4));
+	setbits_le16(PADGPIO(SDLG_PAD_CLK), SDLG_DRV);
+	for (r = SDLG_PAD_FIRST; r <= SDLG_PAD_LAST; r++)
+		setbits_le16(PADGPIO(r), SDLG_PULL | SDLG_DRV);
+}
+
+static void sd_pads(bool on)
+{
+	clrsetbits_le16(PADTOP(SDLG_MODE), SDLG_MODE_MASK,
+			SDLG_MODE_CDZ | (on ? SDLG_MODE_SD : 0));
+}
+
+/* Card power, low active */
+static void sd_power(bool on, unsigned int ms)
+{
+	setbits_le16(PADGPIO(SDLG_POWER), SDLG_POWER_GPIO);
+	clrbits_le16(PADGPIO(SDLG_POWER), SDLG_POWER_OEN);
+	if (on)
+		clrbits_le16(PADGPIO(SDLG_POWER), SDLG_POWER_OUT);
+	else
+		setbits_le16(PADGPIO(SDLG_POWER), SDLG_POWER_OUT);
 	mdelay(ms);
 }
 
