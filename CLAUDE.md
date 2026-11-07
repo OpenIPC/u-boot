@@ -268,20 +268,20 @@ The build logic lives here. Other branches call it:
 - It is `build-anyka.yml` for `openipc-sigmastar`: the same job graph and
   `resolve`/`ref` rules, NOR and SPI NAND. A NOR image is the 256 KiB
   boot partition (the vendor's IPL, IPL_CUST and on Ifliegen TF-A, the
-  die's flash table, U-Boot). A SPI NAND one is the boot area up to the
-  die's environment, as the fit check limits it: 2 MiB, 4352 KiB on
-  infinity2m, 4864 KiB on infinity6c, 5120 KiB on Ifliegen, 5632 KiB on
-  Iford.
-- **Images are not machines:** the infinity3 legs, the MSC316 ones too,
-  boot on `-M msc313e` (#213 or later); the MSC316 IPL sizes its 64 MiB.
-  `ssd201` and `ssd202d` boot on their own machines. The other legs are
-  built and fit-checked, not booted here (their qemu machines are not in
-  the qemu-hisilicon CI uses). Keep the build
-  matrix, the smoke matrix and the README's list in step.
-- **Smoke test:** two boots of an 8 MiB (infinity3) or 16 MiB (infinity2m)
-  flash image holding only the image; the machine's mask ROM loads the IPL.
-  It passes on
-  `Hit Ctrl-C`, and fails if the second boot reports a bad environment CRC.
+  die's flash table, U-Boot). A SPI NAND one is the 768 KiB boot partition
+  of openipc-hisilicon's `768k(boot),256k(env),-(ubi)`, the fit check's
+  limit on every die.
+- **Every image a machine:** each leg, NOR and NAND, boots on its own
+  machine (`ssc029b` as `ssc029,bond=0x10`, `ssc029c` as `ssc029`; the
+  infinity6e NAND legs at `bond=0x10`). The `qemu` job builds a pinned
+  commit, OpenIPC/qemu-bench#242's, for ssc029a/b, ssc327de and ssc034a/b,
+  until it merges. Keep the build matrix, the smoke matrix and the README's
+  list in step.
+- **Smoke test:** two boots of the image in an erased flash: 8 MiB NOR
+  (infinity3) or 16 MiB, or 128 MiB of SPI NAND pages with their spares.
+  The machine's mask ROM loads the IPL. It passes on `Hit Ctrl-C`, and
+  fails if the second boot reports U-Boot's "Warning - bad CRC" (the
+  infinity6c IPL's own "env bad CRC" is not U-Boot's).
 - **Release and publish:**
   - `release` uploads to the `sigmastar` tag.
   - `publish` is commented out for now, with its input: SigmaStar images

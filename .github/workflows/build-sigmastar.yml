@@ -174,20 +174,10 @@ jobs:
             done
             [ "$found" = 1 ] || { echo "missing ${kind} image for ${soc} (${pattern})" >&2; rc=1; }
           }
-          # SPI NAND: the boot area ends where the die's environment
-          # starts (include/configs/openipc-common.h on openipc-sigmastar):
-          # 0x200000, infinity2m 0x440000, infinity6c 0x4C0000, Ifliegen
-          # 0x500000, Iford 0x580000.
+          # SPI NAND: the 768 KiB boot partition, the environment from
+          # 0xC0000 (768k(boot),256k(env),-(ubi), as on openipc-hisilicon)
           case "${soc}" in
-            ssd201-nand|ssd202d-nand|ssr621q-nand)
-              check_kind nand 4352 "output/u-boot-${soc}.bin" ;;
-            ssc377*-nand|ssc378*-nand)
-              check_kind nand 4864 "output/u-boot-${soc}.bin" ;;
-            ssc034a-nand|ssc034b-nand)
-              check_kind nand 5120 "output/u-boot-${soc}.bin" ;;
-            ssc029a-nand)
-              check_kind nand 5632 "output/u-boot-${soc}.bin" ;;
-            *-nand) check_kind nand 2048 "output/u-boot-${soc}.bin" ;;
+            *-nand) check_kind nand 768 "output/u-boot-${soc}.bin" ;;
             *) check_kind nor 256 "output/u-boot-${soc}-nor.bin" ;;
           esac
           exit $rc
@@ -213,10 +203,19 @@ jobs:
             libslirp-dev python3 python3-venv
 
       - name: Build qemu-system-arm
+        # Pinned to the commit of OpenIPC/qemu-bench#242, which adds the
+        # ssc029a/b, ssc327de and ssc034a/b machines and Ifliegen's NAND and
+        # SD; back to OpenIPC/qemu-bench master once it is merged
+        env:
+          QEMU_REPO: https://github.com/dimerr/qemu-hisilicon
+          QEMU_REF: 1689faa5474894185d34eaea9c41506b5f6ae358
         run: |
-          git clone --depth 1 --branch master \
-            https://github.com/widgetii/qemu-hisilicon qemu-hisilicon
+          git init -q qemu-hisilicon
           cd qemu-hisilicon
+          git remote add origin "$QEMU_REPO"
+          git fetch -q --depth 1 origin "$QEMU_REF" || \
+            { git fetch -q origin sigmastar-ifliegen-nand; }
+          git checkout -q "$QEMU_REF"
           bash qemu/setup.sh
           cp qemu-src/build/qemu-system-arm "$GITHUB_WORKSPACE/qemu-arm"
           chmod +x "$GITHUB_WORKSPACE/qemu-arm"
@@ -227,15 +226,11 @@ jobs:
           name: qemu-arm
           path: qemu-arm
 
-  # QEMU smoke test -- boots each freshly-built image from flash through
-  # qemu-hisilicon's msc313e machine (#213 or later), whose mask ROM loads
-  # the image's IPL from 0x4000; the vendor IPL and IPL_CUST in the image
-  # then bring up DDR and unpack U-Boot. It asserts U-Boot reaches the
-  # autoboot prompt. There is no MSC316 machine: the MSC316 images boot on
-  # msc313e too (their IPL sizes its 64 MiB), which checks all but their
-  # DDR set-up, so every SoC is a hard gate on release. The infinity2m
-  # images boot on their own machines the same way. The infinity6 dies have
-  # no machine, so they are built but not booted here.
+  # QEMU smoke test -- boots each freshly-built image, NOR and SPI NAND,
+  # from flash through its own qemu-hisilicon machine, whose mask ROM loads
+  # the image's IPL; the vendor stages in the image then bring up DDR and
+  # unpack U-Boot. It asserts U-Boot reaches the autoboot prompt, so every
+  # leg is a hard gate on release.
   #
   # The second boot must load the environment the first saved, which
   # proves the driver's writes land where its reads find them.
@@ -246,7 +241,62 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        soc: [msc313e, msc316dc, msc316dm, ssd201, ssd202d]
+        # Every leg, on its own machine: the bond strap where the vendor
+        # IPL refuses the machine's default (ssc029b on ssc029; the
+        # infinity6e NAND IPLs past QFN88)
+        include:
+          - { soc: msc313e, machine: "msc313e", medium: nor }
+          - { soc: msc316dc, machine: "msc316dc", medium: nor }
+          - { soc: msc316dm, machine: "msc316dm", medium: nor }
+          - { soc: ssd201, machine: "ssd201", medium: nor }
+          - { soc: ssd202d, machine: "ssd202d", medium: nor }
+          - { soc: ssr621q, machine: "ssr621q", medium: nor }
+          - { soc: ssc325, machine: "ssc325", medium: nor }
+          - { soc: ssc325de, machine: "ssc325de", medium: nor }
+          - { soc: ssc327de, machine: "ssc327de", medium: nor }
+          - { soc: ssc333, machine: "ssc333", medium: nor }
+          - { soc: ssc335, machine: "ssc335", medium: nor }
+          - { soc: ssc335de, machine: "ssc335de", medium: nor }
+          - { soc: ssc337, machine: "ssc337", medium: nor }
+          - { soc: ssc337de, machine: "ssc337de", medium: nor }
+          - { soc: ssc30kd, machine: "ssc30kd", medium: nor }
+          - { soc: ssc30kq, machine: "ssc30kq", medium: nor }
+          - { soc: ssc338q, machine: "ssc338q", medium: nor }
+          - { soc: ssc377, machine: "ssc377", medium: nor }
+          - { soc: ssc377d, machine: "ssc377d", medium: nor }
+          - { soc: ssc377de, machine: "ssc377de", medium: nor }
+          - { soc: ssc377qe, machine: "ssc377qe", medium: nor }
+          - { soc: ssc378de, machine: "ssc378de", medium: nor }
+          - { soc: ssc378qe, machine: "ssc378qe", medium: nor }
+          - { soc: ssc029a, machine: "ssc029a", medium: nor }
+          - { soc: ssc029b, machine: "ssc029,bond=0x10", medium: nor }
+          - { soc: ssc029c, machine: "ssc029", medium: nor }
+          - { soc: ssc375, machine: "ssc375", medium: nor }
+          - { soc: ssc034a, machine: "ssc034a", medium: nor }
+          - { soc: ssc034b, machine: "ssc034b", medium: nor }
+          - { soc: ssd201-nand, machine: "ssd201", medium: nand }
+          - { soc: ssd202d-nand, machine: "ssd202d", medium: nand }
+          - { soc: ssr621q-nand, machine: "ssr621q", medium: nand }
+          - { soc: ssc325-nand, machine: "ssc325", medium: nand }
+          - { soc: ssc325de-nand, machine: "ssc325de", medium: nand }
+          - { soc: ssc327de-nand, machine: "ssc327de", medium: nand }
+          - { soc: ssc333-nand, machine: "ssc333", medium: nand }
+          - { soc: ssc335-nand, machine: "ssc335", medium: nand }
+          - { soc: ssc335de-nand, machine: "ssc335de", medium: nand }
+          - { soc: ssc337-nand, machine: "ssc337", medium: nand }
+          - { soc: ssc337de-nand, machine: "ssc337de", medium: nand }
+          - { soc: ssc30kd-nand, machine: "ssc30kd,bond=0x10", medium: nand }
+          - { soc: ssc30kq-nand, machine: "ssc30kq,bond=0x10", medium: nand }
+          - { soc: ssc338q-nand, machine: "ssc338q,bond=0x10", medium: nand }
+          - { soc: ssc377-nand, machine: "ssc377", medium: nand }
+          - { soc: ssc377d-nand, machine: "ssc377d", medium: nand }
+          - { soc: ssc377de-nand, machine: "ssc377de", medium: nand }
+          - { soc: ssc377qe-nand, machine: "ssc377qe", medium: nand }
+          - { soc: ssc378de-nand, machine: "ssc378de", medium: nand }
+          - { soc: ssc378qe-nand, machine: "ssc378qe", medium: nand }
+          - { soc: ssc029a-nand, machine: "ssc029a", medium: nand }
+          - { soc: ssc034a-nand, machine: "ssc034a", medium: nand }
+          - { soc: ssc034b-nand, machine: "ssc034b", medium: nand }
     steps:
       - name: Download qemu-arm
         uses: actions/download-artifact@v4
@@ -275,21 +325,27 @@ jobs:
         timeout-minutes: 3
         run: |
           soc='${{ matrix.soc }}'
-          UBOOT="u-boot-${soc}-nor.bin"
-          test -f "$UBOOT"
-          echo "booting $UBOOT"
-          # One machine for the whole infinity3 family, each its own for
-          # infinity2m; 8 or 16 MiB NOR, U-Boot at 0, the rest erased
-          case "$soc" in
-            msc*) MACHINE=msc313e; MIB=8 ;;
-            *) MACHINE=$soc; MIB=16 ;;
+          MACHINE='${{ matrix.machine }}'
+          case '${{ matrix.medium }}' in
+            nor) UBOOT="u-boot-${soc}-nor.bin" ;;
+            nand) UBOOT="u-boot-${soc}.bin" ;;
           esac
-          python3 - "$UBOOT" /tmp/flash.bin "$MIB" <<'PY'
+          test -f "$UBOOT"
+          echo "booting $UBOOT on -M $MACHINE"
+          # NOR: 8 MiB (infinity3) or 16 MiB, U-Boot at 0, the rest erased.
+          # SPI NAND: 128 MiB of 2048-byte pages, each with its 64 spare
+          # bytes, the boot area at 0 and the rest erased.
+          python3 - "$UBOOT" /tmp/flash.bin '${{ matrix.medium }}' "$soc" <<'PY'
           import sys
-          img = bytearray(b'\xff' * (int(sys.argv[3]) << 20))
           u = open(sys.argv[1], 'rb').read()
-          img[:len(u)] = u
-          open(sys.argv[2], 'wb').write(img)
+          if sys.argv[3] == 'nor':
+              img = bytearray(b'\xff' * ((8 if sys.argv[4].startswith('msc') else 16) << 20))
+              img[:len(u)] = u
+              open(sys.argv[2], 'wb').write(img)
+          else:
+              with open(sys.argv[2], 'wb') as f:
+                  for o in range(0, 128 << 20, 2048):
+                      f.write(u[o:o + 2048].ljust(2048, b'\xff') + b'\xff' * 64)
           PY
           FLASH="-M $MACHINE,flash-file=/tmp/flash.bin"
           chmod +x ./qemu-arm
@@ -323,7 +379,9 @@ jobs:
               exit 1
             fi
           done
-          if grep -q 'bad CRC' /tmp/uboot2.txt; then
+          # U-Boot's own warning: infinity6c's IPL reads the environment
+          # partition too and prints "env bad CRC" for the format it expects
+          if grep -q 'Warning - bad CRC' /tmp/uboot2.txt; then
             echo "FAIL: the environment saved on the first boot did not land"
             exit 1
           fi
