@@ -439,10 +439,10 @@ config KSZ9477
 	  of GbE switches using the I2C interface.
 
 config MS_EMAC
-	bool "SigmaStar infinity3 EMAC"
+	bool "SigmaStar EMAC"
 	depends on ARCH_SIGMASTAR && !DM_ETH
 	help
-	  The 10/100 MAC of the SigmaStar infinity3 SoCs with their internal
+	  The 10/100 MAC of the SigmaStar SoCs with their internal
 	  PHY, an Atmel AT91RM9200-style EMAC behind the RIU.
 
 config MVGBE
