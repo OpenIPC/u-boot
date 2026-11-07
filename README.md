@@ -138,6 +138,9 @@ swapped back.
 - The images for one generation differ only in RAM size and `soc`.
 - Vendor uImages have entry = load + 0x40, which this U-Boot does not
   run. Repack them with `mkimage -e <load address>`.
+- SD recovery `.img` files: on NOR a uImage whose load address is the flash
+  offset (`mkimage -a 0x50000`, `-a 0x250000`); on NAND the raw kernel and
+  squashfs.
 - SD recovery takes only these file names: `uImage.<soc>.img` (or
   `fitImage.<soc>.img`) and `rootfs.squashfs.<soc>.img`.
 
@@ -222,6 +225,9 @@ firmware. Remove the card and the camera boots from flash.
 - V831/V833 OpenIPC kernels carry no device tree. U-Boot passes them the
   vendor's, which is built in. V3s/V851s kernels carry their own.
 - Building needs `xz`.
+- SD recovery `.img` files: on NOR a uImage whose load address is the flash
+  offset (`mkimage -a 0x50000`, `-a 0x250000`); on NAND the raw kernel and
+  squashfs.
 - SD recovery takes only these file names: `uImage.<soc>.img` (or
   `fitImage.<soc>.img`) and `rootfs.squashfs.<soc>.img`.
 
@@ -260,12 +266,36 @@ firmware. Remove the card and the camera boots from flash.
 | --- | --- | --- | --- | --- |
 | `msc313e` | Cortex-A7 | 64 MiB | NOR | infinity3 |
 | `msc316dc` `msc316dm` | Cortex-A7 | 128 MiB | NOR | infinity3 |
+| `ssd201` | Cortex-A7 | 64 MiB | NOR | infinity2m |
+| `ssd202d` | Cortex-A7 | 128 MiB | NOR | infinity2m |
+| `ssc325` | Cortex-A7 | from the MIU | NOR | infinity6 |
+| `ssc333` `ssc335` `ssc335de` `ssc337` `ssc337de` | Cortex-A7 | from the MIU | NOR | infinity6b0 |
+| `ssc30kd` `ssc30kq` `ssc338q` | Cortex-A7 | from the MIU | NOR | infinity6e |
+| `ssc377` `ssc377d` `ssc377de` `ssc377qe` `ssc378de` `ssc378qe` | Cortex-A7 | from the MIU | NOR | infinity6c |
+| `ssr621q` | Cortex-A7 | 256 MiB | NOR | infinity2m |
+| `ssc325de` `ssc327de` | Cortex-A7 | from the MIU | NOR | infinity6 |
+| `ssc029a` | Cortex-A32 | from the MIU | NOR, SPI NAND | Iford |
+| `ssc029b` `ssc029c` | Cortex-A32 | from the MIU | NOR | Iford |
+| `ssc375` | Cortex-A7 | up to 128 MiB, probed | NOR | Ifado, Dahua's IPL chain |
+| `ssc034a` `ssc034b` | Cortex-A55 (AArch32) | up to 128 MiB, probed | NOR | Ifliegen, after TF-A's SP_MIN |
+
+Every infinity2m, infinity6, 6b0, 6e and 6c part also builds for SPI NAND,
+`./build.sh <soc>-nand`.
 
 - The vendor boot chain is kept. The 256 KiB image holds the MXP
   partition table at `0x3000`, the vendor IPL at `0x4000`, IPL_CUST at
-  `0x10000`, and U-Boot (xz uImage) at `0x20000`.
+  `0x10000`, and U-Boot (xz uImage) at `0x20000`. From infinity2m on, the
+  IPL is at `0` and the table at `0xF000` (infinity6c: `0x9000`).
+- The infinity6, Iford, Ifado and Ifliegen images have **not run on silicon**, only under qemu,
+  and are only in this repository's `sigmastar` release. Cameras get `u-boot-ssc*` from OpenIPC/u-boot-sigmastar.
+- The SPI NAND images are 2 MiB: SNI at `0`, PNI at `0x800`, IPL, IPL_CUST
+  and U-Boot twice each from `0x40000`, the environment at `0x200000`, then
+  UBI, whose volumes `kernel` and `rootfs` hold the firmware.
 - Vendor kernels are xz-compressed uImages that only the vendor U-Boot
   unpacks.
+- SD recovery `.img` files: on NOR a uImage whose load address is the flash
+  offset (`mkimage -a 0x50000`, `-a 0x250000`); on NAND the raw kernel and
+  squashfs.
 - SD recovery takes only these file names: `uImage.<soc>.img` (or
   `fitImage.<soc>.img`) and `rootfs.squashfs.<soc>.img`.
 
@@ -495,7 +525,8 @@ gh workflow run build-<vendor>.yml -f release=true -f publish=true   # + OpenIPC
 ```
 
 `publish` needs a `FIRMWARE_RELEASE_TOKEN` secret. Ingenic has no
-`publish`, and held SoCs are never released.
+`publish`; SigmaStar's is commented out for now, so its images go only to
+this repository's `sigmastar` release. Held SoCs are never released.
 
 **Adding a vendor:** push the port on a new `openipc-<vendor>` branch,
 add `build-<vendor>.yml` here, and add a row and a section to this
