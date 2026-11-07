@@ -75,8 +75,7 @@ build_nand() {
 
     rm -rf "${builddir}"
     mkconfig "${builddir}" openipc/openipc_config openipc/${die}_config \
-        openipc/${soc}_config openipc/nand_config \
-        $(ls openipc/${die}_nand_config 2>/dev/null) && \
+        openipc/${soc}_config openipc/nand_config && \
     make ${make_opts} olddefconfig </dev/null >/dev/null && \
     make ${make_opts} </dev/null || return 1
 
@@ -159,8 +158,7 @@ build_ifliegen_nand() {
 
     rm -rf "${builddir}"
     mkconfig "${builddir}" openipc/openipc_config openipc/ifliegen_config \
-        openipc/${soc}_config openipc/nand_config \
-        openipc/ifliegen_nand_config && \
+        openipc/${soc}_config openipc/nand_config && \
     make ${make_opts} olddefconfig </dev/null >/dev/null && \
     make ${make_opts} </dev/null || return 1
 
@@ -181,7 +179,7 @@ build_iford_nand() {
 
     rm -rf "${builddir}"
     mkconfig "${builddir}" openipc/openipc_config openipc/iford_config \
-        openipc/${soc}_config openipc/nand_config openipc/iford_nand_config && \
+        openipc/${soc}_config openipc/nand_config && \
     make ${make_opts} olddefconfig </dev/null >/dev/null && \
     make ${make_opts} </dev/null || return 1
 
@@ -223,7 +221,7 @@ build_soc() {
             build_ifliegen_nand "${soc%-nand}" ;;
         ssd201-nand|ssd202d-nand|ssr621q-nand)
             build_nand "${soc%-nand}" infinity2m I2M \
-                "--pni-layout --nand-i2m --sni-part 2 --sni-list openipc/infinity2m-nand-sni-list.bin" ;;
+                "--nand-i2m --sni-part 2 --sni-list openipc/infinity2m-nand-sni-list.bin" ;;
         ssc377-nand|ssc377d-nand|ssc377de-nand|ssc377qe-nand|ssc378de-nand|ssc378qe-nand)
             build_nand "${soc%-nand}" infinity6c I6C \
                 "--nand-6c --sni-list openipc/infinity6c-nand-sni-list.bin" ;;
