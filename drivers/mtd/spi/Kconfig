@@ -37,10 +37,10 @@ config SPI_FLASH
 	  If unsure, say N
 
 config MS_SFLASH
-	bool "SigmaStar infinity3 SPI NOR on the FSP"
+	bool "SigmaStar SPI NOR on the FSP"
 	depends on ARCH_SIGMASTAR && !SPI_FLASH && !DM_SPI_FLASH
 	help
-	  The SPI NOR the SigmaStar infinity3 SoCs boot from: read through
+	  The SPI NOR the SigmaStar SoCs boot from: read through
 	  the XIU window, erased and programmed by the FSP and BDMA. The
 	  driver provides spi_flash_probe() directly, without the SPI and
 	  spi-nor layers.

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * SPI NOR behind the FSP of the SigmaStar infinity3.
+ * SPI NOR behind the FSP of the SigmaStar SoCs.
  *
  * The FSP ("flash serial programmer") runs up to three flash commands in
  * one go from a 10-byte write buffer: sizes 0-2 say how many of its bytes
@@ -14,12 +14,20 @@
  * Reads go through the XIU window, the flash mapped at 0x14000000 in the
  * read mode the IPL set up, as the vendor kernel reads it.
  *
- * After the vendor U-Boot and kernel drivers/mstar/flash_isp (infinity3
- * halSERFLASH.c: FSP_READ_DIRECT, FSP_WRITE_BDMA). Like ak_sflash on
+ * After the vendor U-Boot and kernel drivers/mstar/flash_isp (<die>
+ * halSERFLASH.c: FSP_READ_DIRECT, FSP_WRITE_BDMA; the same FSP and BDMA
+ * registers on every die, the FSP's bank apart on infinity6e). Like ak_sflash on
  * openipc-anyka, this driver provides spi_flash_probe() itself, so
  * mainline's non-DM spi_flash_*() wrappers, the sf command and the
  * environment in SPI flash work without the SPI and spi-nor layers.
  * 3-byte addresses: parts up to 16 MiB.
+ *
+ * infinity6c differs: its IPL hands over with the chip select in software,
+ * so one FSP run is no longer one flash command. After the vendor's
+ * flash/nor/drvSPINOR.c and fsp_qspi, what its published U-Boot runs (its
+ * flash_isp/infinity6c does not describe that binary): each flash command
+ * is framed by hand, reads go by BDMA or the FSP since the XIU window would
+ * start a command per burst, and OUT_SIZE counts one more than BDMA sends.
  */
 
 #include <common.h>
@@ -33,7 +41,7 @@
 #include <linux/mtd/mtd.h>
 #include <linux/sizes.h>
 
-#define FSP_REG(r)		SS_REG(SS_BANK_FSP, r)
+#define FSP_REG(r)		SS_REG(ss_fsp_bank(), r)
 #define FSP_WBF(i)		FSP_REG(0x60 + (i) / 2)	/* bytes 0-9 */
 #define FSP_RBF(i)		FSP_REG(0x65 + (i) / 2)	/* bytes 0-9 */
 #define FSP_WBF_SIZE		FSP_REG(0x6a)
@@ -62,11 +70,24 @@
 #define OUT_MODE_BDMA		(1 << 8)
 #define OUT_EN			BIT(12)
 
+/* infinity6c: the QSPI bank next to the FSP, the chip select in software */
+#define QSPI_REG(r)		SS_REG(ss_fsp_bank() + 1, r)
+#define QSPI_CS			QSPI_REG(0x0a)
+#define QSPI_CS_SW		BIT(0)
+#define QSPI_CS_HIGH		BIT(1)
+#define QSPI_CKG		QSPI_REG(0x70)
+#define QSPI_CKG_DUMMY(n)	(BIT(4) | ((n) - 1))
+#define QSPI_MODE		QSPI_REG(0x72)
+#define QSPI_MODE_FAST		0x01
+#define QSPI_FUNC		QSPI_REG(0x7d)
+#define QSPI_FUNC_DUMMY		0x1000
+
 /* BDMA channel 0 */
 #define BDMA_REG(r)		SS_REG(SS_BANK_BDMA, r)
 #define BDMA_CTRL		BDMA_REG(0x00)
 #define BDMA_STATUS		BDMA_REG(0x01)
 #define BDMA_PATH		BDMA_REG(0x02)
+#define BDMA_PATH2		BDMA_REG(0x03)
 #define BDMA_SRC_L		BDMA_REG(0x04)
 #define BDMA_SRC_H		BDMA_REG(0x05)
 #define BDMA_DST_L		BDMA_REG(0x06)
@@ -75,7 +96,13 @@
 #define BDMA_LEN_H		BDMA_REG(0x09)
 #define BDMA_TRIGGER		BIT(0)
 #define BDMA_DONE		BIT(3)
+#ifdef CONFIG_SS_IFORD_FAMILY
+#define BDMA_PATH_MIU_FSP	0x2B41	/* MIU by channel 1, to the FSP */
+#else
 #define BDMA_PATH_MIU_FSP	0x2B40	/* MIU, 16 bytes wide, to the FSP */
+#endif
+#define BDMA_PATH_SPI_MIU	0x4135	/* flash, 8 wide, to MIU, 16 wide */
+#define BDMA_PATH2_CH0_MIU	0x8000	/* infinity6*: channel 0 to the MIU */
 
 #define SZ_PAGE			256
 #define SZ_SECTOR		SZ_64K
@@ -84,6 +111,7 @@
 #define CMD_PP			0x02
 #define CMD_RDSR		0x05
 #define CMD_RDSR2		0x35
+#define CMD_FAST_READ		0x0B
 #define CMD_WREN		0x06
 #define CMD_RDID		0x9F
 #define CMD_SE_64K		0xD8
@@ -94,6 +122,10 @@
 
 /* Longer than any 64 KiB erase or page program of the parts in use */
 #define SF_TIMEOUT_MS		3000
+/* A BDMA read of a whole 16 MiB part, at the slowest clock an IPL sets */
+#define SF_READ_TIMEOUT_MS	30000
+
+#define FSP_BUF_SIZE		10
 
 static int fsp_wait(void)
 {
@@ -127,12 +159,104 @@ static int fsp_run(const u8 *wbuf, unsigned int wlen, u16 wsizes, u16 rsizes,
 	return ret;
 }
 
+/* BDMA channel 0; the DDR's address is the MIU's */
+static void bdma_start(u16 path, u32 src, u32 dst, u32 len)
+{
+	writew(0, BDMA_CTRL);
+	writew(path, BDMA_PATH);
+#if defined(CONFIG_SS_INFINITY2M) || defined(CONFIG_SS_IFADO) || \
+    defined(CONFIG_SS_I6C_FAMILY)
+	writew(0, BDMA_PATH2);
+#elif !defined(CONFIG_SS_INFINITY3)
+	writew(BDMA_PATH2_CH0_MIU, BDMA_PATH2);
+#endif
+	writew(src & 0xffff, BDMA_SRC_L);
+	writew(src >> 16, BDMA_SRC_H);
+	writew(dst & 0xffff, BDMA_DST_L);
+	writew(dst >> 16, BDMA_DST_H);
+	writew(len & 0xffff, BDMA_LEN_L);
+	writew(len >> 16, BDMA_LEN_H);
+	writew(BDMA_TRIGGER, BDMA_CTRL);
+}
+
+static int bdma_wait(unsigned int timeout_ms)
+{
+	int ret = wait_for_bit_le16((void *)BDMA_STATUS, BDMA_DONE, true,
+				    timeout_ms, false);
+
+	writew(BDMA_DONE, BDMA_STATUS);
+	return ret;
+}
+
+#ifdef CONFIG_SS_FSP_SW_CS
+static void sf_cs(bool high)
+{
+	clrsetbits_le16(QSPI_CS, QSPI_CS_SW | QSPI_CS_HIGH,
+			QSPI_CS_SW | (high ? QSPI_CS_HIGH : 0));
+}
+
+/* With the chip select held: bytes out, as many FSP runs as they take */
+static int sf_send(const u8 *buf, unsigned int len)
+{
+	while (len) {
+		unsigned int n = min_t(unsigned int, len, FSP_BUF_SIZE);
+		int ret = fsp_run(buf, n, FSP_SIZES(n, 0, 0), 0, 0, NULL, 0);
+
+		if (ret)
+			return ret;
+		buf += n;
+		len -= n;
+	}
+	return 0;
+}
+
+static int sf_recv(u8 *buf, size_t len)
+{
+	while (len) {
+		unsigned int n = min_t(size_t, len, FSP_BUF_SIZE);
+		int ret = fsp_run(NULL, 0, 0, FSP_SIZES(n, 0, 0), 0, buf, n);
+
+		if (ret)
+			return ret;
+		WATCHDOG_RESET();
+		buf += n;
+		len -= n;
+	}
+	return 0;
+}
+
+/* One flash command, framed by the chip select */
+static int sf_cmd(const u8 *tx, unsigned int txlen, u8 *rx, size_t rxlen)
+{
+	int ret;
+
+	sf_cs(false);
+	ret = sf_send(tx, txlen);
+	if (!ret)
+		ret = sf_recv(rx, rxlen);
+	sf_cs(true);
+	return ret;
+}
+
+static int sf_wren(void)
+{
+	u8 op = CMD_WREN;
+
+	return sf_cmd(&op, 1, NULL, 0);
+}
+
+static int sf_read_cmd(u8 op, u8 *buf, unsigned int len)
+{
+	return sf_cmd(&op, 1, buf, len);
+}
+#else
 /* A command alone, reading len (up to 10) bytes back */
 static int sf_read_cmd(u8 op, u8 *buf, unsigned int len)
 {
 	return fsp_run(&op, 1, FSP_SIZES(1, 0, 0), FSP_SIZES(len, 0, 0), 0,
 		       buf, len);
 }
+#endif
 
 static int sf_wait_ready(void)
 {
@@ -149,6 +273,104 @@ static int sf_wait_ready(void)
 	return -ETIMEDOUT;
 }
 
+/* BDMA reads its source from DDR: a page goes through here */
+static u8 sf_page[SZ_PAGE] __aligned(64);
+
+#ifdef CONFIG_SS_FSP_SW_CS
+/* Short of this, or unaligned, the vendor's driver goes by the FSP */
+#define SF_BDMA_MIN		64
+#define SF_BDMA_ALIGN		16
+
+static int sf_erase_sector(u32 addr)
+{
+	u8 cmd[4] = { CMD_SE_64K, addr >> 16, addr >> 8, addr };
+	int ret = sf_wren();
+
+	return ret ? ret : sf_cmd(cmd, sizeof(cmd), NULL, 0);
+}
+
+/* The rest of a page program, chip select held; sf_page is aligned */
+static int sf_program_bdma(unsigned int len)
+{
+	int ret, bdma;
+
+	ss_miu_flush();
+	writew(CTRL_BASE, FSP_CTRL);
+	writew(0, FSP_WBF_SIZE);
+	writew(0, FSP_RBF_SIZE);
+	writew(OUT_EN, FSP_OUT);
+	writew(len + 1, FSP_OUT_SIZE);
+	writew(BIT(0), FSP_TRIGGER);
+
+	bdma_start(BDMA_PATH_MIU_FSP, SS_MIU_ADDR(sf_page), 0, len);
+	bdma = bdma_wait(SF_TIMEOUT_MS);
+	ret = fsp_wait();
+
+	writew(0, FSP_OUT);
+	writew(0, FSP_OUT_SIZE);
+	return ret ? ret : bdma;
+}
+
+static int sf_program_page(u32 to, const u8 *buf, unsigned int len)
+{
+	u8 cmd[4] = { CMD_PP, to >> 16, to >> 8, to };
+	int ret;
+
+	memcpy(sf_page, buf, len);
+	ret = sf_wren();
+	if (ret)
+		return ret;
+
+	sf_cs(false);
+	ret = sf_send(cmd, sizeof(cmd));
+	if (!ret)
+		ret = len < SF_BDMA_MIN ? sf_send(sf_page, len) :
+					  sf_program_bdma(len);
+	sf_cs(true);
+	return ret ? ret : sf_wait_ready();
+}
+
+static int sf_read_fsp(u32 from, u8 *buf, size_t len)
+{
+	u8 cmd[5] = { CMD_FAST_READ, from >> 16, from >> 8, from, 0 };
+
+	return sf_cmd(cmd, sizeof(cmd), buf, len);
+}
+
+/* QSPI's fast read, 8 dummy cycles: what the vendor's driver reads with */
+static int sf_read_bdma(u32 from, u8 *buf, size_t len)
+{
+	int ret;
+
+	writew(QSPI_FUNC_DUMMY, QSPI_FUNC);
+	writew(QSPI_CKG_DUMMY(8), QSPI_CKG);
+	writew(QSPI_MODE_FAST, QSPI_MODE);
+
+	sf_cs(false);
+	bdma_start(BDMA_PATH_SPI_MIU, from, SS_MIU_ADDR(buf), len);
+	ret = bdma_wait(SF_READ_TIMEOUT_MS);
+	sf_cs(true);
+	return ret;
+}
+
+static int ms_sf_read(struct mtd_info *mtd, loff_t from, size_t len,
+		      size_t *retlen, u_char *buf)
+{
+	int ret;
+
+	if (from > mtd->size || len > mtd->size - from)
+		return -EINVAL;
+	if (len < SF_BDMA_MIN || from % SF_BDMA_ALIGN ||
+	    (ulong)buf % SF_BDMA_ALIGN)
+		ret = sf_read_fsp(from, buf, len);
+	else
+		ret = sf_read_bdma(from, buf, len);
+	if (ret)
+		return ret;
+	*retlen = len;
+	return 0;
+}
+#else
 /*
  * WREN, the command with its address, RDSR polled to the end: an erase,
  * and a page program whose data comes from BDMA (the dummy byte 5 is
@@ -165,6 +387,30 @@ static int sf_wren_cmd(u8 op, u32 addr, bool bdma)
 		       NULL, 0);
 }
 
+static int sf_erase_sector(u32 addr)
+{
+	return sf_wren_cmd(CMD_SE_64K, addr, false);
+}
+
+static int sf_program_page(u32 to, const u8 *buf, unsigned int len)
+{
+	int ret, bdma;
+
+	memcpy(sf_page, buf, len);
+	ss_miu_flush();
+
+	bdma_start(BDMA_PATH_MIU_FSP, SS_MIU_ADDR(sf_page), 0, len);
+
+	writew(len, FSP_OUT_SIZE);
+	writew(OUT_REPLACE(5) | OUT_MODE_BDMA | OUT_EN, FSP_OUT);
+	ret = sf_wren_cmd(CMD_PP, to, true);
+
+	bdma = bdma_wait(SF_TIMEOUT_MS);
+	writew(0, FSP_OUT_SIZE);
+	writew(0, FSP_OUT);
+	return ret ? ret : bdma ? bdma : sf_wait_ready();
+}
+
 static int ms_sf_read(struct mtd_info *mtd, loff_t from, size_t len,
 		      size_t *retlen, u_char *buf)
 {
@@ -174,38 +420,7 @@ static int ms_sf_read(struct mtd_info *mtd, loff_t from, size_t len,
 	*retlen = len;
 	return 0;
 }
-
-/* BDMA reads its source from DDR: a page goes through here */
-static u8 sf_page[SZ_PAGE] __aligned(64);
-
-static int sf_program_page(u32 to, const u8 *buf, unsigned int len)
-{
-	int ret, bdma;
-
-	memcpy(sf_page, buf, len);
-	ss_miu_flush();
-
-	writew(0, BDMA_CTRL);
-	writew(BDMA_PATH_MIU_FSP, BDMA_PATH);
-	writew(SS_MIU_ADDR(sf_page) & 0xffff, BDMA_SRC_L);
-	writew(SS_MIU_ADDR(sf_page) >> 16 & 0x0fff, BDMA_SRC_H);
-	writew(0, BDMA_DST_L);
-	writew(0, BDMA_DST_H);
-	writew(len, BDMA_LEN_L);
-	writew(0, BDMA_LEN_H);
-	writew(BDMA_TRIGGER, BDMA_CTRL);
-
-	writew(len, FSP_OUT_SIZE);
-	writew(OUT_REPLACE(5) | OUT_MODE_BDMA | OUT_EN, FSP_OUT);
-	ret = sf_wren_cmd(CMD_PP, to, true);
-
-	bdma = wait_for_bit_le16((void *)BDMA_STATUS, BDMA_DONE, true,
-				 SF_TIMEOUT_MS, false);
-	writew(BDMA_DONE, BDMA_STATUS);
-	writew(0, FSP_OUT_SIZE);
-	writew(0, FSP_OUT);
-	return ret ? ret : bdma ? bdma : sf_wait_ready();
-}
+#endif
 
 static int ms_sf_write(struct mtd_info *mtd, loff_t to, size_t len,
 		       size_t *retlen, const u_char *buf)
@@ -242,7 +457,7 @@ static int ms_sf_erase(struct mtd_info *mtd, struct erase_info *instr)
 	addr = instr->addr;
 	end = instr->addr + instr->len;
 	for (; addr < end; addr += SZ_SECTOR) {
-		ret = sf_wren_cmd(CMD_SE_64K, addr, false);
+		ret = sf_erase_sector(addr);
 		if (!ret)
 			ret = sf_wait_ready();
 		if (ret) {
@@ -256,6 +471,20 @@ static int ms_sf_erase(struct mtd_info *mtd, struct erase_info *instr)
 
 #define MFR_GIGADEVICE		0xc8
 #define MFR_WINBOND		0xef
+
+/* wbuf: WREN, WRSR, n status bytes, RDSR */
+static int sf_write_status(const u8 *wbuf, unsigned int n)
+{
+#ifdef CONFIG_SS_FSP_SW_CS
+	int ret = sf_wren();
+
+	return ret ? ret : sf_cmd(wbuf + 1, 1 + n, NULL, 0);
+#else
+	return fsp_run(wbuf, 3 + n, FSP_SIZES(1, 1 + n, 1), FSP_SIZES(0, 0, 1),
+		       CTRL_CMD2 | CTRL_CMD3 | CTRL_RDSR(2) | CTRL_FSCHK,
+		       NULL, 0);
+#endif
+}
 
 /*
  * Block protection left on by a vendor loader: the BP and SRWD bits
@@ -280,9 +509,7 @@ static void sf_unprotect(u8 mfr)
 		n = 2;
 	}
 	wbuf[2 + n] = CMD_RDSR;
-	if (fsp_run(wbuf, 3 + n, FSP_SIZES(1, 1 + n, 1), FSP_SIZES(0, 0, 1),
-		    CTRL_CMD2 | CTRL_CMD3 | CTRL_RDSR(2) | CTRL_FSCHK, NULL, 0) ||
-	    sf_wait_ready())
+	if (sf_write_status(wbuf, n) || sf_wait_ready())
 		printf("SF: could not clear the block protection (SR %02x)\n",
 		       sr);
 }
