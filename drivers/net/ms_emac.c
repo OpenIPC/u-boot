@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * The EMAC of the SigmaStar infinity3 and its internal ("Albany") PHY.
+ * The EMAC of the SigmaStar SoCs and their internal ("Albany") PHY.
  *
  * An Atmel AT91RM9200-style 10/100 MAC behind the RIU: register G (the AT91
  * numbering) is two 16-bit RIU registers, bits 15:0 at +2G and 31:16 at
@@ -14,8 +14,9 @@
  *   "ms_emac" for the mii command.
  *
  * After the vendor U-Boot 2015.01 (drivers/mstar/emac, mhal_emac.c of
- * infinity3, CONFIG_ETHERNET_ALBANY and SOFTWARE_DESCRIPTOR as its
- * infinity3_defconfig builds it).
+ * each die, CONFIG_ETHERNET_ALBANY and SOFTWARE_DESCRIPTOR as its
+ * <die>_defconfig builds it). The dies differ in the PHY's banks
+ * (mach/sigmastar.h), the MAC clocks' registers and two PHY settings.
  */
 
 #include <common.h>
@@ -32,6 +33,15 @@
 #include <linux/mii.h>
 
 #define EMAC_BASE		SS_BANK(SS_BANK_EMAC0)
+
+/* CLK_EMAC_RX and _TX in SCGPCTRL */
+#ifdef CONFIG_SS_I6C_FAMILY
+#define SCGP_EMAC_RX		0x54
+#define SCGP_EMAC_TX		0x56
+#else
+#define SCGP_EMAC_RX		0x44
+#define SCGP_EMAC_TX		0x46
+#endif
 
 /* Registers, by their 32-bit (AT91) offset */
 #define EMAC_CTL		0x00
@@ -198,8 +208,8 @@ static const struct {
 	u8 val;
 } ms_albany_init[] = {
 	{ SS_BANK_CLKGEN0,  0x84, 0x00 },	/* CLK_EMAC_AHB 123 MHz */
-	{ SS_BANK_SCGPCTRL, 0x44, 0x00 },	/* CLK_EMAC_RX from the PHY */
-	{ SS_BANK_SCGPCTRL, 0x46, 0x00 },	/* CLK_EMAC_TX from the PHY */
+	{ SS_BANK_SCGPCTRL, SCGP_EMAC_RX, 0x00 },	/* from the PHY */
+	{ SS_BANK_SCGPCTRL, SCGP_EMAC_TX, 0x00 },	/* from the PHY */
 	{ SS_BANK_ALBANY1, 0xb4, 0x02 },	/* gain shift */
 	{ SS_BANK_ALBANY1, 0x4f, 0x02 },	/* det max */
 	{ SS_BANK_ALBANY1, 0x51, 0x01 },	/* det min */
@@ -244,6 +254,9 @@ static const struct {
 	{ SS_BANK_ALBANY1, 0x8e, 0x0e },
 	{ SS_BANK_ALBANY1, 0x90, 0x04 },
 	{ SS_BANK_ALBANY1, 0xc7, 0x80 },	/* clock source hv */
+#ifdef CONFIG_SS_INFINITY6E
+	{ SS_BANK_ALBANY1, 0x10, 0x53 },	/* LMS and LPF scale factor */
+#endif
 };
 
 static void ms_emac_clk_init(void)
@@ -256,10 +269,29 @@ static void ms_emac_clk_init(void)
 	/* RX shift and TX underrun fixes */
 	riu_writeb(riu_readb(SS_BANK_EMAC1, 0x00) | 0x10, SS_BANK_EMAC1, 0x00);
 	riu_writeb(riu_readb(SS_BANK_EMAC1, 0x39) | 0x01, SS_BANK_EMAC1, 0x39);
+#ifdef CONFIG_SS_IFORD_FAMILY
+	/* Iford's and Ifliegen's mhal_emac.c: the clock gate open, its RX/TX
+	 * gating off */
+	riu_writeb(riu_readb(SS_BANK_EMAC1, 0x00) | 0x01, SS_BANK_EMAC1, 0x00);
+	riu_writeb(riu_readb(SS_BANK_EMAC1, 0xf2) & ~0x05, SS_BANK_EMAC1, 0xf2);
+#endif
+#ifdef CONFIG_SS_IFORD
+	/* and on Iford the MCM control that drops the first frame after an
+	 * RBQP reset */
+	riu_writeb(0x00, 0x1132, 0x16);
+#endif
 
-	for (i = 0; i < ARRAY_SIZE(ms_albany_init); i++)
-		riu_writeb(ms_albany_init[i].val, ms_albany_init[i].bank,
-			   ms_albany_init[i].reg);
+	for (i = 0; i < ARRAY_SIZE(ms_albany_init); i++) {
+		u8 val = ms_albany_init[i].val;
+
+#ifndef CONFIG_SS_INFINITY3
+		/* The sadc timer shares its register on the later dies */
+		if (ms_albany_init[i].bank == SS_BANK_ALBANY2 &&
+		    ms_albany_init[i].reg == 0x80)
+			val |= riu_readb(SS_BANK_ALBANY2, 0x80) & 0x0f;
+#endif
+		riu_writeb(val, ms_albany_init[i].bank, ms_albany_init[i].reg);
+	}
 
 	/* CHIPTOP allpad_in off */
 	riu_writeb(riu_readb(SS_BANK_CHIPTOP, 0xa1) & 0x7f, SS_BANK_CHIPTOP,

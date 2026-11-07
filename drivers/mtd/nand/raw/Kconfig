@@ -37,6 +37,14 @@ config SYS_NAND_USE_FLASH_BBT
 	help
 	  Enable the BBT (Bad Block Table) usage.
 
+config NAND_MS_SPINAND
+	bool "SPI NAND on the SigmaStar FSP"
+	depends on ARCH_SIGMASTAR
+	select SYS_NAND_SELF_INIT
+	help
+	  SPI NAND behind the FSP of the SigmaStar infinity6 family, with the
+	  chip's own ECC and its geometry from the SNI the ROM boots from.
+
 config NAND_ATMEL
 	bool "Support Atmel NAND controller"
 	select SYS_NAND_SELF_INIT

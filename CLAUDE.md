@@ -5,17 +5,37 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this branch is
 
 `openipc-sigmastar` is OpenIPC's U-Boot for SigmaStar's (MStar's)
-Cortex-A7 camera SoCs of the infinity3 die: the MSC313E, MSC316DC and
-MSC316DM. The tree is **mainline U-Boot v2022.10**, the same release as
-`openipc-hisilicon`, `openipc-xm`, `openipc-gk710x` and `openipc-anyka`,
-plus:
+Cortex-A7 camera SoCs. The tree is **mainline U-Boot v2022.10**, the same
+release as `openipc-hisilicon`, `openipc-xm`, `openipc-gk710x` and
+`openipc-anyka`, plus:
 
 - the OpenIPC boot layer, carried over from `openipc-anyka`, which took it
   from `openipc-xm` and `openipc-hisilicon`;
-- the infinity3 support, written from the vendor SDK
-  `MSC3XX_SDK_V_1711291828-I3` (U-Boot 2015.01
-  `arch/arm/cpu/armv7/infinity3` and `drivers/mstar`, kernel 3.18.30
-  `drivers/mstar`).
+- the SigmaStar support, written from the vendor SDKs: U-Boot 2015.01
+  `arch/arm/cpu/armv7/<die>` and `drivers/mstar`, and the kernels'
+  `drivers/mstar`.
+
+| Die | SoCs | Boot stages from | Status |
+| --- | --- | --- | --- |
+| infinity3 | `msc313e` `msc316dc` `msc316dm` | SDK `MSC3XX_SDK_V_1711291828-I3` | qemu, see "Verification" |
+| infinity2m | `ssd201` `ssd202d` | SDK `i2m` `project/board/i2m/boot/ipl` | qemu, IPL to kernel |
+| infinity6 | `ssc325` | OpenIPC/u-boot-sigmastar `ipl/` | **no silicon**; qemu per-die machine |
+| infinity6b0 | `ssc333` `ssc335` `ssc335de` `ssc337` `ssc337de` | same | **no silicon**; qemu per-die machine |
+| infinity6e | `ssc30kd` `ssc30kq` `ssc338q` | same | **no silicon**; qemu per-die machine |
+| infinity6c | `ssc377` `ssc377d` `ssc377de` `ssc377qe` `ssc378de` `ssc378qe` | same | **no silicon**; qemu per-die machine |
+| infinity2m | `ssr621q` | SDK `i2m` | **no silicon**; qemu `ssr621q` |
+| infinity6 | `ssc325de` `ssc327de` | as `ssc325` | **no silicon**; qemu per-part machine |
+| Iford | `ssc029a` `ssc029b` `ssc029c` | Iford SDK IMD00V2.1.0 boot.bin, `board/iford/boot/nor/ipl` | **no silicon**; only `ssc029c` boots in qemu |
+| Ifado | `ssc375` | Dahua IPC-HDW1433V-A-IL2 NOR (IPL, CIS, IPL_CUST) | **no silicon**; qemu `ssc375`, to the vendor kernel's userspace |
+| Ifliegen | `ssc034a` `ssc034b`, NOR and SPI NAND | Ifliegen SDK ILSSV01C12 `board/ifliegen/boot` (IPL, IPL_CUST, TF-A `u-bl32.bin`, flash.nri/flash.sni, flash lists) | **no silicon**; qemu `ssc034a`/`ssc034b`, to the SDK kernel's shell |
+| SPI NAND | `<soc>-nand` for every infinity2m, 6, 6b0, 6e, 6c part | published images, i2m and Maruko SDKs | **no silicon**; qemu |
+
+OpenIPC/u-boot-sigmastar, the vendor's U-Boot 2015.01 with OpenIPC's
+environment, is what OpenIPC ships for the infinity6 dies today, and it
+publishes `u-boot-ssc*-nor.bin` to OpenIPC/firmware `latest`. This branch's
+images go only to the CI repository's own `sigmastar` release: the publish
+job of `build-sigmastar.yml` on `openipc` is commented out for now (and its
+`PUBLISH_GLOB` kept to `u-boot-msc31*` for when it returns).
 
 No vendor driver comes along. The vendor's first boot stages, IPL and
 IPL_CUST, are carried as binaries (see "Boot").
@@ -34,8 +54,9 @@ Adding or dropping a SoC needs both branches:
   `TARGET_*` in `arch/arm/mach-sigmastar/Kconfig`;
 - there: `build-sigmastar.yml`'s matrices and the README.
 
-The later SigmaStar dies (infinity2m, infinity6/6b0/6e: SSD20x, SSC33x)
-have another boot chain and are not covered.
+Not covered: the dies with no OpenIPC use or no IPL in the SDKs at hand
+(infinity5, infinity7, pioneer3, mercury6, souffle); Iford's 029b/029c SPI
+NAND (only RTOS/dual-OS sets in the SDK); Mercury6 (no IPL at hand).
 
 ## Relationship to mainline
 
@@ -48,15 +69,15 @@ git diff --diff-filter=M v2022.10 HEAD         # the mainline files we patched
 
 | Area | Location |
 | --- | --- |
-| SoC: timer, reset, DRAM size, MIU flush | `arch/arm/mach-sigmastar/` (`ARCH_SIGMASTAR`; `TARGET_MSC313E/MSC316DC/MSC316DM`, `SS_INFINITY3`; register map in `include/mach/sigmastar.h`) |
-| Board: `misc_init_r` → `openipc_helper()`, `board_eth_init`, `board_mmc_init` | `board/sigmastar/infinity3/` |
+| SoC: timer, reset, DRAM size, MIU flush, `memlx`/`memsz` | `arch/arm/mach-sigmastar/` (`ARCH_SIGMASTAR`; `TARGET_<SOC>` selecting `SS_<DIE>`; register map in `include/mach/sigmastar.h`) |
+| Board: `misc_init_r` → `openipc_helper()`, `board_eth_init`, `board_mmc_init` | `board/sigmastar/ipc/` |
 | SPI NOR on the FSP, non-DM | `drivers/mtd/spi/ms_sflash.c` (`MS_SFLASH`). It provides `spi_flash_probe()` and fills `mtd->_read/_write/_erase`, as `ak_sflash` does on `openipc-anyka` |
 | Ethernet, non-DM | `drivers/net/ms_emac.c` (`MS_EMAC`) |
 | SD card on SDIO0, non-DM | `drivers/mmc/ms_sdmmc.c` (`MMC_MS_SDMMC`), registered from `board_mmc_init()` |
 | xz decompression | `lib/xz/` (xz-embedded, 0BSD, with CRC64; `XZ`), `include/linux/xz.h`, `unxz()` in `include/unxz.h` |
 | Memory map, console, timer | `include/configs/sigmastar.h`, ending in `#include "openipc-common.h"` |
 | OpenIPC boot layer | `common/openipc.c`, `include/openipc.h` (as on `openipc-anyka`), `include/configs/openipc-common.h` (SigmaStar rewrite, NOR only, same env commands) |
-| Kconfig fragments, vendor boot stages, the image packer, the build | `openipc/`, `build.sh` |
+| Kconfig fragments, vendor boot stages, the image packers (`infinity3-image.py`, `sigmastar-image.py`), the build | `openipc/`, `build.sh` |
 
 **Patched mainline files**, each small:
 
@@ -77,7 +98,9 @@ The console is mainline `ns16550`, non-DM.
 
 ## Boot
 
-The vendor boot chain is kept; only the MXP partition `UBOOT` is ours.
+The vendor boot chain is kept on every die; only the partition `UBOOT` is
+ours. What follows up to "Hand-off" is infinity3; "Later dies" says what
+differs.
 
 - The mask ROM looks for the IPL at flash offset `0x4000` (the first
   16 KiB are zeros on every image seen). The **IPL** trains and sizes the
@@ -111,7 +134,207 @@ The vendor boot chain is kept; only the MXP partition `UBOOT` is ours.
 - **DRAM size**: probed up to the part's (`PHYS_SDRAM_1_SIZE`: 64 MiB on
   the MSC313E, 128 MiB on the MSC316s); the DDR wraps past its end.
 
+### Later dies (infinity2m, infinity6*)
+
+`openipc/sigmastar-image.py` packs the same 256 KiB boot partition as
+OpenIPC/u-boot-sigmastar's `make_boot_spinor.sh`, with the same bytes for
+everything but the uImage: IPL at `0`, `openipc/sigmastar-mxp.bin` at `0xF000`
+(infinity6c: `infinity6c-gcis.bin`, a table of flash parts, at `0x9000`),
+IPL_CUST at `0x10000`, the uImage at `0x20000`.
+
+- All parts of a die run the same IPL and IPL_CUST: the images in OpenIPC/firmware
+  `latest` are byte-identical in that area, part to part.
+- The MXP table is the one blob for all of them, and also serves infinity2m,
+  whose SDK has no such layout (it has MXP at `0x20000`, U-Boot at `0x30000`,
+  environment at `0x5D000`, which collide with OpenIPC's). Its entries for IPL
+  (`0x4000`) and MXPT (`0x3000`) do not say where those are in this layout;
+  infinity2m's stages boot from it regardless under qemu.
+- The uImage: `xz -z` data (preset 6, an 8 MiB dictionary, CRC64), not the
+  preset 9e of infinity3, and a 32-byte `MVX4##<die>...#CM_UBT1501#XVM` name, as
+  `create_img.sh` gives it.
+
+### SPI NAND
+
+`./build.sh <soc>-nand` adds `openipc/nand_config` and gives
+`output/u-boot-<soc>-nand.bin`, the 2 MiB of `make_boot_spinand.sh`: SNI at `0`,
+PNI at `0x800`, IPL at `0x40000` and `0x80000`, IPL_CUST at `0xC0000` and
+`0x100000`, the same uImage at `0x140000` and `0x1A0000`. The stages are the NOR
+images' own: the published NAND images hold the same bytes, and
+`openipc/<die>-nand-{sni,pni}.bin` are the vendor's `GCIS.bin`, `PARTINFO.pni`.
+
+- Environment at `0x200000`, 128 KiB, in a 256 KiB range, as a saved one sits.
+- UBI after it, as the firmware's `rootfs.ubi` lays it out: volumes `kernel`,
+  `rootfs` (a squashfs, not UBIFS), `rootfs_data`, `other`.
+  `CONFIG_OPENIPC_NAND_KERNEL_VOLUME` makes `common/openipc.c` check and
+  recover those, and not `/boot/fitImage` as on HiSilicon.
+- `ms_spinand` takes geometry from the SNI, since the published images carry one
+  generic SNI whose ID is `0xEE`. The bad-block table stays in memory, like the
+  vendor's: nothing is written to the last blocks, which UBI owns.
+- A page load holds the chip select by QSPI's burst bit, and OUT_SIZE counts one
+  more than BDMA sends. Whole page and spare go by BDMA; the vendor sends those
+  through the FSP, so a spare write takes a path it never does.
+- No infinity6c or infinity2m NAND is published to compare against. Run
+  instead (qemu): `ssc377-nand` with mstar-06's Maruko kernel, the UBI
+  written by `run ur` over TFTP (`nand erase`/`write` through infinity6c's
+  software chip select), booted to `login:` with the `ubiblock` override;
+  `ssd202d-nand` with the i2m SDK kernel from a UBI, its UBIFS root mounted.
+  A part whose SNI gives a spare other than 64 or 128 bytes is refused: the
+  core has no layout for it.
+- `root=` follows the partition count (`OPENIPC_NAND_ROOTDEV`): the published
+  kernels have gluebi, which makes each UBI volume an MTD after the partitions,
+  `kernel` then `rootfs`. So `mtdblock5` behind the default four partitions,
+  `mtdblock6` on infinity6c and Iford (five), `mtdblock4` on infinity2m (three).
+  A kernel without gluebi (Maruko's, the i2m and Iford SDKs') takes
+  `extras='ubi.block=0,rootfs root=/dev/ubiblock0_1 rootfstype=squashfs'`
+  (the later `root=` wins), or `root=ubi0:rootfs rootfstype=ubifs` for a
+  UBIFS rootfs.
+
+### Iford
+
+`openipc/sigmastar-image.py --iford-cis`: the SDK's NOR boot.bin as it is, IPL at
+`0`, the CIS area (flash.nri, PNI, flash list) at `0xE000`, IPL_CUST at
+`0x18000`, our UBOOT at `0x1F000`, the environment at `0x40000`. Its IPL_CUST
+takes the xz uImage like the older dies, but by the header's load address,
+`0x23E00000`. Iford shares infinity6c's paths (`SS_I6C_FAMILY`): the chip select
+in software, the PHY at bank `0x1518`; its FSP is at `0x100D`/`0x100E`, BDMA from
+MIU reads channel 1 (path `0x2B41`), SD has its own pads (vendor
+`mmc_host/src/iford`, SD0 defaults) and the SD clock's SCGP is bank `0x1135`.
+The DDR size is bank `0x1659` reg `0x0D`, log2 MiB, which the IPL finds by
+fill-and-wrap test; `dram_init()` still probes if it reads outside 64 MiB-2 GiB
+(the kernel's decode takes [7:4] as a second term). `memlx`/`memsz` are the SDK
+images' own (`set_config`) for 128, 256 and 512 MiB. No kernel hand-off was tried: its 5.10 kernel takes a DTB.
+Under qemu `ssc029` (029b at `bond=0x10`, its IPL refuses other bonds; which a
+real part carries is unknown): all three through their own IPL chain, `sf`, env
+across reset, ping, TFTP, SD card detect, FAT load and raw read-back. 029a's IPL
+logs a DQ training failure the model does not train for.
+
+### Ifado
+
+`ssc375` (Ifado, SSC032B, QFN88 DDR3). No SDK: the stages are Dahua's, from
+an IPC-HDW1433V-A-IL2 NOR (`openipc/ifado-*.bin`, the flash's `0-0x8000`,
+`0x8000-0x10000` and `0x10000-0x15000`, trailing `0xFF` cut). `--ifado-cis`:
+IPL at `0`, the CIS area (NRI records, PNI at `0x9000`, NRIB) at `0x8000`,
+IPL_CUST at `0x10000`, our xz uImage in the PNI's UBOOT at `0x20000`
+(`0x23E00000`), the environment at `0x40000`, where Dahua's 8 KiB one was.
+The Dahua `sbot` wrapper is not needed: IPL_CUST checks its magic only on a
+path the shipped image does not take. The die is the infinity2m map
+(`SS_IFADO`: DDR probed up to 128 MiB, PHY at bank `0x31`, SD at `0x1413`,
+EMAC and FSP where infinity2m has them) with infinity6c's software chip
+select (`SS_FSP_SW_CS`). No SD: the camera has no slot and the pads are
+unread. Its IPL_CUST jumps with the MMU and D-cache on, page table at
+`0x20004000`, where the kernel builds its own; `lowlevel_init.S`
+`save_boot_params` cleans the cache and turns both off (a branch on the
+other dies, whose loaders leave SCTLR.M clear; checked on each machine).
+qemu `ssc375`: chain, `sf` unaligned write/read, raw file, env across
+reset, `memlx` for 128 MiB, ping, TFTP CRC; Dahua's 4.9.84 kernel by
+`bootm` with its built-in DTB passed, through the squashfs mount to Dahua's
+userspace (which reboots without DHBoot's partitions). The Dahua dump is
+for tests and reverse engineering only: U-Boot is not changed to run
+Dahua's firmware, and on a flash still holding it the layout scan may take
+Dahua's backup U-Boot at `0xC0000` for a kernel; that stays as it is.
+
+### Ifliegen
+
+`ssc034a` (QFN128, 128 MiB DDR3) and `ssc034b` (QFN88, 64 MiB), Cortex-A55
+in AArch32. The SDK ships no images; `--ifliegen-tfa`/`-nri`/`-list` build
+what its image.mk would, at offsets both packages' IPLs fit: IPL at `0`, the
+CIS at `0xC000` (flash.nri, the PNI at `+0x1000`, the flash list with
+nrigenerator's CRC32 at `+0x2000`), IPL_CUST at `0x16000`, TF-A's SP_MIN at
+`0x1D000`, our xz uImage at `0x24000` (`0x23E00000`), the environment at
+`0x40000`. The IPL runs TF-A, TF-A runs IPL_CUST, IPL_CUST U-Boot, in the
+normal world. The die is Iford's in the SDK (`SS_IFORD_FAMILY`: FSP at
+`0x100D`, BDMA from MIU by channel 1, no MIU pipe to flush, EMAC MCG off;
+not Iford's MCM write at bank `0x1132`), with:
+
+- UART0 left in the URDMA's DMA mode, the IPL's bytes going through its TX
+  FIFO (bank `0x1107` reg `0x17`): `board_early_init_f()` waits for the FIFO,
+  stops both DMAs and leaves DMA mode, as the SDK's `hal_uart_config()`, and
+  clears PM sleep reg 9 bit 11 (RX off); the 8250 then serves the console.
+- SP_MIN stays at `0x23FE0000` as the kernel's PSCI: U-Boot keeps to the first
+  48 MiB, as the SDK's (`CONFIG_SGS_RAM_SIZE`), or the kernel hangs at its
+  first PSCI call. DDR is probed (no size register known), up to 128 MiB.
+- `memlx`/`memsz`: the SDK's set_config, `0x7FE0000`/`0x5000000` at 128 MiB,
+  `0x3FE0000`/`0x2000000` at 64 MiB. Machine 5120 (MACH_TYPE_IFACKEL, its
+  U-Boot's); the 4.9 kernel turns the ATAGs into its built-in DT.
+- SD: SD0, the board's mmc0 (`mmc_host/src/ifliegen`): PADGPIO pads from
+  `0x0F`, card detect at `0x16`, power on PAD_FUART_RTS (`0x34`), the clock
+  as Iford's but SC_GP_CTRL at bank `0x1133`, the host's MCG off.
+- SPI NAND (`ssc034a-nand`, `ssc034b-nand`): `--ifliegen-sni` builds the CIS
+  in ten blocks (SNIB and SNIF, the PNI, the flash list, with snigenerator's
+  boot blocks 10 and 25 and CRCs), BOOT at `0x140000` (IPL and IPL_CUST three
+  blocks each, SP_MIN, a 1 MiB UBOOT), BOOT_BAK at `0x320000`, the
+  environment at `0x500000`, UBI from `0x540000`. The IPL takes its
+  timeouts from the SNIF: the CIS carries the flash list's W25N01GV, record
+  57; the SDK's generic record has none and the IPL fails to load.
+
+The SGS kernels (Iford, Ifliegen, Ifado: `drivers/sgs_common/flash/nor`) name
+the NOR `nor0`, not the older `NOR_FLASH`: `SFC` in
+`openipc-common.h`. qemu `ssc034a`/`ssc034b`: the chain, `sf` unaligned
+write/read and the raw file, env across reset, ping, TFTP CRC, the SDK's
+4.9.84 kernel (mstar-06's build) from OpenIPC's NOR layout, both CPUs by
+PSCI, the six partitions, squashfs root to a shell (`extras=init=/linuxrc`
+for its rootfs). SD (mstar-06's model): detect, 4-bit, FAT load CRC, raw
+write and read-back. NAND: the chain, `nand` erase/write/read against the
+raw file, env across reset, the SDK kernel from an OpenIPC UBI to a shell
+with the `ubiblock` override.
+
+### Iford SPI NAND
+
+`ssc029a-nand` only: the one SDK spinand set for a part with plain Linux
+(`ipc_iford.spinand...ssc029a.512.bga12_ddr4_optee`). Its `cis.bin` in the ten
+CIS blocks (SNIB header, page 0; the SNIF of `flash_list-fb.sni` record 1,
+W25N01JW, in place of the empty generic one; PNI, page 1), its IPL, IPL_CUST
+and OP-TEE from `0x140000`, our uImage in UBOOT at `0x260000`, the environment at
+`0x580000`. U-Boot runs after OP-TEE. `ms_spinand` reads the SNIB's geometry and
+turns a W25N's buffer mode back on, which this IPL leaves off. qemu `ssc029a`:
+the chain, `nand` erase/write/read against the raw file, env across reset.
+Its `mtdparts` are `1280k(cis),2176k(boot0),2176k(boot1),256k(env),-(ubi)`:
+each boot copy is IPL, IPL_CUST, OP-TEE (`0x60000` each) and UBOOT
+(`0x100000`), so `env` lands at `0x580000` and `ubi` at `0x5C0000`, where
+U-Boot keeps them. The SDK's 5.10 kernel, from a UBI of its `kernel` and
+`rootfs.sqfs`, lists those five partitions and, without gluebi, mounts the
+squashfs through the `ubiblock` override (qemu `ssc029a`).
+029b and 029c have only RTOS/dual-OS NAND sets in the SDK; not built.
+
+### SPI NAND on infinity2m and infinity6c
+
+Nothing is published, so the layouts are the SDKs': infinity2m by its PNI
+(stages repeated over their blocks, `writecis ... 10 0 0 5`: part record 2 in
+blocks 0-8); infinity6c by Maruko's `spinand.squashfs` config, the SNI from its
+flash list (record 1, GD5F1GQ4UEYIH) in all ten CIS blocks. A board with another
+part needs its own record in page 0, as the SDK's `nand probe` writes it.
+
 ## Hand-off to the kernel
+
+On the later dies:
+
+- ATAGs at `0x20000000`, machine number per die (`openipc/<die>_config`:
+  infinity6c passes MERCURY6, 1399, as its vendor U-Boot does).
+- No `mem=`. `LX_MEM=${memlx} mma_heap=...,sz=${memsz} cma=2M`, the arguments
+  of OpenIPC/u-boot-sigmastar, whose saved environments have to keep working.
+  `ss_set_mem_env()` sets `memlx` and `memsz` at every boot, before the
+  environment is used, from its table of those values by DDR size. infinity2m has
+  no such table upstream; its row uses infinity6c's, since its kernel warns
+  about an LX_MEM that is not 1 MiB aligned.
+- `CONFIG_ENV_OFFSET`/`SIZE` are those of OpenIPC/u-boot-sigmastar, so a
+  saved environment loads as it is. Its `bootcmd` and `bootargs` are kept.
+- **Flash on infinity6c:** its IPL leaves the chip select in software, held
+  high (QSPI bank `0x17` reg `0x0a` = 3), and the vendor's driver frames each
+  flash command by hand. `ms_sflash` does the same and leaves that state to the
+  kernel. It reads by BDMA, or the FSP when short or unaligned, not by XIU;
+  OUT_SIZE is the count plus one. The published U-Boot runs
+  `flash/nor/drvSPINOR.c` + `fsp_qspi`: `flash_isp/infinity6c` is not its code.
+- **DDR size:** on infinity6, 6b0 and 6e `1 << (MIU 0x1012 reg 0x69 >> 12)` MiB,
+  on infinity6c `1 << (bank 0x1659 reg 0x0D)` MiB, since its IPL writes a fixed
+  `0x6000` to reg 0x69. The IPL sets both; each is what that die's vendor
+  `dram_init()` reads. infinity2m has no such register
+  in its vendor code and probes as infinity3 does.
+- **U-Boot stays in the first 64 MiB** (`board_get_usable_ram_top()`), like the
+  vendor's `CONFIG_UBOOT_RAM_SIZE`. BDMA's address registers are wider than the
+  12-bit mask in the IPLs: the vendor kernel's reach MIU `0x30000000`, on the
+  qemu machines 31 bits.
+
+On infinity3:
 
 - The vendor kernels (3.18.30) take ATAGs at `0x20000100` and turn them into their built-in
   DTB (`early_atags_to_fdt`); machine number 1391 (`INFINITY3`), as the
@@ -132,6 +355,26 @@ The vendor boot chain is kept; only the MXP partition `UBOOT` is ours.
   (`SFC`), the console `ttyS0`.
 
 ## Peripherals
+
+What differs by die is in `include/mach/sigmastar.h`, or under `CONFIG_SS_<DIE>`
+in the driver:
+
+| | infinity3 | infinity2m | infinity6, 6b0 | infinity6e | infinity6c |
+| --- | --- | --- | --- | --- | --- |
+| FSP bank | `0x16` | `0x16` | `0x16` | `0x16` on QFN88, else `0x100D` (CHIPTOP `0x48`) | `0x16` |
+| BDMA reg 3 | untouched | 0 | `0x8000` | `0x8000` | `0x8000` |
+| PHY banks | `0x31`- | `0x31`- | `0x31`- | `0x1514`- | `0x1518`- |
+| EMAC clocks (SCGPCTRL) | `0x44`, `0x46` | same | same | same | `0x54`, `0x56` |
+| PHY sadc timer | written | RMW | RMW | RMW, and LMS scale | RMW |
+| SD host bank | `0x1410` | `0x1410` | `0x1413` | `0x1413` | `0x1413` |
+| SD clock (CLKGEN) | `0x45` | `0x45` | `0x43` | `0x43` | `0x43` |
+| SD `DDR_MOD` | 0 (bypass) | `0x6400` | `0x6400` | `0x6400` | `0x2400` |
+| SD mode | CHIPTOP `0x08` | CHIPTOP | CHIPTOP | PADTOP `0x67`, `0x68` | PADTOP `0x67`, `0x68` |
+| SD pads | PADTOP `0x50`- | same | same | PADTOP `0x12`- | PADGPIO `0x00`- |
+| SD power | PADTOP `0x17` | PADTOP `0x20` | PADTOP `0x17` | PADTOP `0x25` and `0x10` | PADGPIO `0x22` |
+| SD card detect | PM GPIO `0x47` | same | same | PADTOP `0x11` | PADGPIO `0x06` |
+
+The rest of this section is infinity3's, which the table adjusts.
 
 Everything is on the RIU, 16-bit registers: bank B at
 `0x1F000000 + B * 0x200`, register R at `+ R * 4`. The vendor sources name
@@ -195,14 +438,14 @@ a register by its byte address `0xBBBB00 + R * 2`.
 ## Build
 
 ```sh
-bash build.sh               # all three; continues past failures, exits non-zero if any failed
+bash build.sh               # all SoCs; continues past failures, exits non-zero if any failed
 bash build.sh msc313e       # one or more SoCs (CROSS_COMPILE defaults to arm-linux-gnueabi-)
 ```
 
 - The output is `output/u-boot-<soc>-nor.bin`, the 256 KiB boot
   partition, built out of tree in `output/build-<soc>-nor/`.
-- `.config` is `openipc/openipc_config`, then `openipc/<soc>_config`, then
-  `olddefconfig`. There are no `configs/*_defconfig` for these targets.
+- `.config` is `openipc/openipc_config`, then `openipc/<die>_config` on the
+  later dies, then `openipc/<soc>_config`, then `olddefconfig`. There are no `configs/*_defconfig` for these targets.
 - Thumb-2 (`SYS_THUMB_BUILD`): `u-boot.bin` is about 180 KiB, 96 KiB in
   the uImage (SD, FAT, LZMA and xz included); the `UBOOT` partition holds 128 KiB. The image packer fails
   the build past that.
@@ -213,8 +456,11 @@ bash build.sh msc313e       # one or more SoCs (CROSS_COMPILE defaults to arm-li
 The emulator is OpenIPC/qemu-hisilicon, machine `msc313e`
 (`docs/sigmastar.md` there). `-M msc313e,flash-file=<image>` does the mask
 ROM's job, so it boots exactly the flashed bytes, IPL and IPL_CUST
-included. There is no MSC316 machine; the MSC316 images boot on `msc313e`
-(their IPL sizes its 64 MiB), which checks everything but the DDR set-up.
+included. qemu-hisilicon master has no MSC316 machine. On `msc313e` the MSC316
+IPL takes the efuse path that skips DDR set-up altogether. Branch
+`sigmastar-i6-dies` adds `msc316dc` and `msc316dm`, where the IPL programs the
+DDR PHY and MIU (`D-02.`); qemu trains nothing, so that runs the IPL's tables
+without proving them.
 
 - **CI smoke:** two boots of an 8 MiB image holding only U-Boot. The second
   must load the environment the first saved.
@@ -248,9 +494,64 @@ included. There is no MSC316 machine; the MSC316 images boot on `msc313e`
   real timing, the SD pads and card power,
   whether the bootcount word in DDR survives the IPL after a real reset.
 
+### The later dies
+
+Run under qemu-hisilicon master plus its Iford machine (`ssc029`, not yet
+upstream at the time). **Nothing here has run on silicon.**
+
+- `ssd201`, `ssd202d`: the image boots through the real IPL and IPL_CUST, also
+  with the MXP table above. `saveenv` + `reset`; TFTP of 300000 bytes with the
+  right CRC; `ping`; `mii read`; an unaligned `sf write` of 300000 bytes + `sf
+  read` + `cmp.b`. The SDK's 4.9.84 kernel by `bootm`: ATAGs, LX_MEM and
+  mma_heap taken, two CPUs, up to the missing root file system.
+- `ssc337` U-Boot under the infinity2m stages on `ssd202d`: DDR size from the
+  MIU, `memlx`, `sf`, `ping`, TFTP. A flash holding the environment of
+  OpenIPC/u-boot-sigmastar (stale `memlx` and `memsz` included): it loads, the
+  values are refreshed, the saved `bootcmd` boots the kernel.
+- The infinity6* U-Boots loaded in DDR on `ssc029`, with the MIU size register
+  set by a stub (the IPL does not run): banner, DRAM, the 64 MiB top, `memlx`
+  and `memsz` for 6, 6b0, 6e and 6c; SD at bank `0x1413` for 6, 6b0 and 6e.
+  With its bond test inverted in a scratch copy, 6e's `sf` on the FSP at `0x100D`
+  erases and reads; an unaligned write came back one byte short per partial
+  page because `ssc029`'s FSP counts OUT_SIZE plus one. infinity6e does not:
+  its vendor `halSERFLASH.c` writes the plain length, and `ssc338q` below is
+  clean.
+- SD with the `ssd201` U-Boot on the `msc313e` host: `mmc info`, write, read.
+- On the per-die machines of qemu-hisilicon branch `sigmastar-i6-dies` (not
+  merged at the time), `ssc325`, `ssc337`, `ssc338q` and `ssc377`, each also
+  with the published vendor image as a control. Real IPL chain; `sf` erase, an
+  unaligned write of 74565 bytes, read back, `cmp.b`, the raw flash file
+  compared; `saveenv`, `reset`; ping and TFTP; SD; an OpenIPC kernel to `login:`
+  (not past it, so no shell-side checks); a saved vendor environment upgraded.
+  `memlx` and `memsz` per RAM size match the vendor's on 6 and 6b0 (64-256),
+  6e (128-1024) and 6c (64-256). At 512 MiB the vendor's infinity6c falls
+  back to its 64 MiB values; this takes the largest row under the size
+  (256 MiB), as for any size a table lacks. The other parts of these dies reach their
+  prompts, and `ssd201`/`ssd202d` pass SD at `0x1410`.
+- SPI NAND, on the same branch: `ssc325de`, `ssc337de` and `ssc338q` boot the
+  published `rootfs.ubi` to `login:`, also after `saveenv` + `reset`; `ssc30kq`,
+  with no firmware published, to U-Boot. On `ssc337de`: `nand` erase, write and
+  read against the raw file; an environment the vendor's U-Boot saved; a factory
+  bad block and `markbad`, surviving a reboot, UBI seeing both; an injected
+  uncorrectable read (-74), a corrected one and a failed erase; TFTP recovery
+  from blank; SD recovery from a FAT card, also on NOR (`ssc337`).
+- **Not run on any machine:** media (ISP, encoders); `ssc378*` kernels; 4 KiB page
+  NAND; the infinity2m card power pad as a real pad (PAD_TTL0, taken as already
+  GPIO). A `ssc338q` at bond 0 (QFN88) boots U-Boot, but both the vendor's and
+  this U-Boot then lose the kernel: see "Things to keep". From NAND at bond 0,
+  both images stop in the vendor's IPL (`init failed!`).
+
 ## Things to keep
 
-- `mem=` stays the first kernel argument, as on the other OpenIPC targets.
+- infinity6e's bond: U-Boot follows the strap (FSP `0x16` at QFN88), but the
+  vendor kernel's `halSERFLASH.c` hard-codes `u8BoundID = 0x10` and always takes
+  FSP `0x100D`, so a QFN88 board panics at root mount under qemu. Reported by the
+  qemu work; the only package evidence is that vendor's configs list QFN88 as
+  FPGA-only (`SSC012A`), which needs a real board to settle.
+- `mem=` stays the first kernel argument on infinity3, as on the other
+  OpenIPC targets. The later dies have none (see "Hand-off").
+- `u-boot-ssc*` must not reach OpenIPC/firmware `latest` from here before a
+  board has run them.
 - The boot counter is the DRAM word at `0x21F20000`, like the other
   families' DDR + 0x1f20000. A healthy boot does not clear it. Whether the
   IPL's BIST leaves it alone on silicon is not known.

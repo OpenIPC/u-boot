@@ -1014,6 +1014,14 @@ config OPENIPC
 	  (common/openipc.c), driven from the board's misc_init_r(), with the
 	  default environment in include/configs/openipc-common.h.
 
+config OPENIPC_NAND_KERNEL_VOLUME
+	bool "NAND firmware keeps the kernel in its own UBI volume"
+	depends on OPENIPC
+	help
+	  The layout of OpenIPC's SigmaStar NAND images: UBI volumes kernel
+	  and rootfs, a squashfs. Without it, the kernel is a file in the
+	  UBIFS rootfs.
+
 config PRODUCT_SOC
 	string "Product SoC name"
 	default SYS_CONFIG_NAME

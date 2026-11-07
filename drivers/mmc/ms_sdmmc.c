@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * SD card on SDIO0, the FCIE5 SD host of the SigmaStar infinity3.
+ * SD card on SDIO0, the FCIE5 SD host of the SigmaStar SoCs.
  *
  * One job runs a command and, with DTRX_EN, its data: the command goes in
  * through the CMD/RSP FIFO (byte 0 = 0x40 | index, then the argument most
@@ -11,8 +11,10 @@
  * with JOB_DIR set.
  *
  * After the vendor U-Boot 2015.01 (drivers/mstar/sdmmc: hal_sdmmc_v5.c,
- * hal_card_platform_iNF3.c and ms_sdmmc_ub.c, which drives U-Boot's mmc
+ * hal_card_platform_<die>.c and ms_sdmmc_ub.c, which drives U-Boot's mmc
  * core the same way): the SDIO0 IP on the SD pads, DMA, bypass timing.
+ * The host is the same on every die; its bank, clock, pad mux, card power
+ * and card detect are not, and are under "Platform" below.
  */
 
 #include <common.h>
@@ -87,28 +89,84 @@
 #define RST_SOFT		BIT(0)
 #define RST_STS			(BIT(1) | BIT(2) | BIT(3))
 
+/*
+ * DDR_MOD at every speed up to HS: bypass timing on infinity3; the later
+ * vendor trees have left bypass mode, without the falling-edge latch on
+ * infinity6c
+ */
+#define DDR_PAD_CLK_SEL		BIT(10)
+#define DDR_PAD_IN_SEL		BIT(13)
+#define DDR_FALL_LATCH		BIT(14)
+#if defined(CONFIG_SS_INFINITY3)
+#define SD_DDR_MOD_TIMING	0
+#elif defined(CONFIG_SS_I6C_FAMILY)
+#define SD_DDR_MOD_TIMING	(DDR_PAD_CLK_SEL | DDR_PAD_IN_SEL)
+#else
+#define SD_DDR_MOD_TIMING	(DDR_PAD_CLK_SEL | DDR_PAD_IN_SEL | DDR_FALL_LATCH)
+#endif
+
 /* Platform: clock, pads, card power and card detect */
-#define SD_CLKGEN		SS_REG(SS_BANK_CLKGEN0, 0x45)
-#define SD_CLKGEN_MASK		0x3f	/* [5:2] select, [1] invert, [0] gate */
+#define PAD_OEN			BIT(5)	/* set: input, the pad to the IP */
+#define PAD_OUT			BIT(4)
+#define CHIPTOP_ALLPAD		SS_REG(SS_BANK_CHIPTOP, 0x50)
+#define CHIPTOP_ALLPAD_IN	BIT(15)
 #define CHIPTOP_SD_MODE		SS_REG(SS_BANK_CHIPTOP, 0x08)
-#define CHIPTOP_SD_MODE2	BIT(3)
-#define CHIPTOP_SDIO_MODE1	BIT(8)
 #define CHIPTOP_SD_PULL_DRV	SS_REG(SS_BANK_CHIPTOP, 0x32)
 #define CHIPTOP_SD_PULL		(0x1f << 8)	/* D3-D0, CMD pull-ups */
 #define CHIPTOP_SD_DRV		0x3f		/* CLK, D3-D0, CMD drive */
-#define CHIPTOP_ALLPAD		SS_REG(SS_BANK_CHIPTOP, 0x50)
-#define CHIPTOP_ALLPAD_IN	BIT(15)
+#define CHIPTOP_FUART_MODE	SS_REG(SS_BANK_CHIPTOP, 0x03)
 #define PADTOP_SD_POWER		SS_REG(SS_BANK_PADTOP, 0x17)
 #define PADTOP_SD_PAD(i)	SS_REG(SS_BANK_PADTOP, 0x50 + (i)) /* CLK, CMD, D0-D3 */
-#define PAD_OEN			BIT(5)	/* set: input, the pad to the IP */
-#define PAD_OUT			BIT(4)
+#define PADTOP(r)		SS_REG(SS_BANK_PADTOP, r)
+#define PADGPIO(r)		SS_REG(SS_BANK_PADGPIO, r)
 #define PM_SD_CDZ_MODE		SS_REG(SS_BANK_PMSLEEP, 0x28)
 #define PM_SD_CDZ_EN		BIT(14)
 #define PM_GPIO_SD_CDZ		SS_REG(SS_BANK_PMGPIO, 0x47)
 #define CDZ_OEN			BIT(0)
 #define CDZ_IN			BIT(2)	/* low: a card is in */
+/* SCGPCTRL reg 0x25: the SD clock leaves the boot clock */
+#ifdef CONFIG_SS_IFORD
+#define SCGP_SD_CLK		SS_REG(SS_BANK_SCGPCTRL_SD, 0x25)
+#else
+#define SCGP_SD_CLK		SS_REG(SS_BANK_SCGPCTRL, 0x25)
+#endif
 
-/* The vendor's waits */
+/*
+ * SD_CLKGEN: [4:2] or [5:2] select, [1] invert, [0] gate, and on the
+ * infinity6 dies a "boot" select above them that stays set
+ */
+#if defined(CONFIG_SS_INFINITY3)
+#define SD_CLKGEN		SS_REG(SS_BANK_CLKGEN0, 0x45)
+#define SD_CLKGEN_MASK		0x3f
+#define SD_CLKGEN_BOOT		0
+#elif defined(CONFIG_SS_INFINITY2M)
+#define SD_CLKGEN		SS_REG(SS_BANK_CLKGEN0, 0x45)
+#define SD_CLKGEN_MASK		0x3f
+#define SD_CLKGEN_BOOT		0
+#define SCGP_SD_BOOTCLK		BIT(3)
+#elif defined(CONFIG_SS_IFORD_FAMILY)
+/*
+ * Iford's and Ifliegen's hal_card_platform.c: bit 7 set once at init;
+ * each clock change clears the gate and the select and sets bit 6, the
+ * glitch-free select, again
+ */
+#define SD_CLKGEN		SS_REG(SS_BANK_CLKGEN0, 0x43)
+#define SD_CLKGEN_MASK		0x7f
+#define SD_CLKGEN_BOOT		BIT(6)
+#define SD_CLKGEN_ON		BIT(7)
+#define SCGP_SD_BOOTCLK		BIT(7)
+#elif defined(CONFIG_SS_I6C_FAMILY)
+#define SD_CLKGEN		SS_REG(SS_BANK_CLKGEN0, 0x43)
+#define SD_CLKGEN_MASK		0x7f
+#define SD_CLKGEN_BOOT		BIT(6)
+#define SCGP_SD_BOOTCLK		BIT(7)
+#else
+#define SD_CLKGEN		SS_REG(SS_BANK_CLKGEN0, 0x43)
+#define SD_CLKGEN_MASK		0x3f
+#define SD_CLKGEN_BOOT		BIT(5)
+#define SCGP_SD_BOOTCLK		BIT(7)
+#endif
+
 #define WT_RESET_MS		100
 #define WT_RSP_MS		10
 #define WT_READ_MS		2000
@@ -229,8 +287,7 @@ static void sd_setup_job(struct mmc_cmd *cmd, struct mmc_data *data)
 	writew(rsp_ctl | (data && data->flags & MMC_DATA_WRITE ?
 			  CTL_JOB_DIR : 0), SD_CTL);
 	writew(MMA_PRI_RW, SD_MMA_PRI);
-	/* Bypass timing, as the vendor runs every speed up to HS */
-	writew(0, SD_DDR_MOD);
+	writew(SD_DDR_MOD_TIMING, SD_DDR_MOD);
 	clrbits_le16(SD_BOOT_MOD, BOOT_MOD_BOOT);
 	clrbits_le16(SD_BOOT, BOOT_NAND_SRAM_IMI);
 	udelay(sd_nrc_us);
@@ -318,18 +375,351 @@ static int ms_sd_set_ios(struct mmc *mmc)
 		for (sel = 0; sel < ARRAY_SIZE(sd_clocks) - 1; sel++)
 			if (sd_clocks[sel] <= mmc->clock)
 				break;
-		clrsetbits_le16(SD_CLKGEN, SD_CLKGEN_MASK, sel << 2);
+		clrsetbits_le16(SD_CLKGEN, SD_CLKGEN_MASK,
+				SD_CLKGEN_BOOT | sel << 2);
 		sd_nrc_us = sd_nrc_for(sd_clocks[sel]);
 	}
 	sd_bus_width = mmc->bus_width == 4 ? MODE_BUS_4 : 0;
 	return 0;
 }
 
-static int ms_sd_getcd(struct mmc *mmc)
+#if defined(CONFIG_SS_INFINITY6E)
+
+/* The SD pads' GPIO registers, PADTOP: D1, D0, CLK, CMD, D3, D2 */
+#define SD6E_PAD_FIRST		0x12
+#define SD6E_PAD_LAST		0x17
+#define SD6E_PAD_CLK		0x14
+#define SD6E_PULL		BIT(4)
+#define SD6E_OEN		BIT(2)
+#define SD6E_OUT		BIT(1)
+#define SD6E_DRV		BIT(7)
+#define SD6E_CDZ		0x11
+#define SD6E_CDZ_IN		BIT(0)
+#define SD6E_POWER_A		0x25
+#define SD6E_POWER_B		0x10
+#define SD6E_MODE		0x67
+#define SD6E_MODE_MASK		(BIT(13) | BIT(12) | BIT(9) | BIT(8))
+#define SD6E_MODE_SD		(BIT(9) | BIT(8))
+#define SD6E_MODE2		0x68
+#define SD6E_SPI1_MODE		(BIT(2) | BIT(1) | BIT(0))
+#define SD6E_FUART_MODE		0x6E
+
+static int sd_card_in(void)
+{
+	setbits_le16(PADTOP(SD6E_CDZ), SD6E_OEN);
+	return !(readw(PADTOP(SD6E_CDZ)) & SD6E_CDZ_IN);
+}
+
+static void sd_plat_init(void)
+{
+	unsigned int r;
+
+	setbits_le16(SCGP_SD_CLK, SCGP_SD_BOOTCLK);
+	clrsetbits_le16(SD_CLKGEN, SD_CLKGEN_MASK, SD_CLKGEN_BOOT);
+	clrsetbits_le16(PADTOP(SD6E_MODE), SD6E_MODE_MASK, SD6E_MODE_SD);
+	clrbits_le16(PADTOP(SD6E_MODE2), BIT(9));
+	/* reg_spi1_mode 3 takes these pads */
+	if ((readw(PADTOP(SD6E_MODE2)) & 7) == 3)
+		clrbits_le16(PADTOP(SD6E_MODE2), SD6E_SPI1_MODE);
+	for (r = SD6E_PAD_FIRST; r <= SD6E_PAD_LAST; r++) {
+		if (r != SD6E_PAD_CLK)
+			setbits_le16(PADTOP(r), SD6E_PULL);
+		clrbits_le16(PADTOP(r), SD6E_DRV);
+	}
+}
+
+static void sd_pads(bool on)
+{
+	unsigned int r;
+
+	for (r = SD6E_PAD_FIRST; r <= SD6E_PAD_LAST; r++) {
+		if (r != SD6E_PAD_CLK) {
+			if (on)
+				setbits_le16(PADTOP(r), SD6E_PULL);
+			else
+				clrbits_le16(PADTOP(r), SD6E_PULL);
+		}
+		if (on)
+			setbits_le16(PADTOP(r), SD6E_OEN);
+		else
+			clrbits_le16(PADTOP(r), SD6E_OEN | SD6E_OUT);
+	}
+	clrbits_le16(PADTOP(SD6E_MODE), SD6E_MODE_MASK);
+	clrbits_le16(PADTOP(SD6E_MODE2), BIT(9) | BIT(8));
+	if (on)
+		setbits_le16(PADTOP(SD6E_MODE), SD6E_MODE_SD);
+}
+
+/* Card power, low active: on the fuart pad on some boards, sd0 on others */
+static void sd_power(bool on, unsigned int ms)
+{
+	static const u8 regs[] = { SD6E_POWER_A, SD6E_POWER_B };
+	unsigned int i;
+
+	/* reg_fuart_mode 1 takes the power pad */
+	if (on && (readw(PADTOP(SD6E_FUART_MODE)) & 0x70) == 0x10)
+		setbits_le16(PADTOP(SD6E_FUART_MODE), BIT(6));
+	for (i = 0; i < ARRAY_SIZE(regs); i++) {
+		clrbits_le16(PADTOP(regs[i]), SD6E_OEN);
+		if (on)
+			clrbits_le16(PADTOP(regs[i]), SD6E_OUT);
+		else
+			setbits_le16(PADTOP(regs[i]), SD6E_OUT);
+	}
+	mdelay(ms);
+}
+
+#elif defined(CONFIG_SS_IFLIEGEN)
+
+/*
+ * Ifliegen's SD0 (mmc_host/src/ifliegen, IP_SD and PAD_SD_MD1, the
+ * board's mmc0): PADGPIO CLK at 0x0F, CMD, D0-D3 from 0x10, card detect
+ * at 0x16 (PAD_PM_SD_CDZ), the mode in PADTOP 0x61 (its cdz-pad given:
+ * SD and CDZ mode, bits 0 and 4), the card powered from PAD_FUART_RTS,
+ * PADGPIO 0x34, low active. SC_GP_CTRL is bank 0x1133 here.
+ */
+#define SDLG_PAD_CLK		0x0F
+#define SDLG_PAD_FIRST		0x10	/* CMD, D0, D1, D2, D3 */
+#define SDLG_PAD_LAST		0x14
+#define SDLG_PULL		BIT(4)
+#define SDLG_DRV		BIT(7)
+#define SDLG_CDZ		0x16
+#define SDLG_CDZ_IN		BIT(0)
+#define SDLG_CDZ_OEN		BIT(2)
+#define SDLG_MODE		0x61
+#define SDLG_MODE_MASK		(BIT(12) | BIT(9) | BIT(8) | BIT(4) | BIT(0))
+#define SDLG_MODE_SD		BIT(0)
+#define SDLG_MODE_CDZ		BIT(4)
+#define SDLG_POWER		0x34
+#define SDLG_POWER_GPIO		BIT(3)
+#define SDLG_POWER_OEN		BIT(2)
+#define SDLG_POWER_OUT		BIT(1)
+#define SD_CLK_EN_REG		SD_REG(0x3E)
+#define SD_MCG_OFF		BIT(14)
+
+static int sd_card_in(void)
+{
+	setbits_le16(PADGPIO(SDLG_CDZ), SDLG_CDZ_OEN);
+	return !(readw(PADGPIO(SDLG_CDZ)) & SDLG_CDZ_IN);
+}
+
+static void sd_plat_init(void)
+{
+	unsigned int r;
+
+	setbits_le16(SD_CLK_EN_REG, SD_MCG_OFF);
+	/* The SD clock off the 12 MHz boot clock */
+	setbits_le16(SCGP_SD_CLK, SCGP_SD_BOOTCLK);
+	clrsetbits_le16(SD_CLKGEN, 0xff, SD_CLKGEN_ON);
+	setbits_le16(PADGPIO(SDLG_CDZ), BIT(5) | BIT(4));
+	setbits_le16(PADGPIO(SDLG_PAD_CLK), SDLG_DRV);
+	for (r = SDLG_PAD_FIRST; r <= SDLG_PAD_LAST; r++)
+		setbits_le16(PADGPIO(r), SDLG_PULL | SDLG_DRV);
+}
+
+static void sd_pads(bool on)
+{
+	clrsetbits_le16(PADTOP(SDLG_MODE), SDLG_MODE_MASK,
+			SDLG_MODE_CDZ | (on ? SDLG_MODE_SD : 0));
+}
+
+/* Card power, low active */
+static void sd_power(bool on, unsigned int ms)
+{
+	setbits_le16(PADGPIO(SDLG_POWER), SDLG_POWER_GPIO);
+	clrbits_le16(PADGPIO(SDLG_POWER), SDLG_POWER_OEN);
+	if (on)
+		clrbits_le16(PADGPIO(SDLG_POWER), SDLG_POWER_OUT);
+	else
+		setbits_le16(PADGPIO(SDLG_POWER), SDLG_POWER_OUT);
+	mdelay(ms);
+}
+
+#elif defined(CONFIG_SS_IFORD)
+
+/*
+ * Iford's SD0 pads (mmc_host/src/iford, IP_SD and PAD_SD_MD1): PADGPIO
+ * D1, D0, CLK, CMD, D3, D2 from reg 0x15, card detect at 0x14, the mode in
+ * PADTOP 0x61, the card powered from PAD_PM_GPIO11, PADGPIO 0x2C. Which pads
+ * a board wires is in its device tree; these are the vendor's SD0 defaults.
+ */
+#define SDIF_PAD_FIRST		0x15
+#define SDIF_PAD_LAST		0x1A
+#define SDIF_PAD_CLK		0x17
+#define SDIF_PULL		BIT(4)
+#define SDIF_DRV		BIT(7)
+#define SDIF_CDZ		0x14
+#define SDIF_CDZ_IN		BIT(0)
+#define SDIF_CDZ_OEN		BIT(2)
+#define SDIF_MODE		0x61
+#define SDIF_MODE_MASK		(BIT(12) | BIT(11) | BIT(9) | BIT(8) | BIT(5) | \
+				 BIT(4) | BIT(1) | BIT(0))
+#define SDIF_MODE_SD		BIT(0)
+#define SDIF_MODE_CDZ		BIT(4)
+#define SDIF_POWER		0x2C
+#define SDIF_POWER_GPIO		BIT(3)
+#define SDIF_POWER_OEN		BIT(2)
+#define SDIF_POWER_OUT		BIT(1)
+
+static int sd_card_in(void)
+{
+	clrsetbits_le16(PADTOP(SDIF_MODE), BIT(5) | SDIF_MODE_CDZ,
+			SDIF_MODE_CDZ);
+	setbits_le16(PADGPIO(SDIF_CDZ), SDIF_CDZ_OEN);
+	return !(readw(PADGPIO(SDIF_CDZ)) & SDIF_CDZ_IN);
+}
+
+static void sd_plat_init(void)
+{
+	unsigned int r;
+
+	clrbits_le16(CHIPTOP_ALLPAD, CHIPTOP_ALLPAD_IN);
+	/* The SD clock off the 12 MHz boot clock (SC_GP_CTRL bank 0x1135) */
+	setbits_le16(SCGP_SD_CLK, SCGP_SD_BOOTCLK);
+	clrsetbits_le16(SD_CLKGEN, 0xff, SD_CLKGEN_ON);
+	setbits_le16(PADGPIO(SDIF_CDZ), BIT(5) | BIT(4));
+	for (r = SDIF_PAD_FIRST; r <= SDIF_PAD_LAST; r++) {
+		if (r != SDIF_PAD_CLK)
+			setbits_le16(PADGPIO(r), SDIF_PULL);
+		setbits_le16(PADGPIO(r), SDIF_DRV);
+	}
+}
+
+static void sd_pads(bool on)
+{
+	clrsetbits_le16(PADTOP(SDIF_MODE), SDIF_MODE_MASK,
+			SDIF_MODE_CDZ | (on ? SDIF_MODE_SD : 0));
+}
+
+/* Card power, low active */
+static void sd_power(bool on, unsigned int ms)
+{
+	setbits_le16(PADGPIO(SDIF_POWER), SDIF_POWER_GPIO);
+	clrbits_le16(PADGPIO(SDIF_POWER), SDIF_POWER_OEN);
+	if (on)
+		clrbits_le16(PADGPIO(SDIF_POWER), SDIF_POWER_OUT);
+	else
+		setbits_le16(PADGPIO(SDIF_POWER), SDIF_POWER_OUT);
+	mdelay(ms);
+}
+
+#elif defined(CONFIG_SS_INFINITY6C)
+
+/* The SD pads' GPIO registers, PADGPIO: D1, D0, CLK, CMD, D3, D2 */
+#define SD6C_PAD_FIRST		0x00
+#define SD6C_PAD_LAST		0x05
+#define SD6C_PAD_CLK		0x02
+#define SD6C_PULL		BIT(4)
+#define SD6C_OEN		BIT(2)
+#define SD6C_OUT		BIT(1)
+#define SD6C_DRV		BIT(7)
+#define SD6C_CDZ		0x06
+#define SD6C_CDZ_IN		BIT(0)
+#define SD6C_POWER		0x22
+#define SD6C_POWER_GPIO		BIT(3)
+#define SD6C_MODE		0x67
+#define SD6C_MODE_SD		BIT(8)
+#define SD6C_MODE_CDZ		BIT(11)
+#define SD6C_MODE_MASK		(BIT(10) | BIT(9) | BIT(8))
+#define SD6C_MODE2		0x68
+
+static int sd_card_in(void)
+{
+	setbits_le16(PADGPIO(SD6C_CDZ), SD6C_OEN);
+	return !(readw(PADGPIO(SD6C_CDZ)) & SD6C_CDZ_IN);
+}
+
+static void sd_plat_init(void)
+{
+	unsigned int r;
+
+	setbits_le16(SCGP_SD_CLK, SCGP_SD_BOOTCLK);
+	clrsetbits_le16(SD_CLKGEN, SD_CLKGEN_MASK, SD_CLKGEN_BOOT);
+	clrsetbits_le16(PADTOP(SD6C_MODE),
+			BIT(12) | BIT(11) | SD6C_MODE_MASK,
+			SD6C_MODE_SD | SD6C_MODE_CDZ);
+	clrbits_le16(PADTOP(SD6C_MODE2), BIT(13) | BIT(12));
+	for (r = SD6C_PAD_FIRST; r <= SD6C_PAD_LAST; r++) {
+		if (r != SD6C_PAD_CLK)
+			setbits_le16(PADGPIO(r), SD6C_PULL);
+		setbits_le16(PADGPIO(r), SD6C_DRV);
+	}
+	setbits_le16(PADGPIO(SD6C_CDZ), SD6C_PULL);
+}
+
+static void sd_pads(bool on)
+{
+	unsigned int r;
+
+	for (r = SD6C_PAD_FIRST; r <= SD6C_PAD_LAST; r++) {
+		if (r != SD6C_PAD_CLK) {
+			if (on)
+				setbits_le16(PADGPIO(r), SD6C_PULL);
+			else
+				clrbits_le16(PADGPIO(r), SD6C_PULL);
+		}
+		if (on)
+			setbits_le16(PADGPIO(r), SD6C_OEN);
+		else
+			clrbits_le16(PADGPIO(r), SD6C_OEN | SD6C_OUT);
+	}
+	if (on)
+		setbits_le16(PADTOP(SD6C_MODE), SD6C_MODE_SD);
+	else
+		clrbits_le16(PADTOP(SD6C_MODE), SD6C_MODE_MASK);
+}
+
+/* Card power, low active */
+static void sd_power(bool on, unsigned int ms)
+{
+	setbits_le16(PADGPIO(SD6C_POWER), SD6C_POWER_GPIO);
+	clrbits_le16(PADGPIO(SD6C_POWER), SD6C_OEN);
+	if (on)
+		clrbits_le16(PADGPIO(SD6C_POWER), SD6C_OUT);
+	else
+		setbits_le16(PADGPIO(SD6C_POWER), SD6C_OUT);
+	mdelay(ms);
+}
+
+#else	/* infinity3, infinity2m, infinity6, infinity6b0: CHIPTOP's SD modes */
+
+#if defined(CONFIG_SS_INFINITY3)
+#define SD_MODE_CLR		BIT(3)
+#define SD_MODE_SET		BIT(8)
+#elif defined(CONFIG_SS_INFINITY2M)
+#define SD_MODE_CLR		(BIT(9) | BIT(8))
+#define SD_MODE_SET		BIT(8)
+#else
+#define SD_MODE_CLR		(BIT(8) | BIT(3) | BIT(2))
+#define SD_MODE_SET		BIT(2)
+#endif
+
+/* infinity2m powers the card from PAD_TTL0, the rest from PAD_FUART_RTS */
+#ifdef CONFIG_SS_INFINITY2M
+#define SD_POWER_PAD		PADTOP(0x20)
+#else
+#define SD_POWER_PAD		PADTOP_SD_POWER
+#endif
+
+static int sd_card_in(void)
 {
 	setbits_le16(PM_SD_CDZ_MODE, PM_SD_CDZ_EN);
 	setbits_le16(PM_GPIO_SD_CDZ, CDZ_OEN);
 	return !(readw(PM_GPIO_SD_CDZ) & CDZ_IN);
+}
+
+static void sd_plat_init(void)
+{
+#ifdef SCGP_SD_BOOTCLK
+	setbits_le16(SCGP_SD_CLK, SCGP_SD_BOOTCLK);
+#endif
+	clrsetbits_le16(SD_CLKGEN, SD_CLKGEN_MASK, SD_CLKGEN_BOOT);
+	clrsetbits_le16(CHIPTOP_SD_MODE, SD_MODE_CLR, SD_MODE_SET);
+#if defined(CONFIG_SS_INFINITY2M) || defined(CONFIG_SS_INFINITY6B0)
+	setbits_le16(CHIPTOP_SD_PULL_DRV, CHIPTOP_SD_DRV | CHIPTOP_SD_PULL);
+#else
+	clrsetbits_le16(CHIPTOP_SD_PULL_DRV, CHIPTOP_SD_DRV, CHIPTOP_SD_PULL);
+#endif
 }
 
 /* The pads to the IP with pull-ups (on), or driven low (off) */
@@ -347,22 +737,32 @@ static void sd_pads(bool on)
 		else
 			clrbits_le16(PADTOP_SD_PAD(i), PAD_OEN | PAD_OUT);
 	}
-	clrbits_le16(CHIPTOP_SD_MODE, CHIPTOP_SD_MODE2);
+	clrbits_le16(CHIPTOP_SD_MODE, SD_MODE_CLR);
 	if (on)
-		setbits_le16(CHIPTOP_SD_MODE, CHIPTOP_SDIO_MODE1);
-	else
-		clrbits_le16(CHIPTOP_SD_MODE, CHIPTOP_SDIO_MODE1);
+		setbits_le16(CHIPTOP_SD_MODE, SD_MODE_SET);
 }
 
 /* Card power, low active */
 static void sd_power(bool on, unsigned int ms)
 {
-	clrbits_le16(PADTOP_SD_POWER, PAD_OEN);
+#if defined(CONFIG_SS_INFINITY6) || defined(CONFIG_SS_INFINITY6B0)
+	/* reg_fuart_mode 1 takes the power pad */
+	if (on && (readw(CHIPTOP_FUART_MODE) & 7) == 1)
+		setbits_le16(CHIPTOP_FUART_MODE, BIT(2));
+#endif
+	clrbits_le16(SD_POWER_PAD, PAD_OEN);
 	if (on)
-		clrbits_le16(PADTOP_SD_POWER, PAD_OUT);
+		clrbits_le16(SD_POWER_PAD, PAD_OUT);
 	else
-		setbits_le16(PADTOP_SD_POWER, PAD_OUT);
+		setbits_le16(SD_POWER_PAD, PAD_OUT);
 	mdelay(ms);
+}
+
+#endif
+
+static int ms_sd_getcd(struct mmc *mmc)
+{
+	return sd_card_in();
 }
 
 /*
@@ -373,10 +773,7 @@ static void sd_power(bool on, unsigned int ms)
 static int ms_sd_init(struct mmc *mmc)
 {
 	clrbits_le16(CHIPTOP_ALLPAD, CHIPTOP_ALLPAD_IN);
-	clrbits_le16(SD_CLKGEN, SD_CLKGEN_MASK);
-	clrbits_le16(CHIPTOP_SD_MODE, CHIPTOP_SD_MODE2);
-	setbits_le16(CHIPTOP_SD_MODE, CHIPTOP_SDIO_MODE1);
-	clrsetbits_le16(CHIPTOP_SD_PULL_DRV, CHIPTOP_SD_DRV, CHIPTOP_SD_PULL);
+	sd_plat_init();
 
 	writew(FUNC_SDIO_MODE, SD_MIE_FUNC_CTL);
 	clrbits_le16(SD_MODE, MODE_CLK_EN);

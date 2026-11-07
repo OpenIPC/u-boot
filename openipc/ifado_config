@@ -1,0 +1,6 @@
+# Ifado: what Dahua's U-Boot passes; the kernel takes a device tree
+CONFIG_MACH_TYPE=1395
+# No SD slot on the camera the stages come from, and its pads unread
+# CONFIG_MMC is not set
+# CONFIG_MMC_MS_SDMMC is not set
+# CONFIG_CMD_MMC is not set

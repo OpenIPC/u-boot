@@ -47,6 +47,7 @@ ifdef NORMAL_DRIVERS
 
 obj-$(CONFIG_NAND_ECC_BCH) += nand_bch.o
 
+obj-$(CONFIG_NAND_MS_SPINAND) += ms_spinand.o
 obj-$(CONFIG_NAND_ATMEL) += atmel_nand.o
 obj-$(CONFIG_NAND_ARASAN) += arasan_nfc.o
 obj-$(CONFIG_NAND_BRCMNAND) += brcmnand/
