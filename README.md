@@ -286,20 +286,24 @@ Every infinity2m, infinity6, 6b0, 6e and 6c part also builds for SPI NAND,
   partition table at `0x3000`, the vendor IPL at `0x4000`, IPL_CUST at
   `0x10000`, and U-Boot (xz uImage) at `0x20000`. From infinity2m on, the
   IPL is at `0` and the table at `0xF000` (infinity6c: `0x9000`).
-- The infinity6, Iford, Ifado and Ifliegen images have **not run on silicon**. They
-  were booted under qemu's per-die machines during development; CI boots only the
-  infinity3 and infinity2m legs and builds and fit-checks the rest. They are only in
-  this repository's `sigmastar` release. Cameras get `u-boot-ssc*` from OpenIPC/u-boot-sigmastar.
-- The SPI NAND images are 2 MiB: SNI at `0`, PNI at `0x800`, IPL, IPL_CUST
-  and U-Boot twice each from `0x40000`, the environment at `0x200000`, then
-  UBI, whose volumes `kernel` and `rootfs` hold the firmware.
+- The infinity6, Iford, Ifado and Ifliegen images have **not run on silicon**, only
+  under qemu: CI boots every leg, NOR and NAND, on its own qemu-hisilicon machine.
+  They are only in this repository's `sigmastar` release. Cameras get `u-boot-ssc*`
+  from OpenIPC/u-boot-sigmastar.
+- The SPI NAND images are openipc-hisilicon's layout, `768k(boot),256k(env),-(ubi)`:
+  the die's CIS, its vendor stages one copy each and U-Boot in the 768 KiB boot
+  partition, the environment at `0xC0000`, then one UBI device whose UBIFS
+  `rootfs` volume holds the kernel as `/boot/uImage` (`rootfs.ubifs.<soc>`).
+  This is not OpenIPC/u-boot-sigmastar's NAND layout: a camera moving over takes
+  a `rootfs.ubifs` as well.
 - Vendor kernels are xz-compressed uImages that only the vendor U-Boot
   unpacks.
 - SD recovery `.img` files: on NOR a uImage whose load address is the flash
-  offset (`mkimage -a 0x50000`, `-a 0x250000`); on NAND the raw kernel and
-  squashfs.
-- SD recovery takes only these file names: `uImage.<soc>.img` (or
-  `fitImage.<soc>.img`) and `rootfs.squashfs.<soc>.img`.
+  offset (`mkimage -a 0x50000`, `-a 0x250000`); on NAND `rootfs.ubifs.<soc>.img`,
+  the UBIFS rootfs with its kernel, as on HiSilicon.
+- SD recovery takes only these file names: on NOR `uImage.<soc>.img` (or
+  `fitImage.<soc>.img`) and `rootfs.squashfs.<soc>.img`; on NAND
+  `rootfs.ubifs.<soc>.img`.
 
 ### Ingenic
 
