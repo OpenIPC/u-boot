@@ -277,7 +277,7 @@ firmware. Remove the card and the camera boots from flash.
 | `ssc029a` | Cortex-A32 | from the MIU | NOR, SPI NAND | Iford |
 | `ssc029b` `ssc029c` | Cortex-A32 | from the MIU | NOR | Iford |
 | `ssc375` | Cortex-A7 | up to 128 MiB, probed | NOR | Ifado, Dahua's IPL chain |
-| `ssc034a` `ssc034b` | Cortex-A55 (AArch32) | up to 128 MiB, probed | NOR | Ifliegen, after TF-A's SP_MIN |
+| `ssc034a` `ssc034b` | Cortex-A55 (AArch32) | up to 128 MiB, probed | NOR, SPI NAND | Ifliegen, after TF-A's SP_MIN |
 
 Every infinity2m, infinity6, 6b0, 6e and 6c part also builds for SPI NAND,
 `./build.sh <soc>-nand`.

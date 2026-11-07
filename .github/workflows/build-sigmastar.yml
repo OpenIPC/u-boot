@@ -71,6 +71,8 @@ jobs:
           - { soc: ssc375, files: "output/u-boot-ssc375-nor.bin" }
           - { soc: ssc034a, files: "output/u-boot-ssc034a-nor.bin" }
           - { soc: ssc034b, files: "output/u-boot-ssc034b-nor.bin" }
+          - { soc: ssc034a-nand, files: "output/u-boot-ssc034a-nand.bin" }
+          - { soc: ssc034b-nand, files: "output/u-boot-ssc034b-nand.bin" }
           - { soc: ssc30kd-nand, files: "output/u-boot-ssc30kd-nand.bin" }
           - { soc: ssc30kd, files: "output/u-boot-ssc30kd-nor.bin" }
           - { soc: ssc30kq-nand, files: "output/u-boot-ssc30kq-nand.bin" }
@@ -174,13 +176,15 @@ jobs:
           }
           # SPI NAND: the boot area ends where the die's environment
           # starts (include/configs/openipc-common.h on openipc-sigmastar):
-          # 0x200000, infinity2m 0x440000, infinity6c 0x4C0000, Iford
-          # 0x580000.
+          # 0x200000, infinity2m 0x440000, infinity6c 0x4C0000, Ifliegen
+          # 0x500000, Iford 0x580000.
           case "${soc}" in
             ssd201-nand|ssd202d-nand|ssr621q-nand)
               check_kind nand 4352 "output/u-boot-${soc}.bin" ;;
             ssc377*-nand|ssc378*-nand)
               check_kind nand 4864 "output/u-boot-${soc}.bin" ;;
+            ssc034a-nand|ssc034b-nand)
+              check_kind nand 5120 "output/u-boot-${soc}.bin" ;;
             ssc029a-nand)
               check_kind nand 5632 "output/u-boot-${soc}.bin" ;;
             *-nand) check_kind nand 2048 "output/u-boot-${soc}.bin" ;;

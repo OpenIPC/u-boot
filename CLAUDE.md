@@ -270,7 +270,8 @@ The build logic lives here. Other branches call it:
   boot partition (the vendor's IPL, IPL_CUST and on Ifliegen TF-A, the
   die's flash table, U-Boot). A SPI NAND one is the boot area up to the
   die's environment, as the fit check limits it: 2 MiB, 4352 KiB on
-  infinity2m, 4864 KiB on infinity6c, 5632 KiB on Iford.
+  infinity2m, 4864 KiB on infinity6c, 5120 KiB on Ifliegen, 5632 KiB on
+  Iford.
 - **Images are not machines:** the infinity3 legs, the MSC316 ones too,
   boot on `-M msc313e` (#213 or later); the MSC316 IPL sizes its 64 MiB.
   `ssd201` and `ssd202d` boot on their own machines. The other legs are
