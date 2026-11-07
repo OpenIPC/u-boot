@@ -44,8 +44,10 @@ own branch:
   plus the SDK's nsboot, built from source in the tree. CI:
   `build-grainmedia.yml`, called from that branch's `ci.yml`. Its own
   `CLAUDE.md` covers nsboot, the image layout and the kernel hand-off.
-- `openipc-sigmastar`: U-Boot for SigmaStar MSC313E, MSC316DC and
-  MSC316DM (infinity3), on the same mainline release with the same
+- `openipc-sigmastar`: U-Boot for SigmaStar infinity3 (MSC313E, MSC316DC,
+  MSC316DM), infinity2m (SSD201, SSD202D, SSR621Q), infinity6, 6b0, 6e, 6c
+  (SSC3xx), Iford (SSC029A/B/C), Ifado (SSC375) and Ifliegen (SSC034A/B),
+  NOR and SPI NAND, on the same mainline release with the same
   OpenIPC layer, behind the vendor's IPL and IPL_CUST, carried as
   binaries. CI: `build-sigmastar.yml`, called from that branch's
   `ci.yml`. Its own `CLAUDE.md` covers the boot chain, the image layout
@@ -264,21 +266,32 @@ The build logic lives here. Other branches call it:
 ## `build-sigmastar.yml`
 
 - It is `build-anyka.yml` for `openipc-sigmastar`: the same job graph and
-  `resolve`/`ref` rules, NOR only (256 KiB boot partition: MXP table,
-  the vendor IPL and IPL_CUST, U-Boot in the 128 KiB MXP partition
-  `UBOOT`).
-- **Images are not machines:** qemu-hisilicon has an `msc313e` machine
-  only (#213 or later). Every leg, the MSC316 ones too, boots on
-  `-M msc313e`; the MSC316 IPL sizes its 64 MiB. Keep the build matrix,
-  the smoke matrix and the README's list in step.
-- **Smoke test:** two boots of an 8 MiB flash image holding only the
-  image; the machine's mask ROM loads the IPL from 0x4000. It passes on
+  `resolve`/`ref` rules, NOR and SPI NAND. A NOR image is the 256 KiB
+  boot partition (the vendor's IPL, IPL_CUST and on Ifliegen TF-A, the
+  die's flash table, U-Boot). A SPI NAND one is the boot area up to the
+  die's environment, as the fit check limits it: 2 MiB, 4352 KiB on
+  infinity2m, 4864 KiB on infinity6c, 5120 KiB on Ifliegen, 5632 KiB on
+  Iford.
+- **Images are not machines:** the infinity3 legs, the MSC316 ones too,
+  boot on `-M msc313e` (#213 or later); the MSC316 IPL sizes its 64 MiB.
+  `ssd201` and `ssd202d` boot on their own machines. The other legs are
+  built and fit-checked, not booted here (their qemu machines are not in
+  the qemu-hisilicon CI uses). Keep the build
+  matrix, the smoke matrix and the README's list in step.
+- **Smoke test:** two boots of an 8 MiB (infinity3) or 16 MiB (infinity2m)
+  flash image holding only the image; the machine's mask ROM loads the IPL.
+  It passes on
   `Hit Ctrl-C`, and fails if the second boot reports a bad environment CRC.
 - **Release and publish:**
   - `release` uploads to the `sigmastar` tag.
-  - `publish` shares the `publish-firmware-latest` concurrency group and
-    reports a `uboot-sigmastar-…` build id. No other repository
-    publishes `u-boot-msc31*` names to `latest`.
+  - `publish` is commented out for now, with its input: SigmaStar images
+    go only to the `sigmastar` release. When it returns, it shares the
+    `publish-firmware-latest` concurrency group and reports a
+    `uboot-sigmastar-…` build id. No other repository
+    publishes `u-boot-msc31*` names to `latest`, and `PUBLISH_GLOB` keeps
+    `publish` to those: `u-boot-ssc*` in `latest` are
+    OpenIPC/u-boot-sigmastar's vendor U-Boot, which cameras flash, and the
+    ones built here have not run on silicon. `release` carries them all.
   - openipc.org accepts the report only from workflows it allowlists
     (OpenIPC/website `service/internal/builds/verify.go`).
     `build-sigmastar.yml` has to be added there before the first
