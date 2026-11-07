@@ -144,6 +144,17 @@
 #define SD_CLKGEN_MASK		0x3f
 #define SD_CLKGEN_BOOT		0
 #define SCGP_SD_BOOTCLK		BIT(3)
+#elif defined(CONFIG_SS_IFORD)
+/*
+ * Iford's hal_card_platform.c: bit 7 set once at init; each clock change
+ * clears the gate and the select and sets bit 6, the glitch-free select,
+ * again
+ */
+#define SD_CLKGEN		SS_REG(SS_BANK_CLKGEN0, 0x43)
+#define SD_CLKGEN_MASK		0x7f
+#define SD_CLKGEN_BOOT		BIT(6)
+#define SD_CLKGEN_ON		BIT(7)
+#define SCGP_SD_BOOTCLK		BIT(7)
 #elif defined(CONFIG_SS_I6C_FAMILY)
 #define SD_CLKGEN		SS_REG(SS_BANK_CLKGEN0, 0x43)
 #define SD_CLKGEN_MASK		0x7f
@@ -497,7 +508,9 @@ static void sd_plat_init(void)
 	unsigned int r;
 
 	clrbits_le16(CHIPTOP_ALLPAD, CHIPTOP_ALLPAD_IN);
-	setbits_le16(SD_CLKGEN, BIT(7));
+	/* The SD clock off the 12 MHz boot clock (SC_GP_CTRL bank 0x1135) */
+	setbits_le16(SCGP_SD_CLK, SCGP_SD_BOOTCLK);
+	clrsetbits_le16(SD_CLKGEN, 0xff, SD_CLKGEN_ON);
 	setbits_le16(PADGPIO(SDIF_CDZ), BIT(5) | BIT(4));
 	for (r = SDIF_PAD_FIRST; r <= SDIF_PAD_LAST; r++) {
 		if (r != SDIF_PAD_CLK)
