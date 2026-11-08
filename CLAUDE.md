@@ -119,7 +119,10 @@ The memory map is the same in all three generations: system control at
   data to the load address and enters 0x40 bytes into the zImage, which
   hangs. OpenIPC builds entry = load; vendor kernels need repacking with
   `mkimage -e <load>`.
-- `mem=` is the whole DDR (`osmem` 64M/128M), as the vendor passes it. The
+- `mem=` is the whole DDR (`osmem` 64M/128M), as the vendor passes it,
+  except on the EV200: `osmem` is 40M there, and OpenIPC's EV200 kernel
+  gives the ISP and the encoder the DDR above `mem=` (totalmem - osmem),
+  as the vendor firmware gives them 24 of the 64 MiB. The
   MTD name is `spi0.0` (`SFC`): the vendor kernels' `ak_spiflash` takes
   the SPI device's name. The console is `ttySAK0`.
 
