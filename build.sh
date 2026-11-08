@@ -54,6 +54,22 @@ build_v83x() {
         return 1
     fi
 
+    # V831/V833 on NOR: an eGON image as long as the vendor's boot0
+    # (32 KiB, the length booted on silicon); mkimage pads only to 8 KiB
+    case "${soc}-${kind}" in
+        v831-nor|v833-nor)
+            splbin=${builddir}/spl/u-boot-spl.bin
+            { cat "${splbin}"
+              head -c $((UBOOT_OFFSET - 0x60 - $(stat -c %s "${splbin}"))) \
+                  /dev/zero | tr '\0' '\377'; } > "${splbin}.pad" || return 1
+            "${builddir}/tools/mkimage" -A arm -T sunxi_egon \
+                -a "$(sed -n 's/^CONFIG_SPL_TEXT_BASE=//p' "${builddir}/.config")" \
+                -n "$(sed -n 's/^CONFIG_DEFAULT_DEVICE_TREE="\(.*\)"$/\1/p' \
+                      "${builddir}/.config")" \
+                -d "${splbin}.pad" "${spl}" >/dev/null || return 1
+            ;;
+    esac
+
     text=$(sed -n 's/^CONFIG_SYS_TEXT_BASE=//p' "${builddir}/.config")
     xz --format=lzma -9 -c "${builddir}/u-boot.bin" \
         > "${builddir}/u-boot.bin.lzma" || return 1

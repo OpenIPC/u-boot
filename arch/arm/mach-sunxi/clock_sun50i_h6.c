@@ -3,8 +3,80 @@
 #include <asm/arch/cpu.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/prcm.h>
+#include <asm/arch/sys_proto.h>
 
 #ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_MACH_SUN8I_V831
+/* boot0's wait_pll_stable(): retry the enable until the PLL locks */
+static void v831_pll_lock(u32 *reg)
+{
+	unsigned int i;
+
+	while (1) {
+		setbits_le32(reg, BIT(31) | BIT(29));
+		for (i = 0; i < 0x7ff; i++)
+			if (readl(reg) & BIT(28))
+				return;
+		clrbits_le32(reg, BIT(31) | BIT(29));
+	}
+}
+
+/*
+ * The order of boot0's sunxi_board_pll_init(). PLL_PERI0 is
+ * read-modify-written: its reset value holds bits a plain write would
+ * clear, and the buses stop when they move onto it without them. The
+ * timer is not running yet, hence sdelay().
+ */
+void clock_init_safe(void)
+{
+	struct sunxi_ccm_reg *const ccm =
+		(struct sunxi_ccm_reg *)SUNXI_CCM_BASE;
+	struct sunxi_prcm_reg *const prcm =
+		(struct sunxi_prcm_reg *)SUNXI_PRCM_BASE;
+
+	/* the analog (ADDA) supply and the calibration circuit */
+	setbits_le32(&prcm->sys_pwroff_gating, 0x10);
+	setbits_le32(&prcm->res_cal_ctrl, 1);
+	/* PLL_CPUX tuning step */
+	clrsetbits_le32(SUNXI_CCM_BASE + 0x400, 0x7 << 28, 0x1 << 28);
+
+	/* the CPU's dividers first, while still on OSC24M */
+	writel(0x302, &ccm->cpu_axi_cfg);
+	sdelay(0x100);
+	clock_set_pll1(408000000);
+
+	/* PLL_PERI0: lock at N=0x4f, then settle at N=0x31, 1200 MHz (2X) */
+	clrbits_le32(&ccm->psi_ahb1_ahb2_cfg, 0x3 << 24);
+	clrbits_le32(&ccm->pll6_cfg, BIT(31));
+	clrsetbits_le32(&ccm->pll6_cfg, (0xff << 8) | 0x3, 0x4f << 8);
+	sdelay(0x400);
+	setbits_le32(&ccm->pll6_cfg, BIT(27));	/* output enable */
+	v831_pll_lock(&ccm->pll6_cfg);
+	sdelay(0x400);
+	clrbits_le32(&ccm->pll6_cfg, BIT(29));
+	clrsetbits_le32(&ccm->pll6_cfg, (0xff << 8) | 0x3, 0x31 << 8);
+	setbits_le32(&ccm->pll6_cfg, BIT(29));
+	sdelay(0x400);
+	while (!(readl(&ccm->pll6_cfg) & CCM_PLL6_LOCK))
+		;
+	sdelay(0x800);
+
+	/* the buses: the factors, then the source */
+	writel(CCM_PSI_AHB1_AHB2_DEFAULT & ~(0x3 << 24),
+	       &ccm->psi_ahb1_ahb2_cfg);
+	setbits_le32(&ccm->psi_ahb1_ahb2_cfg, 0x3 << 24);
+	sdelay(0x100);
+	writel(CCM_AHB3_DEFAULT & ~(0x3 << 24), &ccm->ahb3_cfg);
+	setbits_le32(&ccm->ahb3_cfg, 0x3 << 24);
+	writel(CCM_APB1_DEFAULT & ~(0x3 << 24), &ccm->apb1_cfg);
+	setbits_le32(&ccm->apb1_cfg, 0x3 << 24);
+	sdelay(0x100);
+
+	/* the MBUS runs at a quarter of the DRAM clock: no mux */
+	writel(MBUS_RESET, &ccm->mbus_cfg);
+	sdelay(0x100);
+}
+#else
 void clock_init_safe(void)
 {
 	struct sunxi_ccm_reg *const ccm =
@@ -16,13 +88,6 @@ void clock_init_safe(void)
 		/* this seems to enable PLLs on H616 */
 		setbits_le32(&prcm->sys_pwroff_gating, 0x10);
 		setbits_le32(&prcm->res_cal_ctrl, 2);
-	}
-
-	if (IS_ENABLED(CONFIG_MACH_SUN8I_V831)) {
-		/* boot0: the analog (ADDA) supply and the calibration circuit */
-		setbits_le32(&prcm->sys_pwroff_gating, 0x10);
-		/* boot0: PLL_CPUX tuning step */
-		clrsetbits_le32(SUNXI_CCM_BASE + 0x400, 0x7 << 28, 0x1 << 28);
 	}
 
 	if (!IS_ENABLED(CONFIG_SUNXI_GEN_NCAT2)) {
@@ -44,7 +109,6 @@ void clock_init_safe(void)
 		;
 
 	clrsetbits_le32(&ccm->cpu_axi_cfg, CCM_CPU_AXI_APB_MASK | CCM_CPU_AXI_AXI_MASK,
-			IS_ENABLED(CONFIG_MACH_SUN8I_V831) ? 0x302 :
 			CCM_CPU_AXI_DEFAULT_FACTORS);
 
 	writel(CCM_PSI_AHB1_AHB2_DEFAULT, &ccm->psi_ahb1_ahb2_cfg);
@@ -53,18 +117,13 @@ void clock_init_safe(void)
 #endif
 	writel(CCM_APB1_DEFAULT, &ccm->apb1_cfg);
 
-	if (IS_ENABLED(CONFIG_MACH_SUN8I_V831)) {
-		/* the MBUS runs at a quarter of the DRAM clock: no mux */
-		writel(MBUS_RESET, &ccm->mbus_cfg);
-		return;
-	}
-
 	/*
 	 * The mux and factor are set, but the clock will be enabled in
 	 * DRAM initialization code.
 	 */
 	writel(MBUS_CLK_SRC_PLL6X2 | MBUS_CLK_M(3), &ccm->mbus_cfg);
 }
+#endif /* CONFIG_MACH_SUN8I_V831 */
 #endif
 
 void clock_init_uart(void)
@@ -102,6 +161,26 @@ void clock_set_pll1(unsigned int clk)
 	val &= ~CCM_CPU_AXI_MUX_MASK;
 	val |= CCM_CPU_AXI_MUX_OSC24M;
 	writel(val, &ccm->cpu_axi_cfg);
+
+	if (IS_ENABLED(CONFIG_MACH_SUN8I_V831)) {
+		/* boot0's order: factors, lock enable, PLL enable, wait */
+		sdelay(0x100);
+		writel(CCM_PLL1_OUT_EN | CCM_PLL1_CLOCK_TIME_2 |
+		       CCM_PLL1_CTRL_N(clk / 24000000), &ccm->pll1_cfg);
+		setbits_le32(&ccm->pll1_cfg, CCM_PLL1_LOCK_EN);
+		setbits_le32(&ccm->pll1_cfg, CCM_PLL1_CTRL_EN);
+		while (!(readl(&ccm->pll1_cfg) & CCM_PLL1_LOCK))
+			;
+		sdelay(0x100);
+		clrbits_le32(&ccm->pll1_cfg, CCM_PLL1_LOCK_EN);
+
+		val = readl(&ccm->cpu_axi_cfg);
+		val &= ~CCM_CPU_AXI_MUX_MASK;
+		val |= CCM_CPU_AXI_MUX_PLL_CPUX;
+		writel(val, &ccm->cpu_axi_cfg);
+		sdelay(0x100);
+		return;
+	}
 
 	/* clk = 24*n/p, p is ignored if clock is >288MHz */
 	writel(CCM_PLL1_CTRL_EN | CCM_PLL1_LOCK_EN | CCM_PLL1_CLOCK_TIME_2 |

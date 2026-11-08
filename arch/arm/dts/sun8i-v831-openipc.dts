@@ -58,6 +58,8 @@
 
 &spi0 {
 	status = "okay";
+	/* The controller's own limit: without it the driver clamps to 1 MHz */
+	spi-max-frequency = <24000000>;
 
 	flash@0 {
 		#address-cells = <1>;
