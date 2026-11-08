@@ -4,8 +4,12 @@ CONFIG_PRODUCT_SOC="v831"
 CONFIG_MACH_SUN8I_V831=y
 CONFIG_DEFAULT_DEVICE_TREE="sun8i-v831-openipc"
 CONFIG_IDENT_STRING=" Allwinner V83x"
-# SPL stack: the end of SRAM A2, as on the H6
-CONFIG_SPL_STACK=0x118000
+# SPL stack: top of SRAM C, the region vendor boot0 stacks in (0x58ffc)
+CONFIG_SPL_STACK=0x58000
+# SPI NOR at 12 MHz (24 MHz HOSC / 2), not the 1 MHz default: the
+# firmware scan reads up to 3.7 MiB of flash on every boot
+CONFIG_SF_DEFAULT_SPEED=12000000
+CONFIG_ENV_SPI_MAX_HZ=12000000
 # Kernel hand-off: non-secure, PSCI 1.0 from U-Boot's own monitor, as
 # the vendor kernels expect from OP-TEE
 CONFIG_ARMV7_NONSEC=y
