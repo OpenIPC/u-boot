@@ -24,10 +24,14 @@
 #define VENDOR			"anyka"
 
 /*
- * Kernel memory (mem=): all of it, as the vendor U-Boot passes. The media
- * drivers take their buffers from the kernel.
+ * Kernel memory (mem=). The EV200 kernel gives the ISP and the encoder the
+ * DRAM above mem= (totalmem - osmem), as the other OpenIPC SoCs do, and the
+ * vendor firmware gives them 24 MiB of the 64. Elsewhere all of it, as the
+ * vendor U-Boot passes: the media drivers take their buffers from the kernel.
  */
-#if PHYS_SDRAM_1_SIZE == 0x08000000
+#if defined(CONFIG_AK39_EV200)
+#define OPENIPC_OSMEM		"40M"
+#elif PHYS_SDRAM_1_SIZE == 0x08000000
 #define OPENIPC_OSMEM		"128M"
 #else
 #define OPENIPC_OSMEM		"64M"
