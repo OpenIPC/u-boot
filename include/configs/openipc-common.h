@@ -27,10 +27,13 @@
  * Kernel memory (mem=). The media pool (vmm.ko's mmz) and the ARC's
  * firmware go above it: OpenIPC's load_fullhan places the pool at
  * 0xA2000000 on V200 and at 0xA1D00000 on V100, and the SDKs recommend the
- * same for the others.
+ * same for the others. FH8626V100's kernel reserves its media and ARC
+ * memory from its device tree, so it is given all of the DDR.
  */
 #if defined(CONFIG_FULLHAN_V200) || defined(CONFIG_FULLHAN_865X)
 #define OPENIPC_OSMEM		"32M"
+#elif defined(CONFIG_FULLHAN_8626)
+#define OPENIPC_OSMEM		"64M"
 #else
 #define OPENIPC_OSMEM		"29M"
 #endif
