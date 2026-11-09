@@ -194,8 +194,10 @@ All the vendor kernels are ATAG board-file kernels for machine **9999**
   block and never enables that clock: `arch_cpu_init()` leaves every
   FH8632 clock ungated, as the vendor's PHY reset did.
 - The kernels redo their own pins and clocks.
-- `mem=`: 32M on V200 / FH865x and 29M before, where OpenIPC's
-  `load_fullhan` and the SDKs put the media pool.
+- `mem=`: 32M on V200 / FH865x and 29M on V100 / FH8632, where OpenIPC's
+  `load_fullhan` and the SDKs put the media pool. 64M on FH8626V100,
+  whose 4.19 kernel takes its device tree appended to the uImage and
+  reserves its own media and ARC memory.
 - MTD id: `spi0.0` (4.9 spi-nor) on V200 / FH865x, `spi_flash` (3.0.8
   m25p80) before. Console `ttyS0`.
 
@@ -247,10 +249,12 @@ under QEMU**.
 - `mem=` stays the first kernel argument, as on the other OpenIPC targets.
 - The boot counter is the DRAM word at `0xA1F20000`, DDR + 0x1f20000 as on
   the other families, inside the kernel's 32M on V200 / FH865x. With
-  `mem=29M` (V100, FH8626V100, FH8632) the media pool starts at
-  `0xA1D00000`, over that word, so there it is `0xA1C20000`. The kernels
-  have no device tree to name it, so OpenIPC's `bootcount-clear` does not
-  clear it: after two boots the boot limit boots with `failsafe`.
+  `mem=29M` (V100, FH8632) the media pool starts at `0xA1D00000`, over
+  that word, so there it is `0xA1C20000`. Those kernels have no device
+  tree to name it, so OpenIPC's `bootcount-clear` does not clear it:
+  after two boots the boot limit boots with `failsafe`. FH8626V100 keeps
+  `0xA1C20000`, below its kernel's media pool, and its device tree
+  reserves it as `bootcount@a1c20000`.
 - The environment is at 0x40000, 64 KiB, as in the vendor layout and
   OpenIPC/firmware's `fw_env.config`.
 

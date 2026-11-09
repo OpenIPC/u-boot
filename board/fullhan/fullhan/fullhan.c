@@ -87,8 +87,6 @@ static const struct fh_pad fh_pads[] = {
 	PAD(46, 0x01001100),				/* GPIO11: PHY reset */
 	PAD(61, 0x00011100), PAD(63, 0x00001140),	/* SD0 CD, CLK */
 	PAD(64, 0x00011100), PAD(65, 0x00011100),	/* SD0 CMD, D0 */
-	PAD(66, 0x00011140), PAD(67, 0x00011100),	/* SD0 D1, D2 */
-	PAD(68, 0x00011100),				/* SD0 D3 */
 #elif defined(CONFIG_FULLHAN_8632)
 	/* Only the functions: the pulls stay as they are */
 	PAD_FUNC(58, 1),				/* GPIO54: flash CS */
@@ -436,8 +434,11 @@ int board_mmc_init(struct bd_info *bis)
 	host->dev_index = 0;
 	host->buswidth = 4;
 	ret = add_dwmci(host, 25000000, 400000);
-#ifdef CONFIG_FULLHAN_8632
-	/* D2 and D3 are not bonded out on the FH8632's package */
+#if defined(CONFIG_FULLHAN_8632) || defined(CONFIG_FULLHAN_8626)
+	/*
+	 * D2 and D3 are not bonded out on the FH8632's package; FH8626V100
+	 * cameras wire SD0 1-bit and use the D1 pad as a GPIO
+	 */
 	if (!ret)
 		host->cfg.host_caps &= ~MMC_MODE_4BIT;
 #endif
