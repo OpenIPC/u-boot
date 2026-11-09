@@ -94,16 +94,19 @@ build_v500() {
 # instead of it, or "-" to use the prebuilt one it ships. A model of "-" names
 # the image after the SoC alone.
 #
-# hi3516cv610 20s/20g pack image_tool/input/gsl-20250416.bin, the GSL of a
-# production K662C6S (ddr param version 20250416): on that module the shipped
-# gsl.bin hangs in DDR training right after the boot table (u-boot#69,
-# defib#148). Only there: on a Hi3516CV608 with an FM25Q64A it trains, but
-# Linux's bsp-sfc then fails to probe the flash ("spi nor register fail"),
-# so it is not a replacement for gsl.bin.
+# hi3516cv610 20s/20g build the GSL from source (gsl/). The earlier factory
+# blob (image_tool/input/gsl-20250416.bin, dumped from a production K662C6S)
+# handed off to Linux with the tsensor/HPM clocks left gated, which stalls the
+# SoC power/thermal bring-up on the 20s module and hangs boot after the kernel
+# loads its vendor modules. The in-tree gsl's start_svb() enables those clocks
+# (TSENSOR_CTRL_CLK_REG 0x11014740, HPM at 0x11014984/0x11014988) and leaves
+# them on, and trains the 128M DDR3 -- HW-verified on a K662C6S (Hi3516CV613).
+# The DDR-training hang the factory blob was meant to avoid (u-boot#69) does
+# not reproduce with a from-source build.
 BOOTIMG_TABLE="
 hi3516cv610 10b     Hi3516CV610-DMEB_4L_DDR2_1333M_64MB_16bit-A7_950M_QFN.bin        arm   image_tool             -
-hi3516cv610 20s     Hi3516CV610-DMEB_4L_DDR3_2133M_128MB_16bit-A7_950M_QFN.bin       arm   image_tool             image_tool/input/gsl-20250416.bin
-hi3516cv610 20g     Hi3516CV610-DMEB_4L_DDR3_2133M_128MB_16bit-A7_950M_QFN.bin       arm   image_tool             image_tool/input/gsl-20250416.bin
+hi3516cv610 20s     Hi3516CV610-DMEB_4L_DDR3_2133M_128MB_16bit-A7_950M_QFN.bin       arm   image_tool             gsl
+hi3516cv610 20g     Hi3516CV610-DMEB_4L_DDR3_2133M_128MB_16bit-A7_950M_QFN.bin       arm   image_tool             gsl
 hi3516cv610 00s     Hi3516CV610-DMEB_4L_DDR3_2133M_512MB_16bit-A7_950M_BGA.bin       arm   image_tool             -
 hi3516cv610 00g     Hi3516CV610-DMEB_4L_DDR3_2133M_512MB_16bit-A7_950M_BGA.bin       arm   image_tool             -
 hi3516cv608 -       Hi3516CV608-DMEB_4L_DDR2_1333M_64MB_16bit-A7_950M_QFN.bin        arm   image_tool             -

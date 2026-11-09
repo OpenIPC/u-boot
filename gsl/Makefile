@@ -35,7 +35,7 @@ endif
 OBJS := $(patsubst %.c,%.o,$(CSRC) )
 OBJS += $(patsubst %.S,%.o,$(SSRC) )
 
-export CFLAGS := -fno-builtin -fno-common -fdata-sections -ffunction-sections
+export CFLAGS := -std=gnu11 -fno-builtin -fno-common -fdata-sections -ffunction-sections
 CFLAGS += -mthumb -mno-unaligned-access -g
 CFLAGS += -Wall
 CFLAGS += -I$(PWD)/include/
