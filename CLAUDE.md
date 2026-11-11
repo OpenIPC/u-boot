@@ -222,8 +222,13 @@ The T41's `mtdparts=` name `sfc0_nor`.
 - T23/T31: PB24 (UART1 RX) pull-up; T31: GPIO62 low (HiChip SD power).
 - No Ethernet PHY found (`jz_net_initialize()` < 0): T31 GPIO61 (PPS) and
   GPIO48 (Wyze V3) low, T20 the Wyze V2 USB/SD power and card-detect
-  pulse; `extras=nogmac` for the kernel unless set. The SD recovery
-  therefore runs from `last_stage_init()`, after the network.
+  pulse; `extras=nogmac` for the kernel unless set. When the PHY does
+  answer, the `nogmac` this code set (marked `nogmac_auto=1`) is dropped:
+  the first boot saves its environment, so one missed probe otherwise
+  disabled the GMAC for good (OpenIPC/firmware#1885). An unmarked
+  `extras=nogmac` is the owner's (builder's Wi-Fi-only profiles) and
+  stays. The SD recovery therefore runs from `last_stage_init()`, after
+  the network.
 - T40: GPIO port A PA00-PA22 at 1.8 V (`board_early_init_f()`); the
   GMAC as u-boot-t40 drives it (L2 written back around DMA buffers, MDC
   divider /2, CPM PHY control set in `jz_init()` with bit 23 cleared for

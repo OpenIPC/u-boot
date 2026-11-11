@@ -169,8 +169,27 @@ int board_eth_init(struct bd_info *bis)
 {
 	int ret = jz_net_initialize(bis);
 
-	if (ret >= 0)
+	if (ret >= 0) {
+#if defined(CONFIG_T20) || defined(CONFIG_T31)
+		/*
+		 * A PHY that answers means Ethernet, whatever an earlier boot
+		 * decided: one probe that missed it (a cold boot racing the
+		 * PHY's reset) set the nogmac below, and the first boot's save
+		 * of the default environment kept it, so the kernel disabled
+		 * the GMAC on every boot after (OpenIPC/firmware#1885). Only
+		 * the nogmac this code set, marked nogmac_auto, is dropped: one
+		 * the owner set (the Wi-Fi-only profiles in OpenIPC/builder)
+		 * stays, and only T20 and T31 ever set it.
+		 */
+		const char *extras = env_get("extras");
+
+		if (env_get("nogmac_auto") && extras && !strcmp(extras, "nogmac")) {
+			env_set("extras", NULL);
+			env_set("nogmac_auto", NULL);
+		}
+#endif
 		return ret;
+	}
 
 	/* No Ethernet PHY: a camera that uses these pins otherwise */
 #if defined(CONFIG_T20)
@@ -183,8 +202,10 @@ int board_eth_init(struct bd_info *bis)
 	gpio_direction_output(48, 0);
 	udelay(1000);
 	gpio_direction_output(43, 0);
-	if (!env_get("extras"))
+	if (!env_get("extras")) {
 		env_set("extras", "nogmac");
+		env_set("nogmac_auto", "1");
+	}
 #elif defined(CONFIG_T31)
 	/* PPS */
 	gpio_request(61, "pps_mmc_enable");
@@ -192,8 +213,10 @@ int board_eth_init(struct bd_info *bis)
 	/* Wyze V3 */
 	gpio_request(48, "wyze_mmc_enable");
 	gpio_direction_output(48, 0);
-	if (!env_get("extras"))
+	if (!env_get("extras")) {
 		env_set("extras", "nogmac");
+		env_set("nogmac_auto", "1");
+	}
 #endif
 	return ret;
 }
