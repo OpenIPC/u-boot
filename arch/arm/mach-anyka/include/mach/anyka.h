@@ -11,7 +11,10 @@
  * 3.4.35 mach-ak39), the AK3918EV200 4.4 kernel port and its U-Boot port,
  * the EV330 4.4 device trees (anycloud_ak39ev330*.dtsi), and for the EV300L
  * the anycloud39av130 SDK V1.03 (U-Boot 2019.10 arch-ak3918ev300l,
- * clk-ak3918ev300l.c, pinctrl-ak3918ev300l.c, ak_spi.c, ak_serial.c).
+ * clk-ak3918ev300l.c, pinctrl-ak3918ev300l.c, ak_spi.c, ak_serial.c), checked
+ * for the AV100 against the AnyCloud39AV100 SDK V1.12 (arch-ak3918av100,
+ * clk-ak3918av100.c, pinctrl-ak3918av100.c, the same ak_spi.c, ak_serial.c,
+ * ak_mci.c and ak_timer_wdt.c, the AV100 device trees).
  */
 
 #ifndef __MACH_ANYKA_H

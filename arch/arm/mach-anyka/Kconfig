@@ -50,6 +50,20 @@ config TARGET_AK3918EV300L
 	  0x21100000, shared pins from 0x178, SD on MCI1. The AK3918EV300W
 	  is the same chip.
 
+config TARGET_AK3918AV100
+	bool "AK3918AV100"
+	select AK39_AV100
+	help
+	  AnyCloud39AV100: AK3918AV100N, AK3918AV100P and KM01N, 64 MiB,
+	  boot header ANYKA322. The EV300L's register map; the mask ROM
+	  copies U-Boot from flash offset 0x600, past a secure-boot area.
+
+config TARGET_AK3918AV100X
+	bool "AK3918AV100X"
+	select AK39_AV100
+	help
+	  AnyCloud39AV100: AK3918AV100X, AK3918AV100XP and KM01D, 128 MiB.
+
 endchoice
 
 config AK39_EV200

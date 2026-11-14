@@ -10,8 +10,9 @@
 #include <asm/arch/anyka.h>
 
 #define CONFIG_SYS_SDRAM_BASE		AK_DDR_BASE
-/* The DDR2 in the package: the AK3919s carry twice as much */
-#if defined(CONFIG_TARGET_AK3919EV300) || defined(CONFIG_TARGET_AK3919EV330)
+/* The DDR2 in the package: the AK3919s and the AK3918AV100X carry 128 MiB */
+#if defined(CONFIG_TARGET_AK3919EV300) || defined(CONFIG_TARGET_AK3919EV330) || \
+	defined(CONFIG_TARGET_AK3918AV100X)
 #define PHYS_SDRAM_1_SIZE		0x08000000
 #else
 #define PHYS_SDRAM_1_SIZE		0x04000000
