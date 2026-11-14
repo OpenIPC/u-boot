@@ -43,7 +43,7 @@ config TARGET_AK3919EV330
 
 config TARGET_AK3918EV300L
 	bool "AK3918EV300L"
-	select AK39_EV300L
+	select AK39_AV100
 	help
 	  AnyCloud39EV300L, 64 MiB, boot header AK_H322L. Not an EV300: a
 	  24 MHz crystal, a new PLL layout, the SPI controllers at
@@ -61,8 +61,12 @@ config AK39_EV300
 config AK39_EV330
 	bool
 
-config AK39_EV300L
+config AK39_AV100
 	bool
+	help
+	  The AK3918AV100 family (AnyCloud39AV100 and AnyCloud39EV300L): a
+	  24 MHz crystal, PLL2 for the peripherals, SPI0 at 0x21100000,
+	  shared pins in 3-bit fields from 0x178, SD on MCI1.
 
 config SYS_SOC
 	default "anyka"

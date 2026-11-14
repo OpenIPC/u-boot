@@ -1,10 +1,11 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Anyka AK39 camera SoCs: AK3918EV200, the AK391xEV300 family, the
- * AK391xEV330 family and the AK3918EV300L. One ARM926EJ-S with DDR2 in the
- * package; the memory map is the same in the first three generations. The
- * EV300L keeps the system control, UART, L2, GPIO, MCI and GMAC blocks where
- * they were, but moves the SPI controllers, the shared pins and the PLLs.
+ * AK391xEV330 family and the AK3918AV100 family (AV100, EV300L;
+ * CONFIG_AK39_AV100). One ARM926EJ-S with DDR2 in the package; the memory
+ * map is the same in the first three generations. The AV100 family keeps
+ * the system control, UART, L2, GPIO, MCI and GMAC blocks where they were,
+ * but moves the SPI controllers, the shared pins and the PLLs.
  *
  * From the vendor SDKs: AnyCloud39EV300 (U-Boot 2013.10 arch-ak39, kernel
  * 3.4.35 mach-ak39), the AK3918EV200 4.4 kernel port and its U-Boot port,
@@ -19,7 +20,7 @@
 #include <linux/bitops.h>
 
 #define AK_SYSCTRL_BASE		0x08000000
-#ifdef CONFIG_AK39_EV300L
+#ifdef CONFIG_AK39_AV100
 #define AK_SPI0_BASE		0x21100000
 #else
 #define AK_SPI0_BASE		0x20120000
@@ -91,10 +92,10 @@
 #define AK_PULL0_UART0		(BIT(1) | BIT(2))
 
 /*
- * GPIO: direction (1 = out) and output banks, 32 pins a bank. The EV300L
- * has four direction banks (pins up to 104), so its outputs start later.
+ * GPIO: direction (1 = out) and output banks, 32 pins a bank. The AV100
+ * family has four direction banks (pins up to 104), so its outputs start later.
  */
-#ifdef CONFIG_AK39_EV300L
+#ifdef CONFIG_AK39_AV100
 #define AK_GPIO_OUT_OFF		0x14
 #else
 #define AK_GPIO_OUT_OFF		0x0c
@@ -111,14 +112,14 @@
 #define AK_SYS_SHAREPIN3	(AK_SYSCTRL_BASE + 0xdc)
 
 /*
- * EV300L (arch-ak3918ev300l, clk-ak3918ev300l.h). 24 MHz crystal. PLL1
+ * AV100 family (arch-ak3918ev300l, clk-ak3918ev300l.h). 24 MHz crystal. PLL1
  * (+0x04) clocks the CPU, PLL2 (+0x08) the peripherals: PLL2 = 24 MHz *
  * (F + 1) / (R + 1) / (OD + 1), GCLK (the ASIC clock the UART and SPI
  * dividers count) = PLL2 / 2 / (GDIV + 1). The boot header sets only PLL1
  * and the DDR controller; out of reset GCLK is 60 MHz. The timers still
  * count at 12 MHz.
  */
-#define AK_EV300L_XTAL_HZ	24000000
+#define AK_AV100_XTAL_HZ	24000000
 #define AK_SYS_PLL1		(AK_SYSCTRL_BASE + 0x04)
 #define AK_SYS_PLL2		(AK_SYSCTRL_BASE + 0x08)
 #define AK_SYS_SPI_CLK		(AK_SYSCTRL_BASE + 0x0c)
@@ -134,8 +135,8 @@
  * PLL2 400 MHz, GCLK 200 MHz, bandwidth 16: what the vendor U-Boot's and
  * kernel's device trees ask for (F 99, R 0, OD 5, GDIV 0)
  */
-#define AK_EV300L_PLL2		(AK_PLL2_GDIV_VLD | 5 << 19 | 0 << 13 | 99)
-#define AK_EV300L_PLL_BW	(16 - 1)
+#define AK_AV100_PLL2		(AK_PLL2_GDIV_VLD | 5 << 19 | 0 << 13 | 99)
+#define AK_AV100_PLL_BW	(16 - 1)
 
 /* SPI0 clock: SYSCTRL +0x0c; SPI clock = PLL2 / 2 / (divider + 1) */
 #define AK_SPI_CLK_DIV(d)	((d) << 10)
@@ -152,13 +153,13 @@
  * SPI0 (CFG4): the SDK's spi_sharepin_cfg() value; pads 42-47 (WP, DIN,
  * CS, HOLD, CLK, DOUT) function 2, and fields 2:0 and 8:6 at 1
  */
-#define AK_EV300L_SPI0_PINS	0x2492441
+#define AK_AV100_SPI0_PINS	0x2492441
 /* UART0 TXD/RXD on GPIO 51/52: CFG5 fields 8:6 and 11:9, function 1 */
-#define AK_EV300L_UART0_PINS_CLR	(0x3f << 6)
-#define AK_EV300L_UART0_PINS	(BIT(6) | BIT(9))
+#define AK_AV100_UART0_PINS_CLR	(0x3f << 6)
+#define AK_AV100_UART0_PINS	(BIT(6) | BIT(9))
 /* SD0 pads 31-36 (D2, D3, CMD, MCLK, D0, D1): CFG3 fields 8:6 .. 23:21 */
-#define AK_EV300L_SD0_PINS_CLR	(0x3ffff << 6)
-#define AK_EV300L_SD0_PINS	0x249240	/* function 1 each */
+#define AK_AV100_SD0_PINS_CLR	(0x3ffff << 6)
+#define AK_AV100_SD0_PINS	0x249240	/* function 1 each */
 /* Pad control, 32 pads a register: pull enable, pull select (0 = up), IE */
 #define AK_SYS_PUPD_EN(n)	(AK_SYSCTRL_BASE + 0x264 + 4 * (n))
 #define AK_SYS_PUPD_SEL(n)	(AK_SYSCTRL_BASE + 0x274 + 4 * (n))
@@ -168,7 +169,7 @@
 
 #ifndef __ASSEMBLY__
 unsigned long ak_asic_clk(void);
-#ifdef CONFIG_AK39_EV300L
+#ifdef CONFIG_AK39_AV100
 unsigned long ak_pll2_clk(void);
 #endif
 #endif

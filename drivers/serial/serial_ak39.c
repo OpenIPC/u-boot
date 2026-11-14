@@ -61,10 +61,10 @@ static void ak_serial_setbrg(void)
 static int ak_serial_init(void)
 {
 	clrbits_le32(AK_SYS_CLK_GATE, AK_CLK_UART0);
-#ifdef CONFIG_AK39_EV300L
+#ifdef CONFIG_AK39_AV100
 	/* GPIO 51/52 as UART0, as the SDK's ak_serial.c sets them */
-	clrsetbits_le32(AK_SYS_SHAREPIN_CFG(5), AK_EV300L_UART0_PINS_CLR,
-			AK_EV300L_UART0_PINS);
+	clrsetbits_le32(AK_SYS_SHAREPIN_CFG(5), AK_AV100_UART0_PINS_CLR,
+			AK_AV100_UART0_PINS);
 #else
 	setbits_le32(AK_SYS_SHAREPIN0, AK_SHAREPIN0_UART0);
 	clrbits_le32(AK_SYS_PULL0, AK_PULL0_UART0);

@@ -23,11 +23,11 @@
 #include <linux/iopoll.h>
 
 /*
- * The SD slot: MCI0 on the EV200, EV300 and EV330; MCI1 on the EV300L, whose
- * vendor device trees put the card on mmc1 (0x20108000) and keep MCI0 and
- * MCI2 for SDIO Wi-Fi. The controller is the same.
+ * The SD slot: MCI0 on the EV200, EV300 and EV330; MCI1 on the AV100 family
+ * (AV100, EV300L), whose vendor device trees put the card on mmc1
+ * (0x20108000) and keep MCI0 and MCI2 for SDIO Wi-Fi. The controller is the same.
  */
-#ifdef CONFIG_AK39_EV300L
+#ifdef CONFIG_AK39_AV100
 #define AK_MCI_BASE		AK_MCI1_BASE
 #define AK_CLK_MCI		AK_CLK_MCI1
 #define AK_RST_MCI		AK_RST_MCI1
@@ -126,7 +126,7 @@ static void ak_mci_set_clock(uint want)
 }
 
 /* Also after a data fault: TX/RXACTIVE stay set until the host is reset */
-#ifdef CONFIG_AK39_EV300L
+#ifdef CONFIG_AK39_AV100
 /*
  * Pads 31-36 as SD0 (function 1), input enabled, pull-ups on the data and
  * command lines, none on the clock, as the vendor device trees' mci1_pins.
@@ -148,8 +148,8 @@ static int mci_powered;
 
 static void ak_mci_pins(void)
 {
-	clrsetbits_le32(AK_SYS_SHAREPIN_CFG(3), AK_EV300L_SD0_PINS_CLR,
-			AK_EV300L_SD0_PINS);
+	clrsetbits_le32(AK_SYS_SHAREPIN_CFG(3), AK_AV100_SD0_PINS_CLR,
+			AK_AV100_SD0_PINS);
 	ak_mci_pads(MCI_PADS, AK_SYS_PAD_IE(0));
 	ak_mci_pads(MCI_PULLUPS, AK_SYS_PUPD_EN(0));
 	/* PU_PD_SEL: 0 = pull-up */

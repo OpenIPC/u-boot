@@ -12,12 +12,12 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-#ifdef CONFIG_AK39_EV300L
+#ifdef CONFIG_AK39_AV100
 unsigned long ak_pll2_clk(void)
 {
 	u32 reg = readl(AK_SYS_PLL2);
 
-	return AK_EV300L_XTAL_HZ / 1000 * (AK_PLL2_F(reg) + 1) /
+	return AK_AV100_XTAL_HZ / 1000 * (AK_PLL2_F(reg) + 1) /
 	       (AK_PLL2_R(reg) + 1) / (AK_PLL2_OD(reg) + 1) * 1000;
 }
 
@@ -63,10 +63,10 @@ int arch_cpu_init(void)
 		return 0;
 	}
 	if ((readl(AK_SYS_PLL2) & AK_PLL2_CFG_MASK) ==
-	    (AK_EV300L_PLL2 & AK_PLL2_CFG_MASK))
+	    (AK_AV100_PLL2 & AK_PLL2_CFG_MASK))
 		return 0;
-	writel(AK_EV300L_PLL2, AK_SYS_PLL2);
-	clrsetbits_le32(AK_SYS_PLL_BW, 0xfff, AK_EV300L_PLL_BW);
+	writel(AK_AV100_PLL2, AK_SYS_PLL2);
+	clrsetbits_le32(AK_SYS_PLL_BW, 0xfff, AK_AV100_PLL_BW);
 	setbits_le32(AK_SYS_PLL1, AK_PLL1_PLL2_ADJ);
 	if (!ak_pll2_adjust_done())
 		pll2_state = PLL2_STUCK;
@@ -171,7 +171,7 @@ int print_cpuinfo(void)
 	printf("CPU:   Anyka %s (chip id %08x), ASIC %lu MHz\n",
 	       CONFIG_PRODUCT_SOC, readl(AK_SYS_CHIP_ID),
 	       ak_asic_clk() / 1000000);
-#ifdef CONFIG_AK39_EV300L
+#ifdef CONFIG_AK39_AV100
 	if (pll2_state == PLL2_BUSY)
 		printf("CPU:   PLL2 busy at boot, left as it was\n");
 	else if (pll2_state == PLL2_STUCK)
