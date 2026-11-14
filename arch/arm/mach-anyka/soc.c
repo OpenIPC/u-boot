@@ -58,6 +58,15 @@ static bool ak_pll2_adjust_done(void)
  */
 int arch_cpu_init(void)
 {
+	/*
+	 * The watchdog runs out of reset on this generation: the SDK's
+	 * board_init_f() stops it first thing ("close watchdog"), and so
+	 * does the EV300L camera's vendor U-Boot. Left running, it resets
+	 * the part from U-Boot or from Linux, whose ak_top_wdt only starts
+	 * and feeds it once /dev/watchdog is opened.
+	 */
+	writel(AK_WDT_CFG2_KEY, AK_SYS_WDT_CFG2);
+
 	if (!ak_pll2_adjust_done()) {
 		pll2_state = PLL2_BUSY;
 		return 0;
