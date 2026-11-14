@@ -5,6 +5,7 @@
  */
 
 #include <common.h>
+#include <env.h>
 #include <init.h>
 #include <net.h>
 #include <netdev.h>
@@ -28,7 +29,134 @@ int misc_init_r(void)
 	return openipc_helper();
 }
 
-#ifdef CONFIG_ETH_DESIGNWARE
+#if defined(CONFIG_ETH_DESIGNWARE) && defined(CONFIG_AK39_AV100)
+/*
+ * AV100 family (AV100, EV300L), after the AV100 SDK's ak_eth.c, its clock
+ * driver and its device trees: RMII to an external PHY, the MAC clock out
+ * (OPCLK1, 50 MHz) on pad 0.
+ *
+ * Pads 0-8 and 11, shared-pin CFG0 fields 26:0 and CFG1 5:3: OPCLK1 (0: 3),
+ * RXER (1: 3), RXDV (2: 4), MDIO (3: 2), TXEN (4: 4), MDC (5: 3), RXD1
+ * (6: 3), TXD0 (7: 3), TXD1 (8: 5), RXD0 (11: 5), the SDK's EVB and the
+ * HVT3610S3 camera's ethernet_rmii pins alike. Input enabled; pull-up on
+ * MDIO, pull-downs on the data pins, none on the clock; the clock pad at
+ * 8 mA and TXD0/TXD1 fast, as their pin groups say.
+ */
+#define AK_MAC_PINS0_CLR	0x7ffffff
+#define AK_MAC_PINS0		(3 << 0 | 3 << 3 | 4 << 6 | 2 << 9 | 4 << 12 | \
+				 3 << 15 | 3 << 18 | 3 << 21 | 5 << 24)
+#define AK_MAC_PINS1_CLR	(0x7 << 3)
+#define AK_MAC_PINS1		(5 << 3)
+#define AK_MAC_PADS		(GENMASK(8, 0) | BIT(11))
+#define AK_MAC_PULLS		(AK_MAC_PADS & ~BIT(0))
+#define AK_MAC_PULLUPS		BIT(3)
+#define AK_SYS_PAD_DRV0		(AK_SYSCTRL_BASE + 0x1a4)	/* 2 bits a pad */
+#define AK_SYS_PAD_SLEW0	(AK_SYSCTRL_BASE + 0x1d0)	/* 0 = fast */
+
+/*
+ * MAC_OPCLK = PLL2 / (div + 1), SYSCTRL +0x18: enable (bit 8) with the
+ * apply bit (9) clear, the divider in 5:0, then apply and wait.
+ */
+#define AK_SYS_MAC_OPCLK	(AK_SYSCTRL_BASE + 0x18)
+#define AK_MAC_OPCLK_EN		BIT(8)
+#define AK_MAC_OPCLK_APPLY	BIT(9)
+#define AK_MAC_SPEED_100	BIT(23)		/* in +0x14 */
+#define AK_RST_MAC		BIT(13)
+
+/* The GPIO function of the default PHY reset pads (function 0 each) */
+static const struct {
+	u8 gpio, cfg, shift;
+} ak_gpio_pads[] = {
+	{ 24, 2, 18 }, { 29, 3, 3 }, { 71, 8, 27 },
+};
+
+static void ak_gpio_mux(uint gpio)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(ak_gpio_pads); i++)
+		if (ak_gpio_pads[i].gpio == gpio)
+			clrbits_le32(AK_SYS_SHAREPIN_CFG(ak_gpio_pads[i].cfg),
+				     0x7 << ak_gpio_pads[i].shift);
+}
+
+/*
+ * The PHY reset (active low) is board wiring: GPIO 71 on the HVT3610S3,
+ * 24 on the SDK's AV100N EVB, 29 on its AV100X EVB, 49, 55 or 57 on other
+ * SDK boards. The default is OpenIPC's per SoC, from the board it stands
+ * for; "phyreset=<gpio>" overrides it, "phyreset=none" (or -1) skips it.
+ */
+#if defined(CONFIG_TARGET_AK3918EV300L)
+#define AK_AV100_PHY_RESET	71
+#elif defined(CONFIG_TARGET_AK3918AV100X)
+#define AK_AV100_PHY_RESET	29
+#else
+#define AK_AV100_PHY_RESET	24
+#endif
+static void ak_phy_reset(void)
+{
+	const char *s = env_get("phyreset");
+	long gpio = AK_AV100_PHY_RESET;
+
+	if (s)
+		gpio = (*s >= '0' && *s <= '9') ? simple_strtol(s, NULL, 10) : -1;
+	if (gpio < 0 || gpio > 104)
+		return;
+	ak_gpio_mux(gpio);
+	setbits_le32(AK_GPIO_OUT(gpio), BIT(gpio % 32));
+	setbits_le32(AK_GPIO_DIR(gpio), BIT(gpio % 32));
+	mdelay(5);
+	clrbits_le32(AK_GPIO_OUT(gpio), BIT(gpio % 32));
+	mdelay(25);
+	setbits_le32(AK_GPIO_OUT(gpio), BIT(gpio % 32));
+	mdelay(50);
+}
+
+static void ak_eth_init(void)
+{
+	uint div = DIV_ROUND_UP(ak_pll2_clk(), 50000000) - 1;
+	int spins = 1000000;
+
+	clrsetbits_le32(AK_SYS_SHAREPIN_CFG(0), AK_MAC_PINS0_CLR, AK_MAC_PINS0);
+	clrsetbits_le32(AK_SYS_SHAREPIN_CFG(1), AK_MAC_PINS1_CLR, AK_MAC_PINS1);
+	setbits_le32(AK_SYS_PAD_IE(0), AK_MAC_PADS);
+	clrbits_le32(AK_SYS_PUPD_EN(0), BIT(0));
+	setbits_le32(AK_SYS_PUPD_EN(0), AK_MAC_PULLS);
+	/* PU_PD_SEL: 1 = pull-down */
+	clrsetbits_le32(AK_SYS_PUPD_SEL(0), AK_MAC_PULLUPS,
+			AK_MAC_PULLS & ~AK_MAC_PULLUPS);
+	clrsetbits_le32(AK_SYS_PAD_DRV0, 0x3, 0x2);
+	clrbits_le32(AK_SYS_PAD_SLEW0, BIT(7) | BIT(8));
+
+	/* 100 Mbit/s, the 50 MHz RMII clock, the MAC's bus clock */
+	setbits_le32(AK_SYS_MAC_CLK, AK_MAC_SPEED_100);
+	clrbits_le32(AK_SYS_MAC_OPCLK, AK_MAC_OPCLK_APPLY);
+	setbits_le32(AK_SYS_MAC_OPCLK, AK_MAC_OPCLK_EN);
+	clrsetbits_le32(AK_SYS_MAC_OPCLK, 0x3f, min(div, 0x3fU));
+	setbits_le32(AK_SYS_MAC_OPCLK, AK_MAC_OPCLK_APPLY);
+	while ((readl(AK_SYS_MAC_OPCLK) & AK_MAC_OPCLK_APPLY) && --spins)
+		;
+	if (!spins)
+		printf("ETH:   MAC clock divider not taken\n");
+	clrbits_le32(AK_SYS_CLK_GATE, AK_CLK_MAC);
+	/*
+	 * Only release the MAC reset, never assert it: the SDK's ak_eth.c
+	 * says that on this generation a MAC reset after the first release
+	 * also resets the DDR controller (the MAC's DMA buffer is not fully
+	 * reset and its FIFO pointers go wrong). The DesignWare driver's own
+	 * DMA soft reset is enough.
+	 */
+	clrbits_le32(AK_SYS_SOFT_RST, AK_RST_MAC);
+
+	ak_phy_reset();
+}
+
+int board_eth_init(struct bd_info *bis)
+{
+	ak_eth_init();
+	return designware_initialize(AK_GMAC_BASE, PHY_INTERFACE_MODE_RMII);
+}
+#elif defined(CONFIG_ETH_DESIGNWARE)
 /*
  * What the vendor U-Boots do before their GMAC driver runs: the MAC pins,
  * the PHY clock out on GPIO 47, the MAC clock, a MAC reset.
