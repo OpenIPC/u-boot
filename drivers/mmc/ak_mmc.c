@@ -143,8 +143,8 @@ static void ak_mci_pads(u64 pads, unsigned long reg0)
 	setbits_le32(reg0 + 4, (u32)(pads >> 32));
 }
 
-/* In .data: called before relocation would clear .bss */
-static int mci_powered = 0;
+/* Set after the first power cycle; MMC init runs after relocation */
+static int mci_powered;
 
 static void ak_mci_pins(void)
 {

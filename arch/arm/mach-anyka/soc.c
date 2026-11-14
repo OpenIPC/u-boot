@@ -28,27 +28,48 @@ unsigned long ak_asic_clk(void)
 }
 
 /*
- * PLL2 to 400 MHz and GCLK to 200 MHz, as the vendor U-Boot's fixed-clk
- * driver does from its device tree, and the vendor kernel again from its
- * own: wait for an earlier change to be taken, write the new values, set
- * the bandwidth, then ask for the change (PLL1 bit 28, which clears when
- * it is done). The boot header leaves PLL2 alone.
+ * What arch_cpu_init() did with PLL2, for print_cpuinfo() to report once
+ * there is a console. Not 0, so that it lives in .data: it is written
+ * before relocation, when .bss is not cleared yet.
  */
-int arch_cpu_init(void)
+enum { PLL2_SET = 1, PLL2_BUSY, PLL2_STUCK };
+static int pll2_state = PLL2_SET;
+
+static bool ak_pll2_adjust_done(void)
 {
 	int spins = 1000000;
 
 	while ((readl(AK_SYS_PLL1) & AK_PLL1_PLL2_ADJ) && --spins)
 		;
+	return spins;
+}
+
+/*
+ * PLL2 to 400 MHz and GCLK to 200 MHz, as the vendor U-Boot's fixed-clk
+ * driver does from its device tree, and the vendor kernel again from its
+ * own: wait for an earlier change to be taken, write the new values, set
+ * the bandwidth, then ask for the change (PLL1 bit 28, which clears when
+ * it is done). The boot header leaves PLL2 alone.
+ *
+ * There is no console yet, and failing here would stop the board
+ * silently: a change still pending is left alone (the UART and SPI
+ * dividers follow the PLL2 word, which then still holds the clock in
+ * use), and either case is reported by print_cpuinfo().
+ */
+int arch_cpu_init(void)
+{
+	if (!ak_pll2_adjust_done()) {
+		pll2_state = PLL2_BUSY;
+		return 0;
+	}
 	if ((readl(AK_SYS_PLL2) & AK_PLL2_CFG_MASK) ==
 	    (AK_EV300L_PLL2 & AK_PLL2_CFG_MASK))
 		return 0;
 	writel(AK_EV300L_PLL2, AK_SYS_PLL2);
 	clrsetbits_le32(AK_SYS_PLL_BW, 0xfff, AK_EV300L_PLL_BW);
 	setbits_le32(AK_SYS_PLL1, AK_PLL1_PLL2_ADJ);
-	spins = 1000000;
-	while ((readl(AK_SYS_PLL1) & AK_PLL1_PLL2_ADJ) && --spins)
-		;
+	if (!ak_pll2_adjust_done())
+		pll2_state = PLL2_STUCK;
 	return 0;
 }
 #else
@@ -150,6 +171,12 @@ int print_cpuinfo(void)
 	printf("CPU:   Anyka %s (chip id %08x), ASIC %lu MHz\n",
 	       CONFIG_PRODUCT_SOC, readl(AK_SYS_CHIP_ID),
 	       ak_asic_clk() / 1000000);
+#ifdef CONFIG_AK39_EV300L
+	if (pll2_state == PLL2_BUSY)
+		printf("CPU:   PLL2 busy at boot, left as it was\n");
+	else if (pll2_state == PLL2_STUCK)
+		printf("CPU:   PLL2 change not acknowledged, clocks may be off\n");
+#endif
 	return 0;
 }
 #endif
