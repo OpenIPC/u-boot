@@ -182,7 +182,7 @@
 #define AK_AV100_SD_POWER	50
 #define AK_AV100_SD_POWER_ALT	98
 #endif
-/* Pad control, 32 pads a register: pull enable, pull select (0 = up), IE */
+/* Pad control, 32 pads a register: pull enable, pull select (1 = up), IE */
 #define AK_SYS_PUPD_EN(n)	(AK_SYSCTRL_BASE + 0x264 + 4 * (n))
 #define AK_SYS_PUPD_SEL(n)	(AK_SYSCTRL_BASE + 0x274 + 4 * (n))
 #define AK_SYS_PAD_IE(n)	(AK_SYSCTRL_BASE + 0x1c0 + 4 * (n))
