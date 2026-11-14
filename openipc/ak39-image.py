@@ -2,20 +2,25 @@
 # SPDX-License-Identifier: GPL-2.0+
 """Put the Anyka AK39 boot ROM's header in front of u-boot.bin.
 
-  ak39-image.py ev200|ev300 <script.rvs> <u-boot.bin> <text_base> <out>
+  ak39-image.py ev200|ev300|ev300l <script.rvs> <u-boot.bin> <text_base> <out>
   ak39-image.py ev330 <boot.bin> <u-boot.bin> <text_base> <out>
 
-EV200 and EV300: the ROM reads the 512-byte header at flash offset 0,
+EV200, EV300 and EV300L: the ROM reads the 512-byte header at flash offset 0,
 replays its register script (PLLs, DDR controller), copies the payload that
 follows the header to the load address and starts it there.
 
   +0x000  ARM branch to the payload, for a ROM that enters at the header
-  +0x004  magic: AKSH_240 (EV200), ANYKA_H3 (EV300)
+  +0x004  magic: AKSH_240 (EV200), ANYKA_H3 (EV300), AK_H322L (EV300L)
   +0x00c  payload length
-  +0x01c  6, as in every header seen
+  +0x010  EV300L: 5 (the SDK's "spi divide")
+  +0x018  EV300L: 1 (the SDK's "single read mode")
+  +0x01c  6, as in every header seen ("use outside RAM")
   +0x020  load address
-  +0x02c  {address, value} pairs; 0x66668888 = delay, 0x88888888 = end
-  +0x18c  SPIP: the SPI NOR descriptor (JEDEC ID, size, page, erase size)
+  +0x024  EV300L: 1 (the SDK's "use CPU mode", not DMA)
+  +0x02c  {address, value} pairs; 0x66668888 = delay, 0x66668881 = poll
+          {address, value}, 0x88888888 = end
+  +0x18c  SPIP: the SPI NOR descriptor (JEDEC ID, size, page, erase size);
+          just the tag on the EV300L flash seen
 
 EV330: the ROM loads a 4 KiB first stage into L2 memory, which runs the DDR
 script of its own header and copies 0x40000 bytes from flash offset 0x1200
@@ -30,7 +35,7 @@ HEADER_LEN = 0x200
 SCRIPT_OFF, SCRIPT_END = 0x2C, 0x18C
 SPIP_OFF = 0x18C
 
-DELAY, END = 0x66668888, 0x88888888
+DELAY, POLL, END = 0x66668888, 0x66668881, 0x88888888
 
 # EV330: where U-Boot goes in flash, and how much of it the first stage loads
 EV330_PREFIX = 0x1200
@@ -44,6 +49,13 @@ FAMILY = {
     "ev300": (b"ANYKA_H3", bytes.fromhex(
         "53504950c840170000008000000100000001000000100000005a6202f8000036"
         "67643235713634")),
+    # The gzhongshi HVT3610S3 camera's flash: the tag, nothing after it
+    "ev300l": (b"AK_H322L", b"SPIP"),
+}
+
+# Header words other than length and load address, by family
+EXTRA = {
+    "ev300l": {0x10: 5, 0x18: 1, 0x24: 1},
 }
 
 
@@ -53,9 +65,18 @@ def script(path):
         line = line.split("#", 1)[0].strip()
         if not line:
             continue
-        if line == "end":
-            out += struct.pack("<II", END, END)
+        words = line.split()
+        if words[0] == "end":
+            last = int(words[1], 0) if len(words) > 1 else END
+            out += struct.pack("<II", END, last)
             break
+        if words[0] == "poll":
+            out += struct.pack("<III", POLL, int(words[1], 0),
+                               int(words[2], 0))
+            continue
+        if words[0] == "raw":
+            out += struct.pack("<II", int(words[1], 0), int(words[2], 0))
+            continue
         if line.startswith("delay"):
             out += struct.pack("<II", DELAY, int(line.split()[1], 0))
             continue
@@ -93,6 +114,8 @@ def main():
         struct.pack_into("<I", hdr, 0x0C, len(uboot))
         struct.pack_into("<I", hdr, 0x1C, 6)
         struct.pack_into("<I", hdr, 0x20, text)
+        for off, val in EXTRA.get(family, {}).items():
+            struct.pack_into("<I", hdr, off, val)
         body = script(data)
         hdr[SCRIPT_OFF:SCRIPT_OFF + len(body)] = body
         hdr[SPIP_OFF:SPIP_OFF + len(spip)] = spip
