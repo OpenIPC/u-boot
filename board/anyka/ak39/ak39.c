@@ -162,14 +162,28 @@ static void ak_eth_init(void)
 	if (!spins)
 		printf("ETH:   MAC clock divider not taken\n");
 	clrbits_le32(AK_SYS_CLK_GATE, AK_CLK_MAC);
+#ifdef CONFIG_TARGET_AK3918EV300L
 	/*
-	 * Only release the MAC reset, never assert it: the SDK's ak_eth.c
-	 * says that on this generation a MAC reset after the first release
-	 * also resets the DDR controller (the MAC's DMA buffer is not fully
-	 * reset and its FIFO pointers go wrong). The DesignWare driver's own
-	 * DMA soft reset is enough.
+	 * A full MAC reset with its clocks running. The AV100 SDK's U-Boot
+	 * ak_eth.c does this for the EV300L (ak_soft_reset()) and skips it
+	 * only for the AV100, and the HVT3610S3's own ak_eth.ko, which finds
+	 * the PHY under Linux, asserts and releases bit 13 at every open.
+	 * Only releasing it left that camera with no PHY on MDIO.
+	 */
+	setbits_le32(AK_SYS_SOFT_RST, AK_RST_MAC);
+	udelay(100);
+	clrbits_le32(AK_SYS_SOFT_RST, AK_RST_MAC);
+	udelay(100);
+#else
+	/*
+	 * AV100: only release the MAC reset, never assert it. The SDK's
+	 * ak_eth.c says that there a MAC reset after the first release also
+	 * resets the DDR controller (the MAC's DMA buffer is not fully reset
+	 * and its FIFO pointers go wrong), and skips the reset on the AV100
+	 * only. The DesignWare driver's own DMA soft reset is enough.
 	 */
 	clrbits_le32(AK_SYS_SOFT_RST, AK_RST_MAC);
+#endif
 
 	ak_phy_reset();
 }
