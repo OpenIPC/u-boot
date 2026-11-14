@@ -12,6 +12,46 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
+#ifdef CONFIG_AK39_EV300L
+unsigned long ak_pll2_clk(void)
+{
+	u32 reg = readl(AK_SYS_PLL2);
+
+	return AK_EV300L_XTAL_HZ / 1000 * (AK_PLL2_F(reg) + 1) /
+	       (AK_PLL2_R(reg) + 1) / (AK_PLL2_OD(reg) + 1) * 1000;
+}
+
+/* GCLK, the vendor U-Boot's get_asic_freq() */
+unsigned long ak_asic_clk(void)
+{
+	return ak_pll2_clk() / 2 / (AK_PLL2_GDIV(readl(AK_SYS_PLL2)) + 1);
+}
+
+/*
+ * PLL2 to 400 MHz and GCLK to 200 MHz, as the vendor U-Boot's fixed-clk
+ * driver does from its device tree, and the vendor kernel again from its
+ * own: wait for an earlier change to be taken, write the new values, set
+ * the bandwidth, then ask for the change (PLL1 bit 28, which clears when
+ * it is done). The boot header leaves PLL2 alone.
+ */
+int arch_cpu_init(void)
+{
+	int spins = 1000000;
+
+	while ((readl(AK_SYS_PLL1) & AK_PLL1_PLL2_ADJ) && --spins)
+		;
+	if ((readl(AK_SYS_PLL2) & AK_PLL2_CFG_MASK) ==
+	    (AK_EV300L_PLL2 & AK_PLL2_CFG_MASK))
+		return 0;
+	writel(AK_EV300L_PLL2, AK_SYS_PLL2);
+	clrsetbits_le32(AK_SYS_PLL_BW, 0xfff, AK_EV300L_PLL_BW);
+	setbits_le32(AK_SYS_PLL1, AK_PLL1_PLL2_ADJ);
+	spins = 1000000;
+	while ((readl(AK_SYS_PLL1) & AK_PLL1_PLL2_ADJ) && --spins)
+		;
+	return 0;
+}
+#else
 unsigned long ak_asic_clk(void)
 {
 	u32 reg = readl(AK_SYS_ASIC_PLL);
@@ -29,6 +69,7 @@ unsigned long ak_asic_clk(void)
 		clk >>= 1;
 	return clk * 1000000;
 }
+#endif
 
 #ifdef CONFIG_AK39_EV200
 /*

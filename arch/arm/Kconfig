@@ -603,8 +603,8 @@ config ARCH_ANYKA
 	select CREATE_ARCH_SYMLINK
 	select SUPPORT_PASSING_ATAGS
 	help
-	  Anyka's ARM926EJ-S camera SoCs: AK3918EV200, AK391xEV300 and
-	  AK391xEV330. The mask ROM runs the PLL and DDR set-up listed in
+	  Anyka's ARM926EJ-S camera SoCs: AK3918EV200, AK391xEV300,
+	  AK391xEV330 and AK3918EV300L. The mask ROM runs the PLL and DDR set-up listed in
 	  the flash header, copies U-Boot into DDR and starts it there.
 
 config ARCH_AT91

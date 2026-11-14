@@ -61,8 +61,14 @@ static void ak_serial_setbrg(void)
 static int ak_serial_init(void)
 {
 	clrbits_le32(AK_SYS_CLK_GATE, AK_CLK_UART0);
+#ifdef CONFIG_AK39_EV300L
+	/* GPIO 51/52 as UART0, as the SDK's ak_serial.c sets them */
+	clrsetbits_le32(AK_SYS_SHAREPIN_CFG(5), AK_EV300L_UART0_PINS_CLR,
+			AK_EV300L_UART0_PINS);
+#else
 	setbits_le32(AK_SYS_SHAREPIN0, AK_SHAREPIN0_UART0);
 	clrbits_le32(AK_SYS_PULL0, AK_PULL0_UART0);
+#endif
 	/* The vendor's L2 set-up for the UART buffers */
 	setbits_le32(AK_L2_FRAC_ADDR, 0x3 << 28);
 	setbits_le32(AK_L2_CONBUF8_15, AK_L2_UART0_TX_CLR | AK_L2_UART0_RX_CLR);

@@ -41,6 +41,15 @@ config TARGET_AK3919EV330
 	help
 	  AnyCloud V500, 128 MiB.
 
+config TARGET_AK3918EV300L
+	bool "AK3918EV300L"
+	select AK39_EV300L
+	help
+	  AnyCloud39EV300L, 64 MiB, boot header AK_H322L. Not an EV300: a
+	  24 MHz crystal, a new PLL layout, the SPI controllers at
+	  0x21100000, shared pins from 0x178, SD on MCI1. The AK3918EV300W
+	  is the same chip.
+
 endchoice
 
 config AK39_EV200
@@ -50,6 +59,9 @@ config AK39_EV300
 	bool
 
 config AK39_EV330
+	bool
+
+config AK39_EV300L
 	bool
 
 config SYS_SOC
