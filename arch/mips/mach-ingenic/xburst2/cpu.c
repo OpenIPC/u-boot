@@ -118,11 +118,12 @@ int dram_init(void)
 /*
  * KSEG0 reaches only the first 256 MiB below the I/O space; the vendor
  * kept U-Boot under CONFIG_SYS_SDRAM_MAX_TOP (0x90000000) for the same
- * reason.
+ * reason. total_size is the monitor's length (setup_dest_addr() passes
+ * gd->mon_len), not the RAM's: the top is gd->ram_top, clipped.
  */
 ulong board_get_usable_ram_top(ulong total_size)
 {
-	return CONFIG_SYS_SDRAM_BASE + min_t(ulong, total_size, SZ_256M);
+	return min_t(ulong, gd->ram_top, CONFIG_SYS_SDRAM_BASE + SZ_256M);
 }
 
 int print_cpuinfo(void)

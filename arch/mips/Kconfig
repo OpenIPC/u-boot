@@ -96,6 +96,7 @@ config ARCH_MTMIPS
 config ARCH_INGENIC
 	bool "Support Ingenic T-series camera SoCs"
 	select CREATE_ARCH_SYMLINK
+	select RESTORE_EXCEPTION_VECTOR_BASE
 	select SUPPORT_SPL
 	select SUPPORTS_LITTLE_ENDIAN
 	select SUPPORTS_CPU_MIPS32_R1
