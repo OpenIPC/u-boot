@@ -64,6 +64,7 @@ jobs:
           - { soc: ak3916ev300, files: "output/u-boot-ak3916ev300-*.bin" }
           - { soc: ak3918ev300, files: "output/u-boot-ak3918ev300-*.bin" }
           - { soc: ak3919ev300, files: "output/u-boot-ak3919ev300-*.bin" }
+          - { soc: ak3918ev300l, files: "output/u-boot-ak3918ev300l-*.bin" }
           - { soc: ak3918ev330, files: "output/u-boot-ak3918ev330-*.bin" }
           - { soc: ak3919ev330, files: "output/u-boot-ak3919ev330-*.bin" }
 
@@ -180,7 +181,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        soc: [ak3918ev200, ak3916ev300, ak3918ev300, ak3919ev300, ak3918ev330, ak3919ev330]
+        soc: [ak3918ev200, ak3916ev300, ak3918ev300, ak3919ev300, ak3918ev300l, ak3918ev330, ak3919ev330]
     steps:
       - name: Download qemu-arm
         uses: actions/download-artifact@v4

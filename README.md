@@ -132,6 +132,7 @@ swapped back.
 | `ak3916ev300` | ARM926 | 64 MiB | NOR | also runs the AK3916EV301 |
 | `ak3918ev300` | ARM926 | 64 MiB | NOR | |
 | `ak3919ev300` | ARM926 | 128 MiB | NOR | |
+| `ak3918ev300l` | ARM926 | 64 MiB | NOR | also runs the AK3918EV300W; tested in qemu only |
 | `ak3918ev330` | ARM926 | 64 MiB | NOR | vendor first stage leads the image |
 | `ak3919ev330` | ARM926 | 128 MiB | NOR | vendor first stage leads the image |
 
