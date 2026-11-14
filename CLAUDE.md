@@ -5,17 +5,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this branch is
 
 `openipc-anyka` is OpenIPC's U-Boot for Anyka's ARM926EJ-S camera SoCs:
-the AK3918EV200 (Cloud39E), the AK391xEV300 family (AnyCloud39EV300) and
-the AK391xEV330 family (AnyCloud V500). The tree is **mainline U-Boot
-v2022.10**, the same release as `openipc-hisilicon`, `openipc-xm` and
-`openipc-gk710x`, plus:
+the AK3918EV200 (Cloud39E), the AK391xEV300 family (AnyCloud39EV300), the
+AK391xEV330 family (AnyCloud V500) and the AK3918EV300L
+(AnyCloud39EV300L). The tree is **mainline U-Boot v2022.10**, the same
+release as `openipc-hisilicon`, `openipc-xm` and `openipc-gk710x`, plus:
 
 - the OpenIPC boot layer, carried over from `openipc-xm`, which took it from
   `openipc-hisilicon`;
 - the AK39 support, written from the vendor sources: the AnyCloud39EV300
   SDK (U-Boot 2013.10 `arch-ak39`, kernel 3.4.35 `mach-ak39`), the
-  AK3918EV200 4.4 kernel port and its U-Boot port, and the EV330 4.4 device
-  trees.
+  AK3918EV200 4.4 kernel port and its U-Boot port, the EV330 4.4 device
+  trees, and for the EV300L the anycloud39av130 SDK V1.03
+  (`sdk/ANYKA_130L_SDK`: U-Boot 2019.10 `arch-ak3918ev300l`, kernel 4.4.302),
+  which covers the AK3918AV100, AV130, EV300L and AK37D/E.
 
 No vendor driver comes along. The EV330's first boot stage, a vendor
 binary, is carried (see "Boot").
@@ -36,6 +38,15 @@ Adding or dropping a SoC needs both branches:
 
 AK37D/AK37E appear only as `#ifdef`s in the vendor trees; they have a
 different memory map and are not supported, nor modelled by qemu-hisilicon.
+
+Siblings not supported yet: the **AK3918AV100** (N/P/X/XP) has the EV300L's
+register map (its `arch-ak3918av100` headers differ only in comments), 128
+MiB, chip id field `0x535335` (EV300L `0x535434`), boot magic most likely
+`ANYKA322` (by its place in `ak_ddr_param`'s list; no dump). The code here
+would serve it as is; what is missing is its DDR script, which only a flash
+dump gives. The **AK3918EV300W** is the EV300L (its board DT includes the
+EV300L's). The **AK3918AV130** is another generation (SFC v2 at
+`0x21120000`, no GMAC).
 
 ## Relationship to mainline
 
@@ -101,6 +112,15 @@ The memory map is the same in all three generations: system control at
   - U-Boot is linked at `0x80E01000` (`ak39ev330`'s `SYS_TEXT_BASE`), and
     `BOARD_SIZE_LIMIT` keeps it under 0x40000 - 0x1200 bytes: the first
     stage then reads into the environment at 0x40000, which is harmless.
+- **EV300L.** As the EV200/EV300: 512-byte header at offset 0, payload
+  at `0x80E00000` (the vendor U-Boot is linked at `0x80DFFE00` with the
+  header inside it, which comes to the same). Magic `AK_H322L`, three more
+  header words (+0x10 = 5, +0x18 = 1, +0x24 = 1), `SPIP` with nothing
+  after it, and `openipc/ak3918ev300l.rvs`, the script from a gzhongshi
+  HVT3610S3 flash; it adds a three-word poll (`0x66668881`) and a
+  `0x66668882` pair, and ends with `0x88888888, 0`. With the same payload
+  the header is that flash's, byte for byte, but for the branch and the
+  length.
 - **DRAM size** is the part's: 128 MiB on the AK3919s, 64 MiB on the
   others (`PHYS_SDRAM_1_SIZE`). `dram_init()` probes only within it; DDR
   past the end is not known to alias, and qemu-hisilicon does not model it.
@@ -111,8 +131,8 @@ The memory map is the same in all three generations: system control at
 
 - EV200 and EV300 kernels (3.4.35, OpenIPC's `ak3918ev300` included) take
   ATAGs, machine number 3892 (`ANYKA_AK39XX`, every vendor board file).
-- EV330 kernels (4.4) take a device tree. The vendor keeps it in its own
-  partition; OpenIPC's flow (`bootflash`) boots the uImage alone, so a DT
+- EV330 and EV300L kernels (4.4) take a device tree. The vendor keeps it
+  in its own partition; OpenIPC's flow (`bootflash`) boots the uImage alone, so a DT
   kernel needs its DTB appended.
 - **Vendor uImages** carry entry = load + 0x40: the vendor U-Boot reads
   them to the load address and runs the data in place. Mainline moves the
@@ -135,14 +155,23 @@ The memory map is the same in all three generations: system control at
   at the RX threshold flag, which says only that something arrived. The
   divider comes from the ASIC clock (`ak_asic_clk()`, from the PLL word
   at `0x08000008`). UART0's shared-pin bits are 1-2 on the EV200 and 2-3
-  on the EV300 and EV330.
+  on the EV300 and EV330; on the EV300L, GPIO 51/52 function 1 in the
+  shared-pin register at `0x18C` (3-bit fields, ten pins a register from
+  `0x178`).
 - **Clocks:** on the EV200, `arch_cpu_init()` sets the ASIC PLL to CPU
   400 / memory 200 / ASIC 100 MHz (`0x018213c8`), as the EV200 vendor
   U-Boot and the EV200 U-Boot port both do; out of reset an AK3918EV200
   runs its peripherals at 60 MHz. The EV300 and EV330 keep what the boot
   header set.
-- **Timer:** timer 1, a 32-bit down counter off the 12 MHz crystal, read
-  through `READ_SEL`; `lib/time.c` does the rest.
+  - EV300L: 24 MHz crystal. PLL1 (`+0x04`) is the CPU's and the header
+    sets it; PLL2 (`+0x08`) clocks the peripherals: 24 MHz x (F+1) / (R+1)
+    / (OD+1), GCLK = PLL2 / 2 / (GDIV+1), 60 MHz out of reset.
+    `arch_cpu_init()` sets PLL2 400 / GCLK 200 MHz as the vendor U-Boot's
+    and kernel's device trees do (write `+0x08`, bandwidth `+0xE0`, then
+    PLL1 bit 28, which clears when applied).
+- **Timer:** timer 1 (`+0xB4`, which the EV300L headers call timer 0), a
+  32-bit down counter at 12 MHz (also on the EV300L, whose crystal is 24),
+  read through `READ_SEL`; `lib/time.c` does the rest.
 - **Reset:** the watchdog, armed as the vendor U-Boots arm it: an 8 s
   count, enable, enable + feed, then the same with a count of 1. A single
   "count 1, enable + feed" write hangs a real AK3918EV200.
@@ -157,6 +186,11 @@ The memory map is the same in all three generations: system control at
     bit 25; `0xDC` 13:0 = `0x2003` on the EV200 (the DT's), `|= 0x3e03`
     on the EV300, the ROM's on the EV330) at each probe, fast read (`0x0B` + a dummy byte),
     at most 8 KiB per CNT transfer (`MAX_XFER_LEN`), about 17 MHz.
+  - EV300L: the same controller at `0x21100000`; its pads are the SDK's
+    `0x188 |= 0x2492441`. CON's divider is unused: the clock is SYSCTRL
+    `+0x0C` bits 17:10 (SPI = PLL2 / 2 / (div+1)), changed with the
+    high-speed clock in reset (soft reset bit 31), bit 19 to apply and
+    bit 18 to enable; then WORK_MODE (`+0x24`) bit 0 is set and read back.
   - Fixed after a real AK3918EV200 (XM25QH64A) read back a kernel written
     with an earlier build with a bad data CRC. qemu never showed it: its
     SPI master stalls on a full FIFO, the real one is not known to.
@@ -174,6 +208,10 @@ The memory map is the same in all three generations: system control at
     pinctrl table agrees; the 3.4 kernel keeps the old value commented
     out). The MAC pins in `0x7C` are the same in both tables.
   - MII vs RMII is the board's choice; these are the vendors' defaults.
+  - EV300L: not set up (`# CONFIG_ETH_DESIGNWARE is not set` in its
+    fragment). The vendor DT has RMII on GPIO 0-8 and 11 through the new
+    shared-pin registers and a PHY reset on GPIO 49; the cameras seen are
+    Wi-Fi only.
 - **SD:** MCI0 (`drivers/mmc/ak_mmc.c`, `MMC_AK39`), 1-bit, PIO through
   the FIFO, up to 20 MHz. After the EV200 U-Boot port's DM driver. Every
   vendor source wires a 1-bit bus on pads 31-33: `0xDC |= 0x1c0` (on the
@@ -188,6 +226,10 @@ The memory map is the same in all three generations: system control at
     card answers only with both: the ROM leaves pad 34's field at `11`, and
     the gwell vendor U-Boot's SPI value `0x3003` puts `11` on pads 35/36.
     Found by setting the registers Linux leaves (`devmem`) one by one.
+  - EV300L: the card is on MCI1 (`0x20108000`, clock gate and reset bit
+    2), pads 31-36 function 1 (`0x184` 23:6), input enable and pull-ups
+    as the vendor DT's `mci1_pins`, and its power switch is GPIO 50,
+    active low (`power-inverted`): off 100 ms, then on, once.
   - `common/openipc.c` recovers from it at every boot: `script.txt`, then
     `uImage.<soc>.img` and `rootfs.squashfs.<soc>.img`. These are uImages
     flashed where their load address says, without the header
@@ -200,7 +242,7 @@ The memory map is the same in all three generations: system control at
 ## Build
 
 ```sh
-bash build.sh               # all six; continues past failures, exits non-zero if any failed
+bash build.sh               # all seven; continues past failures, exits non-zero if any failed
 bash build.sh ak3918ev300   # one or more SoCs (CROSS_COMPILE defaults to arm-linux-gnueabi-)
 ```
 
