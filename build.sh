@@ -52,6 +52,8 @@ build_soc() {
             build_ak39 "${soc}" ev300 openipc/ak39ev300.rvs ;;
         ak3918ev300l)
             build_ak39 "${soc}" ev300l openipc/ak3918ev300l.rvs ;;
+        ak3918av100|ak3918av100x)
+            build_ak39 "${soc}" av100 openipc/${soc}.rvs ;;
         ak3918ev330|ak3919ev330)
             build_ak39 "${soc}" ev330 openipc/ak39ev330-boot.bin ;;
         *)
@@ -60,7 +62,7 @@ build_soc() {
     esac
 }
 
-ALL_SOCS="ak3918ev200 ak3916ev300 ak3918ev300 ak3919ev300 ak3918ev300l ak3918ev330 ak3919ev330"
+ALL_SOCS="ak3918ev200 ak3916ev300 ak3918ev300 ak3919ev300 ak3918ev300l ak3918av100 ak3918av100x ak3918ev330 ak3919ev330"
 
 SOCS="$@"
 [ -z "${SOCS}" ] && SOCS="${ALL_SOCS}"

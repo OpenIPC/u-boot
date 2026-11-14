@@ -1,0 +1,8 @@
+CONFIG_TARGET_AK3918AV100=y
+CONFIG_PRODUCT_SOC="ak3918av100"
+# U-Boot starts at flash offset 0x600 (header and secure-boot area): keep
+# header + image under the 256 KiB boot partition
+CONFIG_BOARD_SIZE_LIMIT=260608
+# The AV100's MAC pins (GPIO 0-8 and 11, or 82-91 on the X/XP EVB),
+# PHY reset and MAC clock are not set up yet. Recovery is from SD.
+# CONFIG_ETH_DESIGNWARE is not set

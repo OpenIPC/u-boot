@@ -2,25 +2,34 @@
 # SPDX-License-Identifier: GPL-2.0+
 """Put the Anyka AK39 boot ROM's header in front of u-boot.bin.
 
-  ak39-image.py ev200|ev300|ev300l <script.rvs> <u-boot.bin> <text_base> <out>
+  ak39-image.py ev200|ev300|ev300l|av100 <script.rvs> <u-boot.bin> <text_base> <out>
   ak39-image.py ev330 <boot.bin> <u-boot.bin> <text_base> <out>
 
-EV200, EV300 and EV300L: the ROM reads the 512-byte header at flash offset 0,
-replays its register script (PLLs, DDR controller), copies the payload that
-follows the header to the load address and starts it there.
+EV200, EV300, EV300L and AV100: the ROM reads the 512-byte header at flash
+offset 0, replays its register script (PLLs, DDR controller), copies the
+payload that follows the header to the load address and starts it there.
 
   +0x000  ARM branch to the payload, for a ROM that enters at the header
-  +0x004  magic: AKSH_240 (EV200), ANYKA_H3 (EV300), AK_H322L (EV300L)
+  +0x004  magic: AKSH_240 (EV200), ANYKA_H3 (EV300), AK_H322L (EV300L),
+          ANYKA322 (AV100)
   +0x00c  payload length
-  +0x010  EV300L: 5 (the SDK's "spi divide")
-  +0x018  EV300L: 1 (the SDK's "single read mode")
-  +0x01c  6, as in every header seen ("use outside RAM")
+  +0x010  EV300L, AV100: 5 (the SDK's "spi divide")
+  +0x018  EV300L, AV100: 1 (the SDK's "single read mode")
+  +0x01c  6, as in every header seen ("use outside RAM"; the AV100 SDK's
+          ak_secureboot writes 0x84000000 into its signed images)
   +0x020  load address
-  +0x024  EV300L: 1 (the SDK's "use CPU mode", not DMA)
+  +0x024  EV300L, AV100: 1 (the SDK's "use CPU mode", not DMA)
   +0x02c  {address, value} pairs; 0x66668888 = delay, 0x66668881 = poll
           {address, value}, 0x88888888 = end
   +0x18c  SPIP: the SPI NOR descriptor (JEDEC ID, size, page, erase size);
-          just the tag on the EV300L flash seen
+          just the tag on the EV300L flash seen and in the AV100 SDK's
+          vectors.S
+
+AV100: the payload starts at 0x600, not 0x200. The 0x400 bytes between are
+the secure-boot area (ak_secureboot: public key at 0x200, signature at
+0x300, U-Boot at 0x600, the header's length counted from there), left
+zero here as the SDK's vectors.S leaves them in an unsigned image; the
+vendor U-Boot is linked at the load address - 0x600 to match.
 
 EV330: the ROM loads a 4 KiB first stage into L2 memory, which runs the DDR
 script of its own header and copies 0x40000 bytes from flash offset 0x1200
@@ -51,11 +60,19 @@ FAMILY = {
         "67643235713634")),
     # The gzhongshi HVT3610S3 camera's flash: the tag, nothing after it
     "ev300l": (b"AK_H322L", b"SPIP"),
+    # The AV100 SDK's vectors.S: the tag, nothing after it
+    "av100": (b"ANYKA322", b"SPIP"),
 }
 
 # Header words other than length and load address, by family
 EXTRA = {
     "ev300l": {0x10: 5, 0x18: 1, 0x24: 1},
+    "av100": {0x10: 5, 0x18: 1, 0x24: 1},
+}
+
+# Where the payload starts in flash, if not right after the header
+PAYLOAD_OFF = {
+    "av100": 0x600,
 }
 
 
@@ -107,9 +124,10 @@ def main():
         image = prefix + uboot
     else:
         magic, spip = FAMILY[family]
-        hdr = bytearray(HEADER_LEN)
-        # b <header + 0x200>, i.e. the payload
-        struct.pack_into("<I", hdr, 0x00, 0xEA000000 | (HEADER_LEN - 8) >> 2)
+        start = PAYLOAD_OFF.get(family, HEADER_LEN)
+        hdr = bytearray(start)
+        # b <payload>
+        struct.pack_into("<I", hdr, 0x00, 0xEA000000 | (start - 8) >> 2)
         hdr[0x04:0x0C] = magic
         struct.pack_into("<I", hdr, 0x0C, len(uboot))
         struct.pack_into("<I", hdr, 0x1C, 6)
