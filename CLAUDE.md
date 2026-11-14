@@ -144,10 +144,12 @@ The build logic lives here. Other branches call it:
 - It is `build-gk710x.yml` for `openipc-anyka`: the same job graph and
   `resolve`/`ref` rules, NOR only (256 KiB boot partition, header
   included; on the EV330 the 0x1200-byte header and first stage).
-- **No `hold`:** all nine SoCs have qemu-hisilicon machines of the same
-  names (qemu-hisilicon #161 or later; the EV300L #305 or later; the
-  AV100s qemu-bench #310 or later, which adds `ak3918av100x` and loads an
-  `ANYKA322` image's U-Boot from flash offset 0x600, not 0x200).
+- **No `hold`:** all nine SoCs have machines of the same names in
+  qemu-hisilicon (now OpenIPC/qemu-bench, the repository the `qemu` job
+  clones): #161 or later; the EV300L #305 or later; the two AV100s #310 or
+  later, which adds `ak3918av100x` and loads an `ANYKA322` image's U-Boot
+  from flash offset 0x600, not 0x200. Until #310 is on its master the
+  AV100 legs fail, and with them the release.
 - **Smoke test:** two boots of an 8 MiB flash image holding only U-Boot,
   in CPU byte order. It passes on `Hit Ctrl-C`,
   and fails if the second boot reports a bad environment CRC.
