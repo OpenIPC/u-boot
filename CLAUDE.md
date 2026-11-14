@@ -6,8 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `openipc-anyka` is OpenIPC's U-Boot for Anyka's ARM926EJ-S camera SoCs:
 the AK3918EV200 (Cloud39E), the AK391xEV300 family (AnyCloud39EV300), the
-AK391xEV330 family (AnyCloud V500) and the AK3918EV300L
-(AnyCloud39EV300L). The tree is **mainline U-Boot v2022.10**, the same
+AK391xEV330 family (AnyCloud V500), the AK3918EV300L (AnyCloud39EV300L)
+and the AK3918AV100 (AnyCloud39AV100). The tree is **mainline U-Boot v2022.10**, the same
 release as `openipc-hisilicon`, `openipc-xm` and `openipc-gk710x`, plus:
 
 - the OpenIPC boot layer, carried over from `openipc-xm`, which took it from
@@ -17,7 +17,10 @@ release as `openipc-hisilicon`, `openipc-xm` and `openipc-gk710x`, plus:
   AK3918EV200 4.4 kernel port and its U-Boot port, the EV330 4.4 device
   trees, and for the EV300L the anycloud39av130 SDK V1.03
   (`sdk/ANYKA_130L_SDK`: U-Boot 2019.10 `arch-ak3918ev300l`, kernel 4.4.302),
-  which covers the AK3918AV100, AV130, EV300L and AK37D/E.
+  which covers the AK3918AV100, AV130, EV300L and AK37D/E, and for the
+  AV100 the AnyCloud39AV100 SDK V1.12 (`sdk/ANYKA_AV100_SDK`: U-Boot 2019.10
+  `arch-ak3918av100`, kernel 4.4.282, `tools/burntool/SDK_CPU_DDR2.ini`,
+  `tools/secureboot/ak_secureboot`).
 
 No vendor driver comes along. The EV330's first boot stage, a vendor
 binary, is carried (see "Boot").
@@ -39,14 +42,19 @@ Adding or dropping a SoC needs both branches:
 AK37D/AK37E appear only as `#ifdef`s in the vendor trees; they have a
 different memory map and are not supported, nor modelled by qemu-hisilicon.
 
-Siblings not supported yet: the **AK3918AV100** (N/P/X/XP) has the EV300L's
-register map (its `arch-ak3918av100` headers differ only in comments), 128
-MiB, chip id field `0x535335` (EV300L `0x535434`), boot magic most likely
-`ANYKA322` (by its place in `ak_ddr_param`'s list; no dump). The code here
-would serve it as is; what is missing is its DDR script, which only a flash
-dump gives. The **AK3918EV300W** is the EV300L (its board DT includes the
-EV300L's). The **AK3918AV130** is another generation (SFC v2 at
-`0x21120000`, no GMAC).
+The **AV100 family** (`AK39_AV100`) is the AK3918AV100 and the EV300L,
+its small sibling. In the AV100 SDK, `arch-ak3918av100` and
+`arch-ak3918ev300l` differ only in comments, and the clock, pinctrl, GPIO,
+SPI, serial, MCI and watchdog drivers only in names (the AV100 has more
+pins; the ones used here are the same entries). The AV100 differs in the
+boot ROM (magic `ANYKA322`, U-Boot at flash offset 0x600, see "Boot"),
+its DDR script, and the DRAM: `ak3918av100` is the AK3918AV100N/P and KM01N,
+64 MiB; `ak3918av100x` the AK3918AV100X/XP and KM01D, 128 MiB. Chip id
+field `0x535335` (EV300L `0x535434`).
+
+Siblings not supported yet: the **AK3918EV300W** is the EV300L (its board
+DT includes the EV300L's). The **AK3918AV130** is another generation (SFC
+v2 at `0x21120000`, no GMAC).
 
 ## Relationship to mainline
 
@@ -59,7 +67,7 @@ git diff --diff-filter=M v2022.10 HEAD         # the mainline files we patched
 
 | Area | Location |
 | --- | --- |
-| SoC: ASIC clock, timer, watchdog reset, DRAM size | `arch/arm/mach-anyka/` (`ARCH_ANYKA`; `TARGET_AK39xxEVyyy`, `AK39_EV200/EV300/EV330`; register map in `include/mach/anyka.h`) |
+| SoC: ASIC clock, timer, watchdog reset, DRAM size | `arch/arm/mach-anyka/` (`ARCH_ANYKA`; `TARGET_AK39xx*`, `AK39_EV200/EV300/EV330/AV100`; register map in `include/mach/anyka.h`) |
 | Board: Ethernet pins and clocks, `misc_init_r` → `openipc_helper()` | `board/anyka/ak39/` |
 | UART0, non-DM | `drivers/serial/serial_ak39.c` (`AK39_SERIAL`) |
 | SPI NOR on SPI0, non-DM | `drivers/mtd/spi/ak_sflash.c` (`AK_SFLASH`). It provides `spi_flash_probe()` and fills `mtd->_read/_write/_erase`, as `gk_sflash` does on `openipc-gk710x` |
@@ -121,9 +129,30 @@ The memory map is the same in all three generations: system control at
   `0x66668882` pair, and ends with `0x88888888, 0`. With the same payload
   the header is that flash's, byte for byte, but for the branch and the
   length.
-- **DRAM size** is the part's: 128 MiB on the AK3919s, 64 MiB on the
-  others (`PHYS_SDRAM_1_SIZE`). `dram_init()` probes only within it; DDR
-  past the end is not known to alias, and qemu-hisilicon does not model it.
+- **AV100.** The EV300L's header with magic `ANYKA322` (the SDK's
+  `ak_secureboot` writes it, with +0x10 = 5, +0x18 = 1, +0x24 = 1, and
+  0x84000000 at +0x1C of signed images; ours keeps 6), but U-Boot starts at
+  flash offset **0x600**: the 0x400 bytes after the header are the
+  secure-boot area (public key at 0x200, signature at 0x300), zero in an
+  unsigned image, and the length at +0x0C counts from 0x600. The vendor
+  `vectors.S` skips those 1024 bytes on the AV100 only, and its U-Boot is
+  linked at `0x80DFFA00`. No AV100 flash dump has been seen.
+  - `openipc/ak3918av100.rvs` / `ak3918av100x.rvs` are `[64M_Ram_Param1]`
+    / `[128M_Ram_Param1]` of the SDK's `SDK_CPU_DDR2.ini` (CPU 888 / DDR
+    444 MHz, the default). They differ only in `0x21000000`. The ini writes
+    the poll as `0x66668881,1` and then the pair; that is the EV300L
+    flash's three words. `0x66668882` and `0x66668880` go in as pairs
+    (`raw`).
+  - The EV300L flash's script is the 64 MiB one but for `0x080000dc`
+    (`0x01100004` vs `0x01100003`) and `0x21000004` (`0x1ab46638` vs
+    `0x1ab56639`), and it stops before the last two operations
+    (`0x66668880, 1` and `0x21000024 = 0xfffffffb`). The 130L SDK's ini is a
+    different (960/480 MHz) script.
+  - `BOARD_SIZE_LIMIT` is 0x400 smaller than elsewhere.
+- **DRAM size** is the part's: 128 MiB on the AK3919s and the
+  AK3918AV100X, 64 MiB on the others (`PHYS_SDRAM_1_SIZE`). `dram_init()`
+  probes only within it; DDR past the end is not known to alias, and
+  qemu-bench does not model it.
 - The image is in CPU byte order, as `sf write` stores it and an external
   programmer writes it.
 
@@ -131,7 +160,7 @@ The memory map is the same in all three generations: system control at
 
 - EV200 and EV300 kernels (3.4.35, OpenIPC's `ak3918ev300` included) take
   ATAGs, machine number 3892 (`ANYKA_AK39XX`, every vendor board file).
-- EV330 and EV300L kernels (4.4) take a device tree. The vendor keeps it
+- EV330, EV300L and AV100 kernels (4.4) take a device tree. The vendor keeps it
   in its own partition; OpenIPC's flow (`bootflash`) boots the uImage alone, so a DT
   kernel needs its DTB appended.
 - **Vendor uImages** carry entry = load + 0x40: the vendor U-Boot reads
@@ -155,7 +184,7 @@ The memory map is the same in all three generations: system control at
   at the RX threshold flag, which says only that something arrived. The
   divider comes from the ASIC clock (`ak_asic_clk()`, from the PLL word
   at `0x08000008`). UART0's shared-pin bits are 1-2 on the EV200 and 2-3
-  on the EV300 and EV330; on the EV300L, GPIO 51/52 function 1 in the
+  on the EV300 and EV330; on the EV300L and AV100, GPIO 51/52 function 1 in the
   shared-pin register at `0x18C` (3-bit fields, ten pins a register from
   `0x178`).
 - **Clocks:** on the EV200, `arch_cpu_init()` sets the ASIC PLL to CPU
@@ -163,11 +192,11 @@ The memory map is the same in all three generations: system control at
   U-Boot and the EV200 U-Boot port both do; out of reset an AK3918EV200
   runs its peripherals at 60 MHz. The EV300 and EV330 keep what the boot
   header set.
-  - EV300L: 24 MHz crystal. PLL1 (`+0x04`) is the CPU's and the header
+  - EV300L and AV100: 24 MHz crystal. PLL1 (`+0x04`) is the CPU's and the header
     sets it; PLL2 (`+0x08`) clocks the peripherals: 24 MHz x (F+1) / (R+1)
     / (OD+1), GCLK = PLL2 / 2 / (GDIV+1), 60 MHz out of reset.
     `arch_cpu_init()` sets PLL2 400 / GCLK 200 MHz as the vendor U-Boot's
-    and kernel's device trees do (write `+0x08`, bandwidth `+0xE0`, then
+    and kernel's device trees do (the AV100's too) (write `+0x08`, bandwidth `+0xE0`, then
     PLL1 bit 28, which clears when applied).
 - **Timer:** timer 1 (`+0xB4`, which the EV300L headers call timer 0), a
   32-bit down counter at 12 MHz (also on the EV300L, whose crystal is 24),
@@ -186,7 +215,7 @@ The memory map is the same in all three generations: system control at
     bit 25; `0xDC` 13:0 = `0x2003` on the EV200 (the DT's), `|= 0x3e03`
     on the EV300, the ROM's on the EV330) at each probe, fast read (`0x0B` + a dummy byte),
     at most 8 KiB per CNT transfer (`MAX_XFER_LEN`), about 17 MHz.
-  - EV300L: the same controller at `0x21100000`; its pads are the SDK's
+  - EV300L and AV100: the same controller at `0x21100000`; its pads are the SDK's
     `0x188 |= 0x2492441`. CON's divider is unused: the clock is SYSCTRL
     `+0x0C` bits 17:10 (SPI = PLL2 / 2 / (div+1)), changed with the
     high-speed clock in reset (soft reset bit 31), bit 19 to apply and
@@ -208,10 +237,11 @@ The memory map is the same in all three generations: system control at
     pinctrl table agrees; the 3.4 kernel keeps the old value commented
     out). The MAC pins in `0x7C` are the same in both tables.
   - MII vs RMII is the board's choice; these are the vendors' defaults.
-  - EV300L: not set up (`# CONFIG_ETH_DESIGNWARE is not set` in its
-    fragment). The vendor DT has RMII on GPIO 0-8 and 11 through the new
-    shared-pin registers and a PHY reset on GPIO 49; the cameras seen are
-    Wi-Fi only.
+  - EV300L and AV100: not set up (`# CONFIG_ETH_DESIGNWARE is not set` in
+    their fragments). The vendor DTs have RMII on GPIO 0-8 and 11 through
+    the new shared-pin registers and a PHY reset on GPIO 49 (the AV100X
+    EVB: an internal PHY on GPIO 82-91, reset on GPIO 29); the EV300L
+    cameras seen are Wi-Fi only.
 - **SD:** MCI0 (`drivers/mmc/ak_mmc.c`, `MMC_AK39`), 1-bit, PIO through
   the FIFO, up to 20 MHz. After the EV200 U-Boot port's DM driver. Every
   vendor source wires a 1-bit bus on pads 31-33: `0xDC |= 0x1c0` (on the
@@ -226,7 +256,7 @@ The memory map is the same in all three generations: system control at
     card answers only with both: the ROM leaves pad 34's field at `11`, and
     the gwell vendor U-Boot's SPI value `0x3003` puts `11` on pads 35/36.
     Found by setting the registers Linux leaves (`devmem`) one by one.
-  - EV300L: the card is on MCI1 (`0x20108000`, clock gate and reset bit
+  - EV300L and AV100: the card is on MCI1 (`0x20108000`, clock gate and reset bit
     2), pads 31-36 function 1 (`0x184` 23:6), input enable and pull-ups
     as the vendor DT's `mci1_pins`, and its power switch is GPIO 50,
     active low (`power-inverted`): off 100 ms, then on, once.
@@ -242,7 +272,7 @@ The memory map is the same in all three generations: system control at
 ## Build
 
 ```sh
-bash build.sh               # all seven; continues past failures, exits non-zero if any failed
+bash build.sh               # all nine; continues past failures, exits non-zero if any failed
 bash build.sh ak3918ev300   # one or more SoCs (CROSS_COMPILE defaults to arm-linux-gnueabi-)
 ```
 
@@ -252,17 +282,24 @@ bash build.sh ak3918ev300   # one or more SoCs (CROSS_COMPILE defaults to arm-li
   `olddefconfig`.
 - There are no `configs/*_defconfig` for these targets.
 - ARM926 has no Thumb-2: the images are ~233 KiB (EV330 ~237 KiB with its
-  first stage). `fdt`, `bootelf`, `imxtract`, `random`, `loads` and `nfs`
+  first stage; EV300L ~221 KiB and AV100 ~222 KiB, without Ethernet). `fdt`, `bootelf`, `imxtract`, `random`, `loads` and `nfs`
   are left out to make room for SD. `BOARD_SIZE_LIMIT` keeps header + image under the 256 KiB
   boot partition. Check the size after enabling anything.
 
 ## Verification
 
-The emulator is OpenIPC/qemu-hisilicon, machines `ak3918ev200`,
-`ak3916ev300`, `ak3918ev300`, `ak3919ev300`, `ak3918ev330`, `ak3919ev330`
-(`docs/anyka.md` there). `-M <soc>,flash-file=<image>` does the mask ROM's
-job (on the EV330 including loading the first stage), so it boots exactly
-the flashed bytes.
+The emulator is OpenIPC/qemu-bench (formerly qemu-hisilicon), machines
+`ak3918ev200`, `ak3916ev300`, `ak3918ev300`, `ak3919ev300`, `ak3918ev330`,
+`ak3919ev330`, `ak3918ev300l`, `ak3918av100` (`docs/anyka.md` there).
+`-M <soc>,flash-file=<image>` does the mask ROM's job (on the EV330
+including loading the first stage), so it boots exactly the flashed bytes.
+
+- The AV100 images need a machine whose ROM loader takes an `ANYKA322`
+  payload from flash offset 0x600: qemu-bench master (as of the AV100
+  support here) copies it from 0x200, like every other header, and the
+  image then never prints anything. `ak3918av100` is 128 MiB there; run the
+  64 MiB `ak3918av100` image with `-m 64M`, and keep test buffers below
+  `0x84000000`.
 
 - **CI smoke:** two boots of an 8 MiB image holding only U-Boot. The second
   must load the environment the first saved.
@@ -286,6 +323,15 @@ the flashed bytes.
     3.4.35 on `ak3918ev200` and the AK3919EV330 camera's 4.4.192 with its
     DTB (`fdt_high=0xffffffff`, as its vendor environment sets) reach
     their login prompts.
+  - EV300L (`ak3918ev300l`) and AV100 (`ak3918av100` with the 0x600
+    loader, `-m 64M` / `-m 128M`): the prompt, ASIC 200 MHz, `sf`
+    unaligned write + `cmp.b` and a 192 KiB read with the host's CRC,
+    `saveenv` + `reset` + the environment back, `script.txt`, `fatls` and a
+    `fatload` with the host's CRC from SD (MCI1). The SDKs' 4.4.282 kernels
+    with their EVB DTBs, loaded from SD and started with
+    `bootm <kernel> - <dtb>`, reach their login prompts (the AV100 SDK's
+    `root.sqsh4` at 0x250000, `root=/dev/mtdblock3` and a `mtdparts=` to
+    match).
 - **What qemu does not check:** DDR timing (the scripts are the vendor's,
   so this is low risk), the PLL and so the UART and SPI dividers, pad
   control, the Ethernet clock and PHY reset, the SPI and MCI controllers'
