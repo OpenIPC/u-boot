@@ -163,6 +163,25 @@
 /* SD0 pads 31-36 (D2, D3, CMD, MCLK, D0, D1): CFG3 fields 8:6 .. 23:21 */
 #define AK_AV100_SD0_PINS_CLR	(0x3ffff << 6)
 #define AK_AV100_SD0_PINS	0x249240	/* function 1 each */
+/* Pad 98: SYS_RSTN_OUT (function 0) or GPIO 98 (1), CFG8 bits 23:21 */
+#define AK_AV100_PAD98_CLR	(0x7 << 21)
+#define AK_AV100_PAD98_GPIO	(0x1 << 21)
+
+/*
+ * TF card power, OpenIPC's per-SoC defaults ("sdpower=" overrides them).
+ * The SDK's boards power the card from GPIO 50 (card detect on 98) or from
+ * GPIO 98 (detect on 37); the first pin is tried first, the other if no
+ * card answers. The EV300L's is that of the gzhongshi HVT3610S3, the one
+ * EV300L board seen (GPIO 98); the AV100's that of the SDK's EVB_CBDM
+ * boards (GPIO 50).
+ */
+#if defined(CONFIG_TARGET_AK3918EV300L)
+#define AK_AV100_SD_POWER	98
+#define AK_AV100_SD_POWER_ALT	50
+#else
+#define AK_AV100_SD_POWER	50
+#define AK_AV100_SD_POWER_ALT	98
+#endif
 /* Pad control, 32 pads a register: pull enable, pull select (0 = up), IE */
 #define AK_SYS_PUPD_EN(n)	(AK_SYSCTRL_BASE + 0x264 + 4 * (n))
 #define AK_SYS_PUPD_SEL(n)	(AK_SYSCTRL_BASE + 0x274 + 4 * (n))

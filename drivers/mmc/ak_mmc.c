@@ -14,6 +14,7 @@
  */
 
 #include <common.h>
+#include <env.h>
 #include <malloc.h>
 #include <mmc.h>
 #include <asm/io.h>
@@ -130,21 +131,15 @@ static void ak_mci_set_clock(uint want)
 /*
  * Pads 31-36 as SD0 (function 1), input enabled, pull-ups on the data and
  * command lines, none on the clock, as the vendor device trees' mci1_pins.
- * The card's power switch is GPIO 50, on when low ("power-inverted"); the
- * vendor driver holds it off for 100 ms, then on, once at probe.
  */
 #define MCI_PADS		(GENMASK_ULL(36, 32) | BIT_ULL(31))
 #define MCI_PULLUPS		(MCI_PADS & ~BIT_ULL(34))
-#define MCI_POWER_GPIO		50
 
 static void ak_mci_pads(u64 pads, unsigned long reg0)
 {
 	setbits_le32(reg0, (u32)pads);
 	setbits_le32(reg0 + 4, (u32)(pads >> 32));
 }
-
-/* Set after the first power cycle; MMC init runs after relocation */
-static int mci_powered;
 
 static void ak_mci_pins(void)
 {
@@ -155,13 +150,76 @@ static void ak_mci_pins(void)
 	/* PU_PD_SEL: 0 = pull-up */
 	clrbits_le32(AK_SYS_PUPD_SEL(0), (u32)MCI_PULLUPS);
 	clrbits_le32(AK_SYS_PUPD_SEL(1), (u32)(MCI_PULLUPS >> 32));
-	if (mci_powered)
-		return;
-	setbits_le32(AK_GPIO_DIR(MCI_POWER_GPIO), BIT(MCI_POWER_GPIO % 32));
-	setbits_le32(AK_GPIO_OUT(MCI_POWER_GPIO), BIT(MCI_POWER_GPIO % 32));
+}
+
+/*
+ * The card's power switch, on when low ("power-inverted"). The vendor
+ * driver holds it off for 100 ms, then on. The SDK's boards wire it one of
+ * two ways: power on GPIO 50 and card detect on GPIO 98 (the EVBs, most
+ * HTOL and YTJ boards, KM01N), or power on GPIO 98 and detect on GPIO 37
+ * (the SC531AI HTOL board, the AV100XP boards, and the gzhongshi HVT3610S3
+ * EV300L camera). Nobody powers both, and card detect is not used here, so
+ * the target's default pin (AK_AV100_SD_POWER: 98 on the EV300L, 50 on the
+ * AV100) is tried first and the other if no card answers; "sdpower=<gpio>"
+ * picks one pin and skips the guessing. Pad 98 comes out of reset as
+ * SYS_RSTN_OUT (function 0) and is muxed to GPIO 98 (function 1) first.
+ */
+#define MCI_POWER_GPIO		AK_AV100_SD_POWER
+#define MCI_POWER_GPIO_ALT	AK_AV100_SD_POWER_ALT
+
+/* The pin that powered a card that answered; -1 until one did */
+static int mci_power_gpio = -1;
+
+static void ak_mci_power_cycle(uint gpio)
+{
+	if (gpio == 98)
+		clrsetbits_le32(AK_SYS_SHAREPIN_CFG(8), AK_AV100_PAD98_CLR,
+				AK_AV100_PAD98_GPIO);
+	setbits_le32(AK_GPIO_DIR(gpio), BIT(gpio % 32));
+	setbits_le32(AK_GPIO_OUT(gpio), BIT(gpio % 32));
 	mdelay(100);
-	clrbits_le32(AK_GPIO_OUT(MCI_POWER_GPIO), BIT(MCI_POWER_GPIO % 32));
-	mci_powered = 1;
+	clrbits_le32(AK_GPIO_OUT(gpio), BIT(gpio % 32));
+	mdelay(10);
+}
+
+static int ak_mci_cmd(uint opcode, uint resp_type, uint arg, bool with_data);
+
+/* CMD0, then CMD8 (SD 2.0) or CMD55 (any SD card): does a card answer? */
+static bool ak_mci_card_answers(void)
+{
+	ak_mci_cmd(MMC_CMD_GO_IDLE_STATE, MMC_RSP_NONE, 0, false);
+	return !ak_mci_cmd(SD_CMD_SEND_IF_COND, MMC_RSP_R7, 0x1aa, false) ||
+	       !ak_mci_cmd(MMC_CMD_APP_CMD, MMC_RSP_R1, 0, false);
+}
+
+static void ak_mci_power(void)
+{
+	const char *s = env_get("sdpower");
+
+	if (mci_power_gpio >= 0)
+		return;
+	if (s) {
+		uint gpio = simple_strtoul(s, NULL, 10);
+
+		if (gpio < 105) {
+			ak_mci_power_cycle(gpio);
+			mci_power_gpio = gpio;
+			return;
+		}
+	}
+	ak_mci_power_cycle(MCI_POWER_GPIO);
+	if (ak_mci_card_answers()) {
+		mci_power_gpio = MCI_POWER_GPIO;
+		return;
+	}
+	ak_mci_power_cycle(MCI_POWER_GPIO_ALT);
+	if (ak_mci_card_answers()) {
+		mci_power_gpio = MCI_POWER_GPIO_ALT;
+		return;
+	}
+	/* No card either way: the other pin may be a card detect input */
+	clrbits_le32(AK_GPIO_DIR(MCI_POWER_GPIO_ALT),
+		     BIT(MCI_POWER_GPIO_ALT % 32));
 }
 #else
 static void ak_mci_pins(void)
@@ -371,7 +429,14 @@ static int ak_mci_set_ios(struct mmc *mmc)
 
 static int ak_mci_init(struct mmc *mmc)
 {
+#ifdef CONFIG_AK39_AV100
+	/* The power probe talks to the card: identification speed */
+	mci_clock = MCI_F_MIN;
 	ak_mci_host_init();
+	ak_mci_power();
+#else
+	ak_mci_host_init();
+#endif
 	return 0;
 }
 
