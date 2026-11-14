@@ -19,8 +19,8 @@ own branch:
   that branch's `ci.yml`. Its own `CLAUDE.md` covers the boot header, the
   flash byte order and the kernel hand-off.
 - `openipc-anyka`: U-Boot for Anyka AK3918EV200, AK391xEV300,
-  AK391xEV330 and AK3918EV300L, on the same mainline release with the
-  same OpenIPC layer.
+  AK391xEV330, AK3918EV300L and AK3918AV100 (N/P and X/XP), on the same
+  mainline release with the same OpenIPC layer.
   CI: `build-anyka.yml`, called from that branch's `ci.yml`. Its own
   `CLAUDE.md` covers the boot headers, the EV330 first stage and the
   drivers.
@@ -144,8 +144,10 @@ The build logic lives here. Other branches call it:
 - It is `build-gk710x.yml` for `openipc-anyka`: the same job graph and
   `resolve`/`ref` rules, NOR only (256 KiB boot partition, header
   included; on the EV330 the 0x1200-byte header and first stage).
-- **No `hold`:** all seven SoCs have qemu-hisilicon machines of the same
-  names (qemu-hisilicon #161 or later; the EV300L #305 or later).
+- **No `hold`:** all nine SoCs have qemu-hisilicon machines of the same
+  names (qemu-hisilicon #161 or later; the EV300L #305 or later). The
+  AV100 legs need the qemu-bench change that adds `ak3918av100x` and
+  loads an `ANYKA322` image's U-Boot from flash offset 0x600, not 0x200.
 - **Smoke test:** two boots of an 8 MiB flash image holding only U-Boot,
   in CPU byte order. It passes on `Hit Ctrl-C`,
   and fails if the second boot reports a bad environment CRC.
