@@ -66,6 +66,13 @@ int arch_cpu_init(void)
 	 * and feeds it once /dev/watchdog is opened.
 	 */
 	writel(AK_WDT_CFG2_KEY, AK_SYS_WDT_CFG2);
+	/*
+	 * GPIO retention is on out of reset. With it the pads ignore GPIO
+	 * writes: on the HVT3610S3 the PHY reset pulse on GPIO 71 never
+	 * reached the PHY, which then never answered on MDIO. The vendor
+	 * kernel and U-Boots clear it in their pinctrl probe.
+	 */
+	clrbits_le32(AK_SYS_GPIO_RETENTION, AK_GPIO_RETENTION_EN);
 
 	if (!ak_pll2_adjust_done()) {
 		pll2_state = PLL2_BUSY;

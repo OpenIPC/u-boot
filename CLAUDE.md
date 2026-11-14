@@ -259,12 +259,12 @@ The memory map is the same in all three generations: system control at
     vendor pinctrl drivers set it (in their `anyka,pull` words bit 4
     enables the pull and bit 0 set means down). The first AV100-family
     builds had it backwards: pull-downs on MDIO and the SD lines.
-  - EV300L only: pad 23, the HVT3610S3 DT's `ethernet_rst_pins`, is made a
-    GPIO input with a pull-up and never driven, as that camera's Linux
-    does (its `reset-gpios` is 71, also AIN0). On the SDK's EVBs that group
-    is the PHY reset pin itself, pulled up the same way. Both U-Boots
-    left it alone and found no PHY on the camera ("Could not get PHY ...
-    addr -1"); `phyreset=23` also pulses it.
+  - **GPIO retention** (`+0x280` bit 31) is on out of reset: the pads
+    keep a latched state and ignore GPIO writes. `arch_cpu_init()` clears
+    it, as the vendor pinctrl probes do (`disable_gpio_retention()`).
+    Without it the HVT3610S3's PHY reset (GPIO 71) never moved, and its
+    PHY never answered on MDIO ("Could not get PHY ... addr -1"); found by
+    copying a Linux register dump into U-Boot and bisecting it.
   - PHY reset, active low, is board wiring: 71 on the HVT3610S3 camera, 24
     on the AV100N EVB, 29 on the AV100X EVB, 49/55/57 on other SDK boards.
     The defaults are OpenIPC's per SoC (EV300L 71, AV100 24, AV100X 29);

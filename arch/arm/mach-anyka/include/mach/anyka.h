@@ -185,6 +185,13 @@
 /* Pad control, 32 pads a register: pull enable, pull select (1 = up), IE */
 #define AK_SYS_PUPD_EN(n)	(AK_SYSCTRL_BASE + 0x264 + 4 * (n))
 #define AK_SYS_PUPD_SEL(n)	(AK_SYSCTRL_BASE + 0x274 + 4 * (n))
+/*
+ * Bit 31 of the last pull-select word: GPIO retention. While it is set the
+ * pads keep a latched state and do not follow GPIO writes; the vendor
+ * kernel's and U-Boots' pinctrl probes clear it (disable_gpio_retention()).
+ */
+#define AK_SYS_GPIO_RETENTION	AK_SYS_PUPD_SEL(3)
+#define AK_GPIO_RETENTION_EN	BIT(31)
 #define AK_SYS_PAD_IE(n)	(AK_SYSCTRL_BASE + 0x1c0 + 4 * (n))
 #define AK_CLK_MCI1		BIT(2)
 #define AK_RST_MCI1		BIT(2)
