@@ -65,6 +65,8 @@ jobs:
           - { soc: ak3918ev300, files: "output/u-boot-ak3918ev300-*.bin" }
           - { soc: ak3919ev300, files: "output/u-boot-ak3919ev300-*.bin" }
           - { soc: ak3918ev300l, files: "output/u-boot-ak3918ev300l-*.bin" }
+          - { soc: ak3918av100, files: "output/u-boot-ak3918av100-*.bin" }
+          - { soc: ak3918av100x, files: "output/u-boot-ak3918av100x-*.bin" }
           - { soc: ak3918ev330, files: "output/u-boot-ak3918ev330-*.bin" }
           - { soc: ak3919ev330, files: "output/u-boot-ak3919ev330-*.bin" }
 
@@ -104,7 +106,8 @@ jobs:
           # The boot partition from this tree's mtdparts: NOR boot = 256 KiB
           # (env at 0x40000). An image larger than it overflows into env and
           # bricks the device on upgrade. The image includes the boot ROM
-          # header (EV330: the 0x1200-byte header and first stage).
+          # header (EV330: the 0x1200-byte header and first stage; AV100:
+          # the header and the 0x400-byte secure-boot area before U-Boot).
           soc='${{ matrix.soc }}'
           rc=0
           check_kind() {
@@ -181,7 +184,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        soc: [ak3918ev200, ak3916ev300, ak3918ev300, ak3919ev300, ak3918ev300l, ak3918ev330, ak3919ev330]
+        soc: [ak3918ev200, ak3916ev300, ak3918ev300, ak3919ev300, ak3918ev300l, ak3918av100, ak3918av100x, ak3918ev330, ak3919ev330]
     steps:
       - name: Download qemu-arm
         uses: actions/download-artifact@v4
