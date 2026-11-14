@@ -22,15 +22,30 @@
 #include <linux/delay.h>
 #include <linux/iopoll.h>
 
-#define MCI_CLK			(AK_MCI0_BASE + 0x04)
-#define MCI_ARGUMENT		(AK_MCI0_BASE + 0x08)
-#define MCI_COMMAND		(AK_MCI0_BASE + 0x0c)
-#define MCI_RESPONSE(n)		(AK_MCI0_BASE + 0x14 + 4 * (n))
-#define MCI_DATATIMER		(AK_MCI0_BASE + 0x24)
-#define MCI_DATALENGTH		(AK_MCI0_BASE + 0x28)
-#define MCI_DATACTRL		(AK_MCI0_BASE + 0x2c)
-#define MCI_STATUS		(AK_MCI0_BASE + 0x34)
-#define MCI_FIFO		(AK_MCI0_BASE + 0x40)
+/*
+ * The SD slot: MCI0 on the EV200, EV300 and EV330; MCI1 on the EV300L, whose
+ * vendor device trees put the card on mmc1 (0x20108000) and keep MCI0 and
+ * MCI2 for SDIO Wi-Fi. The controller is the same.
+ */
+#ifdef CONFIG_AK39_EV300L
+#define AK_MCI_BASE		AK_MCI1_BASE
+#define AK_CLK_MCI		AK_CLK_MCI1
+#define AK_RST_MCI		AK_RST_MCI1
+#else
+#define AK_MCI_BASE		AK_MCI0_BASE
+#define AK_CLK_MCI		AK_CLK_MCI0
+#define AK_RST_MCI		AK_RST_MCI0
+#endif
+
+#define MCI_CLK			(AK_MCI_BASE + 0x04)
+#define MCI_ARGUMENT		(AK_MCI_BASE + 0x08)
+#define MCI_COMMAND		(AK_MCI_BASE + 0x0c)
+#define MCI_RESPONSE(n)		(AK_MCI_BASE + 0x14 + 4 * (n))
+#define MCI_DATATIMER		(AK_MCI_BASE + 0x24)
+#define MCI_DATALENGTH		(AK_MCI_BASE + 0x28)
+#define MCI_DATACTRL		(AK_MCI_BASE + 0x2c)
+#define MCI_STATUS		(AK_MCI_BASE + 0x34)
+#define MCI_FIFO		(AK_MCI_BASE + 0x40)
 
 /* CLK: divider low/high bytes, then enables */
 #define CLK_ENABLE		(BIT(16) | BIT(17) | BIT(19) | BIT(20))
@@ -111,7 +126,45 @@ static void ak_mci_set_clock(uint want)
 }
 
 /* Also after a data fault: TX/RXACTIVE stay set until the host is reset */
-static void ak_mci_host_init(void)
+#ifdef CONFIG_AK39_EV300L
+/*
+ * Pads 31-36 as SD0 (function 1), input enabled, pull-ups on the data and
+ * command lines, none on the clock, as the vendor device trees' mci1_pins.
+ * The card's power switch is GPIO 50, on when low ("power-inverted"); the
+ * vendor driver holds it off for 100 ms, then on, once at probe.
+ */
+#define MCI_PADS		(GENMASK_ULL(36, 32) | BIT_ULL(31))
+#define MCI_PULLUPS		(MCI_PADS & ~BIT_ULL(34))
+#define MCI_POWER_GPIO		50
+
+static void ak_mci_pads(u64 pads, unsigned long reg0)
+{
+	setbits_le32(reg0, (u32)pads);
+	setbits_le32(reg0 + 4, (u32)(pads >> 32));
+}
+
+/* Set after the first power cycle; MMC init runs after relocation */
+static int mci_powered;
+
+static void ak_mci_pins(void)
+{
+	clrsetbits_le32(AK_SYS_SHAREPIN_CFG(3), AK_EV300L_SD0_PINS_CLR,
+			AK_EV300L_SD0_PINS);
+	ak_mci_pads(MCI_PADS, AK_SYS_PAD_IE(0));
+	ak_mci_pads(MCI_PULLUPS, AK_SYS_PUPD_EN(0));
+	/* PU_PD_SEL: 0 = pull-up */
+	clrbits_le32(AK_SYS_PUPD_SEL(0), (u32)MCI_PULLUPS);
+	clrbits_le32(AK_SYS_PUPD_SEL(1), (u32)(MCI_PULLUPS >> 32));
+	if (mci_powered)
+		return;
+	setbits_le32(AK_GPIO_DIR(MCI_POWER_GPIO), BIT(MCI_POWER_GPIO % 32));
+	setbits_le32(AK_GPIO_OUT(MCI_POWER_GPIO), BIT(MCI_POWER_GPIO % 32));
+	mdelay(100);
+	clrbits_le32(AK_GPIO_OUT(MCI_POWER_GPIO), BIT(MCI_POWER_GPIO % 32));
+	mci_powered = 1;
+}
+#else
+static void ak_mci_pins(void)
 {
 	clrsetbits_le32(AK_SYS_SHAREPIN3, MCI0_SHAREPIN3_CLR,
 			MCI0_SHAREPIN3_SET);
@@ -119,9 +172,15 @@ static void ak_mci_host_init(void)
 	clrbits_le32(AK_GPIO_OUT(MCI0_WIFI_EN_GPIO), BIT(MCI0_WIFI_EN_GPIO % 32));
 	setbits_le32(AK_GPIO_DIR(MCI0_WIFI_EN_GPIO), BIT(MCI0_WIFI_EN_GPIO % 32));
 #endif
-	clrbits_le32(AK_SYS_CLK_GATE, AK_CLK_MCI0);
-	setbits_le32(AK_SYS_SOFT_RST, AK_RST_MCI0);
-	clrbits_le32(AK_SYS_SOFT_RST, AK_RST_MCI0);
+}
+#endif
+
+static void ak_mci_host_init(void)
+{
+	ak_mci_pins();
+	clrbits_le32(AK_SYS_CLK_GATE, AK_CLK_MCI);
+	setbits_le32(AK_SYS_SOFT_RST, AK_RST_MCI);
+	clrbits_le32(AK_SYS_SOFT_RST, AK_RST_MCI);
 	writel(0, MCI_COMMAND);
 	writel(0, MCI_DATACTRL);
 	readl(MCI_STATUS);

@@ -15,6 +15,9 @@
  * spi_flash_probe() itself, so mainline's non-DM spi_flash_*() wrappers,
  * the sf command and the environment in SPI flash work without the SPI and
  * spi-nor layers. Single lane, 3-byte addresses: parts up to 16 MiB.
+ *
+ * The EV300L has the same controller at another address, with its clock
+ * divider moved out to the system controller (spi_hw_init()).
  */
 
 #include <common.h>
@@ -351,8 +354,57 @@ static int ak_sf_erase(struct mtd_info *mtd, struct erase_info *instr)
 #define SPI0_SHAREPIN3		(0x3 | 0x1f << 9)
 #endif
 
-static void spi_hw_init(void)
+#ifdef CONFIG_AK39_EV300L
+/*
+ * EV300L, after the SDK's ak_spi.c: the controller is the same, at
+ * 0x21100000, but its clock is SYSCTRL +0x0c's divider of PLL2, changed
+ * with the high-speed clock held in reset, and it has a work-mode bit to
+ * set (and to see set) before the first transfer. CON's own divider field
+ * is not used.
+ */
+static int spi_hw_init(void)
 {
+	unsigned long pll2 = ak_pll2_clk();
+	unsigned int div = DIV_ROUND_UP(pll2, 2 * SPI_HZ) - 1;
+	unsigned int spins = SPI_SPINS;
+
+	setbits_le32(AK_SYS_SOFT_RST, AK_RST_SPI0);
+	udelay(10);
+	clrbits_le32(AK_SYS_SOFT_RST, AK_RST_SPI0);
+	clrbits_le32(AK_SYS_CLK_GATE, BIT(5));
+	setbits_le32(AK_SYS_SHAREPIN_CFG(4), AK_EV300L_SPI0_PINS);
+
+	setbits_le32(AK_SYS_SOFT_RST, AK_RST_SPI_HSCLK);
+	clrbits_le32(AK_SYS_SPI_CLK, AK_SPI_CLK_EN | AK_SPI_CLK_DIV_MASK);
+	setbits_le32(AK_SYS_SPI_CLK, AK_SPI_CLK_DIV(min(div, 0xffU)) |
+		     AK_SPI_CLK_APPLY);
+	while ((readl(AK_SYS_SPI_CLK) & AK_SPI_CLK_APPLY) && --spins)
+		;
+	if (!spins) {
+		printf("SF: SPI0 clock divider not taken\n");
+		return -ETIMEDOUT;
+	}
+	setbits_le32(AK_SYS_SPI_CLK, AK_SPI_CLK_EN);
+	clrbits_le32(AK_SYS_SOFT_RST, AK_RST_SPI_HSCLK);
+
+	spi_con = CON_EN | CON_MASTER;
+	writel(spi_con, SPI_CON);
+	setbits_le32(AK_SPI_WORK_MODE, BIT(0));
+	spins = SPI_SPINS;
+	while (!(readl(AK_SPI_WORK_MODE) & BIT(0)) && --spins)
+		;
+	if (!spins) {
+		printf("SF: SPI0 did not enter normal mode\n");
+		return -ETIMEDOUT;
+	}
+	return 0;
+}
+#else
+static int spi_hw_init(void)
+{
+	unsigned long clk = ak_asic_clk();
+	unsigned int div = clk ? DIV_ROUND_UP(clk, 2 * SPI_HZ) - 1 : 2;
+
 	setbits_le32(AK_SYS_SOFT_RST, AK_RST_SPI0);
 	udelay(10);
 	clrbits_le32(AK_SYS_SOFT_RST, AK_RST_SPI0);
@@ -360,7 +412,10 @@ static void spi_hw_init(void)
 	setbits_le32(AK_SYS_SHAREPIN0, SPI0_SHAREPIN0);
 	clrsetbits_le32(AK_SYS_SHAREPIN3, SPI0_SHAREPIN3_CLR, SPI0_SHAREPIN3);
 #endif
+	spi_con = CON_EN | CON_MASTER | CON_DIV(min(div, CON_DIV_MAX));
+	return 0;
 }
+#endif
 
 static struct spi_flash ak_flash;
 static int ak_announced;
@@ -370,13 +425,11 @@ struct spi_flash *spi_flash_probe(unsigned int bus, unsigned int cs,
 {
 	struct spi_flash *flash = &ak_flash;
 	struct mtd_info *mtd = &flash->mtd;
-	unsigned long clk = ak_asic_clk();
-	unsigned int div = clk ? DIV_ROUND_UP(clk, 2 * SPI_HZ) - 1 : 2;
 	u8 id[3];
 	u32 jedec, size;
 
-	spi_hw_init();
-	spi_con = CON_EN | CON_MASTER | CON_DIV(min(div, CON_DIV_MAX));
+	if (spi_hw_init())
+		return NULL;
 	spi_select(false);
 	writel(0, SPI_INT);
 

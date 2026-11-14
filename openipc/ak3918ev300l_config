@@ -1,0 +1,5 @@
+CONFIG_TARGET_AK3918EV300L=y
+CONFIG_PRODUCT_SOC="ak3918ev300l"
+# The EV300L's MAC pins, PHY reset and MAC clock are not set up yet; the
+# cameras seen so far have Wi-Fi only. Recovery is from SD.
+# CONFIG_ETH_DESIGNWARE is not set
