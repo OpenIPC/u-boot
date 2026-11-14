@@ -204,6 +204,12 @@ The memory map is the same in all three generations: system control at
 - **Reset:** the watchdog, armed as the vendor U-Boots arm it: an 8 s
   count, enable, enable + feed, then the same with a count of 1. A single
   "count 1, enable + feed" write hangs a real AK3918EV200.
+  - EV300L and AV100: the watchdog **runs out of reset**. The SDK's
+    `board_init_f()` stops it first thing (`wdt_disable()`, CFG2 = key
+    only), as the HVT3610S3's vendor U-Boot does; `arch_cpu_init()` does
+    the same. Without it the camera reset itself in U-Boot and in Linux,
+    whose `ak_top_wdt` touches it only once `/dev/watchdog` is opened.
+    qemu-bench's watchdog starts stopped, so it did not show this.
 - **SPI NOR:** SPI0, a byte-wise PIO master: CON picks send-only (`ARRM`)
   or receive-only (`TGDM`), CNT starts a transfer, 8-byte FIFOs a word at
   a time. Opcode and address are plain TX bytes. 64 KiB erase, 3-byte
@@ -249,6 +255,16 @@ The memory map is the same in all three generations: system control at
     after the first release also resets the DDR controller on this
     generation. The PHY is found by an MDIO scan (address 1 on the boards
     seen).
+  - Pull select (`+0x274`, a bit a pad) is **1 = pull-up**, as both
+    vendor pinctrl drivers set it (in their `anyka,pull` words bit 4
+    enables the pull and bit 0 set means down). The first AV100-family
+    builds had it backwards: pull-downs on MDIO and the SD lines.
+  - EV300L only: pad 23, the HVT3610S3 DT's `ethernet_rst_pins`, is made a
+    GPIO input with a pull-up and never driven, as that camera's Linux
+    does (its `reset-gpios` is 71, also AIN0). On the SDK's EVBs that group
+    is the PHY reset pin itself, pulled up the same way. Both U-Boots
+    left it alone and found no PHY on the camera ("Could not get PHY ...
+    addr -1"); `phyreset=23` also pulses it.
   - PHY reset, active low, is board wiring: 71 on the HVT3610S3 camera, 24
     on the AV100N EVB, 29 on the AV100X EVB, 49/55/57 on other SDK boards.
     The defaults are OpenIPC's per SoC (EV300L 71, AV100 24, AV100X 29);
