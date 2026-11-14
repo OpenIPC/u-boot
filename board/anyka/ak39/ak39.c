@@ -107,10 +107,14 @@ static void ak_phy_reset(void)
 	setbits_le32(AK_GPIO_OUT(gpio), BIT(gpio % 32));
 	setbits_le32(AK_GPIO_DIR(gpio), BIT(gpio % 32));
 	mdelay(5);
+	/*
+	 * The timing of the HVT3610S3's own ak_eth.ko, which finds the PHY:
+	 * 20 ms low, then 200 ms before the first MDIO access.
+	 */
 	clrbits_le32(AK_GPIO_OUT(gpio), BIT(gpio % 32));
-	mdelay(25);
+	mdelay(20);
 	setbits_le32(AK_GPIO_OUT(gpio), BIT(gpio % 32));
-	mdelay(50);
+	mdelay(200);
 }
 
 static void ak_eth_init(void)
