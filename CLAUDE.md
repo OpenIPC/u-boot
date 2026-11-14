@@ -237,11 +237,24 @@ The memory map is the same in all three generations: system control at
     pinctrl table agrees; the 3.4 kernel keeps the old value commented
     out). The MAC pins in `0x7C` are the same in both tables.
   - MII vs RMII is the board's choice; these are the vendors' defaults.
-  - EV300L and AV100: not set up (`# CONFIG_ETH_DESIGNWARE is not set` in
-    their fragments). The vendor DTs have RMII on GPIO 0-8 and 11 through
-    the new shared-pin registers and a PHY reset on GPIO 49 (the AV100X
-    EVB: an internal PHY on GPIO 82-91, reset on GPIO 29); the EV300L
-    cameras seen are Wi-Fi only.
+  - EV300L and AV100 (`AK39_AV100` in `ak39.c`), after the AV100 SDK's
+    `ak_eth.c`, clock driver and DTs: RMII on pads 0-8 and 11 (OPCLK1 0
+    fn 3, RXER 1 fn 3, RXDV 2 fn 4, MDIO 3 fn 2, TXEN 4 fn 4, MDC 5 fn 3,
+    RXD1 6 fn 3, TXD0 7 fn 3, TXD1 8 fn 5, RXD0 11 fn 5; CFG0 `0x178`,
+    CFG1 `0x17C`), pull-up on MDIO, pull-downs on the rest, pad 0 at 8 mA,
+    TXD0/1 fast. The 50 MHz clock is MAC_OPCLK = PLL2 / (div + 1) at
+    `+0x18` (enable bit 8, divider 5:0, apply bit 9); `+0x14` bit 23 is
+    100 Mbit/s; the MAC clock is gate bit 13. The MAC reset (`+0x20` bit
+    13) is **only released, never asserted**: `ak_eth.c` says a MAC reset
+    after the first release also resets the DDR controller on this
+    generation. The PHY is found by an MDIO scan (address 1 on the boards
+    seen).
+  - PHY reset, active low, is board wiring: 71 on the HVT3610S3 camera, 24
+    on the AV100N EVB, 29 on the AV100X EVB, 49/55/57 on other SDK boards.
+    The defaults are OpenIPC's per SoC (EV300L 71, AV100 24, AV100X 29);
+    `phyreset=<gpio>` overrides, `phyreset=none` (or -1) skips the pulse.
+    Pads 24, 29, 71 are muxed to GPIO (function 0); another pin must
+    already be a GPIO.
 - **SD:** MCI0 (`drivers/mmc/ak_mmc.c`, `MMC_AK39`), 1-bit, PIO through
   the FIFO, up to 20 MHz. After the EV200 U-Boot port's DM driver. Every
   vendor source wires a 1-bit bus on pads 31-33: `0xDC |= 0x1c0` (on the
@@ -256,10 +269,20 @@ The memory map is the same in all three generations: system control at
     card answers only with both: the ROM leaves pad 34's field at `11`, and
     the gwell vendor U-Boot's SPI value `0x3003` puts `11` on pads 35/36.
     Found by setting the registers Linux leaves (`devmem`) one by one.
-  - EV300L and AV100: the card is on MCI1 (`0x20108000`, clock gate and reset bit
-    2), pads 31-36 function 1 (`0x184` 23:6), input enable and pull-ups
-    as the vendor DT's `mci1_pins`, and its power switch is GPIO 50,
-    active low (`power-inverted`): off 100 ms, then on, once.
+  - EV300L and AV100: the card is on MCI1 (`0x20108000`, clock gate and
+    reset bit 2), pads 31-36 function 1 (`0x184` 23:6), input enable and
+    pull-ups as the vendor DT's `mci1_pins`. Its power switch is active
+    low (`power-inverted`), off 100 ms, then on. The SDK's boards wire it
+    on GPIO 50 (detect on 98: EVBs, most HTOL/YTJ boards, KM01N) or on GPIO
+    98 (detect on 37: SC531AI HTOL, AV100XP, the gzhongshi HVT3610S3
+    EV300L camera); nobody powers both. At the first card init the
+    target's pin is tried (EV300L 98, the one EV300L board seen; AV100 50,
+    the EVBs), then the other if neither CMD8 nor CMD55 answers;
+    `sdpower=<gpio>` picks one and skips the probing. Pad 98 is
+    SYS_RSTN_OUT out of reset and is muxed to GPIO (CFG8 `0x198` 23:21 =
+    1). With no card the other pin goes back to an input and the core's
+    one "did not respond" line is all that is printed.
+  - Found on silicon: the HVT3610S3 saw no card with GPIO 50 only.
   - `common/openipc.c` recovers from it at every boot: `script.txt`, then
     `uImage.<soc>.img` and `rootfs.squashfs.<soc>.img`. These are uImages
     flashed where their load address says, without the header
@@ -282,7 +305,7 @@ bash build.sh ak3918ev300   # one or more SoCs (CROSS_COMPILE defaults to arm-li
   `olddefconfig`.
 - There are no `configs/*_defconfig` for these targets.
 - ARM926 has no Thumb-2: the images are ~233 KiB (EV330 ~237 KiB with its
-  first stage; EV300L ~221 KiB and AV100 ~222 KiB, without Ethernet). `fdt`, `bootelf`, `imxtract`, `random`, `loads` and `nfs`
+  first stage; EV300L ~229 KiB, AV100 ~230 KiB). `fdt`, `bootelf`, `imxtract`, `random`, `loads` and `nfs`
   are left out to make room for SD. `BOARD_SIZE_LIMIT` keeps header + image under the 256 KiB
   boot partition. Check the size after enabling anything.
 
@@ -295,11 +318,14 @@ The emulator is OpenIPC/qemu-bench (formerly qemu-hisilicon), machines
 including loading the first stage), so it boots exactly the flashed bytes.
 
 - The AV100 images need a machine whose ROM loader takes an `ANYKA322`
-  payload from flash offset 0x600: qemu-bench master (as of the AV100
-  support here) copies it from 0x200, like every other header, and the
-  image then never prints anything. `ak3918av100` is 128 MiB there; run the
-  64 MiB `ak3918av100` image with `-m 64M`, and keep test buffers below
-  `0x84000000`.
+  payload from flash offset 0x600, and the `ak3918av100x` machine
+  (qemu-bench PR #310); older qemu-bench copies it from 0x200, like every
+  other header, and the image then never prints anything. Keep test
+  buffers below `0x84000000` on the 64 MiB parts.
+- qemu's GPIO block has the old three-bank layout (OUT at `0x0C`) on the
+  EV300L and AV100 machines too, while the hardware has four direction
+  banks and OUT at `0x14`: GPIO writes (TF power, PHY reset) are not
+  checked there. Its TF slot answers whatever powers it.
 
 - **CI smoke:** two boots of an 8 MiB image holding only U-Boot. The second
   must load the environment the first saved.
@@ -331,7 +357,8 @@ including loading the first stage), so it boots exactly the flashed bytes.
     with their EVB DTBs, loaded from SD and started with
     `bootm <kernel> - <dtb>`, reach their login prompts (the AV100 SDK's
     `root.sqsh4` at 0x250000, `root=/dev/mtdblock3` and a `mtdparts=` to
-    match).
+    match). Ethernet (`-nic user`): `mii info` (PHY at 1), `ping` and a
+    `tftpboot` with the host's CRC on all three machines.
 - **What qemu does not check:** DDR timing (the scripts are the vendor's,
   so this is low risk), the PLL and so the UART and SPI dividers, pad
   control, the Ethernet clock and PHY reset, the SPI and MCI controllers'
