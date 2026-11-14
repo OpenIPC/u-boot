@@ -129,11 +129,11 @@ static void ak_mci_set_clock(uint want)
 /* Also after a data fault: TX/RXACTIVE stay set until the host is reset */
 #ifdef CONFIG_AK39_AV100
 /*
- * Pads 31-36 as SD0 (function 1), input enabled, pull-ups on the data and
- * command lines, none on the clock, as the vendor device trees' mci1_pins.
+ * Pads 31-36 as SD0 (function 1), input enabled, pulled up, as the vendor
+ * device trees' mci1_pins (anyka,pull 0x1010110: pull enabled, up).
  */
 #define MCI_PADS		(GENMASK_ULL(36, 32) | BIT_ULL(31))
-#define MCI_PULLUPS		(MCI_PADS & ~BIT_ULL(34))
+#define MCI_PULLUPS		MCI_PADS
 
 static void ak_mci_pads(u64 pads, unsigned long reg0)
 {
@@ -147,9 +147,8 @@ static void ak_mci_pins(void)
 			AK_AV100_SD0_PINS);
 	ak_mci_pads(MCI_PADS, AK_SYS_PAD_IE(0));
 	ak_mci_pads(MCI_PULLUPS, AK_SYS_PUPD_EN(0));
-	/* PU_PD_SEL: 0 = pull-up */
-	clrbits_le32(AK_SYS_PUPD_SEL(0), (u32)MCI_PULLUPS);
-	clrbits_le32(AK_SYS_PUPD_SEL(1), (u32)(MCI_PULLUPS >> 32));
+	/* PU_PD_SEL: 1 = pull-up */
+	ak_mci_pads(MCI_PULLUPS, AK_SYS_PUPD_SEL(0));
 }
 
 /*

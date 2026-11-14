@@ -39,7 +39,8 @@ int misc_init_r(void)
  * RXER (1: 3), RXDV (2: 4), MDIO (3: 2), TXEN (4: 4), MDC (5: 3), RXD1
  * (6: 3), TXD0 (7: 3), TXD1 (8: 5), RXD0 (11: 5), the SDK's EVB and the
  * HVT3610S3 camera's ethernet_rmii pins alike. Input enabled; pull-up on
- * MDIO, pull-downs on the data pins, none on the clock; the clock pad at
+ * MDIO, pull-downs on the data pins, none on the clock (anyka,pull 0x10010,
+ * 0x10011, 0x10200); the clock pad at
  * 8 mA and TXD0/TXD1 fast, as their pin groups say.
  */
 #define AK_MAC_PINS0_CLR	0x7ffffff
@@ -122,9 +123,27 @@ static void ak_eth_init(void)
 	setbits_le32(AK_SYS_PAD_IE(0), AK_MAC_PADS);
 	clrbits_le32(AK_SYS_PUPD_EN(0), BIT(0));
 	setbits_le32(AK_SYS_PUPD_EN(0), AK_MAC_PULLS);
-	/* PU_PD_SEL: 1 = pull-down */
-	clrsetbits_le32(AK_SYS_PUPD_SEL(0), AK_MAC_PULLUPS,
-			AK_MAC_PULLS & ~AK_MAC_PULLUPS);
+	/*
+	 * PU_PD_SEL: 1 = pull-up (the vendor pinctrl drivers' "pullup"; in
+	 * their anyka,pull words bit 0 set means pull-down).
+	 */
+	clrsetbits_le32(AK_SYS_PUPD_SEL(0), AK_MAC_PULLS & ~AK_MAC_PULLUPS,
+			AK_MAC_PULLUPS);
+#ifdef CONFIG_TARGET_AK3918EV300L
+	/*
+	 * Pad 23, the HVT3610S3 DT's ethernet_rst_pins: GPIO (function 0),
+	 * input, pulled up, never driven (its reset-gpios is 71, AIN0). On
+	 * the SDK's EVBs that group is the PHY reset pin itself (24), pulled
+	 * up the same way. Its vendor Linux sets this and finds the PHY;
+	 * U-Boot left the pad alone and found none.
+	 */
+	clrbits_le32(AK_SYS_SHAREPIN_CFG(2), 0x7 << 12);
+	clrbits_le32(AK_GPIO_DIR(23), BIT(23));
+	setbits_le32(AK_SYS_PAD_IE(0), BIT(23));
+	setbits_le32(AK_SYS_PUPD_EN(0), BIT(23));
+	setbits_le32(AK_SYS_PUPD_SEL(0), BIT(23));
+	mdelay(10);
+#endif
 	clrsetbits_le32(AK_SYS_PAD_DRV0, 0x3, 0x2);
 	clrbits_le32(AK_SYS_PAD_SLEW0, BIT(7) | BIT(8));
 
