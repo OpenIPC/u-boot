@@ -1,0 +1,51 @@
+# AK3918AV100 boot ROM register script (header +0x2c) for the 128 MiB parts
+# (AK3918AV100X/XP and KM01D): [128M_Ram_Param1] of the AnyCloud39AV100 SDK V1.12's
+# tools/burntool/SDK_CPU_DDR2.ini, CPU 888 / DDR 444 MHz, the SDK's
+# default. DDR controller and PHY set-up, PLL1 (the CPU), then the DDR2
+# init sequence. The 64 and 128 MiB scripts differ only in 0x21000000
+# (0x00134db0 / 0x00134fb0, the row and column widths).
+# "addr = value" writes, "delay n" waits, "poll addr value" waits for the
+# value (the ini's "0x66668881,1" followed by that pair, which the
+# EV300L's burn tool wrote as three words), "raw" is a pair copied as it is
+# (the ROM operations 0x66668882 "PQST" and 0x66668880), "end" closes it.
+# The EV300L flash seen has this script but for 0x080000dc and 0x21000004
+# and without the last two operations (openipc/ak3918ev300l.rvs).
+# The boot header leaves PLL2, the peripherals' clock, at its reset value.
+
+0x21000014 = 0x00423e71
+0x21000018 = 0xff070301
+0x2100001c = 0xf7773717
+0x21000080 = 0x00008890
+0x080000dc = 0x01100003
+0x08000004 = 0x40000024
+delay 0x0000000a
+0x21000078 = 0x0001b2cb
+0x21000004 = 0x1ab56639
+0x21000008 = 0x00146567
+0x21000000 = 0x00134fb0
+0x21000098 = 0x9a76e700
+0x2100009c = 0x00080806
+poll 0x210000a4 0x00010000
+0x21000010 = 0x02000000
+0x21000010 = 0x02f00000
+0x21000010 = 0x02a00400
+0x21000010 = 0x02820000
+0x21000010 = 0x02830000
+0x21000010 = 0x02810042
+0x21000010 = 0x02800f72
+0x21000010 = 0x02a00400
+0x21000010 = 0x02c00000
+0x21000010 = 0x02c00000
+0x21000010 = 0x02800e72
+delay 0x00000002
+0x21000010 = 0x028103c2
+0x21000010 = 0x02810042
+0x21000010 = 0x02f00000
+0x2100000c = 0x00001a5d
+delay 0x000000c8
+0x21000084 = 0x88900c08
+0x21000024 = 0x00000001
+raw 0x66668882 0x54535150
+raw 0x66668880 0x00000001
+0x21000024 = 0xfffffffb
+end 0x00000000

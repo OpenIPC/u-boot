@@ -16,8 +16,9 @@
  * the sf command and the environment in SPI flash work without the SPI and
  * spi-nor layers. Single lane, 3-byte addresses: parts up to 16 MiB.
  *
- * The EV300L has the same controller at another address, with its clock
- * divider moved out to the system controller (spi_hw_init()).
+ * The AV100 family (AV100, EV300L) has the same controller at another
+ * address, with its clock divider moved out to the system controller
+ * (spi_hw_init()).
  */
 
 #include <common.h>
@@ -354,9 +355,9 @@ static int ak_sf_erase(struct mtd_info *mtd, struct erase_info *instr)
 #define SPI0_SHAREPIN3		(0x3 | 0x1f << 9)
 #endif
 
-#ifdef CONFIG_AK39_EV300L
+#ifdef CONFIG_AK39_AV100
 /*
- * EV300L, after the SDK's ak_spi.c: the controller is the same, at
+ * AV100 family, after the SDK's ak_spi.c: the controller is the same, at
  * 0x21100000, but its clock is SYSCTRL +0x0c's divider of PLL2, changed
  * with the high-speed clock held in reset, and it has a work-mode bit to
  * set (and to see set) before the first transfer. CON's own divider field
@@ -372,7 +373,7 @@ static int spi_hw_init(void)
 	udelay(10);
 	clrbits_le32(AK_SYS_SOFT_RST, AK_RST_SPI0);
 	clrbits_le32(AK_SYS_CLK_GATE, BIT(5));
-	setbits_le32(AK_SYS_SHAREPIN_CFG(4), AK_EV300L_SPI0_PINS);
+	setbits_le32(AK_SYS_SHAREPIN_CFG(4), AK_AV100_SPI0_PINS);
 
 	setbits_le32(AK_SYS_SOFT_RST, AK_RST_SPI_HSCLK);
 	clrbits_le32(AK_SYS_SPI_CLK, AK_SPI_CLK_EN | AK_SPI_CLK_DIV_MASK);

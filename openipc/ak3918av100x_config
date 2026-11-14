@@ -1,0 +1,5 @@
+CONFIG_TARGET_AK3918AV100X=y
+CONFIG_PRODUCT_SOC="ak3918av100x"
+# U-Boot starts at flash offset 0x600 (header and secure-boot area): keep
+# header + image under the 256 KiB boot partition
+CONFIG_BOARD_SIZE_LIMIT=260608
