@@ -133,21 +133,6 @@ static void ak_eth_init(void)
 	 */
 	clrsetbits_le32(AK_SYS_PUPD_SEL(0), AK_MAC_PULLS & ~AK_MAC_PULLUPS,
 			AK_MAC_PULLUPS);
-#ifdef CONFIG_TARGET_AK3918EV300L
-	/*
-	 * Pad 23, the HVT3610S3 DT's ethernet_rst_pins: GPIO (function 0),
-	 * input, pulled up, never driven (its reset-gpios is 71, AIN0). On
-	 * the SDK's EVBs that group is the PHY reset pin itself (24), pulled
-	 * up the same way. Its vendor Linux sets this and finds the PHY;
-	 * U-Boot left the pad alone and found none.
-	 */
-	clrbits_le32(AK_SYS_SHAREPIN_CFG(2), 0x7 << 12);
-	clrbits_le32(AK_GPIO_DIR(23), BIT(23));
-	setbits_le32(AK_SYS_PAD_IE(0), BIT(23));
-	setbits_le32(AK_SYS_PUPD_EN(0), BIT(23));
-	setbits_le32(AK_SYS_PUPD_SEL(0), BIT(23));
-	mdelay(10);
-#endif
 	clrsetbits_le32(AK_SYS_PAD_DRV0, 0x3, 0x2);
 	clrbits_le32(AK_SYS_PAD_SLEW0, BIT(7) | BIT(8));
 
