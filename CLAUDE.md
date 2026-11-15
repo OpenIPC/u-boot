@@ -206,8 +206,9 @@ The memory map is the same in all three generations: system control at
   "count 1, enable + feed" write hangs a real AK3918EV200.
   - EV300L and AV100: the watchdog **runs out of reset**. The SDK's
     `board_init_f()` stops it first thing (`wdt_disable()`, CFG2 = key
-    only), as the HVT3610S3's vendor U-Boot does; `arch_cpu_init()` does
-    the same. Without it the camera reset itself in U-Boot and in Linux,
+    only), as the HVT3610S3's and the EV330's vendor U-Boots do (EV200 and
+    EV300 vendor U-Boots touch it only to reset). `arch_cpu_init()` stops
+    it on every SoC. Without it the camera reset itself in U-Boot and in Linux,
     whose `ak_top_wdt` touches it only once `/dev/watchdog` is opened.
     qemu-bench's watchdog starts stopped, so it did not show this.
 - **SPI NOR:** SPI0, a byte-wise PIO master: CON picks send-only (`ARRM`)

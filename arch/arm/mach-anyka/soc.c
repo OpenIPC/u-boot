@@ -56,16 +56,8 @@ static bool ak_pll2_adjust_done(void)
  * dividers follow the PLL2 word, which then still holds the clock in
  * use), and either case is reported by print_cpuinfo().
  */
-int arch_cpu_init(void)
+static int ak_soc_init(void)
 {
-	/*
-	 * The watchdog runs out of reset on this generation: the SDK's
-	 * board_init_f() stops it first thing ("close watchdog"), and so
-	 * does the EV300L camera's vendor U-Boot. Left running, it resets
-	 * the part from U-Boot or from Linux, whose ak_top_wdt only starts
-	 * and feeds it once /dev/watchdog is opened.
-	 */
-	writel(AK_WDT_CFG2_KEY, AK_SYS_WDT_CFG2);
 	/*
 	 * GPIO retention is on out of reset. With it the pads ignore GPIO
 	 * writes: on the HVT3610S3 the PHY reset pulse on GPIO 71 never
@@ -114,7 +106,7 @@ unsigned long ak_asic_clk(void)
  * vendor U-Boot and the EV200 U-Boot port both set it before anything else.
  * Out of reset it gives 60 MHz. Bit 28 of the CPU PLL register applies it.
  */
-int arch_cpu_init(void)
+static int ak_soc_init(void)
 {
 	int spins = 1000000;
 
@@ -124,7 +116,26 @@ int arch_cpu_init(void)
 		;
 	return 0;
 }
+#elif !defined(CONFIG_AK39_AV100)
+static int ak_soc_init(void)
+{
+	return 0;
+}
 #endif
+
+/*
+ * Stop the watchdog first thing, as the AV100 SDK, the EV300L camera's and
+ * the EV330's vendor U-Boots do in board_init_f() ("close watchdog": CFG2 =
+ * key only). On the EV300L and AV100 it runs out of reset; left running, it
+ * resets the part from U-Boot or from Linux, whose ak_top_wdt only starts
+ * and feeds it once /dev/watchdog is opened. The EV200 and EV300 vendor
+ * U-Boots leave it alone; stopping a stopped watchdog does no harm.
+ */
+int arch_cpu_init(void)
+{
+	writel(AK_WDT_CFG2_KEY, AK_SYS_WDT_CFG2);
+	return ak_soc_init();
+}
 
 /*
  * Timer 1, free running from 0xffffffff at the crystal rate. The count is
