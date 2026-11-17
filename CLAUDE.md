@@ -331,7 +331,7 @@ The build logic lives here. Other branches call it:
   smoke leg runs `qemu-aarch64`, built by the `qemu` job beside `qemu-arm`.
 - **Smoke pass criterion** is the autoboot prompt `Hit Ctrl-C`, not the banner.
   The banner prints before the board init that can hang (see #4).
-- **Held SoCs** (`hold: true`, currently gk7206v11a/v12a): their artifact is
+- **Held SoCs** (`hold: true`, currently none): their artifact is
   named `hold-u-boot-<soc>`, so the `u-boot-*` download pattern in
   release/publish skips them. Holding a SoC means setting `hold: true`. Do not
   delete the SoC from the matrix.
