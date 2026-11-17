@@ -100,6 +100,21 @@
 */
 #define CONFIG_MISC_INIT_R
 
+/*
+ * The SD slot (SDIO0, 0x10040000) for OpenIPC's SD recovery, as mmc 0.
+ * 50 MHz is the vendor DTS's max-frequency for it; without the 1.8V pad
+ * switch there are no UHS modes, so no tuning either.
+ */
+#ifdef CONFIG_MMC
+#define CONFIG_GENERIC_MMC
+#define CONFIG_SYS_MMC_ENV_DEV		0
+#define CONFIG_SDHCI
+#define CONFIG_XMEDIA_SDHCI
+#define CONFIG_XMEDIA_SDHCI_MAX_FREQ	50000000
+#define CONFIG_BOUNCE_BUFFER
+#define CONFIG_SDHCI_ADMA
+#endif
+
 /* Command line configuration */
 #define CONFIG_MENU
 /* #define CONFIG_CMD_UNZIP */
