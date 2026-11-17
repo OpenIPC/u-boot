@@ -57,6 +57,18 @@ u-boot-t40's isvp_t40*_sfcnand; see "T40 SPI NAND"). The clocks and the DDR chip
 options in `arch/mips/mach-ingenic/include/mach/<soc>-hw.h`, the vendor
 header's hardware section.
 
+Each `openipc/<target>_config` sets `PRODUCT_SOC` to the family (`t31`)
+and `PRODUCT_SOCMODEL` to the target (`t31n`). The environment's `soc` is
+the family, as u-boot-ingenic's was: OpenIPC firmware is published per
+family (`uImage.t31`, `rootfs.squashfs.t31`, `firmware.bin.t31`), which
+`uk`, `ur`, `urfile` and the recovery fetch, and the T30's `load_ingenic`
+builds `tx-isp-${soc}` from it. Only `ubfile` (`u-boot-t31n-nor.bin`) and
+the `Board:` line use the target, also in `socmodel`.
+
+`tftp` is kept as an alias of `tftpboot` (`cmd/net.c`), the name
+u-boot-ingenic had. Autoboot stops on Ctrl-C only (`openipc_config`), on
+every target; u-boot-ingenic's XBurst1 builds stopped on Enter.
+
 ## Relationship to mainline
 
 ```sh
