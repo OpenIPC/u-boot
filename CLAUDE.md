@@ -167,7 +167,8 @@ programmer, `sf write` or SD/TFTP recovery (`ubwrite`).
     pad 64) pulsed with RXDV (pad 27) strapped low through GPIO 54. If
     nothing answers on MDIO, the pads go back as they were and the internal
     PHY is selected, clocked, reset, given its eFuse trim (PMU 0x340) and
-    the vendor's register writes. Any PHY that answers is taken -- the
+    the vendor's register writes. Any PHY that answers is taken (an ID
+    with an all-ones half is the bus floating, not a PHY) -- the
     vendor U-Boots take only IP101G, RTL8201 and the internal one, so an
     FH8852V200 camera with a JL1101 has no network in its own U-Boot. QEMU
     has an IP101G, so only the external path runs there;
