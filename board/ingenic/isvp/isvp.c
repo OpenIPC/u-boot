@@ -146,12 +146,59 @@ int misc_init_r(void)
 }
 
 /*
+ * Builds of this tree before soc became the family named everything after
+ * the target: soc=t31n, urfile=rootfs.squashfs.t31n and so on, which no
+ * OpenIPC release publishes. A saved environment keeps those over the new
+ * defaults, so put each value back to its default where it is exactly what
+ * that build wrote (the default with the target in place of the family);
+ * a value anyone edited is left alone. Once, before the recovery uses them.
+ */
+static void soc_family_migrate(void)
+{
+	static const char *const names[] = {
+		"soc", "board", "nfsroot", "urfile", "fwfile",
+	};
+	const char *fam = CONFIG_PRODUCT_SOC, *model = CONFIG_PRODUCT_SOCMODEL;
+	size_t flen = strlen(fam);
+	char def[128], old[128];
+	const char *s;
+	bool changed = false;
+	int i;
+
+	if ((gd->flags & GD_FLG_ENV_DEFAULT) || !strcmp(fam, model))
+		return;
+	for (i = 0; i < ARRAY_SIZE(names); i++) {
+		s = env_get_default(names[i]);
+		if (!s || strlen(s) < flen || strlen(s) >= sizeof(def))
+			continue;
+		strcpy(def, s);
+		if (strcmp(def + strlen(def) - flen, fam))
+			continue;
+		snprintf(old, sizeof(old), "%.*s%s",
+			 (int)(strlen(def) - flen), def, model);
+		s = env_get(names[i]);
+		if (s && !strcmp(s, old)) {
+			env_set(names[i], def);
+			changed = true;
+		}
+	}
+	if (!changed)
+		return;
+	if (!env_get("socmodel"))
+		env_set("socmodel", model);
+	printf("soc: %s environment moved to the %s family names\n",
+	       model, fam);
+	env_save();
+}
+
+/*
  * After the network: board_eth_init() powers the SD card on the cameras
  * without an Ethernet PHY, and the vendor U-Boot ran its SD update only
  * after eth_initialize() too.
  */
 int last_stage_init(void)
 {
+	soc_family_migrate();
 	openipc_helper();
 	return 0;
 }
@@ -224,7 +271,7 @@ int board_eth_init(struct bd_info *bis)
 
 int checkboard(void)
 {
-	printf("Board: ISVP (Ingenic XBurst %s SoC)\n", CONFIG_PRODUCT_SOC);
+	printf("Board: ISVP (Ingenic XBurst %s SoC)\n", CONFIG_PRODUCT_SOCMODEL);
 	return 0;
 }
 

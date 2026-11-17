@@ -49,6 +49,13 @@ U_BOOT_CMD(
 	"load file via network using TFTP protocol",
 	"[loadAddress] [[hostIPaddr:]bootfilename]"
 );
+
+/* the name u-boot-ingenic and the vendor U-Boots knew it by */
+U_BOOT_CMD(
+	tftp,	3,	1,	do_tftpb,
+	"alias for 'tftpboot'",
+	"[loadAddress] [[hostIPaddr:]bootfilename]"
+);
 #endif
 
 #ifdef CONFIG_CMD_TFTPPUT
