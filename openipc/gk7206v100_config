@@ -28,11 +28,8 @@ CONFIG_SYS_RX_ETH_BUFFER=16
 # CONFIG_PHY_HISI_USB is not set
 CONFIG_PHY_VENDOR_USB=y
 
-# No pad-mux table for this die in drivers/gpio/hi_padmux_tables.c; the
-# SDK does not publish the function names
-# CONFIG_HI_GPIO is not set
-# CONFIG_CMD_GPIO is not set
-# CONFIG_CMD_GPIO_READ is not set
+# GPIO: the openipc_config defaults (HI_GPIO, CMD_GPIO, CMD_GPIO_READ).
+# drivers/gpio/hi_padmux_tables.c lists only the pads the SDK documents.
 # No I2C driver for this SoC here
 # CONFIG_LHS_I2C is not set
 # CONFIG_CMD_LHS_I2C is not set
