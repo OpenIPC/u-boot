@@ -295,13 +295,15 @@ build_xmorca() {
         cp ${BOOT_BUILDDIR}/u-boot-xmorca.bin ${BOOT_BUILDDIR}/../u-boot-${soc}-${flash}.bin && \
         make ${MAKE_OPTS} u-boot-z.clean </dev/null >/dev/null || return 1
         # U-Boot must end before the DDR calibration area the boot header
-        # names (CONFIG_DDR_PARAM_OFFSET in include/configs/xmorca.h)
+        # names (CONFIG_DDR_PARAM_OFFSET in include/configs/xmorca.h); on
+        # NAND one spare 128 KiB block below it, as nand write skips bad
+        # blocks
         limit=$((0x3F000))
-        [ ${flash} = nand ] && limit=$((0x80000))
+        [ ${flash} = nand ] && limit=$((0x80000 - 0x20000))
         size=$(stat -c %s ${BOOT_BUILDDIR}/../u-boot-${soc}-${flash}.bin)
         if [ ${size} -gt ${limit} ]; then
-            echo "u-boot-${soc}-${flash}.bin is ${size} bytes, past the" \
-                "DDR calibration area at ${limit}" >&2
+            echo "u-boot-${soc}-${flash}.bin is ${size} bytes, over its" \
+                "${limit}-byte limit below the DDR calibration area" >&2
             return 1
         fi
     done

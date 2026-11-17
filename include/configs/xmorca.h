@@ -257,9 +257,11 @@
  * record is ~1 KiB (struct lpds_param, DDR_PARAM_SAVE_SIZE 0x800 in the
  * vendor kernel). So it goes in the boot partition, past U-Boot:
  *   NOR:  the last 4 KiB before env (0x3F000), U-Boot <= 252 KiB;
- *   NAND: 0x80000..0xC0000, U-Boot <= 512 KiB, 256 KiB = one or two
- *         erase blocks, so a bad block still leaves a good one.
- * build.sh checks that U-Boot ends before it.
+ *   NAND: 0x80000..0xC0000, 256 KiB = one or two erase blocks, so a bad
+ *         block still leaves a good one. U-Boot <= 384 KiB: ubwrite's
+ *         nand write skips bad blocks, so one spare 128 KiB block is kept
+ *         below the area.
+ * build.sh checks both limits.
  */
 #define CONFIG_AUXCODE_LOG_CTRL		1
 #define CONFIG_AUXCODE_SVB_CTRL		0
