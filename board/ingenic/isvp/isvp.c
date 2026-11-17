@@ -224,7 +224,7 @@ int board_eth_init(struct bd_info *bis)
 
 int checkboard(void)
 {
-	printf("Board: ISVP (Ingenic XBurst %s SoC)\n", CONFIG_PRODUCT_SOC);
+	printf("Board: ISVP (Ingenic XBurst %s SoC)\n", CONFIG_PRODUCT_SOCMODEL);
 	return 0;
 }
 

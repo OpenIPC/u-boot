@@ -182,7 +182,7 @@
 
 #define OPENIPC_LOADKERNEL "sf probe 0; sf read ${baseaddr} ${kernaddr} ${kernsize}"
 #define OPENIPC_ENV_MEDIUM \
-	"ubfile=u-boot-" CONFIG_PRODUCT_SOC "-nor.bin\0" \
+	"ubfile=u-boot-" CONFIG_PRODUCT_SOCMODEL "-nor.bin\0" \
 	"urfile=rootfs.squashfs." CONFIG_PRODUCT_SOC "\0" \
 	"kernaddr=" __stringify(OPENIPC_KERNADDR) "\0" \
 	"kernsize=" __stringify(OPENIPC_KERNSIZE) "\0" \
@@ -232,7 +232,7 @@
 
 #define OPENIPC_LOADKERNEL "ubi part ubi; ubifsmount ubi0:rootfs; ubifsload ${baseaddr} /boot/fitImage || ubifsload ${baseaddr} /boot/uImage"
 #define OPENIPC_ENV_MEDIUM \
-	"ubfile=u-boot-" CONFIG_PRODUCT_SOC "-nand.bin\0" \
+	"ubfile=u-boot-" CONFIG_PRODUCT_SOCMODEL "-nand.bin\0" \
 	"urfile=rootfs.ubifs." CONFIG_PRODUCT_SOC "\0" \
 	"ubwrite=nand erase 0x0 0xc0000; nand write ${baseaddr} 0x0 ${filesize}\0" \
 	"urwrite=ubi part ubi; ubi check rootfs && ubi remove rootfs; if ubi create rootfs ${filesize} d; then ubi check rootfs; else ubi remove rootfs_data; ubi create rootfs ${filesize} d; fi; ubi check rootfs_data || ubi create rootfs_data 0 d; ubi write ${baseaddr} rootfs ${filesize}\0" \
