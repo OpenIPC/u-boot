@@ -280,6 +280,8 @@ build_xmorca() {
     rm -rf ${BOOT_BUILDDIR}
     mkdir -p ${BOOT_BUILDDIR}
     cp openipc/${soc}_reginfo.bin ${BOOT_BUILDDIR}/.reg
+    # The first stage's Makefile does not follow the config: clean it after
+    # each image, or the NAND image keeps the NOR image's boot header.
     for flash in nor nand; do
         cat ${BOOT_SRCDIR}/openipc/openipc_config > ${BOOT_BUILDDIR}/.config && \
         cat ${BOOT_SRCDIR}/openipc/gk7206v100_config >> ${BOOT_BUILDDIR}/.config && \
@@ -290,7 +292,8 @@ build_xmorca() {
         make ${MAKE_OPTS} olddefconfig </dev/null >/dev/null && \
         make ${MAKE_OPTS} BOOT_SRCDIR=${BOOT_SRCDIR} </dev/null && \
         make ${MAKE_OPTS} u-boot-z.bin </dev/null && \
-        cp ${BOOT_BUILDDIR}/u-boot-xmorca.bin ${BOOT_BUILDDIR}/../u-boot-${soc}-${flash}.bin || return 1
+        cp ${BOOT_BUILDDIR}/u-boot-xmorca.bin ${BOOT_BUILDDIR}/../u-boot-${soc}-${flash}.bin && \
+        make ${MAKE_OPTS} u-boot-z.clean </dev/null >/dev/null || return 1
     done
 }
 
