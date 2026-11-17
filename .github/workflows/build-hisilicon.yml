@@ -81,11 +81,10 @@ jobs:
           - { soc: gk7205v510, kinds: "nor nand", files: "output/u-boot-gk7205v510-*.bin" }
           - { soc: gk7205v530, kinds: "nor nand", files: "output/u-boot-gk7205v530-*.bin" }
           - { soc: hi3516cv300, kinds: "nor nand", files: "output/u-boot-hi3516cv300-*.bin" }
-          # Goke GK7206V1 (Lotus xmorca). Built on every run, but held back
-          # from release/publish (hold: true) until the images have booted on
-          # hardware: there is no qemu-hisilicon model to smoke-test them.
-          - { soc: gk7206v11a, kinds: "nor nand", files: "output/u-boot-gk7206v11a-*.bin", hold: true }
-          - { soc: gk7206v12a, kinds: "nor nand", files: "output/u-boot-gk7206v12a-*.bin", hold: true }
+          # Goke GK7206V1 (Lotus xmorca). Released without a smoke leg:
+          # qemu-hisilicon has no model that boots them from flash yet.
+          - { soc: gk7206v11a, kinds: "nor nand", files: "output/u-boot-gk7206v11a-*.bin" }
+          - { soc: gk7206v12a, kinds: "nor nand", files: "output/u-boot-gk7206v12a-*.bin" }
           # --- NOR only ---
           - { soc: hi3516cv610, kinds: "nor", files: "output/boot-hi3516cv610-*-nor.bin" }
           - { soc: hi3516cv608, kinds: "nor", files: "output/boot-hi3516cv608-nor.bin" }
