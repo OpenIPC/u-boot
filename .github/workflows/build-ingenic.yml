@@ -213,7 +213,9 @@ jobs:
   # a second run from uploading between this run's upload and its report.
   publish:
     needs: [resolve, build]
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+    # Only from openipc: the site accepts the report from no other branch,
+    # and the upload to `latest` comes before the report.
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/openipc' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:

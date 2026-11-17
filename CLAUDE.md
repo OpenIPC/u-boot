@@ -304,17 +304,22 @@ The build logic lives here. Other branches call it:
 
 ## `build-ingenic.yml`
 
-- `resolve` -> `build` (matrix, one target per leg) -> `release`; no
-  `qemu`/`qemu_smoke`, since qemu-hisilicon has no Ingenic (MIPS) machine.
+- `resolve` -> `build` (matrix, one target per leg) -> `release` +
+  `publish`; no `qemu`/`qemu_smoke`, since qemu-hisilicon has no Ingenic
+  (MIPS) machine.
 - NOR on every leg: 256 KiB boot partition (the SPL in its 26 KiB slot,
   then the lzop-packed U-Boot), env at 0x40000. The T40 legs (`kinds:
   "nor nand"`) also build `-nand.bin`: 768 KiB boot partition (the SPL in
   its 27 KiB slot, U-Boot at 0x6c00), env at 0xc0000, openipc-hisilicon's
   UBI layout. The build legs install `gcc-mipsel-linux-gnu` and `lzop`.
-- **No `publish`:** the `u-boot-t*-nor.bin` names in OpenIPC/firmware
-  `latest` are OpenIPC/u-boot-ingenic's, which cameras run, and these
-  images have not booted on one. Add the job (and the openipc.org
-  allowlist entry) only after they have.
+- **`publish` uploads only `publish_targets`**, and only from a dispatch
+  on `openipc` (openipc.org accepts the report from no other branch; it
+  lists this workflow in its builds pushers, OpenIPC/website#591). The
+  default is the seven T41 targets, which have no other source in
+  OpenIPC/firmware `latest`. The `u-boot-t10..t31-nor.bin` names there are
+  OpenIPC/u-boot-ingenic's, which cameras run: add one of those targets to
+  a publish, or to the default, only after its image here has booted on a
+  camera.
 - Keep the build matrix and the README's list in step with the branch's
   `build.sh` `ALL_SOCS`.
 
