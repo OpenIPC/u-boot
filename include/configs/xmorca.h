@@ -6,6 +6,7 @@
 #define __XMORCA_H
 
 #include <linux/sizes.h>
+#include <linux/stringify.h>
 #include <asm/arch/platform.h>
 #include <linux/kconfig.h>
 
@@ -312,6 +313,13 @@
 #ifdef CONFIG_FMC_SPI_NAND
 #undef CONFIG_SYS_MALLOC_LEN
 #endif
+
+/*
+ * The console from the kernel's first lines (u-boot#67), in the vendor
+ * bootargs' form: UART0 is a PL011 here that wants 32-bit accesses.
+ */
+#define OPENIPC_EARLYCON "earlycon=pl011,mmio32," __stringify(UART0_REG_BASE) " "
+
 #include "openipc-common.h"
 
 #endif /* __XMORCA_H */
