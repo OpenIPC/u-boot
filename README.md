@@ -48,7 +48,7 @@
 | `gk7205v300` | Cortex-A7 | 128 MiB | NOR, NAND | Goke twin of the hi3516ev300 |
 | `gk7201v200` `gk7201v300` `gk7605v100` | Cortex-A7 | — | NOR, NAND | Goke, hi3516ev200 family |
 | `gk7205v500` `gk7205v510` `gk7205v530` | Cortex-A7 | — | NOR, NAND | |
-| `gk7206v11a` | Cortex-A7 ×2 | — | NOR, NAND | **held**: built, not released until booted on hardware |
+| `gk7206v11a` | Cortex-A7 ×2 | 128 MiB | NOR, NAND | **held**: built, not released until booted on hardware |
 | `gk7206v12a` | Cortex-A7 ×2 | 256 MiB | NOR, NAND | **held**: built, not released until booted on hardware |
 | `hi3516cv610` `hi3516cv608` | Cortex-A7 ×2 | 64 MiB | NOR | signed boot image, `boot-*.bin` |
 | `hi3519dv500` | Cortex-A55 (arm64) | external | NOR | signed boot image, 512 KiB boot partition |
