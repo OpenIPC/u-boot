@@ -232,12 +232,28 @@
 /*
  * Values the boot header hands the auxcode (Kconfig options in the SDK):
  * log level 1 = as the bootrom OTP says; SVB (adaptive voltage) on; and
- * where the SDK's ddr_param partition sits, read on resume from suspend.
+ * where the DDR calibration saved for resume from suspend sits in flash.
+ *
+ * The SDK's place for it, 0xC0000 (its ddr_param partition), is inside the
+ * firmware on OpenIPC's NOR layout (kernel at 0x50000) and is the env on
+ * its NAND layout (768k(boot),256k(env)). Only the vendor's suspend library
+ * (libxmedia_pm) writes it, to the MTD partition named "ddr_param"; the
+ * record is ~1 KiB (struct lpds_param, DDR_PARAM_SAVE_SIZE 0x800 in the
+ * vendor kernel). So it goes in the boot partition, past U-Boot:
+ *   NOR:  the last 4 KiB before env (0x3F000), U-Boot <= 252 KiB;
+ *   NAND: 0x80000..0xC0000, U-Boot <= 512 KiB, 256 KiB = one or two
+ *         erase blocks, so a bad block still leaves a good one.
+ * build.sh checks that U-Boot ends before it.
  */
 #define CONFIG_AUXCODE_LOG_CTRL		1
 #define CONFIG_AUXCODE_SVB_CTRL		0
-#define CONFIG_DDR_PARAM_OFFSET		0xC0000
-#define CONFIG_DDR_PARAM_SIZE		0x80000
+#ifdef CONFIG_FMC_SPI_NAND
+#define CONFIG_DDR_PARAM_OFFSET		0x80000
+#define CONFIG_DDR_PARAM_SIZE		0x40000
+#else
+#define CONFIG_DDR_PARAM_OFFSET		0x3F000
+#define CONFIG_DDR_PARAM_SIZE		0x1000
+#endif
 
 #define CONFIG_SCS_SIMULATE_FLAG	0x69875AB4 /* no verify   */
 #define CONFIG_FLASH_EMPYT_FLAG		0x435A590D /* not empty  */
