@@ -153,7 +153,11 @@ static int fh_mdio(int addr, int reg, int write, u16 val)
 #define fh_mdio_read(a, r)	fh_mdio(a, r, 0, 0)
 #define fh_mdio_write(a, r, v)	fh_mdio(a, r, 1, v)
 
-/* The first address answering with a PHY ID, or -1 */
+/*
+ * The first address answering with a PHY ID, or -1. An all-ones half is
+ * the bus floating, not an ID: an FH8852V200 with no PHY on the pads reads
+ * 0x0000/0xffff at address 0, and taking that kept the internal PHY off.
+ */
 static int fh_phy_find(u32 *id)
 {
 	int addr;
@@ -162,7 +166,7 @@ static int fh_phy_find(u32 *id)
 		int hi = fh_mdio_read(addr, MII_PHYSID1);
 		int lo = fh_mdio_read(addr, MII_PHYSID2);
 
-		if (hi < 0 || lo < 0 || (hi == 0xffff && lo == 0xffff) ||
+		if (hi < 0 || lo < 0 || hi == 0xffff || lo == 0xffff ||
 		    (!hi && !lo))
 			continue;
 		*id = hi << 16 | lo;
