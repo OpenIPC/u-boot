@@ -331,9 +331,11 @@ Every infinity2m, infinity6, 6b0, 6e and 6c part also builds for SPI NAND,
 | `t41n` `t41nq` `t41a` | XBurst2 ×2 | 128 MiB DDR3 | NOR | |
 | `t41zx` `t41xq` | XBurst2 ×2 | 256 MiB DDR3 | NOR | |
 
-- The images are not published to OpenIPC/firmware, where cameras keep
-  using [OpenIPC/u-boot-ingenic](https://github.com/OpenIPC/u-boot-ingenic)'s.
-  Its target names are kept here; `l` parts run at lower clocks.
+- Only the T41 images are published to OpenIPC/firmware, which has no
+  other T41 bootloader. For T10 to T31, cameras keep using
+  [OpenIPC/u-boot-ingenic](https://github.com/OpenIPC/u-boot-ingenic)'s
+  images there until these have booted on cameras. Its target names are
+  kept here; `l` parts run at lower clocks.
 - The image is the vendor SPL, built from source, followed by U-Boot
   (lzop). On NOR, U-Boot starts at `0x6800`; on NAND, at `0x6c00`.
 - Building needs `mipsel-linux-gnu-` and `lzop`. For `.img` recovery
@@ -533,9 +535,10 @@ gh workflow run build-<vendor>.yml -f release=true                   # + this re
 gh workflow run build-<vendor>.yml -f release=true -f publish=true   # + OpenIPC/firmware latest and openipc.org
 ```
 
-`publish` needs a `FIRMWARE_RELEASE_TOKEN` secret. Ingenic has no
-`publish`; SigmaStar's is commented out for now, so its images go only to
-this repository's `sigmastar` release. Held SoCs are never released.
+`publish` needs a `FIRMWARE_RELEASE_TOKEN` secret. Ingenic's publishes
+only its `publish_targets`, the T41 ones by default; SigmaStar's is
+commented out for now, so its images go only to this repository's
+`sigmastar` release. Held SoCs are never released.
 
 **Adding a vendor:** push the port on a new `openipc-<vendor>` branch,
 add `build-<vendor>.yml` here, and add a row and a section to this

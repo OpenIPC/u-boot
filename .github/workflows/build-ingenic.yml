@@ -4,7 +4,7 @@ on:
   # Pull requests against this branch change the workflow itself; they
   # build the current openipc-ingenic.  Code changes reach it through
   # workflow_call from the caller on openipc-ingenic, which passes the revision
-  # to build.  Only workflow_dispatch can release.
+  # to build.  Only workflow_dispatch can release or publish.
   pull_request:
     branches: [openipc]
     paths:
@@ -21,13 +21,28 @@ on:
         description: Publish to this repo's Ingenic release
         type: boolean
         default: false
+      publish:
+        description: Publish the targets below to OpenIPC/firmware latest and report them to openipc.org
+        type: boolean
+        default: false
+      # firmware's `latest` already holds u-boot-<t10..t31>-nor.bin from
+      # OpenIPC/u-boot-ingenic, and cameras run those. A publish replaces
+      # only the targets named here: by default the T41 ones, which have no
+      # other source. Name a target already there only once its image here
+      # has booted on cameras.
+      publish_targets:
+        description: Targets to publish (space-separated matrix soc names)
+        type: string
+        default: t41a t41l t41lq t41n t41nq t41xq t41zx
 
-# The shape of build-hisilicon.yml, without its qemu legs and publish:
-#   build (matrix, every target) -> release (own, `release` input).
-# qemu-hisilicon has no Ingenic (MIPS) machine, so nothing is smoke-tested,
-# and these images are not published to OpenIPC/firmware `latest`: the
-# u-boot-<target>-nor.bin there are OpenIPC/u-boot-ingenic's, which cameras
-# run. Add a publish job only once these have booted on cameras.
+# The shape of build-hisilicon.yml, without its qemu legs:
+#   build (matrix, every target) -> release (own, `release` input) +
+#   publish (OpenIPC/firmware latest + openipc.org report, `publish` input,
+#   only the `publish_targets`).
+# qemu-hisilicon has no Ingenic (MIPS) machine, so nothing is smoke-tested.
+# The u-boot-<t10..t31>-nor.bin in OpenIPC/firmware `latest` are
+# OpenIPC/u-boot-ingenic's, which cameras run, so a publish uploads only the
+# targets it is given, the T41 ones by default (see `publish_targets`).
 # build.sh takes targets as arguments; the matrix calls it with one per leg.
 
 jobs:
@@ -188,3 +203,95 @@ jobs:
           prerelease: true
           files: artifacts/**/*.bin
           fail_on_unmatched_files: true
+
+  # Publish the named targets' images to the OpenIPC/firmware `latest`
+  # release and tell openipc.org what was uploaded. openipc.org builds its
+  # full-flash downloads from those binaries and refuses any whose size and
+  # sha256 differ from its record, so a report must describe exactly the
+  # bytes `latest` holds; it accepts the report only from this workflow on
+  # the openipc branch (its builds pushers list). The concurrency group keeps
+  # a second run from uploading between this run's upload and its report.
+  publish:
+    needs: [resolve, build]
+    # Only from openipc: the site accepts the report from no other branch,
+    # and the upload to `latest` comes before the report.
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/openipc' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: publish-firmware-latest
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: u-boot-*
+
+      # Each matrix leg uploads its images as artifact u-boot-<soc>, so the
+      # artifact directory names the target. A named target with no artifact
+      # stops the publish before anything is uploaded.
+      - name: Select the targets to publish
+        env:
+          TARGETS: ${{ inputs.publish_targets }}
+        run: |
+          set -eu
+          mkdir published
+          [ -n "${TARGETS//[[:space:]]/}" ] || { echo "::error::publish_targets is empty" >&2; exit 1; }
+          for t in $TARGETS; do
+            case "$t" in *[!a-z0-9]*) echo "::error::$t is not a target name" >&2; exit 1 ;; esac
+            [ -d "artifacts/u-boot-$t" ] || { echo "::error::no artifact for $t" >&2; exit 1; }
+            find "artifacts/u-boot-$t" -type f -name '*.bin' -exec cp {} published/ \;
+          done
+          ls -l published
+
+      - name: Upload to OpenIPC/firmware latest release
+        env:
+          GH_TOKEN: ${{ secrets.FIRMWARE_RELEASE_TOKEN }}
+        run: |
+          set -eu
+          # Releases API occasionally returns 502/503. Retry with backoff:
+          # 10s, 20s, 30s, 40s — total ~100s before giving up.
+          upload() {
+            local f="$1" i
+            for i in 1 2 3 4 5; do
+              if gh release upload latest "$f" --clobber -R OpenIPC/firmware; then
+                return 0
+              fi
+              [ "$i" = "5" ] && return 1
+              echo "upload attempt $i failed; sleeping $((i*10))s" >&2
+              sleep $((i*10))
+            done
+          }
+          find published -type f -name '*.bin' | sort | while read -r f; do
+            echo "publishing $f"
+            upload "$f"
+          done
+
+      # The push script is OpenIPC/firmware's, at a fixed commit: the only
+      # code this job checks out, since it holds an id-token.
+      - uses: actions/checkout@v4
+        with:
+          repository: OpenIPC/firmware
+          ref: 7fa63ce694cb5d27c19d4f19058ba2c044849db4
+          sparse-checkout: .github/scripts
+          path: firmware
+
+      # The contract is PUSH.md in OpenIPC/website (source `uboot`, release
+      # `latest`, one id per run). The digests are of the files uploaded
+      # above, hashed here, so the push describes exactly those bytes.
+      - name: Report to openipc.org
+        env:
+          INGENIC_SHA: ${{ needs.resolve.outputs.sha }}
+        run: |
+          set -eu
+          python3 firmware/.github/scripts/push_build.py \
+            --source uboot \
+            --build-id "uboot-$(date -u +%Y%m%dT%H%M%SZ)-${INGENIC_SHA::7}" \
+            --release latest \
+            --sha "$INGENIC_SHA" \
+            --built-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --assets 'published/*.bin'
