@@ -109,6 +109,17 @@ static void wait_sampl_dll_slave_ready(struct sdhci_host *host)
 static void enable_edge_tuning(struct sdhci_host *host)
 {
 	unsigned int reg;
+#ifdef CONFIG_TARGET_XMORCA
+	/* xmorca: each port has its own SAMPLB word, the fields at other bits */
+	const int emmc = (host->type == MMC_TYPE_MMC);
+	const uintptr_t samplb = emmc ? REG_EMMC_SAMPLB_DLL_CTRL :
+					REG_SDIO0_SAMPLB_DLL_CTRL;
+
+	reg = readl(samplb);
+	reg &= ~(emmc ? EMMC_SAMPLB_DLL_CLK_MASK : SDIO_SAMPLB_DLL_CLK_MASK);
+	reg |= emmc ? emmc_samplb_sel(8) : sdio_samplb_sel(8); /* sel 8 */
+	writel(reg, samplb);
+#else
 
 	reg = readl(REG_EMMC_SAMPLB_DLL_CTRL);
 	reg &= ~SDIO_SAMPLB_DLL_CLK_MASK;
@@ -121,6 +132,7 @@ static void enable_edge_tuning(struct sdhci_host *host)
 #endif
 
 	writel(reg, REG_EMMC_SAMPLB_DLL_CTRL);
+#endif
 
 	reg = sdhci_readl(host, SDHCI_MULTI_CYCLE);
 	reg |= SDHCI_EDGE_DETECT_EN;
@@ -273,7 +285,7 @@ void sdhci_set_host_caps(struct sdhci_host *host)
 	host->host_caps = MMC_MODE_HS | MMC_MODE_HS_52MHz |
 			  MMC_MODE_HS200 | MMC_MODE_4BIT;
 
-#if !(defined(CONFIG_TARGET_XM72050200) || defined(CONFIG_TARGET_XM72020300) || defined(CONFIG_TARGET_XM72050500) || defined(CONFIG_TARGET_XM720XXX) || defined(CONFIG_TARGET_XM72010200) || defined(CONFIG_TARGET_XM72010300))
+#if !(defined(CONFIG_TARGET_XM72050200) || defined(CONFIG_TARGET_XM72020300) || defined(CONFIG_TARGET_XM72050500) || defined(CONFIG_TARGET_XM720XXX) || defined(CONFIG_TARGET_XM72010200) || defined(CONFIG_TARGET_XM72010300) || defined(CONFIG_TARGET_XMORCA))
 
 	host->host_caps |= MMC_MODE_HS400_ES | MMC_MODE_HS400 |
 			   MMC_MODE_8BIT;

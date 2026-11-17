@@ -6,6 +6,7 @@
 #define __XMORCA_H
 
 #include <linux/sizes.h>
+#include <linux/stringify.h>
 #include <asm/arch/platform.h>
 #include <linux/kconfig.h>
 
@@ -99,6 +100,21 @@
 *-----------------------------------------------------------------------
 */
 #define CONFIG_MISC_INIT_R
+
+/*
+ * The SD slot (SDIO0, 0x10040000) for OpenIPC's SD recovery, as mmc 0.
+ * 50 MHz is the vendor DTS's max-frequency for it; without the 1.8V pad
+ * switch there are no UHS modes, so no tuning either.
+ */
+#ifdef CONFIG_MMC
+#define CONFIG_GENERIC_MMC
+#define CONFIG_SYS_MMC_ENV_DEV		0
+#define CONFIG_SDHCI
+#define CONFIG_XMEDIA_SDHCI
+#define CONFIG_XMEDIA_SDHCI_MAX_FREQ	50000000
+#define CONFIG_BOUNCE_BUFFER
+#define CONFIG_SDHCI_ADMA
+#endif
 
 /* Command line configuration */
 #define CONFIG_MENU
@@ -232,12 +248,30 @@
 /*
  * Values the boot header hands the auxcode (Kconfig options in the SDK):
  * log level 1 = as the bootrom OTP says; SVB (adaptive voltage) on; and
- * where the SDK's ddr_param partition sits, read on resume from suspend.
+ * where the DDR calibration saved for resume from suspend sits in flash.
+ *
+ * The SDK's place for it, 0xC0000 (its ddr_param partition), is inside the
+ * firmware on OpenIPC's NOR layout (kernel at 0x50000) and is the env on
+ * its NAND layout (768k(boot),256k(env)). Only the vendor's suspend library
+ * (libxmedia_pm) writes it, to the MTD partition named "ddr_param"; the
+ * record is ~1 KiB (struct lpds_param, DDR_PARAM_SAVE_SIZE 0x800 in the
+ * vendor kernel). So it goes in the boot partition, past U-Boot:
+ *   NOR:  the last 4 KiB before env (0x3F000), U-Boot <= 252 KiB;
+ *   NAND: 0x80000..0xC0000, 256 KiB = one or two erase blocks, so a bad
+ *         block still leaves a good one. U-Boot <= 384 KiB: ubwrite's
+ *         nand write skips bad blocks, so one spare 128 KiB block is kept
+ *         below the area.
+ * build.sh checks both limits.
  */
 #define CONFIG_AUXCODE_LOG_CTRL		1
 #define CONFIG_AUXCODE_SVB_CTRL		0
-#define CONFIG_DDR_PARAM_OFFSET		0xC0000
-#define CONFIG_DDR_PARAM_SIZE		0x80000
+#ifdef CONFIG_FMC_SPI_NAND
+#define CONFIG_DDR_PARAM_OFFSET		0x80000
+#define CONFIG_DDR_PARAM_SIZE		0x40000
+#else
+#define CONFIG_DDR_PARAM_OFFSET		0x3F000
+#define CONFIG_DDR_PARAM_SIZE		0x1000
+#endif
 
 #define CONFIG_SCS_SIMULATE_FLAG	0x69875AB4 /* no verify   */
 #define CONFIG_FLASH_EMPYT_FLAG		0x435A590D /* not empty  */
@@ -281,6 +315,13 @@
 #ifdef CONFIG_FMC_SPI_NAND
 #undef CONFIG_SYS_MALLOC_LEN
 #endif
+
+/*
+ * The console from the kernel's first lines (u-boot#67), in the vendor
+ * bootargs' form: UART0 is a PL011 here that wants 32-bit accesses.
+ */
+#define OPENIPC_EARLYCON "earlycon=pl011,mmio32," __stringify(UART0_REG_BASE) " "
+
 #include "openipc-common.h"
 
 #endif /* __XMORCA_H */

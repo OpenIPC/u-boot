@@ -11,6 +11,9 @@
 #include <linux/mtd/mtd.h>
 #include <nand.h>
 #include <netdev.h>
+#include <mmc.h>
+#include <sdhci.h>
+#include <cpu_common.h>
 #include <env.h>
 #include <asm/sections.h>
 #include <asm/mach-types.h>
@@ -99,6 +102,24 @@ int board_init(void)
 
 	return 0;
 }
+
+#ifdef CONFIG_GENERIC_MMC
+/* The SD slot only: OpenIPC boots from SPI flash and recovers from SD */
+int board_mmc_init(struct bd_info *bis)
+{
+	int ret;
+
+	ret = sdhci_add_port(0, SDIO0_BASE_REG, MMC_TYPE_SD);
+	if (ret)
+		return ret;
+
+	ret = bsp_mmc_init(0);
+	if (ret)
+		printf("No SD device found !\n");
+
+	return ret;
+}
+#endif
 
 int dram_init(void)
 {

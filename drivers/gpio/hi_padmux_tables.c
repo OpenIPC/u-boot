@@ -2195,6 +2195,59 @@ const struct hi_muxctrl hi_muxctrl_table[] = {
 
 const int hi_muxctrl_count = ARRAY_SIZE(hi_muxctrl_table);
 
+#elif defined(CONFIG_TARGET_XMORCA)
+/*
+ * Goke GK7206V1 (xmorca). Neither ipctool nor the SDK carries this die's
+ * pin-out table (the vendor's 7206V11A&7206V11AT&7206V12A_PIN_OUT.xlsx is
+ * not shipped), so only the pads whose functions the ShiMetaPi Pico-G1 SDK
+ * documents are listed: its board register patch (xm7206v11a.txt), its
+ * init scripts and its peripheral apps (source/app/{gas_sensor,servo_ctrl,
+ * sonic_display,...}). "reserved" here means "not known". A GPIO missing
+ * from the table still works; `gpio` just leaves its pad mux alone.
+ * Note that GPIO4_4..GPIO4_6 are JTAG at reset and GPIO only at func5.
+ */
+const char hi_muxctrl_names[] =
+	"\0reserved\0GPIO0_0\0GPIO0_1\0GPIO1_0\0LSADC_CH0\0GPIO1_1\0LSADC"
+	"_CH1\0GPIO1_2\0LSADC_CH2\0GPIO1_6\0I2C2_SDA\0GPIO3_5\0UART1_TXD\0"
+	"GPIO3_6\0UART1_RXD\0GPIO4_1\0I2C3_SCL\0JTAG_TDI\0GPIO4_4\0JTAG_T"
+	"DO\0GPIO4_5\0JTAG_TRSTN\0GPIO4_6\0GPIO4_7\0SPI2_SCLK\0GPIO5_0\0S"
+	"PI2_SDO\0GPIO5_1\0SPI2_CSN\0GPIO5_2\0GPIO5_3\0GPIO5_4\0GPIO5_5\0"
+	"GPIO5_6\0GPIO6_0\0GPIO6_5\0GPIO6_6\0GPIO6_7\0GPIO7_0\0GPIO7_2\0G"
+	"PIO7_4\0"
+;
+
+const struct hi_muxctrl hi_muxctrl_table[] = {
+	{0x112c0000, {0x000a}},
+	{0x112c0004, {0x0012}},
+	{0x12090000, {0x001a, 0x0001, 0x0001, 0x0001, 0x0022}},
+	{0x12090004, {0x002c, 0x0001, 0x0001, 0x0001, 0x0034}},
+	{0x12090008, {0x003e, 0x0001, 0x0001, 0x0001, 0x0046}},
+	{0x11980018, {0x0050, 0x0001, 0x0058}},
+	{0x100c0000, {0x0061, 0x0001, 0x0001, 0x0069}},
+	{0x100c0004, {0x0073, 0x0001, 0x0001, 0x007b}},
+	{0x100c0010, {0x0085, 0x0001, 0x008d}},
+	{0x100c001c, {0x0096, 0x0001, 0x0001, 0x0001, 0x0001, 0x009f}},
+	{0x100c0020, {0x00a7, 0x0001, 0x0001, 0x0001, 0x0001, 0x00b0}},
+	{0x100c0024, {0x00b8, 0x0001, 0x0001, 0x0001, 0x0001, 0x00c3}},
+	{0x100c0028, {0x00cb, 0x0001, 0x0001, 0x0001, 0x00d3}},
+	{0x100c002c, {0x00dd, 0x0001, 0x0001, 0x0001, 0x00e5}},
+	{0x100c0030, {0x00ee, 0x0001, 0x0001, 0x0001, 0x00f6}},
+	{0x100c0034, {0x00ff}},
+	{0x100c0038, {0x0107}},
+	{0x100c003c, {0x010f}},
+	{0x100c0040, {0x0117}},
+	{0x100c0044, {0x011f}},
+	{0x100c004c, {0x0127}},
+	{0x100c0060, {0x012f}},
+	{0x100c0064, {0x0137}},
+	{0x100c0068, {0x013f}},
+	{0x100c006c, {0x0147}},
+	{0x100c0074, {0x014f}},
+	{0x100c007c, {0x0157}},
+};
+
+const int hi_muxctrl_count = ARRAY_SIZE(hi_muxctrl_table);
+
 #elif defined(CONFIG_TARGET_HI3520DV100_FAMILY)
 /*
  * No pad-mux data for the Hi3520 family yet: its pads are muxed through
