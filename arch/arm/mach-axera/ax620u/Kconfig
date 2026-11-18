@@ -1,0 +1,27 @@
+config AXERA_AX620U
+	bool "Axera AX620U"
+	select CPU_V7A
+	select SYS_ARCH_TIMER
+	select DM
+	select DM_SERIAL
+	select OF_CONTROL
+	# board_nand_init() makes the SPI NAND nand0
+	select SYS_NAND_SELF_INIT if MTD_SPI_NAND && MTD_RAW_NAND
+	help
+	  Axera AX620U (devicetree "axera,ax620x"): four Cortex-A7 cores
+	  in AArch32, a die of its own rather than an AX620E part. The
+	  vendor SPL (flash 0, 1 MiB, signed) sets up the DDR and the
+	  clocks and loads U-Boot from the boot partition at 0x100000.
+
+if AXERA_AX620U
+
+config SYS_SOC
+	default "ax620u"
+
+config SYS_BOARD
+	default "ax620u"
+
+config SYS_CONFIG_NAME
+	default "ax620u"
+
+endif

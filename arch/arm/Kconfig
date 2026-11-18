@@ -597,6 +597,14 @@ choice
 	prompt "Target select"
 	default TARGET_HIKEY
 
+config ARCH_AXERA
+	bool "Axera camera SoCs"
+	help
+	  Axera's camera SoCs. U-Boot runs after the vendor's first stage
+	  (SPL), which sets up the DDR and the clocks and loads it from the
+	  boot partition. Each SoC selects its own CPU in
+	  arch/arm/mach-axera/<soc>/Kconfig.
+
 config ARCH_AT91
 	bool "Atmel AT91"
 	select GPIO_EXTRA_HEADER
@@ -2181,6 +2189,8 @@ source "arch/arm/mach-apple/Kconfig"
 source "arch/arm/mach-aspeed/Kconfig"
 
 source "arch/arm/mach-at91/Kconfig"
+
+source "arch/arm/mach-axera/Kconfig"
 
 source "arch/arm/mach-bcm283x/Kconfig"
 

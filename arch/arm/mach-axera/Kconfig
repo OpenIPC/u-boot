@@ -1,0 +1,22 @@
+if ARCH_AXERA
+
+config SYS_VENDOR
+	default "axera"
+
+#
+# One directory per SoC, arch/arm/mach-axera/<soc>/: its Kconfig
+# (AXERA_<SOC>, the CPU it selects, SYS_SOC, its boards) and its code.
+# The SoCs come in separate ports, each sourcing its Kconfig under its
+# own heading below; the headings are kept apart so they merge cleanly.
+#
+
+# AX620E family (AX620E, AX630C, AX620Q)
+
+#
+# AX620U: a die of its own ("axera,ax620x"), not an AX620E part
+#
+
+# AX620U
+source "arch/arm/mach-axera/ax620u/Kconfig"
+
+endif

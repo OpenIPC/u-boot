@@ -39,6 +39,8 @@ dtb-$(CONFIG_ARCH_APPLE) += \
 	t8103-j456.dtb \
 	t8103-j457.dtb
 
+dtb-$(CONFIG_AXERA_AX620U) += ax620u-nand.dtb
+
 dtb-$(CONFIG_ARCH_DAVINCI) += \
 	da850-evm.dtb \
 	da850-lcdk.dtb \
