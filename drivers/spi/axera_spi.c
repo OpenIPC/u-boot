@@ -139,8 +139,13 @@ static int ax_spi_xfer(struct udevice *dev, unsigned int bitlen,
 		} else {
 			ax_spi_enable(priv, 1);
 			while (done < len) {
-				n = priv->fifo_len -
-				    readl(priv->regs + DW_SPI_TXFLR);
+				/* room in the FIFO, or give up as reads do */
+				ret = readl_poll_timeout(priv->regs + DW_SPI_TXFLR,
+							 n, n < priv->fifo_len,
+							 AX_SPI_TIMEOUT_US);
+				if (ret)
+					break;
+				n = priv->fifo_len - n;
 				while (n-- && done < len)
 					writel(tx[done++], priv->regs + DW_SPI_DR);
 			}
@@ -162,9 +167,18 @@ static int ax_spi_xfer(struct udevice *dev, unsigned int bitlen,
 	return ret;
 }
 
+/*
+ * Every phase goes out on one data line (ax_spi_xfer() programs standard
+ * SPI only), and the dummy cycles are not sent: no dual or quad
+ * operation, whatever bus width the flash's node allows, and no dummy
+ * bytes.
+ */
 static bool ax_spi_supports_op(struct spi_slave *slave,
 			       const struct spi_mem_op *op)
 {
+	if (op->cmd.buswidth > 1 || op->addr.buswidth > 1 ||
+	    op->dummy.buswidth > 1 || op->data.buswidth > 1)
+		return false;
 	if (op->dummy.nbytes)
 		return false;
 	return spi_mem_default_supports_op(slave, op);
