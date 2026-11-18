@@ -1191,7 +1191,7 @@ static void nor_split_fwsize(void)
 
 int openipc_helper(void) {
   char msize[16];
-  sprintf(msize, "%ldM", gd->ram_size / 1024 / 1024);
+  sprintf(msize, "%luM", (ulong)(gd->ram_size / 1024 / 1024));
   env_set("totalmem", msize);
 
 #if !defined(OPENIPC_SPI_NAND) && defined(CONFIG_OPENIPC_NOR_SPLIT)
