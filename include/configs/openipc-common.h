@@ -16,7 +16,8 @@
  *     OPENIPC_NAND_MTDPARTS  partition list, ending in "-(ubi)"
  *     OPENIPC_NAND_UBI_MTD   the ubi partition's index, for ubi.mtd=
  *     OPENIPC_NAND_BOOT_SIZE the boot partition's size: ubwrite's limit
- *   SPI NOR: the layout every OpenIPC NOR camera shares (below).
+ *   SPI NOR: the layout every OpenIPC NOR camera shares (below); the boot
+ *     partition ends at CONFIG_ENV_OFFSET, ubwrite's limit.
  */
 
 #ifndef __OPENIPC_COMMON_H
@@ -123,7 +124,46 @@
 
 #define CONFIG_BOOTARGS "mem=\\${osmem} console=ttyS0,115200 panic=20 root=/dev/mtdblock3 rootfstype=squashfs init=/init mtdparts=\\${mtdparts} \\${extras}"
 
+/*
+ * Recovery: the rootfs is fetched first so its size selects the NOR schema,
+ * starting from the lite layout. The split layout (CONFIG_OPENIPC_NOR_SPLIT)
+ * takes the whole firmware file instead, written where the firmware starts,
+ * when the server has one that fits the firmware area; else the fixed-slot
+ * pair as before. common/openipc.c turns a saved fwupd of exactly the legacy
+ * form into the split one. As on openipc-sigmastar.
+ */
+#ifdef CONFIG_OPENIPC_NOR_SPLIT
+/* the split package's image; spelled out, as urfile is: U-Boot does not
+ * expand a variable inside another's value */
+#define OPENIPC_FW_FILE		"firmware.bin." CONFIG_PRODUCT_SOC
+#define OPENIPC_FWUPD_SPLIT_CMD \
+	"if ${source} ${baseaddr} ${fwfile} && itest ${filesize} -gt 0 && itest ${filesize} -le ${fwsize}; " \
+	"then run fwwrite; else run mtdslite; run ur; run uk; fi"
+#define OPENIPC_FWUPD_LEGACY_CMD "run mtdslite; run ur; run uk"
+/*
+ * The whole firmware area (the scan sets fwsize to the end of the chip), and
+ * only for a file that fits it: an oversized download must not erase the
+ * firmware it cannot replace.
+ */
+#define OPENIPC_FWWRITE_SPLIT_CMD \
+	"sf probe 0; if itest ${filesize} -gt 0; then if itest ${filesize} -le ${fwsize}; then " \
+	"sf erase ${kernaddr} ${fwsize}; sf write ${baseaddr} ${kernaddr} ${filesize}; " \
+	"else echo fwwrite: ${filesize} bytes do not fit ${fwsize} from ${kernaddr}, nothing written; fi; " \
+	"else echo fwwrite: empty file, nothing written; fi"
+#define OPENIPC_FWUPD \
+	"fwfile=" OPENIPC_FW_FILE "\0" \
+	"fwupd=" OPENIPC_FWUPD_SPLIT_CMD "\0"
+#define OPENIPC_FWWRITE "fwwrite=" OPENIPC_FWWRITE_SPLIT_CMD "\0"
+#else
 #define OPENIPC_FWUPD "fwupd=run mtdslite; run ur; run uk\0"
+#define OPENIPC_FWWRITE \
+	"fwwrite=sf probe 0; sf erase ${kernaddr} ${filesize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0"
+#endif
+
+/* ubwrite before it kept to the boot partition: it erased the env too */
+#define OPENIPC_RETIRED_MEDIUM \
+	"ubwrite=sf probe 0; sf erase 0x0 ${kernaddr}; sf write ${baseaddr} 0x0 ${filesize}\0"
+
 #define OPENIPC_LOADKERNEL "sf probe 0; sf read ${baseaddr} ${kernaddr} ${kernsize}"
 #define OPENIPC_ENV_MEDIUM \
 	"ubfile=u-boot-" CONFIG_PRODUCT_SOC "-nor.bin\0" \
@@ -134,10 +174,10 @@
 	"rootsize=" __stringify(OPENIPC_ROOTSIZE) "\0" \
 	"mtdslite=setenv kernaddr " __stringify(OPENIPC_KERNADDR) "; setenv kernsize 0x200000; setenv rootaddr 0x250000; setenv rootsize 0x500000\0" \
 	"mtdsultimate=setenv kernsize 0x300000; setenv rootaddr 0x350000; setenv rootsize 0xa00000\0" \
-	"ubwrite=sf probe 0; sf erase 0x0 ${kernaddr}; sf write ${baseaddr} 0x0 ${filesize}\0" \
+	"ubwrite=if itest ${filesize} -gt 0 && itest ${filesize} -le " __stringify(CONFIG_ENV_OFFSET) "; then sf probe 0 && sf erase 0x0 " __stringify(CONFIG_ENV_OFFSET) " && sf write ${baseaddr} 0x0 ${filesize}; else echo ubwrite: ${filesize} bytes do not fit the boot partition, nothing written; fi\0" \
 	"ukwrite=sf probe 0; sf erase ${kernaddr} ${kernsize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0" \
 	"urwrite=sf probe 0; if itest ${filesize} -gt 500000; then run mtdsultimate; fi; sf erase ${rootaddr} ${rootsize}; sf write ${baseaddr} ${rootaddr} ${filesize}\0" \
-	"fwwrite=sf probe 0; sf erase ${kernaddr} ${filesize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0" \
+	OPENIPC_FWWRITE \
 	"loadkernel=" OPENIPC_LOADKERNEL "\0" \
 	"mtdids=" SFC "\0" \
 	"mtds=" OPENIPC_MTDPARTS "\0" \
