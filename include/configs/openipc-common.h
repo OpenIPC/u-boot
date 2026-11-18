@@ -68,6 +68,16 @@
  * kernel that loads but never boots still comes to altbootcmd past
  * bootlimit, which does not reset.
  */
+/*
+ * What earlier builds of this tree saved for commands since replaced, as
+ * "name=value\0" pairs: openipc_helper() puts today's default in place of a
+ * saved value that is exactly one of these (an edited one stays), so a
+ * board that saved its environment under an older U-Boot gets the fixes.
+ */
+#define OPENIPC_RETIRED_COMMON \
+	"fwrecovery=if env exists bootfail; then run fwupd; sleep 5; reset; fi\0" \
+	"bootflash=run fwrecovery; setenv setargs setenv bootargs ${bootargs}; run setargs; run loadkernel; bootm ${baseaddr}; reset\0"
+
 #if defined(CONFIG_CMD_NET) || defined(CONFIG_MMC) || defined(CONFIG_USB_STORAGE)
 #define OPENIPC_RECOVERY \
 	"fwrecovery=if env exists bootfail; then run fwupd; sleep 5; reset; fi\0" \
@@ -160,6 +170,11 @@
  */
 #define OPENIPC_FWUPD "fwupd=run ur\0"
 
+/* ubwrite and urwrite before fwfit (#135) */
+#define OPENIPC_RETIRED_MEDIUM \
+	"ubwrite=if itest ${filesize} -gt 0 && itest ${filesize} -le " __stringify(OPENIPC_NAND_BOOT_SIZE) "; then nand erase.part boot; nand write ${baseaddr} boot ${filesize}; else echo ubwrite: ${filesize} bytes do not fit the boot partition, nothing written; fi\0" \
+	"urwrite=ubi part ubi; ubi check rootfs && ubi remove rootfs; if ubi create rootfs ${filesize} d; then ubi check rootfs; else ubi remove rootfs_data; ubi create rootfs ${filesize} d; fi; ubi check rootfs_data || ubi create rootfs_data 0 d; ubi write ${baseaddr} rootfs ${filesize}\0"
+
 #define OPENIPC_LOADKERNEL "ubi part ubi; ubifsmount ubi0:rootfs; ubifsload ${baseaddr} /boot/fitImage || ubifsload ${baseaddr} /boot/uImage"
 #define OPENIPC_ENV_MEDIUM \
 	"ubfile=u-boot-" CONFIG_PRODUCT_SOC "-nand.bin\0" \
@@ -173,6 +188,11 @@
 	"bootargs=" CONFIG_BOOTARGS
 
 #endif /* CONFIG_ENV_IS_IN_NAND */
+
+#ifndef OPENIPC_RETIRED_MEDIUM
+#define OPENIPC_RETIRED_MEDIUM ""
+#endif
+#define OPENIPC_RETIRED_ENV OPENIPC_RETIRED_COMMON OPENIPC_RETIRED_MEDIUM
 
 #define CONFIG_BOOTCOMMAND "run bootflash"
 

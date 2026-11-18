@@ -3,6 +3,7 @@
 #include <command.h>
 #include <common.h>
 #include <env.h>
+#include <env_internal.h>
 #include <fs.h>
 #include <image.h>
 #include <init.h>
@@ -1121,6 +1122,46 @@ static void altbootcmd_migrate(void) {
   env_save();
 }
 
+#ifdef OPENIPC_RETIRED_ENV
+/* name's value in the linear "name=value\0...\0" list env, or NULL */
+static const char *linear_env_get(const char *env, const char *name) {
+  size_t len = strlen(name);
+
+  for (; *env; env += strlen(env) + 1)
+    if (!strncmp(env, name, len) && env[len] == '=')
+      return env + len + 1;
+  return NULL;
+}
+
+/* Saved commands that an earlier build shipped and this one replaced
+ * (OPENIPC_RETIRED_ENV): exactly those take today's default, once. */
+static void retired_env_migrate(void) {
+  static const char retired[] = OPENIPC_RETIRED_ENV "\0";
+  const char *r;
+  int changed = 0;
+
+  for (r = retired; *r; r += strlen(r) + 1) {
+    const char *eq = strchr(r, '=');
+    const char *saved, *def;
+    char name[32];
+
+    if (!eq || eq - r >= sizeof(name))
+      continue;
+    memcpy(name, r, eq - r);
+    name[eq - r] = '\0';
+    saved = env_get(name);
+    def = linear_env_get(default_environment, name);
+    if (!saved || !def || strcmp(saved, eq + 1) || !strcmp(saved, def))
+      continue;
+    printf("%s: retired command replaced with the current default\n", name);
+    env_set(name, def);
+    changed = 1;
+  }
+  if (changed)
+    env_save();
+}
+#endif
+
 #if !defined(OPENIPC_SPI_NAND) && defined(CONFIG_OPENIPC_NOR_SPLIT)
 /*
  * fwwrite writes only a file that fits fwsize, the firmware area from
@@ -1160,6 +1201,9 @@ int openipc_helper(void) {
   /* A saved environment's retired commands are replaced first: a
    * script.txt that runs them would otherwise get the old ones */
   altbootcmd_migrate();
+#ifdef OPENIPC_RETIRED_ENV
+  retired_env_migrate();
+#endif
 
   /* Recovery checks what it runs: a board may already have set verify=n
    * (so that the split scan below can clear it), and source would then run
