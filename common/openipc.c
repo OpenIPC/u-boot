@@ -1197,10 +1197,12 @@ int openipc_helper(void) {
  *
  *   fwfit boot <size>    the good eraseblocks of the 'boot' partition:
  *                        nand write skips bad blocks, so the nominal size
- *                        overstates the room
+ *                        overstates the room; a block whose state cannot be
+ *                        read fails the check
  *   fwfit rootfs <size>  the attached UBI device ('ubi part' first): its
  *                        free PEBs and those of the rootfs and rootfs_data
- *                        volumes, which urwrite may remove to make room
+ *                        volumes, which urwrite may remove to make room,
+ *                        less what UBI takes back for its bad-block reserve
  */
 static int fwfit_boot(ulong size) {
   struct mtd_info *mtd;
@@ -1213,9 +1215,19 @@ static int fwfit_boot(ulong size) {
     printf("fwfit: no boot partition\n");
     return CMD_RET_FAILURE;
   }
-  for (off = 0; off < mtd->size; off += mtd->erasesize)
-    if (!mtd_block_isbad(mtd, off))
+  for (off = 0; off < mtd->size; off += mtd->erasesize) {
+    int bad = mtd_block_isbad(mtd, off);
+
+    /* a block that cannot be probed would stop the erase half-way */
+    if (bad < 0) {
+      printf("fwfit: boot block at 0x%llx unreadable: %d\n",
+             (unsigned long long)off, bad);
+      put_mtd_device(mtd);
+      return CMD_RET_FAILURE;
+    }
+    if (!bad)
       good += mtd->erasesize;
+  }
   put_mtd_device(mtd);
 
   if (size > good) {
@@ -1228,7 +1240,7 @@ static int fwfit_boot(ulong size) {
 
 static int fwfit_rootfs(ulong size) {
   struct ubi_device *ubi = ubi_devices[0];
-  ulong need, room;
+  long need, room;
   int i;
 
   if (!ubi) {
@@ -1243,10 +1255,14 @@ static int fwfit_rootfs(ulong size) {
                 !strcmp(vol->name, "rootfs_data")))
       room += vol->reserved_pebs;
   }
+  /* PEBs freed by a remove first top up a short bad-block reserve
+   * (ubi_update_reserved()): those are not the rootfs's */
+  if (ubi->beb_rsvd_level > ubi->beb_rsvd_pebs)
+    room -= ubi->beb_rsvd_level - ubi->beb_rsvd_pebs;
   need = DIV_ROUND_UP(size, ubi->leb_size);
 
   if (need > room) {
-    printf("fwfit: %lu bytes need %lu LEBs, the UBI device has %lu for rootfs\n",
+    printf("fwfit: %lu bytes need %ld LEBs, the UBI device has %ld for rootfs\n",
            size, need, room);
     return CMD_RET_FAILURE;
   }
