@@ -65,16 +65,23 @@ static int ax_eqos_probe_resources(struct udevice *dev)
 {
 	struct eqos_priv *eqos = dev_get_priv(dev);
 	phy_interface_t interface = eqos->config->interface(dev);
+	int ret;
 
+	/* The interface select and TX clock are known for these two only */
 	if (interface != PHY_INTERFACE_MODE_RMII &&
-	    interface != PHY_INTERFACE_MODE_RGMII &&
-	    interface != PHY_INTERFACE_MODE_GMII) {
+	    interface != PHY_INTERFACE_MODE_RGMII) {
 		pr_err("unsupported phy-mode %d\n", interface);
 		return -EINVAL;
 	}
 
-	gpio_request_by_name(dev, "phy-reset-gpios", 0, &eqos->phy_reset_gpio,
-			     GPIOD_IS_OUT | GPIOD_IS_OUT_ACTIVE);
+	/* Optional; but one the node names must be had */
+	ret = gpio_request_by_name(dev, "phy-reset-gpios", 0,
+				   &eqos->phy_reset_gpio,
+				   GPIOD_IS_OUT | GPIOD_IS_OUT_ACTIVE);
+	if (ret && ret != -ENOENT) {
+		pr_err("phy-reset-gpios: %d\n", ret);
+		return ret;
+	}
 	return 0;
 }
 
