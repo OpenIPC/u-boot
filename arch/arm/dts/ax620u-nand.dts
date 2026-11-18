@@ -1,0 +1,92 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * Axera AX620U camera with SPI NAND: what U-Boot drives. Addresses from
+ * the stock AX620U U-Boot's and kernel's devicetrees; the DDR size is
+ * the one the stock U-Boot reports.
+ */
+/dts-v1/;
+
+/ {
+	model = "Axera AX620U (OpenIPC)";
+	compatible = "axera,ax620x";
+	#address-cells = <1>;
+	#size-cells = <1>;
+
+	aliases {
+		serial0 = &uart0;
+		spi4 = &spi4;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	memory@40000000 {
+		device_type = "memory";
+		reg = <0x40000000 0x10000000>;
+	};
+
+	timer {
+		compatible = "arm,armv7-timer";
+		clock-frequency = <24000000>;
+	};
+
+	/*
+	 * The stock U-Boot's ap_clk. The vendor SPL has set the UART and SSI
+	 * clocks; U-Boot only divides them.
+	 */
+	ap_clk: ap-clk {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <200000000>;
+		u-boot,dm-pre-reloc;
+	};
+
+	uart0: serial@4990000 {
+		compatible = "snps,dw-apb-uart";
+		reg = <0x4990000 0x100>;
+		reg-shift = <2>;
+		reg-io-width = <4>;
+		clocks = <&ap_clk>;
+		u-boot,dm-pre-reloc;
+	};
+
+	gpio@10010000 {
+		compatible = "snps,dw-apb-gpio";
+		reg = <0x10010000 0x400>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		gpio2: gpio-controller@0 {
+			compatible = "snps,dw-apb-gpio-port";
+			gpio-controller;
+			#gpio-cells = <2>;
+			snps,nr-gpios = <32>;
+			reg = <0>;
+		};
+	};
+
+	/*
+	 * The SPI NAND's DesignWare SSI ("snps,dw-ssi" in the stock trees),
+	 * with the DWC_ssi register layout, and its chip select on GPIO2 5.
+	 * Mainline's driver moves one data line, so the NAND is driven at
+	 * single width; spi-max-frequency keeps the divider at 8 or more.
+	 */
+	spi4: spi@8000000 {
+		compatible = "snps,dwc-ssi-1.01a";
+		reg = <0x8000000 0x1000>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		clocks = <&ap_clk>;
+		cs-gpios = <&gpio2 5 0>;
+		spi-max-frequency = <25000000>;
+
+		spi-nand@0 {
+			compatible = "spi-nand";
+			reg = <0>;
+			spi-max-frequency = <25000000>;
+			spi-tx-bus-width = <1>;
+			spi-rx-bus-width = <1>;
+		};
+	};
+};

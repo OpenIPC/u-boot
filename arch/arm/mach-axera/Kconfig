@@ -17,5 +17,6 @@ config SYS_VENDOR
 #
 
 # AX620U
+source "arch/arm/mach-axera/ax620u/Kconfig"
 
 endif
