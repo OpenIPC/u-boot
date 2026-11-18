@@ -42,8 +42,9 @@
 #define  AX_EPHY_OTP_BG_SHIFT	24
 #define  AX_EPHY_OTP_BG_MASK	(0xf << AX_EPHY_OTP_BG_SHIFT)
 #define AX_EMAC_EMAC0		(AX_FLASH_SYS_GLB + 0x28)
-#define  AX_PHY_IF_SEL_SHIFT	9
-#define  AX_PHY_IF_SEL_MASK	(3 << AX_PHY_IF_SEL_SHIFT)
+/* As the vendor U-Boot and kernel drive it: bit 9 selects RGMII (else
+ * RMII), bit 10 the external pads (else the internal PHY) */
+#define  AX_PHY_IF_RGMII	BIT(9)
 #define  AX_EXT_PAD_SEL		BIT(10)
 #define AX_EMAC_SYS_GLB0	(AX_FLASH_SYS_GLB + 0x144)
 #define  AX_RMII_RX_DIVN_MASK	0xf
@@ -109,9 +110,8 @@ static int ax_eqos_start_clks(struct udevice *dev)
 	if (interface == PHY_INTERFACE_MODE_RMII)
 		sel = ax_eqos_internal_phy(dev) ? 0 : AX_EXT_PAD_SEL;
 	else
-		sel = (1 << AX_PHY_IF_SEL_SHIFT) | AX_EXT_PAD_SEL;
-	clrsetbits_le32(AX_EMAC_EMAC0, AX_PHY_IF_SEL_MASK | AX_EXT_PAD_SEL,
-			sel);
+		sel = AX_PHY_IF_RGMII | AX_EXT_PAD_SEL;
+	clrsetbits_le32(AX_EMAC_EMAC0, AX_PHY_IF_RGMII | AX_EXT_PAD_SEL, sel);
 	return 0;
 }
 
