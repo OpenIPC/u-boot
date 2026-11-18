@@ -59,6 +59,25 @@
 #define OPENIPC_ALTBOOTCMD "run fwrecovery; echo \"*** Boot limit exceeded -- entering FAILSAFE (network + SSH only) ***\"; setenv setargs setenv bootargs ${bootargs} failsafe; run setargs; if " OPENIPC_LOADKERNEL "; then bootm ${baseaddr}; fi"
 #define OPENIPC_ALTBOOTCMD_RETIRED "echo \"*** Boot limit exceeded -- forcing firmware recovery ***\"; run fwupd"
 
+/*
+ * Firmware the scan found broken (bootfail): fetch a new one (fwupd) and
+ * reset, retrying until the server has it. A U-Boot with no network, MMC
+ * or USB cannot fetch anything, and that reset would loop forever: there it
+ * says so and stays at the prompt, where an image loaded over the serial
+ * line (loady ${baseaddr}) goes in with run urwrite or run ubwrite. A
+ * kernel that loads but never boots still comes to altbootcmd past
+ * bootlimit, which does not reset.
+ */
+#if defined(CONFIG_CMD_NET) || defined(CONFIG_MMC) || defined(CONFIG_USB_STORAGE)
+#define OPENIPC_RECOVERY \
+	"fwrecovery=if env exists bootfail; then run fwupd; sleep 5; reset; fi\0" \
+	"bootflash=run fwrecovery; setenv setargs setenv bootargs ${bootargs}; run setargs; run loadkernel; bootm ${baseaddr}; reset\0"
+#else
+#define OPENIPC_RECOVERY \
+	"fwrecovery=if env exists bootfail; then echo \"*** Firmware broken, and this U-Boot has no network, MMC or USB to recover it from: staying at the prompt (loady ${baseaddr}, then run urwrite) ***\"; fi\0" \
+	"bootflash=if env exists bootfail; then run fwrecovery; else setenv setargs setenv bootargs ${bootargs}; run setargs; run loadkernel; bootm ${baseaddr}; reset; fi\0"
+#endif
+
 /* Environment shared by all boot media: identity, network boot, update
  * source selection and the medium-agnostic update commands. The selected
  * medium provides ubfile/ubwrite/ukwrite/urwrite/loadkernel/mtdids/
@@ -84,8 +103,7 @@
 	OPENIPC_FWUPD \
 	"bootlimit=2\0" \
 	"altbootcmd=" OPENIPC_ALTBOOTCMD "\0" \
-	"fwrecovery=if env exists bootfail; then run fwupd; sleep 5; reset; fi\0" \
-	"bootflash=run fwrecovery; setenv setargs setenv bootargs ${bootargs}; run setargs; run loadkernel; bootm ${baseaddr}; reset\0"
+	OPENIPC_RECOVERY
 
 #ifndef CONFIG_ENV_IS_IN_NAND
 

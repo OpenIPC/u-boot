@@ -81,9 +81,15 @@ Toolchain: `arm-linux-gnueabi-`.
 - Reset: 0x81 to 0x02220044 (the stock U-Boot's), then the DesignWare
   watchdog at 0x49aa000 as the stock kernel's `dw_wdt_restart()` (what
   QEMU resets on). Timer: the generic timer.
-- No network, so a firmware the scan finds broken sends `fwrecovery`
-  to a `tftpboot` that does not exist and resets, over and over: Ctrl-C
-  at the prompt stops it.
+- No network, MMC or USB, so nothing can fetch a firmware: when the scan
+  finds it broken (`bootfail`), `bootflash` says so and stays at the
+  prompt instead of resetting (`openipc-common.h`, `OPENIPC_RECOVERY`).
+  There, `loady ${baseaddr}` over the console and `run urwrite` (a
+  `rootfs.ubifs`) or `run ubwrite` (a U-Boot image) restore it.
+- `ubwrite` and `urwrite` ask `fwfit` (`common/openipc.c`) first whether
+  the image fits -- the boot partition's good blocks, or the UBI device
+  with the rootfs and rootfs_data volumes it may replace -- so an image
+  too big erases or removes nothing.
 - No Ethernet driver (EQOS at 0x4970000), no SD, so `NET` is off and
   updates come from Linux (`sysupgrade`) or a programmer.
 
