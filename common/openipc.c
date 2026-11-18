@@ -1188,3 +1188,91 @@ int openipc_helper(void) {
 
   return 0;
 }
+
+#if defined(OPENIPC_SPI_NAND) && defined(CONFIG_CMD_UBI)
+/*
+ * fwfit: will an image of <size> bytes fit where ubwrite or urwrite puts
+ * it? Asked before anything is erased or removed, so that an image too big
+ * leaves the old one, and the user's data, in place.
+ *
+ *   fwfit boot <size>    the good eraseblocks of the 'boot' partition:
+ *                        nand write skips bad blocks, so the nominal size
+ *                        overstates the room
+ *   fwfit rootfs <size>  the attached UBI device ('ubi part' first): its
+ *                        free PEBs and those of the rootfs and rootfs_data
+ *                        volumes, which urwrite may remove to make room
+ */
+static int fwfit_boot(ulong size) {
+  struct mtd_info *mtd;
+  u64 good = 0;
+  loff_t off;
+
+  mtd_probe_devices();
+  mtd = get_mtd_device_nm("boot");
+  if (IS_ERR(mtd)) {
+    printf("fwfit: no boot partition\n");
+    return CMD_RET_FAILURE;
+  }
+  for (off = 0; off < mtd->size; off += mtd->erasesize)
+    if (!mtd_block_isbad(mtd, off))
+      good += mtd->erasesize;
+  put_mtd_device(mtd);
+
+  if (size > good) {
+    printf("fwfit: %lu bytes do not fit the boot partition's %llu good bytes\n",
+           size, good);
+    return CMD_RET_FAILURE;
+  }
+  return CMD_RET_SUCCESS;
+}
+
+static int fwfit_rootfs(ulong size) {
+  struct ubi_device *ubi = ubi_devices[0];
+  ulong need, room;
+  int i;
+
+  if (!ubi) {
+    printf("fwfit: no UBI device attached\n");
+    return CMD_RET_FAILURE;
+  }
+  room = ubi->avail_pebs;
+  for (i = 0; i < ubi->vtbl_slots; i++) {
+    struct ubi_volume *vol = ubi->volumes[i];
+
+    if (vol && (!strcmp(vol->name, "rootfs") ||
+                !strcmp(vol->name, "rootfs_data")))
+      room += vol->reserved_pebs;
+  }
+  need = DIV_ROUND_UP(size, ubi->leb_size);
+
+  if (need > room) {
+    printf("fwfit: %lu bytes need %lu LEBs, the UBI device has %lu for rootfs\n",
+           size, need, room);
+    return CMD_RET_FAILURE;
+  }
+  return CMD_RET_SUCCESS;
+}
+
+static int do_fwfit(struct cmd_tbl *cmdtp, int flag, int argc,
+                    char *const argv[]) {
+  ulong size;
+
+  if (argc != 3)
+    return CMD_RET_USAGE;
+  size = hextoul(argv[2], NULL);
+  if (!size) {
+    printf("fwfit: empty image\n");
+    return CMD_RET_FAILURE;
+  }
+  if (!strcmp(argv[1], "boot"))
+    return fwfit_boot(size);
+  if (!strcmp(argv[1], "rootfs"))
+    return fwfit_rootfs(size);
+  return CMD_RET_USAGE;
+}
+
+U_BOOT_CMD(fwfit, 3, 0, do_fwfit,
+           "check that an image fits before ubwrite/urwrite erase anything",
+           "boot <size>   - <size> (hex) fits the boot partition's good blocks\n"
+           "fwfit rootfs <size> - <size> (hex) fits the attached UBI device as rootfs");
+#endif

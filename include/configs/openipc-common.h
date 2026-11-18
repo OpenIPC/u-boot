@@ -135,7 +135,10 @@
  * Recovery rewrites the rootfs volume only, sized to the image, with
  * rootfs_data taking the rest. Only a rootfs that grew beyond what the old
  * volume could give costs the data volume, as U-Boot cannot resize UBI
- * volumes; else rootfs_data is preserved.
+ * volumes; else rootfs_data is preserved. fwfit (common/openipc.c) checks
+ * first that the image fits at all -- the UBI device for urwrite, the boot
+ * partition's good blocks for ubwrite -- so an image too big erases and
+ * removes nothing.
  */
 #define OPENIPC_FWUPD "fwupd=run ur\0"
 
@@ -143,8 +146,8 @@
 #define OPENIPC_ENV_MEDIUM \
 	"ubfile=u-boot-" CONFIG_PRODUCT_SOC "-nand.bin\0" \
 	"urfile=rootfs.ubifs." CONFIG_PRODUCT_SOC "\0" \
-	"ubwrite=if itest ${filesize} -gt 0 && itest ${filesize} -le " __stringify(OPENIPC_NAND_BOOT_SIZE) "; then nand erase.part boot; nand write ${baseaddr} boot ${filesize}; else echo ubwrite: ${filesize} bytes do not fit the boot partition, nothing written; fi\0" \
-	"urwrite=ubi part ubi; ubi check rootfs && ubi remove rootfs; if ubi create rootfs ${filesize} d; then ubi check rootfs; else ubi remove rootfs_data; ubi create rootfs ${filesize} d; fi; ubi check rootfs_data || ubi create rootfs_data 0 d; ubi write ${baseaddr} rootfs ${filesize}\0" \
+	"ubwrite=if itest ${filesize} -gt 0 && itest ${filesize} -le " __stringify(OPENIPC_NAND_BOOT_SIZE) " && fwfit boot ${filesize}; then nand erase.part boot && nand write ${baseaddr} boot ${filesize}; else echo ubwrite: ${filesize} bytes do not fit the boot partition, nothing written; fi\0" \
+	"urwrite=if ubi part ubi && fwfit rootfs ${filesize}; then ubi check rootfs && ubi remove rootfs; if ubi create rootfs ${filesize} d; then ubi check rootfs; else ubi remove rootfs_data; ubi create rootfs ${filesize} d; fi; ubi check rootfs_data || ubi create rootfs_data 0 d; if ubi check rootfs; then ubi write ${baseaddr} rootfs ${filesize}; else echo urwrite: no rootfs volume, nothing written; fi; else echo urwrite: ${filesize} bytes do not fit the UBI device, nothing removed or written; fi\0" \
 	"loadkernel=" OPENIPC_LOADKERNEL "\0" \
 	"mtdids=nand0=" SFC "\0" \
 	"mtds=" OPENIPC_NAND_MTDPARTS "\0" \
