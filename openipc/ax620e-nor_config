@@ -65,6 +65,9 @@ CONFIG_ENV_IS_IN_SPI_FLASH=y
 CONFIG_ENV_OFFSET=0x40000
 CONFIG_ENV_SIZE=0x10000
 CONFIG_ENV_SECT_SIZE=0x10000
+# gd->env_addr points into the image at 0x5C000000 until relocated: past
+# the DRAM the memory map covers once the MMU is on
+CONFIG_SYS_RELOC_GD_ENV_ADDR=y
 
 # Commands
 CONFIG_CMD_BOOTM=y

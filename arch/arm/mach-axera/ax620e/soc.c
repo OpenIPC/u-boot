@@ -23,9 +23,10 @@ DECLARE_GLOBAL_DATA_PTR;
 
 static struct mm_region ax620e_mem_map[] = {
 	{
+		/* Normal memory over the DRAM there is: dram_init() sizes it */
 		.virt = AX_DDR_BASE,
 		.phys = AX_DDR_BASE,
-		.size = SZ_1G,
+		.size = SZ_256M,
 		.attrs = PTE_BLOCK_MEMTYPE(MT_NORMAL) |
 			 PTE_BLOCK_INNER_SHARE
 	}, {
@@ -78,6 +79,8 @@ int arch_cpu_init(void)
 int dram_init(void)
 {
 	gd->ram_size = get_ram_size((long *)AX_DDR_BASE, SZ_256M);
+	/* No cacheable mapping past it: speculation there may fault */
+	ax620e_mem_map[0].size = gd->ram_size;
 	return 0;
 }
 
