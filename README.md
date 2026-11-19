@@ -362,17 +362,24 @@ Every infinity2m, infinity6, 6b0, 6e and 6c part also builds for SPI NAND,
 - The AX620E image is set up for AX620Q cameras (256 MiB LPDDR4); other
   parts of the family, such as the AX630C, need their own DDR setup in the
   first stage and are not supported yet.
-- The DDR-init first stage loads U-Boot behind a 1 KiB Axera header
-  (checksums; the AX620E's also carries the SDK's RSA test key and a
-  signature with it). A part with secure boot fused would refuse these
-  images. On AX620U it is the vendor's binary SPL, left on the flash. On
-  AX620E it is the SDK's BL1 SPL, built from source
-  (`openipc/ax620e-spl`, from Sipeed's public SDK) and set up to program
-  DDR as the Xiongmai cameras' own first stage does; the cameras' own
-  stays in the tree as a fallback (`openipc/ax620e-spl/stock.bin`).
-- **AX620U.** The vendor SPL stays in its own 1 MiB `spl` partition and
-  is not in the image: `u-boot-ax620u-nand.bin` is the 1536 KiB `boot`
-  partition alone, at `0x100000`, not at 0. The layout is
+- Each image carries its DDR-init first stage, built from source, which
+  loads U-Boot behind a 1 KiB Axera header (checksums); the first
+  stage's own header carries the SDK's RSA test key and a signature, as
+  the cameras' does. A part with secure boot fused would refuse these
+  images. On AX620E it is the SDK's BL1 SPL (`openipc/ax620e-spl`, from
+  Sipeed's public SDK), set up to program DDR as the Xiongmai cameras'
+  own first stage does; on AX620U a C rebuild of the cameras' own
+  (`openipc/ax620u-spl`). The cameras' own first stages stay in the tree
+  as fallbacks (`stock.bin` there): `build.sh` also writes
+  `u-boot-<soc>-<flash>-stockspl.bin`, the same image with them, which
+  is not in the release.
+- **AX620U.** `u-boot-ax620u-nand.bin` covers the 1 MiB `spl` partition
+  (the first stage, its copy and the EIP-130 firmware, as the cameras
+  have them) and the 1536 KiB `boot` partition, U-Boot at `0x100000`:
+  2.5 MiB at most, written at 0. `run ubwrite` writes it the same way,
+  U-Boot skipping bad blocks and the first stage at its fixed places
+  (it refuses if one of those blocks is bad); an older image of U-Boot
+  alone updates `boot` only. The layout is
   `1024k(spl),1536k(boot),512k(env),-(ubi)`, the environment at
   `0x280000`, then openipc-hisilicon's UBI (UBIFS `rootfs` holding
   `/boot/fitImage`, `rootfs_data`). There is no Ethernet, SD or USB
@@ -380,16 +387,10 @@ Every infinity2m, infinity6, 6b0, 6e and 6c part also builds for SPI NAND,
   stops at the prompt, where `loady ${baseaddr}` over the console and
   `run urwrite` (a `rootfs.ubifs`) or `run ubwrite` (a U-Boot image)
   restore it. Otherwise update from Linux (`sysupgrade`) or a programmer.
-  Where `openipc-axera` builds the AX620U first stage from source
-  (`openipc/ax620u-spl`), the release also has `spl-ax620u-nand.bin`
-  and the cameras' own, `spl-ax620u-nand-stock.bin`: the first 256 KiB
-  of the `spl` partition, written at `0` with a programmer.
 - **AX620E.** `u-boot-ax620e-nor.bin` is the whole 256 KiB boot
   partition: the first stage at 0, U-Boot at `0x10000` packed in
   Axera's own format for the SoC's unpacking engine. OpenIPC's NOR layout
-  follows. `u-boot-ax620e-nor-stockspl.bin` is the same with the
-  cameras' own first stage, should the source-built one not bring a
-  camera up. Ethernet works (`ub`, `uk`, `ur` over TFTP); there is no SD
+  follows. Ethernet works (`ub`, `uk`, `ur` over TFTP); there is no SD
   driver, so no SD recovery.
 - Building needs `arm-linux-gnueabi-` (AX620U) and `aarch64-linux-gnu-`
   (AX620E, `CROSS_COMPILE_64`), plus `curl`: the AX620E image is packed by
@@ -408,7 +409,7 @@ Every infinity2m, infinity6, 6b0, 6e and 6c part also builds for SPI NAND,
 
 Each image already holds whatever the boot ROM needs in front of U-Boot
 (DDR scripts, a first stage, a vendor loader). Write it at offset 0 as it
-is (the AX620U's alone goes at `0x100000`, see [Axera](#axera)). From a running U-Boot, either this one or a vendor one, with a TFTP
+is. From a running U-Boot, either this one or a vendor one, with a TFTP
 server:
 
 ```sh
@@ -444,10 +445,10 @@ if the kernel supports it. U-Boot detects which layout is on the flash.
 | `0x0c0000` | 256 KiB | `env` |
 | `0x100000` | rest | `ubi`: volumes `rootfs` (UBIFS, kernel at `/boot/uImage` or `/boot/fitImage`) and `rootfs_data` |
 
-The Axera AX620U does not use the table above: its vendor SPL keeps the
+The Axera AX620U does not use the table above: its first stage keeps the
 first 1 MiB, so its layout is `1024k(spl),1536k(boot),512k(env),-(ubi)`,
 with `boot` at `0x100000` and `env` at `0x280000` (see [Axera](#axera)).
-Writing an AX620U `boot` image at `0` would overwrite that SPL.
+Its image covers `spl` and `boot`.
 
 OpenIPC firmware, sysupgrade and openipc.org rely on these layouts, the
 AX620U's included, and they do not change.

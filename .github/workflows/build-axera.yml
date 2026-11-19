@@ -29,22 +29,22 @@ on:
 
 # The shape of build-sigmastar.yml:
 #   resolve -> build (matrix, one target per leg) + qemu (prep) ->
-#   qemu_smoke (hard gate, AX620E only) -> release (own, `release` input);
+#   qemu_smoke (hard gate) -> release (own, `release` input);
 #   publish (OpenIPC/firmware latest + openipc.org report) is commented out:
 #   these images have booted only in QEMU, never on silicon.
 # build.sh takes targets (<soc>-<flash>) as arguments; the matrix calls it
 # with one per leg.
 #
-# Nothing private is needed. Each SoC's first stage (SPL) is built from
-# source in the tree (openipc/ax620e-spl, openipc/ax620u-spl), and the
-# cameras' own stays beside it as a fallback, so every leg uploads two
-# variants:
-#   AX620E: u-boot-ax620e-nor.bin (the boot partition: first stage, then
-#     U-Boot packed at 0x10000) and u-boot-ax620e-nor-stockspl.bin (the
-#     same with the cameras' first stage)
-#   AX620U: u-boot-ax620u-nand.bin (U-Boot behind its 1 KiB Axera header,
-#     for `boot` at 0x100000), and for the `spl` partition at 0
-#     spl-ax620u-nand.bin and spl-ax620u-nand-stock.bin
+# Nothing private is needed. Each image is one file written at flash 0,
+# first stage included, built from source in the tree (openipc/ax620e-spl,
+# openipc/ax620u-spl):
+#   AX620E: u-boot-ax620e-nor.bin, the boot partition (first stage, then
+#     U-Boot packed at 0x10000)
+#   AX620U: u-boot-ax620u-nand.bin, the spl and boot partitions (first
+#     stage and its copies, then U-Boot at 0x100000)
+# u-boot-<soc>-stockspl.bin is the same with the cameras' own first stage,
+# kept in the tree as a fallback: a separate artifact, smoke-tested, not
+# released. The release has u-boot-<soc>.bin only.
 # build.sh fetches the SDK's ax_gzip (AX620E) from a public SDK copy at a
 # fixed commit, checked against its SHA-256.
 
@@ -76,11 +76,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # AX620U (Cortex-A7, AArch32): SPI NAND, 1536 KiB `boot` at
-          # 0x100000 behind the 1 MiB `spl` partition; u-boot-* is the
-          # boot partition's content, written at 0x100000, not at 0, and
-          # spl-* the start of the spl partition, written at 0
-          - { soc: ax620u-nand, limit_kb: 1536, spl_kb: 1024 }
+          # AX620U (Cortex-A7, AArch32): SPI NAND, the 1 MiB `spl` and
+          # 1536 KiB `boot` partitions from 0, up to the environment
+          - { soc: ax620u-nand, limit_kb: 2560 }
           # AX620E (Cortex-A53, AArch64): SPI NOR, the 256 KiB boot
           # partition at 0 (first stage, then packed U-Boot at 0x10000)
           - { soc: ax620e-nor, limit_kb: 256 }
@@ -137,31 +135,29 @@ jobs:
               rc=1
             fi
           }
-          # The image and its stock-first-stage twin (AX620E)
+          # The image and its stock-first-stage twin
           for f in output/u-boot-${{ matrix.soc }}*.bin; do
             check "$f" $((${{ matrix.limit_kb }} * 1024))
           done
-          # The spl partition's images (AX620U), against that partition
-          for f in output/spl-${{ matrix.soc }}*.bin; do
-            [ -f "$f" ] || continue
-            if [ -z '${{ matrix.spl_kb }}' ]; then
-              echo "$f: no spl partition size for ${{ matrix.soc }}" >&2
-              rc=1
-              continue
-            fi
-            check "$f" $((${{ matrix.spl_kb }} * 1024))
-          done
           exit $rc
 
+      # u-boot-<soc>: the image the release takes
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: u-boot-${{ matrix.soc }}
-          # Every image of the leg: u-boot-<soc>*.bin, spl-<soc>*.bin
-          path: |
-            output/u-boot-${{ matrix.soc }}*.bin
-            output/spl-${{ matrix.soc }}*.bin
+          path: output/u-boot-${{ matrix.soc }}.bin
           if-no-files-found: error
+
+      # stockspl-<soc>: the same with the cameras' first stage, for the
+      # smoke test (and anyone who wants it from the run); not released.
+      # A revision that does not build it has none.
+      - name: Upload stock-first-stage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stockspl-${{ matrix.soc }}
+          path: output/u-boot-${{ matrix.soc }}-stockspl.bin
+          if-no-files-found: warn
 
   # Build qemu-system-aarch64 once for the smoke leg.
   qemu:
@@ -199,22 +195,22 @@ jobs:
           path: qemu-aarch64
 
   # QEMU smoke test, each SoC with each first stage (`spl`: source, or the
-  # cameras' own, stock), from otherwise erased flash:
-  #   AX620E: the boot partition image at 0 of a 16 MiB NOR on qemu-bench's
-  #     `-M ax620e`, which runs the first stage from flash 0; it unpacks
-  #     U-Boot from 0x10000 with the GZIPD engine model.
-  #   AX620U: the spl partition image at 0 and U-Boot's at 0x100000 of a
-  #     128 MiB SPI NAND on `-M ax620u`, which starts the first stage at
-  #     flash 0x800 (it does not model the boot ROM or DDR training).
+  # cameras' own, stock), the image at 0 of otherwise erased flash:
+  #   AX620E: a 16 MiB NOR on qemu-bench's `-M ax620e`, which runs the
+  #     first stage from flash 0; it unpacks U-Boot from 0x10000 with the
+  #     GZIPD engine model.
+  #   AX620U: a 128 MiB SPI NAND on `-M ax620u`, which starts the first
+  #     stage at flash 0x800 (it does not model the boot ROM or DDR
+  #     training); the first stage loads U-Boot from 0x100000.
   # It must reach the autoboot prompt, then, after `reset` (the
   # watchdog), reach it again having loaded the environment the first
   # boot saved: the models keep flash writes in memory across a reset, not
   # in the file, so both boots are one QEMU run.
   #
-  # A leg whose first stage the revision built does not have (an
-  # openipc-axera from before that SoC's first stage was built from
-  # source, or kept as a fallback) is skipped with a warning, except the
-  # AX620E source one, the image that has always been there.
+  # A leg whose image the revision does not build (no -stockspl, or an
+  # AX620U image of U-Boot alone, from before it carried the first stage)
+  # is skipped with a warning, except the AX620E source one, the image
+  # that has always been there.
   qemu_smoke:
     needs: [build, qemu]
     runs-on: ubuntu-latest
@@ -234,9 +230,17 @@ jobs:
           name: qemu-aarch64
 
       - name: Download u-boot artifact
+        if: ${{ matrix.spl == 'source' }}
         uses: actions/download-artifact@v4
         with:
           name: u-boot-${{ matrix.soc }}
+
+      - name: Download stock-first-stage artifact
+        if: ${{ matrix.spl == 'stock' }}
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: stockspl-${{ matrix.soc }}
 
       - name: Install QEMU runtime deps
         run: |
@@ -254,37 +258,34 @@ jobs:
       - name: Smoke-test in QEMU
         timeout-minutes: 3
         run: |
-          UBOOT='u-boot-${{ matrix.soc }}.bin'
-          test -f "$UBOOT"
-          case '${{ matrix.machine }}/${{ matrix.spl }}' in
-            ax620e/source) FIRST="$UBOOT" ;;
-            ax620e/stock) FIRST='u-boot-${{ matrix.soc }}-stockspl.bin' ;;
-            ax620u/source) FIRST='spl-${{ matrix.soc }}.bin' ;;
-            ax620u/stock) FIRST='spl-${{ matrix.soc }}-stock.bin' ;;
+          case '${{ matrix.spl }}' in
+            source) IMG='u-boot-${{ matrix.soc }}.bin' ;;
+            stock) IMG='u-boot-${{ matrix.soc }}-stockspl.bin' ;;
           esac
-          if [ ! -f "$FIRST" ]; then
-            if [ '${{ matrix.machine }}/${{ matrix.spl }}' = ax620e/source ]; then
-              echo "missing $FIRST" >&2
-              exit 1
-            fi
-            echo "::warning::$FIRST not built by this revision: ${{ matrix.machine }} with the ${{ matrix.spl }} first stage not tested"
+          skip() {
+            echo "::warning::$1: ${{ matrix.machine }} with the ${{ matrix.spl }} first stage not tested"
             exit 0
+          }
+          if [ ! -f "$IMG" ]; then
+            [ '${{ matrix.machine }}/${{ matrix.spl }}' = ax620e/source ] &&
+              { echo "missing $IMG" >&2; exit 1; }
+            skip "$IMG not built by this revision"
           fi
-          # The flash, erased but for the images: AX620E 16 MiB NOR, the
-          # boot partition (first stage included) at 0; AX620U 128 MiB SPI
-          # NAND, the spl partition's image at 0 and U-Boot at 0x100000.
-          # env-from-flash (AX620E): serve the environment from the flash
-          # image, not the model's synthetic one.
+          # The flash, erased but for the image at 0: AX620E 16 MiB NOR,
+          # AX620U 128 MiB SPI NAND. env-from-flash (AX620E): serve the
+          # environment from the flash image, not the model's synthetic one.
           case '${{ matrix.machine }}' in
             ax620e)
               SIZE_MB=16
-              set -- "$FIRST" 0
               MACHINE_ARGS='-global axera-spi-nor.env-from-flash=on' ;;
             ax620u)
               SIZE_MB=128
-              set -- "$FIRST" 0 "$UBOOT" $((0x100000))
-              MACHINE_ARGS= ;;
+              MACHINE_ARGS=
+              # U-Boot's Axera header at 0x100000: the first stage with it
+              python3 -c 'import sys; d = open(sys.argv[1], "rb").read(); sys.exit(not (len(d) > 0x100400 and d[0x100004:0x100008] == bytes.fromhex("22335455")))' "$IMG" ||
+                skip "$IMG is U-Boot alone, no first stage" ;;
           esac
+          set -- "$IMG" 0
           echo "booting $* on -M ${{ matrix.machine }}"
           python3 - /tmp/flash.bin $((SIZE_MB << 20)) "$@" <<'PY'
           import sys

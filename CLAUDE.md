@@ -60,9 +60,10 @@ own branch:
   SPL, the DDR tables and the vendor quirks.
 - `openipc-axera`: U-Boot for Axera AX620U (Cortex-A7, SPI NAND) and the
   AX620E family (Cortex-A53, AArch64, NOR), on the same mainline release
-  with the same OpenIPC layer, behind a DDR-init first stage (AX620U: the
-  vendor's, kept on flash; AX620E: the SDK's BL1 SPL, built from source in
-  `openipc/ax620e-spl`). CI:
+  with the same OpenIPC layer, behind a DDR-init first stage built from
+  source and carried in the image (AX620E: the SDK's BL1 SPL,
+  `openipc/ax620e-spl`; AX620U: a C rebuild of the cameras' own,
+  `openipc/ax620u-spl`). CI:
   `build-axera.yml`, called from that branch's `ci.yml`. Its own
   `CLAUDE.md` covers the boot chain, the Axera header and the drivers.
 - `main`: a fork of upstream mainline U-Boot, kept for rebasing.
@@ -338,16 +339,14 @@ The build logic lives here. Other branches call it:
   (gcc-aarch64-linux-gnu, build.sh's `CROSS_COMPILE_64` default); the build
   legs also need `curl`, as build.sh fetches the SDK's `ax_gzip` (checked
   against its SHA-256).
-- **Partition fit:** `ax620u-nand` is the 1536 KiB `boot` partition at
-  0x100000, without the first stage in front (it is in the camera's
-  `spl` partition); `ax620e-nor` is the 256 KiB boot partition at 0,
-  first stage (built from `openipc/ax620e-spl` by build.sh) included.
-  Each SoC also gets its cameras' own first stage as a fallback:
-  `u-boot-ax620e-nor-stockspl.bin` (same limit), and, where
-  `openipc-axera` builds the AX620U first stage, `spl-ax620u-nand.bin`
-  and `spl-ax620u-nand-stock.bin`, checked against the 1024 KiB `spl`
-  partition (`spl_kb`). Each leg uploads all its images in one artifact,
-  `u-boot-<soc>`.
+- **Partition fit:** every image is written at 0 with its first stage:
+  `ax620u-nand` the 1 MiB `spl` and 1536 KiB `boot` partitions (2560 KiB,
+  up to the environment), `ax620e-nor` the 256 KiB boot partition.
+  `u-boot-<soc>-stockspl.bin`, the same with the cameras' own first
+  stage (the fallback), is checked against the same limit.
+- **Artifacts:** `u-boot-<soc>` holds `u-boot-<soc>.bin` only, what the
+  release takes; `stockspl-<soc>` holds the `-stockspl` image, for the
+  smoke test, and is not released.
 - **Smoke test:** the `qemu` job builds qemu-system-aarch64
   from OpenIPC/qemu-bench at a pinned commit; the source-built first stage
   needs one with `axera-spi-nor` ending a command at the flash's software
@@ -360,11 +359,11 @@ The build logic lives here. Other branches call it:
   U-Boot's "Warning - bad CRC" printed once only. The model keeps flash
   writes in memory, not in the file, so two QEMU runs would not test the
   saved environment. The same for AX620U on `-M ax620u` (128 MiB erased
-  SPI NAND, the spl image at 0, `u-boot-ax620u-nand.bin` at 0x100000;
-  the machine starts the first stage at flash 0x800, no boot ROM
-  model), and for each SoC's stock first stage: four legs. A leg whose
-  first stage image the revision does not build is skipped with a
-  warning, except AX620E's source one.
+  SPI NAND, the image at 0; the machine starts the first stage at flash
+  0x800, no boot ROM model; the AX620U legs need no qemu-bench change),
+  and for each SoC's `-stockspl` image: four legs. A leg whose image the
+  revision does not build (no `-stockspl`, or an AX620U image of U-Boot
+  alone) is skipped with a warning, except AX620E's source one.
 - **Release and publish:**
   - `release` uploads to the `axera` tag.
   - `publish` is commented out, with its input: neither image has run on
