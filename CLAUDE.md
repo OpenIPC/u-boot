@@ -18,11 +18,14 @@ v2022.10**, the same release as the other `openipc-*` branches, plus:
 | SoC | Targets | Status |
 | --- | --- | --- |
 | AX620U (`axera,ax620x`, 4x Cortex-A7, AArch32) | `ax620u-nand` | qemu-bench `-M ax620u` to OpenIPC's userspace; **no silicon** |
-| AX620E family (AX620Q/AX630C, 2x Cortex-A53, AArch64) | `ax620e-nor` | private QEMU `-M ax620e` to OpenIPC's userspace and back; **no silicon** |
+| AX620E family (AX620Q/AX630C, 2x Cortex-A53, AArch64) | `ax620e-nor` | qemu-bench `-M ax620e` to OpenIPC's userspace and back; **no silicon** |
 
 `git show origin/openipc-hisilicon:CLAUDE.md` covers the OpenIPC layer
 (default environment, `common/openipc.c`, env compatibility); it applies
-here unchanged. There is no `build-axera.yml` on `openipc` yet, so no CI.
+here unchanged. CI: `.github/workflows/ci.yml` calls `build-axera.yml`
+on `openipc` (both targets built, the AX620E image smoke-tested on
+qemu-bench `-M ax620e`, release by hand to the `axera` tag; no publish to
+OpenIPC/firmware); `git show origin/openipc:CLAUDE.md` describes it.
 
 ## Relationship to mainline
 
@@ -177,7 +180,7 @@ it).
 - No SD driver (Cadence SD4HC with an Axera PHY), so no SD recovery;
   updates over TFTP (`ub`, `uk`, `ur`) or `loady`. No pads are set.
 
-### Verification (private QEMU `-M ax620e`, not in qemu-bench yet)
+### Verification (qemu-bench `-M ax620e`)
 
 ```sh
 # a 16 MiB OpenIPC NOR image with this boot partition at 0, env erased
