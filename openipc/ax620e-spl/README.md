@@ -49,3 +49,6 @@ x16, 2 Gbit = 256 MiB, 2400 MT/s, the SDK's `LPDDR4_CONFIG_2400`).
 - `boot.c`: `SPINOR_SINGLE_IO` reads the flash with 0x03 on one data
   line, as the Xiongmai first stage does, instead of setting the flash's
   QE bit and reading with 0x6b (quad output).
+- `spinand.h`: drops an unused `#include "errno.h"`, so the SPL builds
+  with no C library headers (`-nostdinc`; `-std=gnu11`, as the code
+  predates C23).
