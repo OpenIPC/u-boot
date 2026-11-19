@@ -151,13 +151,21 @@ jobs:
 
       # stockspl-<soc>: the same with the cameras' first stage, for the
       # smoke test (and anyone who wants it from the run); not released.
-      # A revision that does not build it has none.
+      # A revision that does not build it uploads a marker saying so, so
+      # the smoke test tells that from a failed download.
+      - name: Mark a missing stock-first-stage image
+        run: |
+          f='output/u-boot-${{ matrix.soc }}-stockspl.bin'
+          [ -f "$f" ] || echo "not built by this revision" > output/stockspl-none.txt
+
       - name: Upload stock-first-stage artifact
         uses: actions/upload-artifact@v4
         with:
           name: stockspl-${{ matrix.soc }}
-          path: output/u-boot-${{ matrix.soc }}-stockspl.bin
-          if-no-files-found: warn
+          path: |
+            output/u-boot-${{ matrix.soc }}-stockspl.bin
+            output/stockspl-none.txt
+          if-no-files-found: error
 
   # Build qemu-system-aarch64 once for the smoke leg.
   qemu:
@@ -237,7 +245,6 @@ jobs:
 
       - name: Download stock-first-stage artifact
         if: ${{ matrix.spl == 'stock' }}
-        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: stockspl-${{ matrix.soc }}
@@ -267,9 +274,11 @@ jobs:
             exit 0
           }
           if [ ! -f "$IMG" ]; then
-            [ '${{ matrix.machine }}/${{ matrix.spl }}' = ax620e/source ] &&
-              { echo "missing $IMG" >&2; exit 1; }
-            skip "$IMG not built by this revision"
+            # only the build's own marker excuses a missing image
+            [ '${{ matrix.spl }}' = stock ] && [ -f stockspl-none.txt ] &&
+              skip "$IMG not built by this revision"
+            echo "missing $IMG" >&2
+            exit 1
           fi
           # The flash, erased but for the image at 0: AX620E 16 MiB NOR,
           # AX620U 128 MiB SPI NAND. env-from-flash (AX620E): serve the
@@ -281,9 +290,28 @@ jobs:
             ax620u)
               SIZE_MB=128
               MACHINE_ARGS=
-              # U-Boot's Axera header at 0x100000: the first stage with it
-              python3 -c 'import sys; d = open(sys.argv[1], "rb").read(); sys.exit(not (len(d) > 0x100400 and d[0x100004:0x100008] == bytes.fromhex("22335455")))' "$IMG" ||
-                skip "$IMG is U-Boot alone, no first stage" ;;
+              # The first stage's two headers, U-Boot's at 0x100000: the
+              # image to test (0). U-Boot alone behind its header, at most
+              # the boot partition, is what openipc-axera built before the
+              # image carried the first stage (2): skipped. Anything else
+              # is a broken image (1).
+              rc=0
+              python3 - "$IMG" <<'PY' || rc=$?
+          import sys
+          d = open(sys.argv[1], 'rb').read()
+          magic = bytes.fromhex('22335455')
+          if (len(d) > 0x100400 and d[4:8] == magic and d[:0x400] == d[0x400:0x800]
+                  and d[0x100004:0x100008] == magic):
+              sys.exit(0)
+          if len(d) <= 0x180000 and d[4:8] == magic and d[:0x400] != d[0x400:0x800]:
+              sys.exit(2)
+          sys.exit(1)
+          PY
+              case $rc in
+                0) ;;
+                2) skip "$IMG is U-Boot alone, from before the image carried the first stage" ;;
+                *) echo "$IMG: not an AX620U image (headers at 0, 0x400, 0x100000)" >&2; exit 1 ;;
+              esac ;;
           esac
           set -- "$IMG" 0
           echo "booting $* on -M ${{ matrix.machine }}"
