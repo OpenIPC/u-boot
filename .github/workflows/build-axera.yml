@@ -37,9 +37,10 @@ on:
 #
 # Nothing private is needed. The AX620U image is U-Boot behind its 1 KiB
 # Axera header only: the vendor SPL stays in the camera's `spl` partition.
-# The AX620E image carries the vendor first stage, which is in the tree
-# (openipc/ax620e.spl), and build.sh fetches the SDK's ax_gzip from a public
-# SDK copy at a fixed commit, checked against its SHA-256.
+# The AX620E image carries its first stage, which build.sh builds from the
+# SDK source in the tree (openipc/ax620e-spl), and build.sh fetches the
+# SDK's ax_gzip from a public SDK copy at a fixed commit, checked against
+# its SHA-256.
 
 jobs:
   # Resolve the openipc-axera revision this run builds from. The workflow
@@ -171,7 +172,7 @@ jobs:
           path: qemu-aarch64
 
   # QEMU smoke test: boots the AX620E image from an erased 16 MiB NOR on
-  # qemu-bench's `-M ax620e`. The machine runs the image's own vendor first
+  # qemu-bench's `-M ax620e`. The machine runs the image's own first
   # stage from flash 0, which unpacks U-Boot from 0x10000 with the GZIPD
   # engine model. It must reach the autoboot prompt, then, after `reset`
   # (the watchdog), reach it again having loaded the environment the first

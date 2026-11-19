@@ -353,11 +353,13 @@ Every infinity2m, infinity6, 6b0, 6e and 6c part also builds for SPI NAND,
 - **The images have not run on silicon**, only on qemu-bench's `ax620u`
   and `ax620e` machines. They are only in this repository's `axera`
   release, and nothing is published to OpenIPC/firmware.
-- The vendor's DDR-init first stage is kept, as a binary: it is signed
-  and there is no source. It loads U-Boot behind a 1 KiB Axera header
+- The DDR-init first stage loads U-Boot behind a 1 KiB Axera header
   (checksums; the AX620E's also carries the SDK's RSA test key and a
   signature with it). A part with secure boot fused would refuse these
-  images.
+  images. On AX620U it is the vendor's binary SPL, left on the flash. On
+  AX620E it is the SDK's BL1 SPL, built from source
+  (`openipc/ax620e-spl`, from Sipeed's public SDK) and set up to program
+  DDR as the Xiongmai cameras' own first stage does.
 - **AX620U.** The vendor SPL stays in its own 1 MiB `spl` partition and
   is not in the image: `u-boot-ax620u-nand.bin` is the 1536 KiB `boot`
   partition alone, at `0x100000`, not at 0. The layout is
@@ -369,7 +371,7 @@ Every infinity2m, infinity6, 6b0, 6e and 6c part also builds for SPI NAND,
   `run urwrite` (a `rootfs.ubifs`) or `run ubwrite` (a U-Boot image)
   restore it. Otherwise update from Linux (`sysupgrade`) or a programmer.
 - **AX620E.** `u-boot-ax620e-nor.bin` is the whole 256 KiB boot
-  partition: the vendor first stage at 0, U-Boot at `0x10000` packed in
+  partition: the first stage at 0, U-Boot at `0x10000` packed in
   Axera's own format for the SoC's unpacking engine. OpenIPC's NOR layout
   follows. Ethernet works (`ub`, `uk`, `ur` over TFTP); there is no SD
   driver, so no SD recovery.
