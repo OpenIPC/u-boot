@@ -76,7 +76,11 @@ static void cpupll_config(int div)
 	/* Step2: set CPUPLL_FBK_FRA bit[28:2]=0x555_5555 */
 	value = readl(CPUPLL_CFG0_ADDR);
 	value &= ~0x1FFFFFFC;
+#ifdef AX620E_XM
+	value |= 0x5555555 << 2;	/* as the cameras' first stage: 12M x 166.33 / 2 */
+#else
 	// value |= 0x5555555 << 2;
+#endif
 	writel(value, CPUPLL_CFG0_ADDR);
 	/* Step3: set CPUPLL_FBK_INT bit[8:0]=0xA6 */
 	value = readl(CPUPLL_CFG1_ADDR);

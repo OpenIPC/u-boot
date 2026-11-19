@@ -47,6 +47,10 @@ CFLAGS += -DAX620E_CFG=1 -DCONFIG_ARM64=1
 # FLASH_TYPE=nor; SUPPPORT_GZIPD=TRUE (the U-Boot image is packed);
 # SPINOR_SINGLE_IO: 0x03 reads on one line, as the stock first stage
 CFLAGS += -DAX620E_NOR=1 -DSUPPPORT_GZIPD -DSPINOR_SINGLE_IO
+# AX620E_XM: DDR, CPU PLL and flash pads set up as the AX620E Xiongmai
+# cameras' own first stage does (an older SDK build, proven on them),
+# reproduced from its register trace; grep AX620E_XM for each place
+CFLAGS += -DAX620E_XM
 # The image layout: U-Boot's header at flash 0x10000 (no backup copy),
 # loaded to 0x5C000000; the rest is what spl/Makefile always defines
 CFLAGS += -DUBOOT_HEADER_FLASH_BASE=0x10000 -DUBOOT_HEADER_BAK_FLASH_BASE=0x0 \

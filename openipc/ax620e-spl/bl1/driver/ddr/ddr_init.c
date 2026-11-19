@@ -629,7 +629,11 @@ void ddrmc_sys_glb_init(DDR_FREQ freq)
 	} else if (freq == DDR_CLK_2800) {
 		bit_shift = 0xe9;  // 2796
 	} else if (freq == DDR_CLK_2666) {
+#ifdef AX620E_XM
+		bit_shift = 0xc8;  // 2400: the 2666 timings, clocked at 2400
+#else
 		bit_shift = 0xde;  // 2664
+#endif
 	} else if (freq == DDR_CLK_2400) {
 		bit_shift = 0xc8;  // 2400
 	} else if (freq == DDR_CLK_2133) {
@@ -884,8 +888,10 @@ void ddrmc_pre_init(const u32 ddrmc_timing[][29], u8 ddrc_timming_index)
 		reg_data &= ~(0x3 << 16);//D_HALF_FREQ_MODE
 		ddr_writel(D_DDRMC_TMG16_F0_ADDR, reg_data);
 		#endif
+#ifndef AX620E_XM	/* not written there: TMG16 keeps the table's value */
 		ddr_writel(D_DDRMC_CFG29_ADDR, 0x00000960);
 		ddr_writel(D_DDRMC_TMG16_F0_ADDR, 0x00010081);
+#endif
 		#if LPDDR4_DFS_CONFIG
 		ddrmc_freq1_timing_init();
 		ddr_writel(D_DDRMC_TMG16_F1_ADDR, 0x00010081);

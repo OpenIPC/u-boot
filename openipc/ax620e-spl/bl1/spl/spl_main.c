@@ -402,6 +402,7 @@ failed:
 }
 #endif
 
+#ifndef AX620E_XM
 static void clk_aux_config(void)
 {
 	int val = 0;
@@ -413,6 +414,7 @@ static void clk_aux_config(void)
 	writel(val, 0x2300030);
 	writel(0x110, 0x23401b8);
 }
+#endif
 
 static void set_ddr_init(void)
 {
@@ -476,7 +478,9 @@ int main(void)
 	set_ddr_init();
 	WRITE_DEBUG_BOOT_TIME(DBG_DDR_INIT_END); //ddr init end
 
+#ifndef AX620E_XM	/* not in the cameras' first stage */
 	clk_aux_config();
+#endif
 
 	is_boot_uboot(flash_type);
 

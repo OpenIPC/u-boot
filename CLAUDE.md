@@ -144,13 +144,16 @@ it).
   `spl_AX620E_sign.py -small_size_nor` (`spl_header()`: checksums,
   capability 0x54FAFE, the test key and a signature); for the Xiongmai
   cameras' own first stage it gives their header byte for byte. The SPL
-  picks the DRAM by the eFuse chip type (AX620Q: LPDDR4 x16 256 MiB at
-  2400 MT/s), reads the flash with 0x03 on one line and enters U-Boot in
-  EL1, as the cameras' first stage does. It differs from that one, an
-  older SDK build, in some DDR settings (the controller timings of the
-  SDK's 2400 table, where the cameras' used its 2666 one at the same
-  2400 MT/s clock; the PHY's DQ deskew presets and a few drive and
-  training values): that is what a camera has to confirm.
+  picks the DRAM by the eFuse chip type (AX620Q: LPDDR4 x16 256 MiB),
+  reads the flash with 0x03 on one line and enters U-Boot in EL1, as the
+  cameras' first stage does. `AX620E_XM` (README there) makes it set up
+  the DDR as that first stage does, an older SDK build: in QEMU the DDR
+  controller, PHY and DDR PLL get the same 1308 writes in the same order
+  (the 2666 tables at 2400 MT/s, its PHY values and training limits),
+  and the CPU PLL the same values. Still different: the board init
+  around it (the AXI timeout and watchdog/thermal abort enables, the
+  ADC reference for the board id), the flash clock registers and when
+  the flash is first set up. Only a camera confirms any of it.
 - The first stage reads the image at 0x10000: a 1 KiB Axera header, then
   the payload in Axera's own LZ77/Huffman format ("20", `ax_gzip`; the
   GZIPD engine unpacks it, no other writer exists). It unpacks to

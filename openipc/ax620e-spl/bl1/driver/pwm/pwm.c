@@ -218,7 +218,9 @@ void pwm_config(u32 pwm_id, u32 freq, u32 vout)
 
 void pwm_volt_config(int pwm_id, int voltage)
 {
+#ifndef AX620E_XM	/* the cameras' first stage leaves the pin's function alone */
 	pwm_pinmux_config(pwm_id);
+#endif
 	pwm_clk_config(pwm_id);
 	pwm_config(pwm_id, 240, voltage);
 	udelay(500);

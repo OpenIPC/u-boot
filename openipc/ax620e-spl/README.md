@@ -32,7 +32,7 @@ an AArch64 U-Boot): `FLASH_TYPE=nor`, `SUPPPORT_GZIPD`, no ATF, no
 DDRINIT partition, U-Boot's header at flash 0x10000 (no backup copy) and
 RAM 0x5C000000. The part is not a build option: the SPL reads the chip
 type from the eFuse and picks the DRAM from it (AX620Q: LPDDR4, one rank,
-x16, 2 Gbit = 256 MiB, 2400 MT/s, the SDK's `LPDDR4_CONFIG_2400`).
+x16, 2 Gbit = 256 MiB, at 2400 MT/s).
 
 ## Changes from the SDK
 
@@ -54,3 +54,16 @@ x16, 2 Gbit = 256 MiB, 2400 MT/s, the SDK's `LPDDR4_CONFIG_2400`).
 - `spinand.h`: drops an unused `#include "errno.h"`, so the SPL builds
   with no C library headers (`-nostdinc`; `-std=gnu11`, as the code
   predates C23).
+- `AX620E_XM` (set by the Makefile): the DDR, CPU PLL and flash pad setup
+  of the AX620E Xiongmai cameras' own first stage, an older build of this
+  SDK that those cameras run. Its values come from its QEMU register
+  trace and its code, and each place is an `#ifdef AX620E_XM` next to the
+  SDK's own: the LPDDR4 2666 controller and PHY tables (the PHY entry
+  with that build's values) with the DPLL at 2400 MT/s; port 2 configured
+  as the others; no CFG29/TMG16 rewrite; its training limits; write
+  deskew trained without the SDK's extra eye limits and rank-1 copy; the
+  CPU PLL's fraction (998 MHz, not 996); flash pads at the lower drive
+  strength; the PWM11 core-voltage pin's function and `clk_aux_config()`
+  left alone. In QEMU, the DDR controller, PHY and DDR PLL then get the
+  same writes in the same order as from the cameras' first stage (1308
+  writes, 256 registers).

@@ -31,11 +31,20 @@ static void spi_pin_config(void)
 
 #ifndef SPI_HAPS_DEBUG
 	//pull-up/pull-down and driver strength config
+#ifdef AX620E_XM
+	/* the cameras' first stage: the same, drive strength bit 2 clear */
+	writel(0x10013, (PIN_MUX_G11_BASE + SFC_CLK));
+	writel(0x10093, (PIN_MUX_G11_BASE + SFC_MOSI_IO0));
+	writel(0x10093, (PIN_MUX_G11_BASE + SFC_MISO_IO1));
+	writel(0x10093, (PIN_MUX_G11_BASE + SFC_WP_IO2));
+	writel(0x10093, (PIN_MUX_G11_BASE + SFC_HOLD_IO3));
+#else
 	writel(0x10017, (PIN_MUX_G11_BASE + SFC_CLK));
 	writel(0x10097, (PIN_MUX_G11_BASE + SFC_MOSI_IO0));
 	writel(0x10097, (PIN_MUX_G11_BASE + SFC_MISO_IO1));
 	writel(0x10097, (PIN_MUX_G11_BASE + SFC_WP_IO2));
 	writel(0x10097, (PIN_MUX_G11_BASE + SFC_HOLD_IO3));
+#endif
 	writel(0x60093, (PIN_MUX_G11_BASE + SFC_CSN0)); //GPIO2 A27
 	writel(0x60093, (PIN_MUX_G11_BASE + SFC_CSN1)); //GPIO2 A25
 #endif

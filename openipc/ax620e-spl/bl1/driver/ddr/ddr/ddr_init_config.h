@@ -2,7 +2,24 @@
 #define __DDR_INIT_CONFIG__
 #include "ddr_common_config.h"
 
-#if !defined(CFG_LPDDR4_CLK_CMDLINE) && defined(SENSOR_2M_CONFIG_1600)
+/*
+ * AX620E_XM (OpenIPC): the DDR setup of the AX620E Xiongmai cameras' own
+ * first stage, an older build of this SDK proven on those cameras,
+ * reproduced register for register from its trace (QEMU): the LPDDR4 2666
+ * tables with the DPLL at 2400 MT/s (ddrmc_sys_glb_init()), its PHY
+ * timing values (ddrphy_timing_define_lpddr4.h), port 2's config
+ * (ddrmc_reg_data_def.h), and its training limits and steps
+ * (ddrmc_pre_init(), ddrmc_train_flow_lp4.c). So the 2666 entry is built.
+ */
+#if defined(AX620E_XM)
+#define LPDDR4_CONFIG_1600              0
+#define LPDDR4_CONFIG_2133              0
+#define LPDDR4_CONFIG_2400              0
+#define LPDDR4_CONFIG_2666              1
+#define LPDDR4_CONFIG_2800              0
+#define LPDDR4_CONFIG_3200              0
+#define LPDDR4_CONFIG_3733              0
+#elif !defined(CFG_LPDDR4_CLK_CMDLINE) && defined(SENSOR_2M_CONFIG_1600)
 #define LPDDR4_CONFIG_1600              1
 #define LPDDR4_CONFIG_2133              0
 #define LPDDR4_CONFIG_2400              0

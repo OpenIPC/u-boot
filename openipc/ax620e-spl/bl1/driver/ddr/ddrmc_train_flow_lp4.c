@@ -520,7 +520,9 @@ void wrdsk_train_flow(void)
 {
 	u32 reg_data;
 
+#ifndef AX620E_XM	/* the cameras train write deskew with the limits above */
 	reg_mask_set(D_DDRMC_TRAIN_CTRL3_ADDR, 0xFF0FF7FF, (0x08 << 24) | 0x200);
+#endif
 	set_ddrmc_train_control(0xFF000407, (1 << 10) | (1 << 2) | 0x1, 1);
 	for (int i=0; i<1000 ; i++)  {
 		//#1us;
@@ -545,8 +547,10 @@ void wrdsk_train_flow(void)
 	}
 	set_ddrmc_train_control(0xFF000407, (1 << 10) | (1 << 2) | (1 << 1), 1);
 	set_ddrmc_train_control(0xFF000407, 0x0, 1);
+#ifndef AX620E_XM	/* nor copy the result to rank 1's registers */
 	reg_mask_set(D_DDRMC_TRAIN_CTRL3_ADDR, 0xFF0FF7FF, (0x10 << 24) | 0x400);
 	single_rank_wr_rd_dsk_flow(0);
+#endif
 }
 
 void Adjust_Wreye_Value(u32 regAddr, u32 wreyeVal, u32 shiftNum)
@@ -1116,9 +1120,16 @@ void ddrmc_train_flow_lp4_sequence(void * rom_param)
 		bit_shift = (1 << 28);
 	}
 	reg_mask_set(D_DDRMC_BIST_CTRL0_ADDR, 0x3070F000, (0x5 << 20) | (0x1 << 12) | (bit_shift));
+#ifdef AX620E_XM
+	/* the cameras' training limits: update count, eye and deskew maxima */
+	reg_mask_set(D_DDRMC_TRAIN_CTRL1_ADDR, (0xff << 20), 0x80 << 20);
+	reg_mask_set(D_DDRMC_TRAIN_CTRL3_ADDR, 0xFF0FF7FF, (0x16 << 24) | 0xc0);
+	reg_mask_set(D_DDRMC_TRAIN_CTRL4_ADDR, (0xff << 12), 0x80);
+#else
 	reg_mask_set(D_DDRMC_TRAIN_CTRL1_ADDR, (0xff << 20), 0xf0 << 20);
 	reg_mask_set(D_DDRMC_TRAIN_CTRL3_ADDR, 0xFF0FF7FF, (0x10 << 24) | 0x400);
 	reg_mask_set(D_DDRMC_TRAIN_CTRL4_ADDR, (0xff << 12), 0xf0);
+#endif
 	reg_mask_set(D_DDRMC_TRAIN_CTRL5_ADDR, 0xFF0FF, (0x2 << 12) | 0x4);
 	reg_mask_set(D_DDRMC_TRAIN_CTRL6_ADDR, 0xff, 0xa);
 #if LPDDR4_DFS_CONFIG
