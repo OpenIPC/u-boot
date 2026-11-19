@@ -58,17 +58,31 @@ void board_nand_init(void)
  * "rmii-phy-dir" "output"), as the stock U-Boot's driver for it sets
  * before autonegotiation; mainline's leaves both to the strap pins.
  */
+static int rtl8201f_rmii(struct phy_device *phydev)
+{
+	int ret, rmsr;
+
+	ret = phy_write(phydev, MDIO_DEVAD_NONE, RTL8201F_PAGE_SELECT, 7);
+	if (ret < 0)
+		return ret;
+	rmsr = phy_read(phydev, MDIO_DEVAD_NONE, RTL8201F_RMSR);
+	ret = rmsr < 0 ? rmsr :
+	      phy_write(phydev, MDIO_DEVAD_NONE, RTL8201F_RMSR,
+			(rmsr & ~RMSR_RMII_TXC_IN) | RMSR_RMII_MODE);
+	/* back to page 0 whatever happened on page 7 */
+	rmsr = phy_write(phydev, MDIO_DEVAD_NONE, RTL8201F_PAGE_SELECT, 0);
+	return ret < 0 ? ret : rmsr;
+}
+
 int board_phy_config(struct phy_device *phydev)
 {
 	if ((phydev->phy_id & 0xffffff) == RTL8201F_UID) {
-		int rmsr;
+		int ret = rtl8201f_rmii(phydev);
 
-		phy_write(phydev, MDIO_DEVAD_NONE, RTL8201F_PAGE_SELECT, 7);
-		rmsr = phy_read(phydev, MDIO_DEVAD_NONE, RTL8201F_RMSR);
-		if (rmsr >= 0)
-			phy_write(phydev, MDIO_DEVAD_NONE, RTL8201F_RMSR,
-				  (rmsr & ~RMSR_RMII_TXC_IN) | RMSR_RMII_MODE);
-		phy_write(phydev, MDIO_DEVAD_NONE, RTL8201F_PAGE_SELECT, 0);
+		if (ret < 0) {
+			printf("RTL8201F: RMII setup failed (%d)\n", ret);
+			return ret;
+		}
 	}
 	if (phydev->drv->config)
 		return phydev->drv->config(phydev);
