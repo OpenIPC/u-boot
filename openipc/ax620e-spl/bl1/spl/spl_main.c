@@ -21,7 +21,9 @@
 #define COMM_SYS_DUMMY_SW0    (0x02340000 + 0xDC) //second core jump addr [31:0]
 #define COMM_SYS_DUMMY_SW1    (0x02340000 + 0xE0) //second core jump addr [39:32]
 #define SECONDARY_TIMEOUT     50
+#if !CONFIG_ARM64
 extern unsigned int pen_release[2];
+#endif
 
 #ifdef DEBUG_BOOT_TIME
 	#define WRITE_DEBUG_BOOT_TIME(addr) writel(readl(TIMER_64_0_BASE), addr)
@@ -102,23 +104,21 @@ void prepare_boot(unsigned long boot_addr, unsigned long dtb_addr)
 
 void wakeup_slave(void) {
 
+#if !CONFIG_ARM64
 	unsigned int last_time;
 	int wake_flag = 0;
+#endif
 
 	*((unsigned int*)(COMM_SYS_DUMMY_SW1)) = 0x0;
 	*((unsigned int*)(COMM_SYS_DUMMY_SW0)) = SPL_START_ADDR;
 	__asm__ __volatile__("sev\n\t");
 
-#if CONFIG_ARM64
 	/*
 	 * arm64 start.S has no pen_release: the second core leaves the boot
 	 * ROM for _start, clears these registers itself and waits in wfe for
 	 * the kernel's spin table (as the AX620E Xiongmai first stage does).
 	 */
-	(void)last_time;
-	(void)wake_flag;
-	return;
-#endif
+#if !CONFIG_ARM64
 	/* waiting secondary cores to finish, the getCurrTime is decrease */
 	last_time = getCurrTime(MSEC);
 	do {
@@ -135,7 +135,7 @@ void wakeup_slave(void) {
 
 	/* reset dummy to 0, secondary cores holding */
 	writel(0, COMM_SYS_DUMMY_SW0);
-
+#endif
 }
 #endif
 
@@ -422,8 +422,11 @@ static void set_ddr_init(void)
 	mc20e_ddr_init((void *)&ddr_rom_param[0]);
 #elif defined (AX620E_SUPPORT_SD)
 	mc20e_ddr_init(NULL);
-#else
+#elif defined(SUPPORT_DDRINIT_PART)
 	mc20e_ddr_init((void *)DDRINIT_PARAM_HEADER_BASE + sizeof(struct img_header));
+#else
+	/* no DDRINIT partition loaded: no saved training values to start from */
+	mc20e_ddr_init(NULL);
 #endif
 }
 

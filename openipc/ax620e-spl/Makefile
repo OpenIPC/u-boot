@@ -63,9 +63,13 @@ all: $(O)/spl.bin
 $(O)/spl.bin: $(O)/spl.elf
 	$(OBJCOPY) -O binary $< $@
 
+# GNU ld 2.39+ warns about bl1.lds's single RWX segment; older ld lacks the flag
+LDFLAGS_RWX := $(shell $(LD) --no-warn-rwx-segments --version >/dev/null 2>&1 && \
+	echo --no-warn-rwx-segments)
+
 $(O)/spl.elf: $(OBJS) $(SRC)/board/arch/arm64/bl1.lds
 	$(LD) --entry=_start -T $(SRC)/board/arch/arm64/bl1.lds \
-		--no-warn-rwx-segments -Map $(O)/spl.map $(OBJS) -o $@ \
+		$(LDFLAGS_RWX) -Map $(O)/spl.map $(OBJS) -o $@ \
 		$$($(CC) -print-libgcc-file-name)
 
 $(O)/obj/%.o: $(SRC)/%.c
