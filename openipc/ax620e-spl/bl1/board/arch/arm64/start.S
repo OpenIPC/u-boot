@@ -38,6 +38,8 @@ _start:					// the first line code
 	bl gic400_secure_init
 
 	bl main
+	mov w23, w0		/* main() returns the image entry: x23 for main_start_el1 */
+	mov x24, xzr		/* x0 at the entry */
 
 	/*
 	* Prepare the switch to the EL2_SP1 mode from EL3

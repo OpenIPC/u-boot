@@ -109,6 +109,16 @@ void wakeup_slave(void) {
 	*((unsigned int*)(COMM_SYS_DUMMY_SW0)) = SPL_START_ADDR;
 	__asm__ __volatile__("sev\n\t");
 
+#if CONFIG_ARM64
+	/*
+	 * arm64 start.S has no pen_release: the second core leaves the boot
+	 * ROM for _start, clears these registers itself and waits in wfe for
+	 * the kernel's spin table (as the AX620E Xiongmai first stage does).
+	 */
+	(void)last_time;
+	(void)wake_flag;
+	return;
+#endif
 	/* waiting secondary cores to finish, the getCurrTime is decrease */
 	last_time = getCurrTime(MSEC);
 	do {
@@ -263,6 +273,10 @@ static void is_boot_uboot(char flash_type)
 {
 	int boot_addr = 0;
 	u32 boot_reg = readl(TOP_CHIPMODE_GLB_BACKUP0);
+#if CONFIG_ARM64 && !defined(SUPPORT_ATF) && !defined(AX_BOOT_OPTIMIZATION_SUPPORT)
+	/* main() loads U-Boot next anyway, and enters it in EL1, not here in EL3 */
+	return;
+#endif
 	if ((boot_reg & BOOT_DOWNLOAD)
 	|| (boot_reg & BOOT_RECOVERY)
 	|| (boot_reg & BOOT_KERNEL_FAIL)) {
@@ -487,6 +501,10 @@ int main(void)
 	riscv_start_load_rootfs();
 #endif
 		ax_print_str("jump to next boot\r\n");
+#if CONFIG_ARM64
+		/* start.S drops to EL1 and enters boot_addr there */
+		return boot_addr;
+#endif
 		jump_to_execute(boot_addr);
 		// prepare_boot(boot_addr, dtb_addr);
 	} else {

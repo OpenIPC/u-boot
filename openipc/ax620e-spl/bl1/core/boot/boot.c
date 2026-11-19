@@ -618,6 +618,15 @@ int read_img_header(u32 flash_type, struct img_header *header, struct img_header
 		spinand_phy_setting[2] = header->nand_phy_setting[2];
 	}
 	#endif
+	#if defined(AX620E_NOR) && defined(SPINOR_SINGLE_IO)
+	/*
+	 * Plain 0x03 reads, one data line, as the first stage of the AX620E
+	 * Xiongmai cameras does: no QE bit written to the flash and no quad
+	 * read (0x6b) that the board's IO2/IO3 wiring would have to carry.
+	 */
+	if (flash_type == FLASH_NOR)
+		bus_width = BUS_WIDTH_1;
+	#endif
 	#if defined(AX620E_NOR)
 	if (flash_type == FLASH_NOR) {
 		spinor_qe_rdsr = (header->nand_nor_cfg & GENMASK(15, 8)) >> 8;
