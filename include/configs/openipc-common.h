@@ -71,24 +71,28 @@
  * kernel that loads but never boots still comes to altbootcmd past
  * bootlimit, which does not reset.
  */
+#define OPENIPC_RECOVERY_FETCH \
+	"fwrecovery=if env exists bootfail; then run fwupd; sleep 5; reset; fi\0" \
+	"bootflash=run fwrecovery; setenv setargs setenv bootargs ${bootargs}; run setargs; run loadkernel; bootm ${baseaddr}; reset\0"
+#define OPENIPC_RECOVERY_PROMPT \
+	"fwrecovery=if env exists bootfail; then echo \"*** Firmware broken, and this U-Boot has no network, MMC or USB to recover it from: staying at the prompt (loady ${baseaddr}, then run urwrite) ***\"; fi\0" \
+	"bootflash=if env exists bootfail; then run fwrecovery; else setenv setargs setenv bootargs ${bootargs}; run setargs; run loadkernel; bootm ${baseaddr}; reset; fi\0"
+
 /*
  * What earlier builds of this tree saved for commands since replaced, as
  * "name=value\0" pairs: openipc_helper() puts today's default in place of a
  * saved value that is exactly one of these (an edited one stays), so a
  * board that saved its environment under an older U-Boot gets the fixes.
+ * Both recovery variants are listed: a board whose U-Boot gained (or lost)
+ * a medium to recover from takes the other one; the one that is today's
+ * default is left as it is.
  */
-#define OPENIPC_RETIRED_COMMON \
-	"fwrecovery=if env exists bootfail; then run fwupd; sleep 5; reset; fi\0" \
-	"bootflash=run fwrecovery; setenv setargs setenv bootargs ${bootargs}; run setargs; run loadkernel; bootm ${baseaddr}; reset\0"
+#define OPENIPC_RETIRED_COMMON OPENIPC_RECOVERY_FETCH OPENIPC_RECOVERY_PROMPT
 
 #if defined(CONFIG_CMD_NET) || defined(CONFIG_MMC) || defined(CONFIG_USB_STORAGE)
-#define OPENIPC_RECOVERY \
-	"fwrecovery=if env exists bootfail; then run fwupd; sleep 5; reset; fi\0" \
-	"bootflash=run fwrecovery; setenv setargs setenv bootargs ${bootargs}; run setargs; run loadkernel; bootm ${baseaddr}; reset\0"
+#define OPENIPC_RECOVERY OPENIPC_RECOVERY_FETCH
 #else
-#define OPENIPC_RECOVERY \
-	"fwrecovery=if env exists bootfail; then echo \"*** Firmware broken, and this U-Boot has no network, MMC or USB to recover it from: staying at the prompt (loady ${baseaddr}, then run urwrite) ***\"; fi\0" \
-	"bootflash=if env exists bootfail; then run fwrecovery; else setenv setargs setenv bootargs ${bootargs}; run setargs; run loadkernel; bootm ${baseaddr}; reset; fi\0"
+#define OPENIPC_RECOVERY OPENIPC_RECOVERY_PROMPT
 #endif
 
 /* Environment shared by all boot media: identity, network boot, update
