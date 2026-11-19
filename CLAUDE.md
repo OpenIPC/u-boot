@@ -85,11 +85,15 @@ SHA-256 into `output/`, or `AX_GZIP=<path>`) and `curl`.
   the rebuilt one: its MMIO writes up to U-Boot equal the stock's.
 - The SPL loads the boot partition, a 1 KiB Axera header and then the
   image, to 0x40000000 and jumps to 0x40000400 (`SYS_TEXT_BASE`). It
-  checks two 32-bit LE word sums only: the image's (+0x14) and the
-  header's over +0x08..+0x2bc (+0x00). `axera-image.py` writes the stock
-  header's capability and flash words, the size and the sums; the RSA
-  key and signature stay zero (no secure boot on these cameras; a part
-  with secure boot fused would refuse the image).
+  checks the header only: magic and its 32-bit LE word sum (+0x00, over
+  +0x08..+0x3f8). The image's sum (+0x14) is not checked, by the stock
+  first stage (its decompile) nor by `openipc/ax620u-spl`.
+  `axera-image.py` writes the stock header's capability and flash words,
+  the size and both sums; in U-Boot's header the RSA key and signature
+  stay zero (no secure boot on these cameras; a part with secure boot
+  fused would refuse the image). The first stage's own header, for the
+  boot ROM, is another format and does carry the SDK test key and a
+  signature, as the cameras' does (`ax620u-spl-image.py`).
 - No SPL here, `SKIP_LOWLEVEL_INIT`; `board_init_f()` runs on
   `SYS_INIT_RAM_ADDR` 0x40f00000.
 

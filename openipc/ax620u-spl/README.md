@@ -50,6 +50,11 @@ blocks from 0x100000 ("eba %d is bad").
   `ax620u` machine acknowledges the cores' release at exactly those
   addresses. On silicon the cores write them themselves, so any address
   would do.
+- Like the stock code, it checks U-Boot's header (magic, header word
+  sum) but not the image's word sum (+0x14), and it goes on after a DDR
+  training timeout (printed), a PLL that does not lock or an eFuse read
+  error. The bad-block check reads the spare area into a buffer for the
+  largest size the header's geometry word can give (512 bytes).
 - -O0, as the stock build: the DDR PLL and PHY waits (`DELAY()` in
   `ddr_init.c`) are counted loops whose length is the -O0 code's. Built
   with Ubuntu's gcc 15, the loop is the stock one instruction for

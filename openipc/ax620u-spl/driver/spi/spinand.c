@@ -250,9 +250,11 @@ static int read_page(u32 addr, void *buf, u32 len, int oob)
 
 static int is_bad_block(u32 addr)
 {
-	char oob[64];
+	char oob[512];		/* the largest spare area flash_cfg describes */
 	int ret, i;
 
+	if ((1 << oob_shift) > (int)sizeof(oob))
+		return -1;
 	ret = read_page(addr & -(1 << block_shift), oob, 1 << oob_shift, 1);
 	if (ret)
 		return ret;
