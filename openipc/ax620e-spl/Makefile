@@ -35,7 +35,7 @@ SRCS := board/arch/arm64/start.S board/board.c board/arch/arm64/stack.S \
 	driver/dmaper/dmaper.c
 OBJS := $(addprefix $(O)/obj/,$(patsubst %.S,%.o,$(SRCS:.c=.o)))
 
-CFLAGS := -Os -Wall -Wno-array-bounds -ffreestanding -fno-builtin \
+CFLAGS := -std=gnu11 -Os -Wall -Wno-array-bounds -ffreestanding -fno-builtin \
 	-fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables \
 	-fomit-frame-pointer -fno-stack-protector -fno-pic -fno-pie \
 	-mstrict-align -mgeneral-regs-only -MMD -MP
