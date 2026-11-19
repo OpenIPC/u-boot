@@ -3,8 +3,9 @@
 # Build U-Boot for the targets named on the command line, or for every
 # target with an openipc/<target>_config when invoked without arguments.
 # A target is <soc>-<flash>, e.g. ax620u-nand; the image is
-# output/u-boot-<soc>-<flash>.bin. Failures are collected: every requested
-# target is attempted and the script exits non-zero if any of them failed.
+# output/u-boot-<soc>-<flash>.bin, written at flash 0 (for the Axera SoCs
+# also u-boot-<soc>-<flash>-stockspl.bin, the same with the cameras' own
+# first stage). Failures are collected: every requested target is attempted and the script exits non-zero if any of them failed.
 
 cd "$(dirname "$0")"
 
@@ -17,9 +18,53 @@ BOOT_SRCDIR=$(pwd)
 
 mkdir -p output
 
-# The boot partition's size, from the target's mtdparts: the image's limit
+# A partition's size in KiB (the boot partition's unless named), from the
+# target's mtdparts: the image's limit
 part_size() {
-    sed -n 's/^CONFIG_MTDPARTS_DEFAULT=.*[:,]\([0-9]*\)k(boot).*/\1/p' "$1"
+    sed -n "s/^CONFIG_MTDPARTS_DEFAULT=.*[:,]\([0-9]*\)k(${2:-boot}).*/\1/p" "$1"
+}
+
+# AX620U: the spl and boot partitions in one image, from flash 0
+# (ax620u-image.py): the first stage with its backup and the EIP-130
+# firmware in spl, U-Boot behind its Axera header (axera-image.py) at
+# 0x100000, all before the environment. The first stage is
+# openipc/ax620u-spl built here; u-boot-<target>-stockspl.bin has the
+# cameras' own instead (openipc/ax620u-spl/stock.bin), the fallback.
+# SPL=stock puts that one in u-boot-<target>.bin and builds nothing else.
+ax620u_image() {
+    target=$1
+    builddir=$2
+    spl=$(part_size "${builddir}/.config" spl)
+    boot=$(part_size "${builddir}/.config")
+    [ -n "${spl}" ] && [ -n "${boot}" ] ||
+        { echo "${target}: no spl or boot partition in mtdparts" >&2; return 1; }
+    [ "${spl}" = 1024 ] ||
+        { echo "${target}: a ${spl} KiB spl partition, the image wants 1024" >&2; return 1; }
+    uboot=${builddir}/u-boot-boot.bin
+    python3 openipc/axera-image.py "${builddir}/u-boot.bin" "${uboot}" \
+        $((boot * 1024)) || return 1
+    # <out> <first stage arguments>
+    pack() {
+        out=$1
+        shift
+        python3 openipc/ax620u-image.py "$@" openipc/ax620u-spl/eip130.bin \
+            "${uboot}" $(((spl + boot) * 1024)) "output/${out}"
+    }
+    stock=openipc/ax620u-spl/stock.bin
+    case "${SPL:-source}" in
+        stock)
+            rm -f "output/u-boot-${target}-stockspl.bin"
+            pack "u-boot-${target}.bin" --signed "${stock}"
+            return ;;
+        source) ;;
+        *) echo "SPL=${SPL}: source or stock" >&2; return 1 ;;
+    esac
+    spldir=${builddir}/spl
+    make -C openipc/ax620u-spl O="${spldir}" CROSS_COMPILE=${CROSS_COMPILE} \
+        -j${JOBS:-$(nproc)} </dev/null &&
+    pack "u-boot-${target}.bin" "${spldir}/spl.bin" \
+        openipc/axera-sdk-test-key.pem &&
+    pack "u-boot-${target}-stockspl.bin" --signed "${stock}"
 }
 
 # The AX620E's first stage unpacks U-Boot from Axera's own packed format,
@@ -48,16 +93,39 @@ ax_gzip() {
 }
 
 # AX620E: the first stage at flash 0, then U-Boot packed behind its header
-# at 0x10000, all before the environment (ax620e-image.py)
+# at 0x10000, all before the environment (ax620e-image.py). The first stage
+# is openipc/ax620e-spl built here; u-boot-<target>-stockspl.bin has the
+# Xiongmai cameras' own instead (openipc/ax620e-spl/stock.bin), the
+# fallback. SPL=stock puts that one in u-boot-<target>.bin and builds
+# nothing else.
 ax620e_image() {
     target=$1
     builddir=$2
     tool=$(ax_gzip) || return 1
     text=$(sed -n 's/^CONFIG_SYS_TEXT_BASE=//p' "${builddir}/.config")
     env=$(sed -n 's/^CONFIG_ENV_OFFSET=//p' "${builddir}/.config")
-    python3 openipc/ax620e-image.py openipc/ax620e.spl \
-        "${builddir}/u-boot.bin" "${text}" "${tool}" \
-        openipc/axera-sdk-test-key.pem "${env}" "output/u-boot-${target}.bin"
+    # <out> <first stage arguments>
+    pack() {
+        out=$1
+        shift
+        python3 openipc/ax620e-image.py "$@" "${builddir}/u-boot.bin" \
+            "${text}" "${tool}" openipc/axera-sdk-test-key.pem "${env}" \
+            "output/${out}"
+    }
+    stock=openipc/ax620e-spl/stock.bin
+    case "${SPL:-source}" in
+        stock)
+            rm -f "output/u-boot-${target}-stockspl.bin"
+            pack "u-boot-${target}.bin" --signed "${stock}"
+            return ;;
+        source) ;;
+        *) echo "SPL=${SPL}: source or stock" >&2; return 1 ;;
+    esac
+    spldir=${builddir}/spl
+    make -C openipc/ax620e-spl O="${spldir}" CROSS_COMPILE=${CROSS_COMPILE_64} \
+        -j${JOBS:-$(nproc)} </dev/null &&
+    pack "u-boot-${target}.bin" "${spldir}/spl.bin" &&
+    pack "u-boot-${target}-stockspl.bin" --signed "${stock}"
 }
 
 build_target() {
@@ -81,15 +149,10 @@ build_target() {
     make ${make_opts} </dev/null || return 1
 
     case "${target}" in
-        ax620e-*)
-            ax620e_image "${target}" "${builddir}"
-            return ;;
+        ax620e-*) ax620e_image "${target}" "${builddir}" ;;
+        ax620u-*) ax620u_image "${target}" "${builddir}" ;;
+        *) echo "${target}: no image layout" >&2; return 1 ;;
     esac
-
-    limit=$(part_size "${builddir}/.config")
-    [ -n "${limit}" ] || { echo "${target}: no boot partition in mtdparts" >&2; return 1; }
-    python3 openipc/axera-image.py "${builddir}/u-boot.bin" \
-        "output/u-boot-${target}.bin" $((limit * 1024))
 }
 
 ALL_TARGETS=$(cd openipc && ls *_config | sed 's/_config$//')

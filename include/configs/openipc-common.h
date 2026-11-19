@@ -16,6 +16,8 @@
  *     OPENIPC_NAND_MTDPARTS  partition list, ending in "-(ubi)"
  *     OPENIPC_NAND_UBI_MTD   the ubi partition's index, for ubi.mtd=
  *     OPENIPC_NAND_BOOT_SIZE the boot partition's size: ubwrite's limit
+ *     OPENIPC_NAND_SPL_SIZE  (optional) the spl partition before boot,
+ *                            whose first stage the image carries (AX620U)
  *   SPI NOR: the layout every OpenIPC NOR camera shares (below); the boot
  *     partition ends at CONFIG_ENV_OFFSET, ubwrite's limit.
  */
@@ -214,8 +216,28 @@
  */
 #define OPENIPC_FWUPD "fwupd=run ur\0"
 
+/*
+ * ubwrite: the image goes where it is written from flash 0. Where the
+ * first stage comes with U-Boot (OPENIPC_NAND_SPL_SIZE, the spl partition
+ * before boot: AX620U), fwglued (common/openipc.c) checks the image and
+ * splits it: U-Boot to the boot partition, then the first stage to spl;
+ * an image of U-Boot alone updates boot only. Else the image is boot's.
+ */
+#ifdef OPENIPC_NAND_SPL_SIZE
+#define OPENIPC_NAND_UBWRITE \
+	"ubwrite=if fwglued ${baseaddr} ${filesize}; then if nand erase.part boot && nand write ${ubbootaddr} boot ${ubbootsize}; then if itest ${ubsplsize} -gt 0; then nand erase.part spl && nand write ${baseaddr} spl ${ubsplsize}; fi; fi; else echo ubwrite: nothing written; fi; setenv ubbootaddr; setenv ubbootsize; setenv ubsplsize\0"
+/* ubwrite before it took the first stage too */
+#define OPENIPC_RETIRED_UBWRITE \
+	"ubwrite=if itest ${filesize} -gt 0 && itest ${filesize} -le " __stringify(OPENIPC_NAND_BOOT_SIZE) " && fwfit boot ${filesize}; then nand erase.part boot && nand write ${baseaddr} boot ${filesize}; else echo ubwrite: ${filesize} bytes do not fit the boot partition, nothing written; fi\0"
+#else
+#define OPENIPC_NAND_UBWRITE \
+	"ubwrite=if itest ${filesize} -gt 0 && itest ${filesize} -le " __stringify(OPENIPC_NAND_BOOT_SIZE) " && fwfit boot ${filesize}; then nand erase.part boot && nand write ${baseaddr} boot ${filesize}; else echo ubwrite: ${filesize} bytes do not fit the boot partition, nothing written; fi\0"
+#define OPENIPC_RETIRED_UBWRITE ""
+#endif
+
 /* ubwrite and urwrite before fwfit (#135) */
 #define OPENIPC_RETIRED_MEDIUM \
+	OPENIPC_RETIRED_UBWRITE \
 	"ubwrite=if itest ${filesize} -gt 0 && itest ${filesize} -le " __stringify(OPENIPC_NAND_BOOT_SIZE) "; then nand erase.part boot; nand write ${baseaddr} boot ${filesize}; else echo ubwrite: ${filesize} bytes do not fit the boot partition, nothing written; fi\0" \
 	"urwrite=ubi part ubi; ubi check rootfs && ubi remove rootfs; if ubi create rootfs ${filesize} d; then ubi check rootfs; else ubi remove rootfs_data; ubi create rootfs ${filesize} d; fi; ubi check rootfs_data || ubi create rootfs_data 0 d; ubi write ${baseaddr} rootfs ${filesize}\0"
 
@@ -223,7 +245,7 @@
 #define OPENIPC_ENV_MEDIUM \
 	"ubfile=u-boot-" CONFIG_PRODUCT_SOC "-nand.bin\0" \
 	"urfile=rootfs.ubifs." CONFIG_PRODUCT_SOC "\0" \
-	"ubwrite=if itest ${filesize} -gt 0 && itest ${filesize} -le " __stringify(OPENIPC_NAND_BOOT_SIZE) " && fwfit boot ${filesize}; then nand erase.part boot && nand write ${baseaddr} boot ${filesize}; else echo ubwrite: ${filesize} bytes do not fit the boot partition, nothing written; fi\0" \
+	OPENIPC_NAND_UBWRITE \
 	"urwrite=if ubi part ubi && fwfit rootfs ${filesize}; then ubi check rootfs && ubi remove rootfs; if ubi create rootfs ${filesize} d; then ubi check rootfs; else ubi remove rootfs_data; ubi create rootfs ${filesize} d; fi; ubi check rootfs_data || ubi create rootfs_data 0 d; if ubi check rootfs; then ubi write ${baseaddr} rootfs ${filesize}; else echo urwrite: no rootfs volume, nothing written; fi; else echo urwrite: ${filesize} bytes do not fit the UBI device, nothing removed or written; fi\0" \
 	"loadkernel=" OPENIPC_LOADKERNEL "\0" \
 	"mtdids=nand0=" SFC "\0" \

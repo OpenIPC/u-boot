@@ -36,7 +36,7 @@
 	};
 
 	/*
-	 * The stock U-Boot's ap_clk. The vendor SPL has set the UART and SSI
+	 * The stock U-Boot's ap_clk. The first stage has set the UART and SSI
 	 * clocks; U-Boot only divides them.
 	 */
 	ap_clk: ap-clk {

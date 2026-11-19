@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Axera AX620U. U-Boot is the second stage: the vendor SPL has trained
+ * Axera AX620U. U-Boot is the second stage: the first stage has trained
  * the DDR and set the PLLs and the boot clocks, and nothing here touches
  * them. The timer is the Cortex-A7 generic timer (SYS_ARCH_TIMER).
  */
