@@ -18,6 +18,7 @@ v2022.10**, the same release as the other `openipc-*` branches, plus:
 | SoC | Targets | Status |
 | --- | --- | --- |
 | AX620U (`axera,ax620x`, 4x Cortex-A7, AArch32) | `ax620u-nand` | qemu-bench `-M ax620u` to OpenIPC's userspace; **no silicon** |
+| AX620E family (AX620Q/AX630C, 2x Cortex-A53, AArch64) | `ax620e-nor` | private QEMU `-M ax620e` to OpenIPC's userspace and back; **no silicon** |
 
 `git show origin/openipc-hisilicon:CLAUDE.md` covers the OpenIPC layer
 (default environment, `common/openipc.c`, env compatibility); it applies
@@ -31,10 +32,14 @@ git diff --diff-filter=M v2022.10 HEAD      # the mainline files patched
 ```
 
 Patched mainline files: `arch/arm/{Kconfig,Makefile}` (`ARCH_AXERA`),
-`arch/arm/dts/Makefile`, `common/{Kconfig,Makefile}` (`OPENIPC`,
+`arch/arm/dts/Makefile`, `drivers/{gpio,spi,net}/{Kconfig,Makefile}`,
+`drivers/net/dwc_eth_qos.{c,h}` (the `axera,ax620e-eqos` entry), `common/{Kconfig,Makefile}` (`OPENIPC`,
 `PRODUCT_SOC`, `PRODUCT_SOCMODEL`, `OPENIPC_NOR_SPLIT`),
 `drivers/gpio/dwapb_gpio.c` (drops `asm/arch/gpio.h`, as mainline
-00b04933985), `.gitignore` (`/output/`). Every driver is mainline's.
+00b04933985), `.gitignore` (`/output/`). The AX620U uses mainline drivers
+only; the AX620E adds `drivers/gpio/axera_gpio.c`,
+`drivers/spi/axera_spi.c` and `drivers/net/dwc_eth_qos_axera.c` (glue
+on mainline's EQOS driver).
 
 ## Build
 
@@ -47,7 +52,11 @@ Patched mainline files: `arch/arm/{Kconfig,Makefile}` (`ARCH_AXERA`),
 config fragment, no base file), builds, and wraps `u-boot.bin` with
 `openipc/axera-image.py`, checking it against the boot partition in the
 target's `CONFIG_MTDPARTS_DEFAULT`. `JOBS` sets make's `-j`.
-Toolchain: `arm-linux-gnueabi-`.
+Toolchains: `arm-linux-gnueabi-` (`CROSS_COMPILE`), and for `ax620e-*`
+`aarch64-linux-gnu-` (`CROSS_COMPILE_64`); those targets are laid out by
+`openipc/ax620e-image.py` instead, which needs the SDK's `ax_gzip`
+(x86-64 binary; `build.sh` fetches it at a fixed commit and checks its
+SHA-256 into `output/`, or `AX_GZIP=<path>`) and `curl`.
 
 ## AX620U
 
@@ -81,9 +90,15 @@ Toolchain: `arm-linux-gnueabi-`.
 - Reset: 0x81 to 0x02220044 (the stock U-Boot's), then the DesignWare
   watchdog at 0x49aa000 as the stock kernel's `dw_wdt_restart()` (what
   QEMU resets on). Timer: the generic timer.
-- No network, so a firmware the scan finds broken sends `fwrecovery`
-  to a `tftpboot` that does not exist and resets, over and over: Ctrl-C
-  at the prompt stops it.
+- No network, MMC or USB, so nothing can fetch a firmware: when the scan
+  finds it broken (`bootfail`), `bootflash` says so and stays at the
+  prompt instead of resetting (`openipc-common.h`, `OPENIPC_RECOVERY`).
+  There, `loady ${baseaddr}` over the console and `run urwrite` (a
+  `rootfs.ubifs`) or `run ubwrite` (a U-Boot image) restore it.
+- `ubwrite` and `urwrite` ask `fwfit` (`common/openipc.c`) first whether
+  the image fits -- the boot partition's good blocks, or the UBI device
+  with the rootfs and rootfs_data volumes it may replace -- so an image
+  too big erases or removes nothing.
 - No Ethernet driver (EQOS at 0x4970000), no SD, so `NET` is off and
   updates come from Linux (`sysupgrade`) or a programmer.
 
@@ -110,3 +125,71 @@ The flash must hold the vendor SPL at 0 (from a camera). The machine's
 the 0x0b/0x3b cache reads, and a PROGRAM LOAD kept open across the SER
 write that mainline's driver makes after queueing the data (SER 0 ends
 it).
+
+## AX620E
+
+### Boot
+
+- Boot ROM -> **vendor first stage** (flash 0, 64 KiB: DDR; signed with
+  the SDK's test key, no source; `openipc/ax620e.spl`, the 0xa5bc bytes
+  of an AX620E Xiongmai camera's flash) -> **U-Boot** (flash 0x10000) ->
+  Linux, OpenIPC's NOR layout.
+- The first stage reads the image at 0x10000: a 1 KiB Axera header, then
+  the payload in Axera's own LZ77/Huffman format ("20", `ax_gzip`; the
+  GZIPD engine unpacks it, no other writer exists). It unpacks to
+  0x5C000400 and enters there in **EL1**. `ax620e-image.py` writes the
+  header as the SDK's `sec_boot_AX620E_sign.py` (checksums, capability
+  0x54FAFE, RSA-2048 key, PKCS#1 v1.5 SHA-256 signature with
+  `openipc/axera-sdk-test-key.pem`, the SDK's published test key): byte
+  for byte the SDK script's output.
+- `SYS_TEXT_BASE` is 0x5C001000: the payload starts with a branch there.
+  At 0x5C000400 U-Boot dies after relocation, as the offset is then not
+  whole pages and `adrp` addresses pages. (Not `POSITION_INDEPENDENT`
+  either: it parks in `wfi` when not 4 KiB aligned.)
+- **Three tiles.** The first stage streams the packed image in 64 KiB
+  tiles; below three (16 + 2 x 64 KiB + 8 KiB) it queues the first tile
+  before reading all of it and the engine unpacks 16 stale bytes. The
+  tool pads the payload past U-Boot's end with incompressible filler up
+  to three; the stock images are all larger. Keep the image at most
+  0x40000 (the environment); about 55 KiB are left.
+
+### Hardware
+
+- UART0 0x4880000, ns16550 (`snps,dw-apb-uart`), 208 MHz (the SDK's).
+- SPI NOR on the boot DesignWare SSI at 0x1a00000, `axera_spi`: transmit
+  only or receive only transfers, chip select GPIO2 29 (`axera_gpio`,
+  one register per pin, not a DW GPIO), receives kept to the FIFO depth
+  (no DMA), clock and sample delay as the first stage left them,
+  opcode 0x03 single width (ops with dummy cycles refused). Mainline
+  `designware_spi` uses EEPROM-read/TR transfers the vendor driver does
+  not, so it is not used. Receive phases clear x19 for the QEMU model
+  (see below).
+- Ethernet: mainline `dwc_eth_qos` + `dwc_eth_qos_axera.c` (clocks,
+  resets, RMII select, the SoC's 10/100 PHY with the eFuse bandgap trim
+  from misc_info at 0x740; 312 MHz CSR clock). Descriptors are 64-byte
+  padded with an AXI width of 8 for the skip length (not confirmed on
+  silicon).
+- DDR 256 MiB at 0x40000000; `mem=120M`, the rest is the vendor's CMM;
+  `SYS_BOOTMAPSZ` 64 MiB keeps the device tree in the kernel's memory.
+- Watchdog 0 is stopped at boot. Reset: the software chip reset
+  (`chip_rst_sw()`), then watchdog 0 with a zero timeout (the kernel's
+  restart handler, what QEMU resets on).
+- No SD driver (Cadence SD4HC with an Axera PHY), so no SD recovery;
+  updates over TFTP (`ub`, `uk`, `ur`) or `loady`. No pads are set.
+
+### Verification (private QEMU `-M ax620e`, not in qemu-bench yet)
+
+```sh
+# a 16 MiB OpenIPC NOR image with this boot partition at 0, env erased
+qemu-system-aarch64 -M ax620e,flash-file=flash.bin \
+    -global axera-spi-nor.env-from-flash=on -nographic \
+    -netdev user,id=n0,tftp=dir -net nic,netdev=n0
+```
+
+Checked: first boot saves the default environment, the scan finds the
+kernel and rootfs, DHCP/ping/TFTP (CRC checked), `sf` reads, the kernel
+(5.15, multi-file uImage) to login with DHCP, `fw_setenv` from Linux
+read back by U-Boot on the next boot (reboot via the watchdog), `run ub`
+writing this image over TFTP and booting it after `reset`. The model's
+`axera-spi-nor` copies receive data to `[x19 + 120]` for the stock
+U-Boot's driver; `axera_spi` zeroes x19 so it does not scribble.

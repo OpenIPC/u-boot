@@ -201,6 +201,13 @@ config DWC_ETH_QOS
 	  Of Service) IP block. The IP supports many options for bus type,
 	  clocking/reset structure, and feature list.
 
+config DWC_ETH_QOS_AXERA
+	bool "Synopsys DWC Ethernet QOS device support for Axera AX620E"
+	depends on DWC_ETH_QOS && AXERA_AX620E
+	help
+	  The Ethernet MAC of Axera's AX620E: clocks, resets and interface
+	  select, and the SoC's own 10/100 PHY.
+
 config DWC_ETH_QOS_IMX
 	bool "Synopsys DWC Ethernet QOS device support for IMX"
 	depends on DWC_ETH_QOS

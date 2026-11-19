@@ -57,6 +57,14 @@ config APPLE_SPI
 	  Enable the Apple SPI driver. This driver can be used to
 	  access the SPI flash and keyboard on machines based on Apple SoCs.
 
+config AXERA_SPI
+	bool "Axera AX620E boot SPI flash controller"
+	depends on AXERA_AX620E && DM_GPIO
+	help
+	  The DesignWare SSI that holds the boot SPI flash on Axera's
+	  AX620E, driven polled in standard SPI mode with a GPIO chip
+	  select, as the vendor's first stage drives it.
+
 config ATCSPI200_SPI
 	bool "Andestech ATCSPI200 SPI driver"
 	help

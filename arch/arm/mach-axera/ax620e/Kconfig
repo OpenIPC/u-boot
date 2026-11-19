@@ -1,0 +1,24 @@
+config AXERA_AX620E
+	bool "Axera AX620E family"
+	select ARM64
+	select SYS_ARCH_TIMER
+	select DM
+	select DM_SERIAL
+	select OF_CONTROL
+	help
+	  Axera's AX620E family (AX620Q, AX630C), Cortex-A53 in AArch64. The
+	  vendor's first stage at flash 0 sets up the DDR, unpacks U-Boot's
+	  image from flash 0x10000 to 0x5C000400 and starts it there, in EL1.
+
+if AXERA_AX620E
+
+config SYS_SOC
+	default "ax620e"
+
+config SYS_BOARD
+	default "ax620e"
+
+config SYS_CONFIG_NAME
+	default "ax620e"
+
+endif

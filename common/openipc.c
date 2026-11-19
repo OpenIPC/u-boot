@@ -3,6 +3,7 @@
 #include <command.h>
 #include <common.h>
 #include <env.h>
+#include <env_internal.h>
 #include <fs.h>
 #include <image.h>
 #include <init.h>
@@ -1121,6 +1122,46 @@ static void altbootcmd_migrate(void) {
   env_save();
 }
 
+#ifdef OPENIPC_RETIRED_ENV
+/* name's value in the linear "name=value\0...\0" list env, or NULL */
+static const char *linear_env_get(const char *env, const char *name) {
+  size_t len = strlen(name);
+
+  for (; *env; env += strlen(env) + 1)
+    if (!strncmp(env, name, len) && env[len] == '=')
+      return env + len + 1;
+  return NULL;
+}
+
+/* Saved commands that an earlier build shipped and this one replaced
+ * (OPENIPC_RETIRED_ENV): exactly those take today's default, once. */
+static void retired_env_migrate(void) {
+  static const char retired[] = OPENIPC_RETIRED_ENV "\0";
+  const char *r;
+  int changed = 0;
+
+  for (r = retired; *r; r += strlen(r) + 1) {
+    const char *eq = strchr(r, '=');
+    const char *saved, *def;
+    char name[32];
+
+    if (!eq || eq - r >= sizeof(name))
+      continue;
+    memcpy(name, r, eq - r);
+    name[eq - r] = '\0';
+    saved = env_get(name);
+    def = linear_env_get(default_environment, name);
+    if (!saved || !def || strcmp(saved, eq + 1) || !strcmp(saved, def))
+      continue;
+    printf("%s: retired command replaced with the current default\n", name);
+    env_set(name, def);
+    changed = 1;
+  }
+  if (changed)
+    env_save();
+}
+#endif
+
 #if !defined(OPENIPC_SPI_NAND) && defined(CONFIG_OPENIPC_NOR_SPLIT)
 /*
  * fwwrite writes only a file that fits fwsize, the firmware area from
@@ -1150,7 +1191,7 @@ static void nor_split_fwsize(void)
 
 int openipc_helper(void) {
   char msize[16];
-  sprintf(msize, "%ldM", gd->ram_size / 1024 / 1024);
+  sprintf(msize, "%luM", (ulong)(gd->ram_size / 1024 / 1024));
   env_set("totalmem", msize);
 
 #if !defined(OPENIPC_SPI_NAND) && defined(CONFIG_OPENIPC_NOR_SPLIT)
@@ -1160,6 +1201,9 @@ int openipc_helper(void) {
   /* A saved environment's retired commands are replaced first: a
    * script.txt that runs them would otherwise get the old ones */
   altbootcmd_migrate();
+#ifdef OPENIPC_RETIRED_ENV
+  retired_env_migrate();
+#endif
 
   /* Recovery checks what it runs: a board may already have set verify=n
    * (so that the split scan below can clear it), and source would then run
@@ -1188,3 +1232,107 @@ int openipc_helper(void) {
 
   return 0;
 }
+
+#if defined(OPENIPC_SPI_NAND) && defined(CONFIG_CMD_UBI)
+/*
+ * fwfit: will an image of <size> bytes fit where ubwrite or urwrite puts
+ * it? Asked before anything is erased or removed, so that an image too big
+ * leaves the old one, and the user's data, in place.
+ *
+ *   fwfit boot <size>    the good eraseblocks of the 'boot' partition:
+ *                        nand write skips bad blocks, so the nominal size
+ *                        overstates the room; a block whose state cannot be
+ *                        read fails the check
+ *   fwfit rootfs <size>  the attached UBI device ('ubi part' first): its
+ *                        free PEBs and those of the rootfs and rootfs_data
+ *                        volumes, which urwrite may remove to make room,
+ *                        less what UBI takes back for its bad-block reserve
+ */
+static int fwfit_boot(ulong size) {
+  struct mtd_info *mtd;
+  u64 good = 0;
+  loff_t off;
+
+  mtd_probe_devices();
+  mtd = get_mtd_device_nm("boot");
+  if (IS_ERR(mtd)) {
+    printf("fwfit: no boot partition\n");
+    return CMD_RET_FAILURE;
+  }
+  for (off = 0; off < mtd->size; off += mtd->erasesize) {
+    int bad = mtd_block_isbad(mtd, off);
+
+    /* a block that cannot be probed would stop the erase half-way */
+    if (bad < 0) {
+      printf("fwfit: boot block at 0x%llx unreadable: %d\n",
+             (unsigned long long)off, bad);
+      put_mtd_device(mtd);
+      return CMD_RET_FAILURE;
+    }
+    if (!bad)
+      good += mtd->erasesize;
+  }
+  put_mtd_device(mtd);
+
+  if (size > good) {
+    printf("fwfit: %lu bytes do not fit the boot partition's %llu good bytes\n",
+           size, good);
+    return CMD_RET_FAILURE;
+  }
+  return CMD_RET_SUCCESS;
+}
+
+static int fwfit_rootfs(ulong size) {
+  struct ubi_device *ubi = ubi_devices[0];
+  long need, room;
+  int i;
+
+  if (!ubi) {
+    printf("fwfit: no UBI device attached\n");
+    return CMD_RET_FAILURE;
+  }
+  room = ubi->avail_pebs;
+  for (i = 0; i < ubi->vtbl_slots; i++) {
+    struct ubi_volume *vol = ubi->volumes[i];
+
+    if (vol && (!strcmp(vol->name, "rootfs") ||
+                !strcmp(vol->name, "rootfs_data")))
+      room += vol->reserved_pebs;
+  }
+  /* PEBs freed by a remove first top up a short bad-block reserve
+   * (ubi_update_reserved()): those are not the rootfs's */
+  if (ubi->beb_rsvd_level > ubi->beb_rsvd_pebs)
+    room -= ubi->beb_rsvd_level - ubi->beb_rsvd_pebs;
+  need = DIV_ROUND_UP(size, ubi->leb_size);
+
+  if (need > room) {
+    printf("fwfit: %lu bytes need %ld LEBs, the UBI device has %ld for rootfs\n",
+           size, need, room);
+    return CMD_RET_FAILURE;
+  }
+  return CMD_RET_SUCCESS;
+}
+
+static int do_fwfit(struct cmd_tbl *cmdtp, int flag, int argc,
+                    char *const argv[]) {
+  ulong size;
+
+  if (argc != 3)
+    return CMD_RET_USAGE;
+  size = hextoul(argv[2], NULL);
+  if (!size) {
+    printf("fwfit: empty image\n");
+    return CMD_RET_FAILURE;
+  }
+  if (!strcmp(argv[1], "boot"))
+    return fwfit_boot(size);
+  if (!strcmp(argv[1], "rootfs"))
+    return fwfit_rootfs(size);
+  return CMD_RET_USAGE;
+}
+
+U_BOOT_CMD(fwfit, 3, 0, do_fwfit,
+           "check that an image fits before ubwrite/urwrite erase anything",
+           "boot <size>   - <size> (hex) fits the boot partition's good blocks\n"
+           "fwfit rootfs <size> - <size> (hex) fits the attached UBI device as rootfs");
+#endif

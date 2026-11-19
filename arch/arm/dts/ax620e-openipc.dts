@@ -1,0 +1,76 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * AX620E camera, as OpenIPC's U-Boot sees it: UART0, the boot SPI NOR on
+ * the flash controller (spi4 in the vendor's devicetree), its chip select
+ * on GPIO2_A29, and the Ethernet MAC with its own 10/100 PHY. Addresses
+ * and clocks are the vendor SDK U-Boot's (arch/arm/dts/ax620e.dtsi).
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/gpio/gpio.h>
+
+/ {
+	model = "Axera AX620E (OpenIPC)";
+	compatible = "axera,ax620e";
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	aliases {
+		serial0 = &uart0;
+		spi0 = &spi4;
+		ethernet0 = &eth0;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	soc {
+		compatible = "simple-bus";
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+		u-boot,dm-pre-reloc;
+
+		uart0: serial@4880000 {
+			compatible = "snps,dw-apb-uart";
+			reg = <0x0 0x04880000 0x0 0x400>;
+			reg-shift = <2>;
+			reg-io-width = <4>;
+			clock-frequency = <208000000>;
+			u-boot,dm-pre-reloc;
+		};
+
+		gpio2: gpio@6000000 {
+			compatible = "axera,ax620e-gpio";
+			reg = <0x0 0x06000000 0x0 0x400>;
+			gpio-controller;
+			#gpio-cells = <2>;
+			ngpios = <32>;
+			gpio-bank-name = "gpio2_";
+		};
+
+		/* The boot flash controller, a DesignWare SSI */
+		spi4: spi@1a00000 {
+			compatible = "axera,ax620e-spi";
+			reg = <0x0 0x01a00000 0x0 0x1000>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			cs-gpios = <&gpio2 29 GPIO_ACTIVE_LOW>;
+			spi-max-frequency = <50000000>;
+
+			flash@0 {
+				compatible = "jedec,spi-nor";
+				reg = <0>;
+				spi-max-frequency = <50000000>;
+			};
+		};
+
+		eth0: ethernet@104c0000 {
+			compatible = "axera,ax620e-eqos";
+			reg = <0x0 0x104c0000 0x0 0x10000>;
+			phy-mode = "rmii";
+		};
+	};
+};

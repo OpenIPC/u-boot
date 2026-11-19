@@ -11,6 +11,7 @@ config SYS_VENDOR
 #
 
 # AX620E family (AX620E, AX630C, AX620Q)
+source "arch/arm/mach-axera/ax620e/Kconfig"
 
 #
 # AX620U: a die of its own ("axera,ax620x"), not an AX620E part
