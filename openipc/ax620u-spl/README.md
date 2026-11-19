@@ -32,7 +32,7 @@ for register, and the names and comments are ours.
 
 ## What is left out
 
-The stock first stage is 74736 bytes of code; this one is 34640. Not
+The stock first stage is 74736 bytes of code; this one is 34704. Not
 here: USB and UART download (FDL), SD and FAT, eMMC and SPI NOR boot,
 the crypto engine and secure boot (signature checks, the EIP-130
 firmware, decryption). Only SPI NAND boot remains, with its quad reads
