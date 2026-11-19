@@ -6,9 +6,10 @@ Put u-boot.bin behind the 1 KiB Axera image header the AX620U vendor SPL
 loads from the boot partition: header and image go to 0x40000000, the
 SPL jumps to 0x40000400 (SYS_TEXT_BASE).
 
-The SPL checks two 32-bit little-endian word sums: img_check_sum (+0x14)
-over the image, and check_sum (+0x00) over the header from +0x08 to
-+0x2bc. The header's other words are those of the stock AX620U U-Boot
+The SPL checks the magic and check_sum (+0x00), the 32-bit
+little-endian word sum of the header from +0x08; img_check_sum (+0x14),
+the image's, is written but not checked (the stock first stage's
+decompile, and openipc/ax620u-spl). The header's other words are those of the stock AX620U U-Boot
 (the capability and flash words the SPL reads); its RSA key and signature
 are left zero, as an SPL without secure boot does not read them.
 

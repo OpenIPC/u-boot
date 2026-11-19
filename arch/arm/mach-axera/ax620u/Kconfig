@@ -10,7 +10,7 @@ config AXERA_AX620U
 	help
 	  Axera AX620U (devicetree "axera,ax620x"): four Cortex-A7 cores
 	  in AArch32, a die of its own rather than an AX620E part. The
-	  vendor SPL (flash 0, 1 MiB, signed) sets up the DDR and the
+	  first stage (flash 0, 1 MiB, signed) sets up the DDR and the
 	  clocks and loads U-Boot from the boot partition at 0x100000.
 
 if AXERA_AX620U
