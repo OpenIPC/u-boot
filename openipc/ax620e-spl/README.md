@@ -67,3 +67,30 @@ x16, 2 Gbit = 256 MiB, at 2400 MT/s).
   left alone. In QEMU, the DDR controller, PHY and DDR PLL then get the
   same writes in the same order as from the cameras' first stage (1308
   writes, 256 registers).
+
+## The stock first stage (`stock.bin`), the fallback
+
+`stock.bin` is the AX620E Xiongmai cameras' own first stage, kept for
+when the one built here does not bring a camera up: its 1 KiB boot ROM
+header and code, as they are, the 0xa5bc (42428) bytes at flash 0 of the
+flash dump `General_IPC_AX620E_A6.Nat.dss.OnvifS.HIK_V5.00.R02.20240814_all`
+(a Xiongmai IVG-A6 board, 16 MiB NOR; SHA-256 of the dump
+`0246b169fbf35295d5b7cee370154a6d60e5107f846bbaab960ffddcc9d3c37a`); the
+dump is zeros from there to 0x10000. No source exists for it; it is
+signed with the SDK test key and `spl_header()` reproduces its header from
+its code. SHA-256 of `stock.bin`:
+`a130efbd2dcfa557dcbfe9bb1397eac78b067c124b53a5c38f4988b0ca57c2e6`.
+
+`build.sh` writes both images, U-Boot the same in each:
+
+- `output/u-boot-ax620e-nor.bin`: the first stage built from this source
+- `output/u-boot-ax620e-nor-stockspl.bin`: `stock.bin` instead
+  (`ax620e-image.py --signed`, which checks its header and puts it in as
+  it is)
+
+`SPL=stock ./build.sh ax620e-nor` puts `stock.bin` in
+`u-boot-ax620e-nor.bin` and does not build the source. Use the stock one
+when a camera flashed with the source-built image prints nothing after
+the boot ROM, or U-Boot reports less than 256 MiB of DRAM or fails its
+memory: flash `u-boot-ax620e-nor-stockspl.bin` at 0 the same way (with a
+programmer, if the camera does not reach U-Boot).

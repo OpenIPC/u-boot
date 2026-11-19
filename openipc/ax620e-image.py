@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-2.0+
 """Lay out the Axera AX620E NOR boot partition.
 
-    ax620e-image.py <spl.bin> <u-boot.bin> <text-base> <ax_gzip> <key.pem>
-                    <env-offset> <out>
+    ax620e-image.py [--signed] <spl> <u-boot.bin> <text-base> <ax_gzip>
+                    <key.pem> <env-offset> <out>
 
 The boot ROM loads the first stage (openipc/ax620e-spl, the SDK's BL1
 SPL; spl.bin is its code) from flash 0 to 0x03000400 and runs it; it sets
@@ -35,6 +35,11 @@ different layout (spl_header()). Parts with secure boot fused check the
 key's hash and the signatures; others only the checksums. The key is the
 SDK's default test key, which signs the Xiongmai cameras' first stage too:
 for that first stage, spl_header() gives its header byte for byte.
+
+With --signed, <spl> is a first stage that has its boot ROM header
+already and goes in as it is: openipc/ax620e-spl/stock.bin, the Xiongmai
+cameras' own (README.md there), the fallback should the one built from
+source not work on a camera. Its header is checked, not rewritten.
 """
 
 import hashlib
@@ -153,6 +158,23 @@ def spl_header(spl, n, e, d):
     return bytes(h)
 
 
+def check_signed(spl):
+    """A first stage with its header: the magic, length and both sums."""
+    if len(spl) < HEADER_SIZE:
+        raise ValueError('shorter than its header')
+    magic, length = struct.unpack_from('<I4xI', spl, 4)
+    if magic != MAGIC:
+        raise ValueError('no boot ROM header (magic 0x%08x)' % magic)
+    if length != len(spl) - HEADER_SIZE:
+        raise ValueError('the header says %d bytes of code, %d follow' %
+                         (length, len(spl) - HEADER_SIZE))
+    if struct.unpack_from('<I', spl, 0)[0] != \
+            word_sum(spl[8:HEADER_SIZE - 8]):
+        raise ValueError('bad header checksum')
+    if struct.unpack_from('<I', spl, 20)[0] != word_sum(spl[HEADER_SIZE:]):
+        raise ValueError('bad code checksum')
+
+
 def payload(uboot, text_base):
     """U-Boot behind a branch from the entry point to its link address."""
     gap = text_base - ENTRY
@@ -182,16 +204,27 @@ def ax_gzip(tool, data):
 
 
 def main():
-    if len(sys.argv) != 8:
+    args = sys.argv[1:]
+    signed = args[:1] == ['--signed']
+    if signed:
+        args = args[1:]
+    if len(args) != 7:
         sys.exit(__doc__.split('\n\n')[1])
-    spl_path, uboot, text_base, tool, key, env_off, out = sys.argv[1:]
+    spl_path, uboot, text_base, tool, key, env_off, out = args
     env_off = int(env_off, 0)
 
     spl = open(spl_path, 'rb').read()
-    if len(spl) > SPL_MAX:
+    code = len(spl) - HEADER_SIZE if signed else len(spl)
+    if code > SPL_MAX:
         sys.exit('%s: %d bytes, more than the %d before 0x%x' %
-                 (spl_path, len(spl), SPL_MAX, SPL_FW))
+                 (spl_path, code, SPL_MAX, SPL_FW))
+    if signed:
+        try:
+            check_signed(spl)
+        except ValueError as err:
+            sys.exit('%s: %s' % (spl_path, err))
     n, e, d = load_key(key)
+    first = spl if signed else spl_header(spl, n, e, d) + spl
 
     data = payload(uboot, int(text_base, 0))
     pad = 0
@@ -199,7 +232,7 @@ def main():
     while len(packed) < MIN_PACKED:
         pad += MIN_PACKED - len(packed) + 256
         packed = ax_gzip(tool, data + filler(pad))
-    image = (spl_header(spl, n, e, d) + spl).ljust(UBOOT_OFFSET, b'\0') + \
+    image = first.ljust(UBOOT_OFFSET, b'\0') + \
         header(packed, n, e, d) + packed
 
     if len(image) > env_off:

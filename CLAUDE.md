@@ -58,8 +58,11 @@ target's `CONFIG_MTDPARTS_DEFAULT`. `JOBS` sets make's `-j`.
 Toolchains: `arm-linux-gnueabi-` (`CROSS_COMPILE`), and for `ax620e-*`
 `aarch64-linux-gnu-` (`CROSS_COMPILE_64`); those targets are laid out by
 `openipc/ax620e-image.py` instead, after `build.sh` has built the first
-stage (`make -C openipc/ax620e-spl`, into `output/build-<target>/spl`);
-the tool needs the SDK's `ax_gzip` (x86-64 binary; `build.sh` fetches it
+stage (`make -C openipc/ax620e-spl`, into `output/build-<target>/spl`),
+twice: `u-boot-<target>.bin` with that first stage and
+`u-boot-<target>-stockspl.bin` with the cameras' own
+(`openipc/ax620e-spl/stock.bin`, the fallback; `SPL=stock` puts it in
+`u-boot-<target>.bin` and builds no other). The tool needs the SDK's `ax_gzip` (x86-64 binary; `build.sh` fetches it
 at a fixed commit and checks its SHA-256 into `output/`, or
 `AX_GZIP=<path>`) and `curl`.
 
@@ -154,6 +157,10 @@ it).
   around it (the AXI timeout and watchdog/thermal abort enables, the
   ADC reference for the board id), the flash clock registers and when
   the flash is first set up. Only a camera confirms any of it.
+- `openipc/ax620e-spl/stock.bin` is the cameras' own first stage (header
+  and code, 0xa5bc bytes from flash 0 of the IVG-A6 dump; README there),
+  the fallback: `u-boot-ax620e-nor-stockspl.bin` carries it, and
+  `ax620e-image.py --signed` checks its header and copies it as it is.
 - The first stage reads the image at 0x10000: a 1 KiB Axera header, then
   the payload in Axera's own LZ77/Huffman format ("20", `ax_gzip`; the
   GZIPD engine unpacks it, no other writer exists). It unpacks to
@@ -223,4 +230,5 @@ this U-Boot, the environment save, `reset`, and the OpenIPC kernel to
 login, both on the AX620Q DDR path (`-M ax620e,chip=ax620q`, the eFuse
 chip type qemu-bench's `chip=` reports) and on the AX630C one a qemu-bench
 without `chip=` gives (an eFuse of zeros). QEMU's DDR models accept any
-settings: only a camera tests the DDR.
+settings: only a camera tests the DDR. The `-stockspl` image boots the
+same way (env save, `reset`, env loaded, kernel to login).
