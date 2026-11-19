@@ -36,8 +36,13 @@
 #define OPENIPC_OSMEM			"87M"
 /* The SPI NAND's MTD name in the AX620U kernels */
 #define OPENIPC_SFC			"spi4.0_nand"
-/* The first stage owns the first 1 MiB and loads U-Boot from 0x100000 */
+/*
+ * The first stage owns the first 1 MiB and loads U-Boot from 0x100000.
+ * The image covers both from flash 0 (openipc/ax620u-image.py), and
+ * ubwrite writes it so (OPENIPC_NAND_SPL_SIZE)
+ */
 #define OPENIPC_NAND_MTDPARTS		"1024k(spl),1536k(boot),512k(env),-(ubi)"
+#define OPENIPC_NAND_SPL_SIZE		0x100000
 #define OPENIPC_NAND_UBI_MTD		3
 #define OPENIPC_NAND_BOOT_SIZE		0x180000
 

@@ -6,8 +6,8 @@
 #   make -C openipc/ax620u-spl O=<dir> CROSS_COMPILE=arm-linux-gnueabi-
 #
 # gives <dir>/spl.bin, the code the boot ROM loads to on-chip RAM 0x800;
-# openipc/ax620u-spl-image.py puts the boot ROM's header in front of it
-# and lays out the spl partition.
+# openipc/ax620u-image.py puts the boot ROM's header in front of it and
+# lays out the image, spl and boot from flash 0.
 
 O ?= .
 CROSS_COMPILE ?= arm-linux-gnueabi-

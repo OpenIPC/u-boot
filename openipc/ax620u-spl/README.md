@@ -5,9 +5,9 @@ RAM 0x800 and runs in ARM state, as the cameras' own first stage does:
 clocks, PLLs, core voltage and pads, LPDDR training, the secondary cores'
 release, then U-Boot from flash 0x100000 (`boot`; its 1 KiB header to
 0x40000000, the image to 0x40000400, entered there). `build.sh` builds it
-with `make -C openipc/ax620u-spl O=<dir>`, and
-`openipc/ax620u-spl-image.py` writes the boot ROM's header in front of it
-and lays out the start of the `spl` partition.
+with `make -C openipc/ax620u-spl O=<dir>`, and `openipc/ax620u-image.py`
+writes the boot ROM's header in front of it and lays out the image, the
+`spl` and `boot` partitions from flash 0.
 
 ## Provenance
 
@@ -84,20 +84,35 @@ SPI NAND): the header, its copy at 0x400 and 0x123f0 bytes of code at
 0x800, signed with the Axera SDK test key. SHA-256
 `faad7357d752cce79e278b2cc074ed5f5091b78a92b2d065f544b968aa06ed33`.
 Its partition also holds the code again at 0x20000 (rebuilt from
-`stock.bin`), 0x12ac0 bytes at 0x40000 and again at 0x60000 whose size
-and word sum are the header's firmware fields (the EIP-130 firmware for
-secure boot parts; not here and not written), and zeros to 1 MiB.
+`stock.bin`), the EIP-130 firmware at 0x40000 and again at 0x60000
+(`eip130.bin`, below), and zeros to 1 MiB.
 
-`build.sh` writes, besides U-Boot's `u-boot-ax620u-nand.bin`:
+`build.sh` writes two images, each the `spl` and `boot` partitions from
+flash 0 (2.5 MiB at most, up to the environment at 0x280000), U-Boot the
+same in both:
 
-- `output/spl-ax620u-nand.bin`: this first stage
-- `output/spl-ax620u-nand-stock.bin`: `stock.bin`, the same bytes as the
-  camera's flash 0 to 0x40000
+- `output/u-boot-ax620u-nand.bin`: this first stage
+- `output/u-boot-ax620u-nand-stockspl.bin`: `stock.bin`; its first 1 MiB
+  is the camera's `spl` partition byte for byte
 
-Both are the first 256 KiB (two 128 KiB blocks) of the `spl` partition,
-written at flash 0: header at 0 and 0x400, code at 0x800, code at
-0x20000. They leave the firmware at 0x40000 as it is.
 `SPL=stock ./build.sh ax620u-nand` puts `stock.bin` in
-`spl-ax620u-nand.bin` and builds no other. Write the stock one back when
-the camera prints nothing, no `ddr init success!`, or U-Boot does not
-report 256 MiB of DRAM.
+`u-boot-ax620u-nand.bin` and builds no other. Write the stock one back
+when the camera prints nothing, no `ddr init success!`, or U-Boot does
+not report 256 MiB of DRAM.
+
+## The EIP-130 firmware (`eip130.bin`)
+
+`eip130.bin` is the 0x12ac0 (76480) bytes at flash 0x40000 (and 0x60000)
+of the camera dump, SHA-256
+`4ba8368c2cc413e4e4b00d84947287318835a22664062cc295f4eb5ee6777f48`:
+the firmware of the SoC's EIP-130 security engine, the same bytes as the
+AX620 SDK's `tools/imgsign/eip.bin` that Sipeed publishes
+(<https://github.com/sipeed/maix_ax620e_sdk>, commit `fe7545cf`), so not
+the camera's own. The first stage's header gives its size and word sum
+(+0x10, +0x18) and its places (+0x24, +0x28); the stock first stage
+loads it into the engine only on parts with secure boot fused, and this
+one does not boot those. Nothing in OpenIPC uses it. The image carries
+it at its places anyway, as the cameras have it: writing the image at 0
+then changes nothing in `spl` beyond the first stage, and the stock
+fallback image is the camera's partition byte for byte. Whether the boot
+ROM or the vendor's kernel reads it is not known.

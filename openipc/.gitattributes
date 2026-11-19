@@ -1,3 +1,3 @@
 # The vendor first stages are binaries: no end-of-line conversion
 *.spl binary
-*/stock.bin binary
+*-spl/*.bin binary

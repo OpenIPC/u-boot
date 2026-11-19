@@ -1,25 +1,30 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0+
-"""Lay out the start of the Axera AX620U SPI NAND `spl` partition.
+"""Lay out the Axera AX620U image: the spl and boot partitions, from 0.
 
-    ax620u-spl-image.py <spl.bin> <key.pem> <out>
-    ax620u-spl-image.py --signed <stock.bin> <out>
-    ax620u-spl-image.py --check <flash dump> <key.pem>
+    ax620u-image.py <spl.bin> <key.pem> <eip.bin> <u-boot.img> <limit> <out>
+    ax620u-image.py --signed <stock.bin> <eip.bin> <u-boot.img> <limit> <out>
+    ax620u-image.py --check <flash dump> <key.pem>
 
-The boot ROM reads flash 0: a 1 KiB header, the same header again at
-0x400, and the first stage's code at 0x800, which it loads to on-chip RAM
-0 as it is in flash and runs at 0x800 (openipc/ax620u-spl). The cameras'
-`spl` partition (1 MiB at 0) has the code once more at 0x20000, the
-header's first backup address, without a header. 0x40000 holds 0x12ac0
-bytes whose size and word sum are the header's firmware fields (the
-EIP-130 firmware, which only parts with secure boot fused load, as on the
-AX620E), 0x60000 the same again, zeros after.
-The output is the first two 128 KiB blocks, as the cameras have them
-(zeros between): header, header, code, then the code at 0x20000. It
-leaves the firmware blocks alone, so writing it at flash 0 changes only
-what this first stage replaces.
+One image, written at flash 0 as it is, as OpenIPC's other images:
 
-The header, as the cameras' first stage has it:
+  0x000000  `spl` (1 MiB), as the cameras have it:
+    0x00000  the boot ROM header, the same header again at 0x400, and the
+             first stage's code at 0x800, which the boot ROM loads to
+             on-chip RAM 0 as it is in flash and runs at 0x800
+             (openipc/ax620u-spl)
+    0x20000  the code again, without a header: the header's first backup
+    0x40000  the EIP-130 firmware (openipc/ax620u-spl/eip130.bin), whose
+             size and word sum the header carries; only parts with secure
+             boot fused load it. 0x60000: the same again.
+    zeros to 0x100000
+  0x100000  `boot`: U-Boot behind its 1 KiB Axera header (u-boot.img,
+            axera-image.py's output), which the first stage loads; it
+            skips bad blocks from there, as `nand write` does
+
+The output must fit <limit> bytes: up to the environment at 0x280000.
+
+The first stage's header, as the cameras' first stage has it:
 
   0x000 word sum of bytes 0x8-0x3f8      0x004 magic 0x55543322
   0x008 capability 0x7afe                0x00c code size
@@ -31,16 +36,15 @@ The header, as the cameras' first stage has it:
   0x1b8 0x01000800, PKCS#1 v1.5 SHA-256 signature of the code at 0x1bc
         (little endian)
 
-The firmware fields describe the cameras' firmware, which stays in their
-flash; this first stage does not boot secure boot parts anyway. The key
-is the Axera SDK's default test key, which signs the cameras' first stage
-too: given its code, this writes its header byte for byte (--check).
-Parts with secure boot fused check the key's hash and the signature, the
-others the sums.
+The boot ROM's format, unlike U-Boot's header: it is signed with the Axera
+SDK's default test key, as the cameras' first stage is; given its code,
+this writes its header byte for byte (--check). Parts with secure boot
+fused check the key's hash and the signature, the others the sums.
 
 --signed takes a first stage that has its headers already, flash 0 up to
 the end of its code as the cameras have it (openipc/ax620u-spl/stock.bin),
-checks them and lays it out the same way.
+checks them and lays it out the same way: with the cameras' U-Boot image
+the result is their flash from 0 byte for byte.
 """
 import base64
 import hashlib
@@ -50,10 +54,11 @@ import sys
 HEADER_SIZE = 0x400
 CODE = 0x800
 BACKUP = 0x20000
-OUT_SIZE = 0x40000          # two 128 KiB blocks: up to the firmware
+SPL_PART = 0x100000         # the spl partition; boot follows
+FW = (0x40000, 0x60000)     # the EIP-130 firmware and its copy
 MAGIC = 0x55543322
 CAPABILITY = 0x7afe
-FW_SIZE = 0x12ac0
+FW_SIZE = 0x12ac0           # openipc/ax620u-spl/eip130.bin
 FW_SUM = 0xdbb7c627
 NAND_CFG = 0x06010504       # 2 KiB page, 128 KiB block, 64 B OOB, 1 BBM byte
 BACKUPS = (BACKUP, 0x40000, 0x60000)
@@ -139,22 +144,31 @@ def check_signed(spl):
         raise ValueError('bad code checksum')
 
 
-def layout(hdr, code):
+def layout(hdr, code, fw, uboot, limit):
     if len(code) > CODE_MAX:
         raise ValueError('%d bytes of code, more than the %d the on-chip RAM '
                          'has for it' % (len(code), CODE_MAX))
-    img = bytearray(OUT_SIZE)
+    if len(fw) != FW_SIZE or word_sum(fw) != FW_SUM:
+        raise ValueError('the EIP-130 firmware is not the one the header '
+                         'describes (%d bytes, sum 0x%08x)' % (len(fw), word_sum(fw)))
+    if struct.unpack_from('<I', uboot, 4)[0] != MAGIC:
+        raise ValueError('U-Boot\'s image has no Axera header')
+    img = bytearray(SPL_PART)
     img[:HEADER_SIZE] = hdr
     img[HEADER_SIZE:CODE] = hdr
     img[CODE:CODE + len(code)] = code
     img[BACKUP:BACKUP + len(code)] = code
+    for off in FW:
+        img[off:off + len(fw)] = fw
+    img += uboot
+    if len(img) > limit:
+        raise ValueError('%d bytes, %d over the %d up to the environment' %
+                         (len(img), len(img) - limit, limit))
     return bytes(img)
 
 
 def main():
     args = sys.argv[1:]
-    if len(args) != 3:
-        sys.exit(__doc__.split('\n\n')[1])
     try:
         if args[:1] == ['--check'] and len(args) == 3:
             flash = open(args[1], 'rb').read(BACKUP)
@@ -163,25 +177,28 @@ def main():
             same = h == flash[:HEADER_SIZE] and h == flash[HEADER_SIZE:CODE]
             print('header reproduced' if same else 'header differs')
             sys.exit(0 if same else 1)
-        if args[:1] == ['--signed'] and len(args) == 3:
+        if args[:1] == ['--signed'] and len(args) == 6:
             spl = open(args[1], 'rb').read()
             check_signed(spl)
-            img = layout(spl[:HEADER_SIZE], spl[CODE:])
-            what = 'signed first stage'
-        elif len(args) == 3 and not args[0].startswith('-'):
+            hdr, code = spl[:HEADER_SIZE], spl[CODE:]
+            fw, uboot, limit, out = args[2:]
+            what = 'the cameras\' first stage'
+        elif len(args) == 6 and not args[0].startswith('-'):
             code = open(args[0], 'rb').read()
             code += b'\0' * (-len(code) % 16)
-            img = layout(header(code, *load_key(args[1])), code)
+            hdr = header(code, *load_key(args[1]))
+            fw, uboot, limit, out = args[2:]
             what = 'first stage'
         else:
             sys.exit(__doc__.split('\n\n')[1])
+        img = layout(hdr, code, open(fw, 'rb').read(), open(uboot, 'rb').read(),
+                     int(limit, 0))
     except ValueError as err:
-        sys.exit('%s: %s' % (args[1] if args[0].startswith('-') else args[0], err))
-    out = args[2]
+        sys.exit('%s: %s' % (args[-1], err))
     open(out, 'wb').write(img)
-    size = struct.unpack_from('<I', img, 0xc)[0]
-    print('%s: %d bytes, the %s (%d bytes of code) at 0x%x and 0x%x' %
-          (out, len(img), what, size, CODE, BACKUP))
+    print('%s: %d bytes: %s (%d bytes of code), U-Boot at 0x%x, %d left before '
+          'the environment' % (out, len(img), what, len(code), SPL_PART,
+                               int(limit, 0) - len(img)))
 
 
 if __name__ == '__main__':
