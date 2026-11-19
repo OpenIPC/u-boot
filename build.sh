@@ -47,15 +47,19 @@ ax_gzip() {
     echo "${tool}"
 }
 
-# AX620E: the first stage at flash 0, then U-Boot packed behind its header
-# at 0x10000, all before the environment (ax620e-image.py)
+# AX620E: the first stage (openipc/ax620e-spl, built here) at flash 0, then
+# U-Boot packed behind its header at 0x10000, all before the environment
+# (ax620e-image.py)
 ax620e_image() {
     target=$1
     builddir=$2
     tool=$(ax_gzip) || return 1
+    spldir=${builddir}/spl
+    make -C openipc/ax620e-spl O="${spldir}" CROSS_COMPILE=${CROSS_COMPILE_64} \
+        -j${JOBS:-$(nproc)} </dev/null || return 1
     text=$(sed -n 's/^CONFIG_SYS_TEXT_BASE=//p' "${builddir}/.config")
     env=$(sed -n 's/^CONFIG_ENV_OFFSET=//p' "${builddir}/.config")
-    python3 openipc/ax620e-image.py openipc/ax620e.spl \
+    python3 openipc/ax620e-image.py "${spldir}/spl.bin" \
         "${builddir}/u-boot.bin" "${text}" "${tool}" \
         openipc/axera-sdk-test-key.pem "${env}" "output/u-boot-${target}.bin"
 }
