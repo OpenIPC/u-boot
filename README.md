@@ -347,18 +347,18 @@ Every infinity2m, infinity6, 6b0, 6e and 6c part also builds for SPI NAND,
 
 | SoC | CPU | RAM | Flash | Notes |
 | --- | --- | --- | --- | --- |
-| `ax620u` | Cortex-A7 ×4 | 256 MiB | SPI NAND | target `ax620u-nand`; no Ethernet, SD or USB in U-Boot; tested in qemu only |
+| `ax620u` | Cortex-A7 ×4 | 256 MiB | SPI NAND | target `ax620u-nand`; Ethernet and SD, no USB; tested in qemu only |
 | `ax620e` | Cortex-A53 ×2 (arm64) | 256 MiB | NOR | target `ax620e-nor`, set up for AX620Q cameras; Ethernet, no SD or USB; tested in qemu only |
 
 - **The images have not run on silicon**, only on qemu-bench's `ax620u`
   and `ax620e` machines. They are only in this repository's `axera`
   release, and nothing is published to OpenIPC/firmware.
-- **Not on Axera:** booting from SD/MMC, the [SD card or USB
-  stick](#sd-card-or-usb-stick) recovery, and `run srcmmc` / `run srcusb`
-  (the variables exist, but there is no SD or USB driver behind them).
-  The AX620U also has no network: no TFTP (`ub`, `uk`, `ur`, `fwupd`,
-  `bootnfs`), and with no bootable firmware it stops at the prompt
-  instead of fetching `fwupd`. The AX620E has TFTP only.
+- **Not on Axera:** booting from SD/MMC, and USB (`run srcusb`: the
+  variable exists, but there is no USB driver behind it). The AX620E
+  also has no SD driver: no [SD card](#sd-card-or-usb-stick) recovery and
+  no `run srcmmc`. Both have Ethernet (TFTP: `ub`, `ur`, `fwupd`,
+  `bootnfs`; `uk` too on the AX620E's NOR), and the AX620U also has its SD
+  slot (`srcmmc`, the SD card recovery).
 - The AX620E image is set up for AX620Q cameras (256 MiB LPDDR4); other
   parts of the family, such as the AX630C, need their own DDR setup in the
   first stage and are not supported yet.
@@ -382,11 +382,13 @@ Every infinity2m, infinity6, 6b0, 6e and 6c part also builds for SPI NAND,
   alone updates `boot` only. The layout is
   `1024k(spl),1536k(boot),512k(env),-(ubi)`, the environment at
   `0x280000`, then openipc-hisilicon's UBI (UBIFS `rootfs` holding
-  `/boot/fitImage`, `rootfs_data`). There is no Ethernet, SD or USB
-  driver, so U-Boot cannot fetch anything: a camera with broken firmware
-  stops at the prompt, where `loady ${baseaddr}` over the console and
-  `run urwrite` (a `rootfs.ubifs`) or `run ubwrite` (a U-Boot image)
-  restore it. Otherwise update from Linux (`sysupgrade`) or a programmer.
+  `/boot/fitImage`, `rootfs_data`). Ethernet (an external RTL8201F PHY)
+  and the SD slot work: a camera with broken firmware fetches `fwupd`
+  over TFTP, or takes `rootfs.ubifs.ax620u.img` from an SD card, as on
+  other platforms. Without a network, `loady ${baseaddr}` over the
+  console and `run urwrite` (a `rootfs.ubifs`) or `run ubwrite` (a U-Boot
+  image) restore it. The kernel lives in the rootfs, so `run ur` updates
+  both and `run uk` has nothing to write.
 - **AX620E.** `u-boot-ax620e-nor.bin` is the whole 256 KiB boot
   partition: the first stage at 0, U-Boot at `0x10000` packed in
   Axera's own format for the SoC's unpacking engine. OpenIPC's NOR layout
@@ -457,7 +459,7 @@ AX620U's included, and they do not change.
 
 1. **Recovery check.** If there is an SD card or USB stick, U-Boot looks
    for [recovery files](#sd-card-or-usb-stick) on it and flashes them
-   (on SoCs whose U-Boot has an SD or USB driver; not Axera). It
+   (on SoCs whose U-Boot has an SD or USB driver; not the AX620E). It
    skips files that are already on the flash, so a card left in the slot
    does nothing.
 2. **First start.** If the env partition is blank, U-Boot saves the
@@ -499,11 +501,11 @@ reset, or for good after `saveenv`:
 | Command | Source |
 | --- | --- |
 | `run srcnet` | TFTP from `serverip` (default) |
-| `run srcmmc` | FAT on the SD card (not Axera) |
+| `run srcmmc` | FAT on the SD card (not AX620E) |
 | `run srcusb` | FAT on a USB stick (not Axera) |
 
-On the AX620U, which has no network in U-Boot, only the console
-commands in [Axera](#axera) (`loady`, `urwrite`, `ubwrite`) update it.
+On the AX620U the kernel lives in the rootfs, so `run ur` updates both;
+`run uk` does not apply.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
@@ -537,7 +539,7 @@ right files unbricks it without a console.
 
 ### SD card or USB stick
 
-Not on Axera: its U-Boot has no SD or USB driver.
+Axera has no USB driver, and the AX620E no SD driver: of the two, only the AX620U takes a card.
 
 On every boot, U-Boot reads the first FAT partition of the card, or the
 whole card if it has no partition table. It acts on what it finds in the
