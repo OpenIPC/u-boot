@@ -58,6 +58,12 @@ own branch:
   the vendor SPL built from source in the tree. CI: `build-ingenic.yml`,
   called from that branch's `ci.yml`. Its own `CLAUDE.md` covers the
   SPL, the DDR tables and the vendor quirks.
+- `openipc-axera`: U-Boot for Axera AX620U (Cortex-A7, SPI NAND) and the
+  AX620E family (Cortex-A53, AArch64, NOR), on the same mainline release
+  with the same OpenIPC layer, behind the vendor's signed DDR-init first
+  stage (kept on flash on AX620U, carried as a binary on AX620E). CI:
+  `build-axera.yml`, called from that branch's `ci.yml`. Its own
+  `CLAUDE.md` covers the boot chain, the Axera header and the drivers.
 - `main`: a fork of upstream mainline U-Boot, kept for rebasing.
 
 To change bootloader code, check out `openipc-hisilicon`, or read it with
@@ -322,6 +328,40 @@ The build logic lives here. Other branches call it:
   camera.
 - Keep the build matrix and the README's list in step with the branch's
   `build.sh` `ALL_SOCS`.
+
+## `build-axera.yml`
+
+- It is `build-sigmastar.yml` for `openipc-axera`: the same job graph and
+  `resolve`/`ref` rules. The matrix is build.sh's targets, `<soc>-<flash>`:
+  `ax620u-nand` (arm-linux-gnueabi-) and `ax620e-nor`
+  (gcc-aarch64-linux-gnu, build.sh's `CROSS_COMPILE_64` default); the build
+  legs also need `curl`, as build.sh fetches the SDK's `ax_gzip` (checked
+  against its SHA-256).
+- **Partition fit:** `ax620u-nand` is the 1536 KiB `boot` partition at
+  0x100000, without the vendor SPL in front (it stays in the camera's
+  `spl` partition); `ax620e-nor` is the 256 KiB boot partition at 0,
+  first stage (`openipc/ax620e.spl`, in the tree) included.
+- **Smoke test, AX620E only:** the `qemu` job builds qemu-system-aarch64
+  from OpenIPC/qemu-bench at a pinned commit. One QEMU run of `-M ax620e`
+  on a 16 MiB erased NOR holding the image, with
+  `-global axera-spi-nor.env-from-flash=on`: the first boot must reach
+  `Hit Ctrl-C` (saving the default environment), then `reset` (the
+  watchdog, back through the first stage) must reach it again, with
+  U-Boot's "Warning - bad CRC" printed once only. The model keeps flash
+  writes in memory, not in the file, so two QEMU runs would not test the
+  saved environment.
+  No AX620U leg: `-M ax620u` boots only through the camera's own SPL at
+  flash 0 (no `uboot-file=` there), and that SPL comes from a camera's
+  flash dump: it is in neither the tree nor any public source.
+- **Release and publish:**
+  - `release` uploads to the `axera` tag.
+  - `publish` is commented out, with its input: neither image has run on
+    silicon. When it returns, it shares the `publish-firmware-latest`
+    concurrency group, runs only from `openipc`, and reports a
+    `uboot-axera-…` build id; openipc.org accepts the report only from
+    workflows it allowlists (OpenIPC/website
+    `service/internal/builds/verify.go`), so add `build-axera.yml` there
+    first.
 
 ## Invariants to keep when editing `build-hisilicon.yml`
 
