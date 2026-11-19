@@ -35,11 +35,18 @@ on:
 # build.sh takes targets (<soc>-<flash>) as arguments; the matrix calls it
 # with one per leg.
 #
-# Nothing private is needed. The AX620U image is U-Boot behind its 1 KiB
-# Axera header only: the vendor SPL stays in the camera's `spl` partition.
-# The AX620E image carries the vendor first stage, which is in the tree
-# (openipc/ax620e.spl), and build.sh fetches the SDK's ax_gzip from a public
-# SDK copy at a fixed commit, checked against its SHA-256.
+# Nothing private is needed. Each SoC's first stage (SPL) is built from
+# source in the tree (openipc/ax620e-spl, openipc/ax620u-spl), and the
+# cameras' own stays beside it as a fallback, so every leg uploads two
+# variants:
+#   AX620E: u-boot-ax620e-nor.bin (the boot partition: first stage, then
+#     U-Boot packed at 0x10000) and u-boot-ax620e-nor-stockspl.bin (the
+#     same with the cameras' first stage)
+#   AX620U: u-boot-ax620u-nand.bin (U-Boot behind its 1 KiB Axera header,
+#     for `boot` at 0x100000), and for the `spl` partition at 0
+#     spl-ax620u-nand.bin and spl-ax620u-nand-stock.bin
+# build.sh fetches the SDK's ax_gzip (AX620E) from a public SDK copy at a
+# fixed commit, checked against its SHA-256.
 
 jobs:
   # Resolve the openipc-axera revision this run builds from. The workflow
@@ -70,9 +77,10 @@ jobs:
       matrix:
         include:
           # AX620U (Cortex-A7, AArch32): SPI NAND, 1536 KiB `boot` at
-          # 0x100000 behind the 1 MiB vendor SPL; the image is that
-          # partition's content, written at 0x100000, not at 0
-          - { soc: ax620u-nand, limit_kb: 1536 }
+          # 0x100000 behind the 1 MiB `spl` partition; u-boot-* is the
+          # boot partition's content, written at 0x100000, not at 0, and
+          # spl-* the start of the spl partition, written at 0
+          - { soc: ax620u-nand, limit_kb: 1536, spl_kb: 1024 }
           # AX620E (Cortex-A53, AArch64): SPI NOR, the 256 KiB boot
           # partition at 0 (first stage, then packed U-Boot at 0x10000)
           - { soc: ax620e-nor, limit_kb: 256 }
@@ -120,19 +128,39 @@ jobs:
           [ -f "$f" ] || { echo "missing $f" >&2; exit 1; }
           # Compare bytes: rounding down to KiB would pass an image up to
           # 1023 bytes into the environment.
-          size=$(stat -c %s "$f")
-          limit=$((${{ matrix.limit_kb }} * 1024))
-          echo "- $f: [${size}/${limit} bytes]"
-          if [ "$size" -gt "$limit" ]; then
-            echo "-- size exceeded by: $((size - limit)) bytes" >&2
-            exit 1
-          fi
+          rc=0
+          check() {
+            size=$(stat -c %s "$1")
+            echo "- $1: [${size}/$2 bytes]"
+            if [ "$size" -gt "$2" ]; then
+              echo "-- size exceeded by: $((size - $2)) bytes" >&2
+              rc=1
+            fi
+          }
+          # The image and its stock-first-stage twin (AX620E)
+          for f in output/u-boot-${{ matrix.soc }}*.bin; do
+            check "$f" $((${{ matrix.limit_kb }} * 1024))
+          done
+          # The spl partition's images (AX620U), against that partition
+          for f in output/spl-${{ matrix.soc }}*.bin; do
+            [ -f "$f" ] || continue
+            if [ -z '${{ matrix.spl_kb }}' ]; then
+              echo "$f: no spl partition size for ${{ matrix.soc }}" >&2
+              rc=1
+              continue
+            fi
+            check "$f" $((${{ matrix.spl_kb }} * 1024))
+          done
+          exit $rc
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: u-boot-${{ matrix.soc }}
-          path: output/u-boot-${{ matrix.soc }}.bin
+          # Every image of the leg: u-boot-<soc>*.bin, spl-<soc>*.bin
+          path: |
+            output/u-boot-${{ matrix.soc }}*.bin
+            output/spl-${{ matrix.soc }}*.bin
           if-no-files-found: error
 
   # Build qemu-system-aarch64 once for the smoke leg.
@@ -170,17 +198,23 @@ jobs:
           name: qemu-aarch64
           path: qemu-aarch64
 
-  # QEMU smoke test: boots the AX620E image from an erased 16 MiB NOR on
-  # qemu-bench's `-M ax620e`. The machine runs the image's own vendor first
-  # stage from flash 0, which unpacks U-Boot from 0x10000 with the GZIPD
-  # engine model. It must reach the autoboot prompt, then, after `reset`
-  # (the watchdog), reach it again having loaded the environment the first
-  # boot saved: the model keeps flash writes in memory across a reset, not
+  # QEMU smoke test, each SoC with each first stage (`spl`: source, or the
+  # cameras' own, stock), from otherwise erased flash:
+  #   AX620E: the boot partition image at 0 of a 16 MiB NOR on qemu-bench's
+  #     `-M ax620e`, which runs the first stage from flash 0; it unpacks
+  #     U-Boot from 0x10000 with the GZIPD engine model.
+  #   AX620U: the spl partition image at 0 and U-Boot's at 0x100000 of a
+  #     128 MiB SPI NAND on `-M ax620u`, which starts the first stage at
+  #     flash 0x800 (it does not model the boot ROM or DDR training).
+  # It must reach the autoboot prompt, then, after `reset` (the
+  # watchdog), reach it again having loaded the environment the first
+  # boot saved: the models keep flash writes in memory across a reset, not
   # in the file, so both boots are one QEMU run.
   #
-  # No AX620U leg: `-M ax620u` boots only from a whole flash dump through
-  # the vendor SPL at flash 0 (it has no uboot-file= entry), and that SPL
-  # comes from a camera's flash and is not in the tree or anywhere public.
+  # A leg whose first stage the revision built does not have (an
+  # openipc-axera from before that SoC's first stage was built from
+  # source, or kept as a fallback) is skipped with a warning, except the
+  # AX620E source one, the image that has always been there.
   qemu_smoke:
     needs: [build, qemu]
     runs-on: ubuntu-latest
@@ -189,7 +223,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { soc: ax620e-nor, machine: ax620e }
+          - { soc: ax620e-nor, machine: ax620e, spl: source }
+          - { soc: ax620e-nor, machine: ax620e, spl: stock }
+          - { soc: ax620u-nand, machine: ax620u, spl: source }
+          - { soc: ax620u-nand, machine: ax620u, spl: stock }
     steps:
       - name: Download qemu-aarch64
         uses: actions/download-artifact@v4
@@ -219,21 +256,48 @@ jobs:
         run: |
           UBOOT='u-boot-${{ matrix.soc }}.bin'
           test -f "$UBOOT"
-          echo "booting $UBOOT on -M ${{ matrix.machine }}"
-          # 16 MiB NOR, the boot partition at 0, the rest erased
-          python3 - "$UBOOT" /tmp/flash.bin <<'PY'
+          case '${{ matrix.machine }}/${{ matrix.spl }}' in
+            ax620e/source) FIRST="$UBOOT" ;;
+            ax620e/stock) FIRST='u-boot-${{ matrix.soc }}-stockspl.bin' ;;
+            ax620u/source) FIRST='spl-${{ matrix.soc }}.bin' ;;
+            ax620u/stock) FIRST='spl-${{ matrix.soc }}-stock.bin' ;;
+          esac
+          if [ ! -f "$FIRST" ]; then
+            if [ '${{ matrix.machine }}/${{ matrix.spl }}' = ax620e/source ]; then
+              echo "missing $FIRST" >&2
+              exit 1
+            fi
+            echo "::warning::$FIRST not built by this revision: ${{ matrix.machine }} with the ${{ matrix.spl }} first stage not tested"
+            exit 0
+          fi
+          # The flash, erased but for the images: AX620E 16 MiB NOR, the
+          # boot partition (first stage included) at 0; AX620U 128 MiB SPI
+          # NAND, the spl partition's image at 0 and U-Boot at 0x100000.
+          # env-from-flash (AX620E): serve the environment from the flash
+          # image, not the model's synthetic one.
+          case '${{ matrix.machine }}' in
+            ax620e)
+              SIZE_MB=16
+              set -- "$FIRST" 0
+              MACHINE_ARGS='-global axera-spi-nor.env-from-flash=on' ;;
+            ax620u)
+              SIZE_MB=128
+              set -- "$FIRST" 0 "$UBOOT" $((0x100000))
+              MACHINE_ARGS= ;;
+          esac
+          echo "booting $* on -M ${{ matrix.machine }}"
+          python3 - /tmp/flash.bin $((SIZE_MB << 20)) "$@" <<'PY'
           import sys
-          u = open(sys.argv[1], 'rb').read()
-          img = bytearray(b'\xff' * (16 << 20))
-          img[:len(u)] = u
-          open(sys.argv[2], 'wb').write(img)
+          img = bytearray(b'\xff' * int(sys.argv[2]))
+          for f, off in zip(sys.argv[3::2], sys.argv[4::2]):
+              u = open(f, 'rb').read()
+              img[int(off):int(off) + len(u)] = u
+          open(sys.argv[1], 'wb').write(img)
           PY
           chmod +x ./qemu-aarch64
           mkfifo /tmp/uart.in /tmp/uart.out
-          # env-from-flash: serve the environment from the flash image,
-          # not the model's synthetic one
           ./qemu-aarch64 -M ${{ matrix.machine }},flash-file=/tmp/flash.bin \
-            -global axera-spi-nor.env-from-flash=on \
+            $MACHINE_ARGS \
             -nographic -serial pipe:/tmp/uart \
             -monitor none > /tmp/qemu.log 2>&1 &
           QEMU_PID=$!
@@ -278,7 +342,7 @@ jobs:
             echo "FAIL: the environment saved on the first boot did not load after reset"
             exit 1
           fi
-          echo "PASS: u-boot reached the autoboot prompt, and its saved environment survived a reset"
+          echo "PASS: u-boot (${{ matrix.spl }} first stage) reached the autoboot prompt, and its saved environment survived a reset"
 
   # Mirror every built image to this repository's own Axera release.
   release:

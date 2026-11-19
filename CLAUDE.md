@@ -60,8 +60,9 @@ own branch:
   SPL, the DDR tables and the vendor quirks.
 - `openipc-axera`: U-Boot for Axera AX620U (Cortex-A7, SPI NAND) and the
   AX620E family (Cortex-A53, AArch64, NOR), on the same mainline release
-  with the same OpenIPC layer, behind the vendor's signed DDR-init first
-  stage (kept on flash on AX620U, carried as a binary on AX620E). CI:
+  with the same OpenIPC layer, behind a DDR-init first stage (AX620U: the
+  vendor's, kept on flash; AX620E: the SDK's BL1 SPL, built from source in
+  `openipc/ax620e-spl`). CI:
   `build-axera.yml`, called from that branch's `ci.yml`. Its own
   `CLAUDE.md` covers the boot chain, the Axera header and the drivers.
 - `main`: a fork of upstream mainline U-Boot, kept for rebasing.
@@ -338,21 +339,32 @@ The build logic lives here. Other branches call it:
   legs also need `curl`, as build.sh fetches the SDK's `ax_gzip` (checked
   against its SHA-256).
 - **Partition fit:** `ax620u-nand` is the 1536 KiB `boot` partition at
-  0x100000, without the vendor SPL in front (it stays in the camera's
+  0x100000, without the first stage in front (it is in the camera's
   `spl` partition); `ax620e-nor` is the 256 KiB boot partition at 0,
-  first stage (`openipc/ax620e.spl`, in the tree) included.
-- **Smoke test, AX620E only:** the `qemu` job builds qemu-system-aarch64
-  from OpenIPC/qemu-bench at a pinned commit. One QEMU run of `-M ax620e`
+  first stage (built from `openipc/ax620e-spl` by build.sh) included.
+  Each SoC also gets its cameras' own first stage as a fallback:
+  `u-boot-ax620e-nor-stockspl.bin` (same limit), and, where
+  `openipc-axera` builds the AX620U first stage, `spl-ax620u-nand.bin`
+  and `spl-ax620u-nand-stock.bin`, checked against the 1024 KiB `spl`
+  partition (`spl_kb`). Each leg uploads all its images in one artifact,
+  `u-boot-<soc>`.
+- **Smoke test:** the `qemu` job builds qemu-system-aarch64
+  from OpenIPC/qemu-bench at a pinned commit; the source-built first stage
+  needs one with `axera-spi-nor` ending a command at the flash's software
+  reset (qemu-bench#351), or its first read returns zeros
+  (`verify_img_header: magic 0x55543322 != 0x0`). One QEMU run of `-M ax620e`
   on a 16 MiB erased NOR holding the image, with
   `-global axera-spi-nor.env-from-flash=on`: the first boot must reach
   `Hit Ctrl-C` (saving the default environment), then `reset` (the
   watchdog, back through the first stage) must reach it again, with
   U-Boot's "Warning - bad CRC" printed once only. The model keeps flash
   writes in memory, not in the file, so two QEMU runs would not test the
-  saved environment.
-  No AX620U leg: `-M ax620u` boots only through the camera's own SPL at
-  flash 0 (no `uboot-file=` there), and that SPL comes from a camera's
-  flash dump: it is in neither the tree nor any public source.
+  saved environment. The same for AX620U on `-M ax620u` (128 MiB erased
+  SPI NAND, the spl image at 0, `u-boot-ax620u-nand.bin` at 0x100000;
+  the machine starts the first stage at flash 0x800, no boot ROM
+  model), and for each SoC's stock first stage: four legs. A leg whose
+  first stage image the revision does not build is skipped with a
+  warning, except AX620E's source one.
 - **Release and publish:**
   - `release` uploads to the `axera` tag.
   - `publish` is commented out, with its input: neither image has run on
