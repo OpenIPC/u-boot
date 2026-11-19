@@ -1669,10 +1669,16 @@ static const struct udevice_id eqos_ids[] = {
 		.data = (ulong)&eqos_imx_config
 	},
 #endif
-#if IS_ENABLED(CONFIG_DWC_ETH_QOS_AXERA)
+#if IS_ENABLED(CONFIG_DWC_ETH_QOS_AXERA) && IS_ENABLED(CONFIG_AXERA_AX620E)
 	{
 		.compatible = "axera,ax620e-eqos",
 		.data = (ulong)&eqos_axera_config
+	},
+#endif
+#if IS_ENABLED(CONFIG_DWC_ETH_QOS_AXERA) && IS_ENABLED(CONFIG_AXERA_AX620U)
+	{
+		.compatible = "axera,ax620-eqos",
+		.data = (ulong)&eqos_ax620u_config
 	},
 #endif
 

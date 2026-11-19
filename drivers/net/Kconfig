@@ -202,11 +202,13 @@ config DWC_ETH_QOS
 	  clocking/reset structure, and feature list.
 
 config DWC_ETH_QOS_AXERA
-	bool "Synopsys DWC Ethernet QOS device support for Axera AX620E"
-	depends on DWC_ETH_QOS && AXERA_AX620E
+	bool "Synopsys DWC Ethernet QOS device support for Axera AX620E/AX620U"
+	depends on DWC_ETH_QOS && (AXERA_AX620E || AXERA_AX620U)
 	help
-	  The Ethernet MAC of Axera's AX620E: clocks, resets and interface
-	  select, and the SoC's own 10/100 PHY.
+	  The Ethernet MAC of Axera's AX620E (clocks, resets and interface
+	  select, and the SoC's own 10/100 PHY) or AX620U (bus clock,
+	  reset, interface select, RMII clock direction, an external PHY's
+	  reset GPIO).
 
 config DWC_ETH_QOS_IMX
 	bool "Synopsys DWC Ethernet QOS device support for IMX"

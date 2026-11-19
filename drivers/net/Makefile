@@ -20,7 +20,10 @@ obj-$(CONFIG_DRIVER_DM9000) += dm9000x.o
 obj-$(CONFIG_DSA_SANDBOX) += dsa_sandbox.o
 obj-$(CONFIG_DWC_ETH_QOS) += dwc_eth_qos.o
 obj-$(CONFIG_DWC_ETH_QOS_IMX) += dwc_eth_qos_imx.o
-obj-$(CONFIG_DWC_ETH_QOS_AXERA) += dwc_eth_qos_axera.o
+ifdef CONFIG_DWC_ETH_QOS_AXERA
+obj-$(CONFIG_AXERA_AX620E) += dwc_eth_qos_axera.o
+obj-$(CONFIG_AXERA_AX620U) += dwc_eth_qos_ax620u.o
+endif
 obj-$(CONFIG_E1000) += e1000.o
 obj-$(CONFIG_E1000_SPI) += e1000_spi.o
 obj-$(CONFIG_EEPRO100) += eepro100.o

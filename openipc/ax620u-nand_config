@@ -25,7 +25,6 @@ CONFIG_LEGACY_IMAGE_FORMAT=y
 # CONFIG_EFI_LOADER is not set
 # CONFIG_SYSRESET is not set
 # CONFIG_ENV_IS_NOWHERE is not set
-# CONFIG_MMC is not set
 
 # Console: UART0, DesignWare APB UART
 CONFIG_DM_SERIAL=y
@@ -99,6 +98,29 @@ CONFIG_CMD_GPIO=y
 # CONFIG_CMD_FLASH is not set
 # CONFIG_CMD_LOADS is not set
 
-# No Ethernet driver yet (the EQOS at 0x4970000), so no network commands;
-# updates go through the SPI NAND from Linux (sysupgrade)
-# CONFIG_NET is not set
+# Network: the DWC Ethernet QoS at 0x4970000, RMII to an external PHY
+CONFIG_NET=y
+CONFIG_DM_ETH=y
+CONFIG_DWC_ETH_QOS=y
+CONFIG_DWC_ETH_QOS_AXERA=y
+CONFIG_PHYLIB=y
+CONFIG_CMD_NET=y
+CONFIG_CMD_TFTPBOOT=y
+CONFIG_CMD_DHCP=y
+CONFIG_CMD_PING=y
+CONFIG_CMD_MII=y
+CONFIG_NET_RANDOM_ETHADDR=y
+CONFIG_LIB_RAND=y
+# CONFIG_CMD_NFS is not set
+
+# SD card: Cadence SD4HC; recovery (common/openipc.c) and srcmmc read FAT
+CONFIG_MMC=y
+CONFIG_DM_MMC=y
+CONFIG_MMC_SDHCI=y
+CONFIG_MMC_SDHCI_CADENCE=y
+CONFIG_CMD_MMC=y
+CONFIG_CMD_FAT=y
+CONFIG_FS_FAT=y
+CONFIG_DOS_PARTITION=y
+# CONFIG_EFI_PARTITION is not set
+# CONFIG_MMC_HW_PARTITIONING is not set

@@ -36,13 +36,15 @@ git diff --diff-filter=M v2022.10 HEAD      # the mainline files patched
 
 Patched mainline files: `arch/arm/{Kconfig,Makefile}` (`ARCH_AXERA`),
 `arch/arm/dts/Makefile`, `drivers/{gpio,spi,net}/{Kconfig,Makefile}`,
-`drivers/net/dwc_eth_qos.{c,h}` (the `axera,ax620e-eqos` entry), `common/{Kconfig,Makefile}` (`OPENIPC`,
+`drivers/net/dwc_eth_qos.{c,h}` (the `axera,ax620e-eqos` and
+`axera,ax620-eqos` entries), `common/{Kconfig,Makefile}` (`OPENIPC`,
 `PRODUCT_SOC`, `PRODUCT_SOCMODEL`, `OPENIPC_NOR_SPLIT`),
 `drivers/gpio/dwapb_gpio.c` (drops `asm/arch/gpio.h`, as mainline
-00b04933985), `.gitignore` (`/output/`). The AX620U uses mainline drivers
-only; the AX620E adds `drivers/gpio/axera_gpio.c`,
-`drivers/spi/axera_spi.c` and `drivers/net/dwc_eth_qos_axera.c` (glue
-on mainline's EQOS driver).
+00b04933985), `.gitignore` (`/output/`). The AX620U uses mainline drivers plus
+`drivers/net/dwc_eth_qos_ax620u.c` (glue on mainline's EQOS driver);
+the AX620E adds `drivers/gpio/axera_gpio.c`, `drivers/spi/axera_spi.c`
+and `drivers/net/dwc_eth_qos_axera.c`. Both glues are
+`DWC_ETH_QOS_AXERA`; the SoC picks the file.
 
 ## Build
 
@@ -93,17 +95,38 @@ SHA-256 into `output/`, or `AX_GZIP=<path>`) and `curl`.
 - Reset: 0x81 to 0x02220044 (the stock U-Boot's), then the DesignWare
   watchdog at 0x49aa000 as the stock kernel's `dw_wdt_restart()` (what
   QEMU resets on). Timer: the generic timer.
-- No network, MMC or USB, so nothing can fetch a firmware: when the scan
-  finds it broken (`bootfail`), `bootflash` says so and stays at the
-  prompt instead of resetting (`openipc-common.h`, `OPENIPC_RECOVERY`).
-  There, `loady ${baseaddr}` over the console and `run urwrite` (a
-  `rootfs.ubifs`) or `run ubwrite` (a U-Boot image) restore it.
+- Ethernet: mainline `dwc_eth_qos` + `dwc_eth_qos_ax620u.c`,
+  `axera,ax620-eqos` (the stock U-Boot's compatible), RMII to an
+  external RTL8201F at MDIO address 1, written from the stock U-Boot
+  2020.04 binary (no AX620U source is published) and its devicetree:
+  in the AP clock block 0x49ba000, the bus clock select (+0x00 [1:0], 3
+  for the 312 MHz `emac-bus-clock`, which is also the CSR clock, MDIO
+  CR 5), the MAC reset (+0x20 bit 4, 50 ms), RMII/RGMII (+0x34 bit 10),
+  the RMII RX divider per speed (+0x18); 0x49bc500 bit 3 only for
+  `rmii-phy-dir` "input". PHY reset GPIO1 (0x4960000) 28, low 100 ms
+  then 200 ms. `board_phy_config()` puts the RTL8201F in RMII mode with
+  its TXC an output, the PHY driving the 50 MHz reference clock (page 7
+  reg 16: bit 3 set, bit 12 clear), as the stock driver does. No clock gates or pads are touched
+  (the stock U-Boot does not either). Descriptors 64-byte padded with
+  an AXI width of 8 for the skip length, as on the AX620E (not
+  confirmed on silicon). Random MAC (`NET_RANDOM_ETHADDR`).
+- SD: mainline `sdhci-cadence` on the Cadence SD4HC at 0x4950000, 4 bit,
+  3.3 V, the stock U-Boot's PHY delays, card detect on GPIO1 2
+  (`cd-inverted`); `mmc0`. FAT for `srcmmc` and the recovery
+  (`rootfs.ubifs.ax620u.img` or `script.txt` on the card, at boot).
+- With a medium to fetch from, a firmware the scan finds broken
+  (`bootfail`) runs `fwupd` (`run ur`: TFTP `rootfs.ubifs.ax620u`) and
+  resets, as on the other OpenIPC platforms. `loady ${baseaddr}` and
+  `run urwrite` / `run ubwrite` still work without a network. An
+  environment saved by the earlier build without network keeps its
+  stay-at-the-prompt `fwrecovery`/`bootflash` until `openipc_helper()`
+  replaces them (both variants are in `OPENIPC_RETIRED_COMMON`).
+- `uk` has no `ukwrite` on NAND (as on openipc-hisilicon): the kernel
+  is `/boot/fitImage` in the rootfs, so `ur` updates both.
 - `ubwrite` and `urwrite` ask `fwfit` (`common/openipc.c`) first whether
   the image fits -- the boot partition's good blocks, or the UBI device
   with the rootfs and rootfs_data volumes it may replace -- so an image
   too big erases or removes nothing.
-- No Ethernet driver (EQOS at 0x4970000), no SD, so `NET` is off and
-  updates come from Linux (`sysupgrade`) or a programmer.
 
 ### Layout and environment
 
@@ -122,6 +145,17 @@ openipc-hisilicon's: UBIFS `rootfs` holding `/boot/fitImage`,
 dd if=output/u-boot-ax620u-nand.bin of=flash.bin bs=1M seek=1 conv=notrunc  # into a 128 MiB dump
 QEMU_TLBI_RELAXED=1 qemu-system-arm -M ax620u,flash-file=flash.bin -smp 4 -nographic
 ```
+
+Networking: `-netdev user,id=n0,net=192.168.1.0/24,host=192.168.1.107,dhcpstart=192.168.1.10,tftp=<dir> -net nic,netdev=n0`
+puts QEMU's TFTP server at the default `serverip`, so `fwupd` on an
+empty flash (the SPL at 0, U-Boot at 0x100000, the rest erased) fetches
+`rootfs.ubifs.ax620u`, resets and boots it. SD: `-drive
+if=sd,index=1,file=sd.img,format=raw` (a power-of-two size, FAT).
+Checked: that bootfail path to the OpenIPC login, `ping`, `tftpboot`,
+`run ub` (read back and compared), `run ur` over TFTP and from SD
+(`srcmmc`), the SD recovery at boot, the retired-command migration. The
+model's PHY is not an RTL8201F (ID 0044.1400), so `board_phy_config()`
+is untested, as is everything clock- or pad-related.
 
 The flash must hold the vendor SPL at 0 (from a camera). The machine's
 `axera-spi-nand` model needs READID answered after the opcode alone,

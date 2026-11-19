@@ -6,6 +6,8 @@
  */
 /dts-v1/;
 
+#include <dt-bindings/gpio/gpio.h>
+
 / {
 	model = "Axera AX620U (OpenIPC)";
 	compatible = "axera,ax620x";
@@ -15,6 +17,8 @@
 	aliases {
 		serial0 = &uart0;
 		spi4 = &spi4;
+		ethernet0 = &eth0;
+		mmc0 = &sd;
 	};
 
 	chosen {
@@ -66,6 +70,21 @@
 		};
 	};
 
+	gpio@4960000 {
+		compatible = "snps,dw-apb-gpio";
+		reg = <0x4960000 0x400>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		gpio1: gpio-controller@0 {
+			compatible = "snps,dw-apb-gpio-port";
+			gpio-controller;
+			#gpio-cells = <2>;
+			snps,nr-gpios = <32>;
+			reg = <0>;
+		};
+	};
+
 	/*
 	 * The SPI NAND's DesignWare SSI ("snps,dw-ssi" in the stock trees),
 	 * with the DWC_ssi register layout, and its chip select on GPIO2 5.
@@ -88,5 +107,50 @@
 			spi-tx-bus-width = <1>;
 			spi-rx-bus-width = <1>;
 		};
+	};
+
+	/*
+	 * The DWC Ethernet QoS, RMII to an external PHY (an RTL8201F at
+	 * MDIO address 1 in the stock kernel's tree) whose TXC drives the
+	 * 50 MHz reference clock ("rmii-phy-dir" "output", the stock glue's
+	 * "RMII PHY TXC output mode"); the PHY's reset is GPIO1 28, low in
+	 * reset. "emac-bus-clock" is the CSR clock.
+	 */
+	eth0: ethernet@4970000 {
+		compatible = "axera,ax620-eqos";
+		reg = <0x4970000 0x10000>;
+		emac-bus-clock = <312000000>;
+		phy-mode = "rmii";
+		rmii-phy-dir = "output";
+		phy-reset-gpios = <&gpio1 28 GPIO_ACTIVE_LOW>;
+	};
+
+	/*
+	 * The SD card slot: Cadence SD4HC, 4 bits, 3.3 V only, card detect
+	 * on GPIO1 2 (low with a card in). The PHY delays are the stock
+	 * U-Boot's; the base clock comes from the capabilities register.
+	 */
+	sd: mmc@4950000 {
+		compatible = "socionext,uniphier-sd4hc", "cdns,sd4hc";
+		reg = <0x4950000 0x10000>;
+		bus-width = <4>;
+		sdhci-caps-mask = <0x7 0x200000>;
+		cap-sd-highspeed;
+		no-1-8-v;
+		no-sdio;
+		no-mmc;
+		disable-wp;
+		cd-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
+		cd-inverted;
+		cdns,phy-input-delay-sd-highspeed = <0x2>;
+		cdns,phy-input-delay-legacy = <0x4>;
+		cdns,phy-input-delay-sd-uhs-sdr12 = <0x1>;
+		cdns,phy-input-delay-sd-uhs-sdr25 = <0x2>;
+		cdns,phy-input-delay-sd-uhs-sdr50 = <0x1>;
+		cdns,phy-input-delay-sd-uhs-ddr50 = <0x2>;
+		cdns,phy-input-delay-mmc-highspeed = <0x2>;
+		cdns,phy-input-delay-mmc-ddr = <0x2>;
+		cdns,phy-dll-delay-sdclk = <0x0>;
+		cdns,phy-dll-delay-sdclk-hsmmc = <0x17>;
 	};
 };
