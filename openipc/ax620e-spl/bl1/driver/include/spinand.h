@@ -2,7 +2,6 @@
 #define __SPINAND_H
 
 #include "cmn.h"
-#include "errno.h"
 
 #define SPINAND_CONTINUOUS_READ_SUPPORT
 

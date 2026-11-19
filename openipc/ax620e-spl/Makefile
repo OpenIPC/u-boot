@@ -39,6 +39,8 @@ CFLAGS := -std=gnu11 -Os -Wall -Wno-array-bounds -ffreestanding -fno-builtin \
 	-fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables \
 	-fomit-frame-pointer -fno-stack-protector -fno-pic -fno-pie \
 	-mstrict-align -mgeneral-regs-only -MMD -MP
+# Bare metal: the compiler's own headers (stdint.h), no C library's
+CFLAGS += -nostdinc -isystem $(shell $(CC) -print-file-name=include)
 CFLAGS += $(addprefix -I$(SRC)/,driver/include board/include common/include \
 	core/include driver/usb driver/ddr/ddr driver/adc core/ax_env)
 CFLAGS += -DAX620E_CFG=1 -DCONFIG_ARM64=1
