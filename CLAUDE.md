@@ -48,13 +48,19 @@ on mainline's EQOS driver).
 
 ```sh
 ./build.sh                 # every openipc/<target>_config
-./build.sh ax620u-nand     # -> output/u-boot-ax620u-nand.bin
+./build.sh ax620u-nand     # -> output/u-boot-ax620u-nand.bin, spl-ax620u-nand{,-stock}.bin
 ```
 
 `build.sh` runs `olddefconfig` on `openipc/<target>_config` (a complete
 config fragment, no base file), builds, and wraps `u-boot.bin` with
 `openipc/axera-image.py`, checking it against the boot partition in the
-target's `CONFIG_MTDPARTS_DEFAULT`. `JOBS` sets make's `-j`.
+target's `CONFIG_MTDPARTS_DEFAULT`. `JOBS` sets make's `-j`. For
+`ax620u-*` it also builds the first stage (`make -C openipc/ax620u-spl`,
+into `output/build-<target>/spl`) and lays out the start of the `spl`
+partition with `openipc/ax620u-spl-image.py`: `spl-<target>.bin`, and
+`spl-<target>-stock.bin` from the cameras' own first stage
+(`openipc/ax620u-spl/stock.bin`, the fallback; `SPL=stock` puts it in
+`spl-<target>.bin` and builds no other).
 Toolchains: `arm-linux-gnueabi-` (`CROSS_COMPILE`), and for `ax620e-*`
 `aarch64-linux-gnu-` (`CROSS_COMPILE_64`); those targets are laid out by
 `openipc/ax620e-image.py` instead, which needs the SDK's `ax_gzip`
@@ -65,9 +71,18 @@ SHA-256 into `output/`, or `AX_GZIP=<path>`) and `curl`.
 
 ### Boot
 
-- Boot ROM -> **vendor SPL** (`spl`, flash 0, 1 MiB: DDR training, PLLs,
-  signed, no source; kept as shipped) -> **U-Boot** (`boot`, 0x100000,
-  1.5 MiB) -> Linux from UBI.
+- Boot ROM -> **first stage** (`spl`, flash 0, 1 MiB: DDR training,
+  PLLs) -> **U-Boot** (`boot`, 0x100000, 1.5 MiB) -> Linux from UBI.
+- The first stage is `openipc/ax620u-spl` (`README.md` there),
+  reconstructed in C from the cameras' -O0 binary, SPI NAND boot only,
+  its DDR tables generated from that binary. `ax620u-spl-image.py`
+  writes the boot ROM's header (twice, at 0 and 0x400; code at 0x800 and
+  again at 0x20000), signed with the SDK test key; given the stock code
+  it reproduces the cameras' header byte for byte (`--check <dump>`).
+  0x40000 and 0x60000 hold the EIP-130 firmware (the header's firmware
+  size and sum match), which the images leave alone. The cameras' own
+  first stage stays as `openipc/ax620u-spl/stock.bin`. Only QEMU has run
+  the rebuilt one: its MMIO writes up to U-Boot equal the stock's.
 - The SPL loads the boot partition, a 1 KiB Axera header and then the
   image, to 0x40000000 and jumps to 0x40000400 (`SYS_TEXT_BASE`). It
   checks two 32-bit LE word sums only: the image's (+0x14) and the
@@ -123,7 +138,10 @@ dd if=output/u-boot-ax620u-nand.bin of=flash.bin bs=1M seek=1 conv=notrunc  # in
 QEMU_TLBI_RELAXED=1 qemu-system-arm -M ax620u,flash-file=flash.bin -smp 4 -nographic
 ```
 
-The flash must hold the vendor SPL at 0 (from a camera). The machine's
+The machine starts the code at flash 0x800 (no boot ROM model), so the
+first stage must be there: `spl-ax620u-nand.bin` at 0 boots OpenIPC's
+U-Boot from an otherwise erased 128 MiB flash, or splice it into a
+camera's dump. The machine's
 `axera-spi-nand` model needs READID answered after the opcode alone,
 the 0x0b/0x3b cache reads, and a PROGRAM LOAD kept open across the SER
 write that mainline's driver makes after queueing the data (SER 0 ends

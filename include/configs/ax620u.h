@@ -2,8 +2,8 @@
 /*
  * Axera AX620U cameras.
  *
- * Boot chain: boot ROM -> vendor SPL (spl partition, flash 0, 1 MiB: DDR,
- * PLLs; signed, kept as shipped) -> U-Boot (boot partition, 0x100000,
+ * Boot chain: boot ROM -> first stage (spl partition, flash 0, 1 MiB: DDR,
+ * PLLs; signed; openipc/ax620u-spl, or the cameras' own) -> U-Boot (boot partition, 0x100000,
  * behind the 1 KiB Axera image header; loaded at 0x40000000, entered at
  * 0x40000400 = SYS_TEXT_BASE) -> Linux from UBI.
  */
@@ -36,7 +36,7 @@
 #define OPENIPC_OSMEM			"87M"
 /* The SPI NAND's MTD name in the AX620U kernels */
 #define OPENIPC_SFC			"spi4.0_nand"
-/* The vendor SPL owns the first 1 MiB and loads U-Boot from 0x100000 */
+/* The first stage owns the first 1 MiB and loads U-Boot from 0x100000 */
 #define OPENIPC_NAND_MTDPARTS		"1024k(spl),1536k(boot),512k(env),-(ubi)"
 #define OPENIPC_NAND_UBI_MTD		3
 #define OPENIPC_NAND_BOOT_SIZE		0x180000
