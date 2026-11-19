@@ -84,16 +84,39 @@ ax_gzip() {
 }
 
 # AX620E: the first stage at flash 0, then U-Boot packed behind its header
-# at 0x10000, all before the environment (ax620e-image.py)
+# at 0x10000, all before the environment (ax620e-image.py). The first stage
+# is openipc/ax620e-spl built here; u-boot-<target>-stockspl.bin has the
+# Xiongmai cameras' own instead (openipc/ax620e-spl/stock.bin), the
+# fallback. SPL=stock puts that one in u-boot-<target>.bin and builds
+# nothing else.
 ax620e_image() {
     target=$1
     builddir=$2
     tool=$(ax_gzip) || return 1
     text=$(sed -n 's/^CONFIG_SYS_TEXT_BASE=//p' "${builddir}/.config")
     env=$(sed -n 's/^CONFIG_ENV_OFFSET=//p' "${builddir}/.config")
-    python3 openipc/ax620e-image.py openipc/ax620e.spl \
-        "${builddir}/u-boot.bin" "${text}" "${tool}" \
-        openipc/axera-sdk-test-key.pem "${env}" "output/u-boot-${target}.bin"
+    # <out> <first stage arguments>
+    pack() {
+        out=$1
+        shift
+        python3 openipc/ax620e-image.py "$@" "${builddir}/u-boot.bin" \
+            "${text}" "${tool}" openipc/axera-sdk-test-key.pem "${env}" \
+            "output/${out}"
+    }
+    stock=openipc/ax620e-spl/stock.bin
+    case "${SPL:-source}" in
+        stock)
+            rm -f "output/u-boot-${target}-stockspl.bin"
+            pack "u-boot-${target}.bin" --signed "${stock}"
+            return ;;
+        source) ;;
+        *) echo "SPL=${SPL}: source or stock" >&2; return 1 ;;
+    esac
+    spldir=${builddir}/spl
+    make -C openipc/ax620e-spl O="${spldir}" CROSS_COMPILE=${CROSS_COMPILE_64} \
+        -j${JOBS:-$(nproc)} </dev/null &&
+    pack "u-boot-${target}.bin" "${spldir}/spl.bin" &&
+    pack "u-boot-${target}-stockspl.bin" --signed "${stock}"
 }
 
 build_target() {

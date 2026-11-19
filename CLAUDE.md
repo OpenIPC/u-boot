@@ -63,9 +63,14 @@ partition with `openipc/ax620u-spl-image.py`: `spl-<target>.bin`, and
 `spl-<target>.bin` and builds no other).
 Toolchains: `arm-linux-gnueabi-` (`CROSS_COMPILE`), and for `ax620e-*`
 `aarch64-linux-gnu-` (`CROSS_COMPILE_64`); those targets are laid out by
-`openipc/ax620e-image.py` instead, which needs the SDK's `ax_gzip`
-(x86-64 binary; `build.sh` fetches it at a fixed commit and checks its
-SHA-256 into `output/`, or `AX_GZIP=<path>`) and `curl`.
+`openipc/ax620e-image.py` instead, after `build.sh` has built the first
+stage (`make -C openipc/ax620e-spl`, into `output/build-<target>/spl`),
+twice: `u-boot-<target>.bin` with that first stage and
+`u-boot-<target>-stockspl.bin` with the cameras' own
+(`openipc/ax620e-spl/stock.bin`, the fallback; `SPL=stock` puts it in
+`u-boot-<target>.bin` and builds no other). The tool needs the SDK's `ax_gzip` (x86-64 binary; `build.sh` fetches it
+at a fixed commit and checks its SHA-256 into `output/`, or
+`AX_GZIP=<path>`) and `curl`.
 
 ## AX620U
 
@@ -155,10 +160,29 @@ it).
 
 ### Boot
 
-- Boot ROM -> **vendor first stage** (flash 0, 64 KiB: DDR; signed with
-  the SDK's test key, no source; `openipc/ax620e.spl`, the 0xa5bc bytes
-  of an AX620E Xiongmai camera's flash) -> **U-Boot** (flash 0x10000) ->
-  Linux, OpenIPC's NOR layout.
+- Boot ROM -> **first stage** (flash 0, 64 KiB: DDR) -> **U-Boot** (flash
+  0x10000) -> Linux, OpenIPC's NOR layout.
+- The first stage is the SDK's BL1 SPL built from source,
+  `openipc/ax620e-spl` (`README.md` there: Sipeed's SDK commit, the files
+  imported, the changes). The boot ROM loads it to 0x03000400 behind a
+  1 KiB header that `ax620e-image.py` writes as the SDK's
+  `spl_AX620E_sign.py -small_size_nor` (`spl_header()`: checksums,
+  capability 0x54FAFE, the test key and a signature); for the Xiongmai
+  cameras' own first stage it gives their header byte for byte. The SPL
+  picks the DRAM by the eFuse chip type (AX620Q: LPDDR4 x16 256 MiB),
+  reads the flash with 0x03 on one line and enters U-Boot in EL1, as the
+  cameras' first stage does. `AX620E_XM` (README there) makes it set up
+  the DDR as that first stage does, an older SDK build: in QEMU the DDR
+  controller, PHY and DDR PLL get the same 1308 writes in the same order
+  (the 2666 tables at 2400 MT/s, its PHY values and training limits),
+  and the CPU PLL the same values. Still different: the board init
+  around it (the AXI timeout and watchdog/thermal abort enables, the
+  ADC reference for the board id), the flash clock registers and when
+  the flash is first set up. Only a camera confirms any of it.
+- `openipc/ax620e-spl/stock.bin` is the cameras' own first stage (header
+  and code, 0xa5bc bytes from flash 0 of the IVG-A6 dump; README there),
+  the fallback: `u-boot-ax620e-nor-stockspl.bin` carries it, and
+  `ax620e-image.py --signed` checks its header and copies it as it is.
 - The first stage reads the image at 0x10000: a 1 KiB Axera header, then
   the payload in Axera's own LZ77/Huffman format ("20", `ax_gzip`; the
   GZIPD engine unpacks it, no other writer exists). It unpacks to
@@ -211,10 +235,22 @@ qemu-system-aarch64 -M ax620e,flash-file=flash.bin \
     -netdev user,id=n0,tftp=dir -net nic,netdev=n0
 ```
 
-Checked: first boot saves the default environment, the scan finds the
+Checked (with the stock first stage, before it was built from source):
+first boot saves the default environment, the scan finds the
 kernel and rootfs, DHCP/ping/TFTP (CRC checked), `sf` reads, the kernel
 (5.15, multi-file uImage) to login with DHCP, `fw_setenv` from Linux
 read back by U-Boot on the next boot (reboot via the watchdog), `run ub`
 writing this image over TFTP and booting it after `reset`. The model's
 `axera-spi-nor` copies receive data to `[x19 + 120]` for the stock
 U-Boot's driver; `axera_spi` zeroes x19 so it does not scribble.
+
+The source-built first stage needs a qemu-bench whose `axera-spi-nor`
+ends a command at the SDK's software reset (0x66, 0x99), which it sends
+before its first read; with an older one that read returns zeros and it
+stops at `verify_img_header: magic 0x55543322 != 0x0`. With it, it boots
+this U-Boot, the environment save, `reset`, and the OpenIPC kernel to
+login, both on the AX620Q DDR path (`-M ax620e,chip=ax620q`, the eFuse
+chip type qemu-bench's `chip=` reports) and on the AX630C one a qemu-bench
+without `chip=` gives (an eFuse of zeros). QEMU's DDR models accept any
+settings: only a camera tests the DDR. The `-stockspl` image boots the
+same way (env save, `reset`, env loaded, kernel to login).
