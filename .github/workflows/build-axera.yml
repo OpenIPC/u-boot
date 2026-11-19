@@ -1,0 +1,382 @@
+name: Build axera
+
+on:
+  # Pull requests against this branch change the workflow itself; they
+  # build the current openipc-axera.  Code changes reach it through
+  # workflow_call from the caller on openipc-axera, which passes the revision
+  # to build.  Only workflow_dispatch can release or publish.
+  pull_request:
+    branches: [openipc]
+    paths:
+      - .github/workflows/build-axera.yml
+  workflow_call:
+    inputs:
+      ref:
+        description: openipc-axera revision to build
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Publish to this repo's Axera release
+        type: boolean
+        default: false
+      # Publishing to OpenIPC/firmware is off for now: see the publish job.
+#      publish:
+#        description: Publish to OpenIPC/firmware latest and report to openipc.org
+#        type: boolean
+#        default: false
+
+# The shape of build-sigmastar.yml:
+#   resolve -> build (matrix, one target per leg) + qemu (prep) ->
+#   qemu_smoke (hard gate, AX620E only) -> release (own, `release` input);
+#   publish (OpenIPC/firmware latest + openipc.org report) is commented out:
+#   these images have booted only in QEMU, never on silicon.
+# build.sh takes targets (<soc>-<flash>) as arguments; the matrix calls it
+# with one per leg.
+#
+# Nothing private is needed. The AX620U image is U-Boot behind its 1 KiB
+# Axera header only: the vendor SPL stays in the camera's `spl` partition.
+# The AX620E image carries the vendor first stage, which is in the tree
+# (openipc/ax620e.spl), and build.sh fetches the SDK's ax_gzip from a public
+# SDK copy at a fixed commit, checked against its SHA-256.
+
+jobs:
+  # Resolve the openipc-axera revision this run builds from. The workflow
+  # lives on the openipc branch, so github.sha is the openipc commit, not
+  # the revision being built; release provenance must name the commit that
+  # build.sh actually compiled.
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.rev.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || 'openipc-axera' }}
+          path: src
+
+      - name: Resolve revision
+        id: rev
+        run: echo "sha=$(git -C src rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # AX620U (Cortex-A7, AArch32): SPI NAND, 1536 KiB `boot` at
+          # 0x100000 behind the 1 MiB vendor SPL; the image is that
+          # partition's content, written at 0x100000, not at 0
+          - { soc: ax620u-nand, limit_kb: 1536 }
+          # AX620E (Cortex-A53, AArch64): SPI NOR, the 256 KiB boot
+          # partition at 0 (first stage, then packed U-Boot at 0x10000)
+          - { soc: ax620e-nor, limit_kb: 256 }
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # The commit resolve recorded, not the ref again: every leg then
+          # builds the revision the release names, even if the branch
+          # moves while the matrix runs.
+          ref: ${{ needs.resolve.outputs.sha }}
+
+      - name: Install dependencies
+        timeout-minutes: 15
+        run: |
+          # apt mirrors on hosted runners intermittently HANG on the
+          # mirrorlist fetch (not just fail). Bound each attempt with its own
+          # `timeout` so a hang is killed fast and the retry actually fires.
+          install() {
+            sudo timeout 180 apt-get update && \
+            sudo timeout 240 apt-get install -y --no-install-recommends \
+              build-essential gcc-arm-linux-gnueabi gcc-aarch64-linux-gnu \
+              device-tree-compiler bison flex bc libssl-dev python3 curl
+          }
+          for i in 1 2 3 4; do
+            install && break
+            [ "$i" = 4 ] && { echo "apt failed after 4 attempts" >&2; exit 1; }
+            echo "apt attempt $i failed/timed out; retrying in $((i*10))s" >&2
+            sleep $((i*10))
+          done
+
+      # build.sh's defaults: CROSS_COMPILE=arm-linux-gnueabi- (AX620U),
+      # CROSS_COMPILE_64=aarch64-linux-gnu- (AX620E)
+      - name: Build ${{ matrix.soc }}
+        run: bash build.sh ${{ matrix.soc }}
+
+      - name: Check partition fit
+        run: |
+          # An image larger than its boot partition overflows into the
+          # environment and bricks the camera on upgrade. build.sh checks
+          # this too (axera-image.py against the mtdparts, ax620e-image.py
+          # against CONFIG_ENV_OFFSET); this is the gate on the artifact.
+          f='output/u-boot-${{ matrix.soc }}.bin'
+          [ -f "$f" ] || { echo "missing $f" >&2; exit 1; }
+          # Compare bytes: rounding down to KiB would pass an image up to
+          # 1023 bytes into the environment.
+          size=$(stat -c %s "$f")
+          limit=$((${{ matrix.limit_kb }} * 1024))
+          echo "- $f: [${size}/${limit} bytes]"
+          if [ "$size" -gt "$limit" ]; then
+            echo "-- size exceeded by: $((size - limit)) bytes" >&2
+            exit 1
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: u-boot-${{ matrix.soc }}
+          path: output/u-boot-${{ matrix.soc }}.bin
+          if-no-files-found: error
+
+  # Build qemu-system-aarch64 once for the smoke leg.
+  qemu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Install QEMU build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            build-essential ninja-build meson pkg-config \
+            libglib2.0-dev libpixman-1-dev libfdt-dev zlib1g-dev \
+            libslirp-dev python3 python3-venv
+
+      - name: Build qemu-system-aarch64
+        # OpenIPC/qemu-bench master at a fixed commit, which has the
+        # ax620e machine with its axera-spi-nor env-from-flash property
+        env:
+          QEMU_REPO: https://github.com/OpenIPC/qemu-bench
+          QEMU_REF: f39c96432151564f395f5db77e8ab2035259228a
+        run: |
+          git init -q qemu-bench
+          cd qemu-bench
+          git remote add origin "$QEMU_REPO"
+          git fetch -q --depth 1 origin "$QEMU_REF"
+          git checkout -q "$QEMU_REF"
+          bash qemu/setup.sh
+          cp qemu-src/build/qemu-system-aarch64 "$GITHUB_WORKSPACE/qemu-aarch64"
+          chmod +x "$GITHUB_WORKSPACE/qemu-aarch64"
+
+      - name: Upload qemu-aarch64
+        uses: actions/upload-artifact@v4
+        with:
+          name: qemu-aarch64
+          path: qemu-aarch64
+
+  # QEMU smoke test: boots the AX620E image from an erased 16 MiB NOR on
+  # qemu-bench's `-M ax620e`. The machine runs the image's own vendor first
+  # stage from flash 0, which unpacks U-Boot from 0x10000 with the GZIPD
+  # engine model. It must reach the autoboot prompt, then, after `reset`
+  # (the watchdog), reach it again having loaded the environment the first
+  # boot saved: the model keeps flash writes in memory across a reset, not
+  # in the file, so both boots are one QEMU run.
+  #
+  # No AX620U leg: `-M ax620u` boots only from a whole flash dump through
+  # the vendor SPL at flash 0 (it has no uboot-file= entry), and that SPL
+  # comes from a camera's flash and is not in the tree or anywhere public.
+  qemu_smoke:
+    needs: [build, qemu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { soc: ax620e-nor, machine: ax620e }
+    steps:
+      - name: Download qemu-aarch64
+        uses: actions/download-artifact@v4
+        with:
+          name: qemu-aarch64
+
+      - name: Download u-boot artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: u-boot-${{ matrix.soc }}
+
+      - name: Install QEMU runtime deps
+        run: |
+          # qemu-aarch64 is built once in the `qemu` job and downloaded
+          # here, so this leg needs the shared libraries it links against.
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            libglib2.0-0 libpixman-1-0 libfdt1 zlib1g libslirp0
+          if ldd ./qemu-aarch64 | grep -qi 'not found'; then
+            echo "qemu-aarch64 has unresolved libraries:" >&2
+            ldd ./qemu-aarch64 >&2
+            exit 1
+          fi
+
+      - name: Smoke-test in QEMU
+        timeout-minutes: 3
+        run: |
+          UBOOT='u-boot-${{ matrix.soc }}.bin'
+          test -f "$UBOOT"
+          echo "booting $UBOOT on -M ${{ matrix.machine }}"
+          # 16 MiB NOR, the boot partition at 0, the rest erased
+          python3 - "$UBOOT" /tmp/flash.bin <<'PY'
+          import sys
+          u = open(sys.argv[1], 'rb').read()
+          img = bytearray(b'\xff' * (16 << 20))
+          img[:len(u)] = u
+          open(sys.argv[2], 'wb').write(img)
+          PY
+          chmod +x ./qemu-aarch64
+          mkfifo /tmp/uart.in /tmp/uart.out
+          # env-from-flash: serve the environment from the flash image,
+          # not the model's synthetic one
+          ./qemu-aarch64 -M ${{ matrix.machine }},flash-file=/tmp/flash.bin \
+            -global axera-spi-nor.env-from-flash=on \
+            -nographic -serial pipe:/tmp/uart \
+            -monitor none > /tmp/qemu.log 2>&1 &
+          QEMU_PID=$!
+          cat /tmp/uart.out > /tmp/uboot.txt &
+          CAT_PID=$!
+          exec 3>/tmp/uart.in
+          # Wait for the n-th autoboot prompt, not the banner: the banner
+          # prints before the board init that can hang. Up to 30 s.
+          prompt() {
+            for i in $(seq 1 60); do
+              [ "$(grep -c 'Hit Ctrl-C' /tmp/uboot.txt 2>/dev/null)" -ge "$1" ] && return 0
+              sleep 0.5
+            done
+            return 1
+          }
+          rc=0
+          if prompt 1; then
+            # Ctrl-C a few times: one that lands after the countdown
+            # stops the TFTP fetch bootcmd starts instead
+            for i in 1 2 3 4; do printf '\003' >&3; sleep 0.3; done
+            printf 'reset\r' >&3
+            prompt 2 || rc=2
+          else
+            rc=1
+          fi
+          exec 3>&-
+          kill "$QEMU_PID" "$CAT_PID" 2>/dev/null || true
+          wait 2>/dev/null || true
+          echo "== captured u-boot output =="
+          cat /tmp/uboot.txt
+          echo
+          if [ "$rc" != 0 ]; then
+            echo "FAIL: boot $rc did not reach the autoboot prompt"
+            echo
+            echo "== qemu stderr =="
+            tail -40 /tmp/qemu.log || true
+            exit 1
+          fi
+          # The first boot finds an erased environment and saves the
+          # default one; the second must load it back
+          if [ "$(grep -c 'Warning - bad CRC' /tmp/uboot.txt)" != 1 ]; then
+            echo "FAIL: the environment saved on the first boot did not load after reset"
+            exit 1
+          fi
+          echo "PASS: u-boot reached the autoboot prompt, and its saved environment survived a reset"
+
+  # Mirror every built image to this repository's own Axera release.
+  release:
+    needs: [resolve, build, qemu_smoke]
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: u-boot-*
+
+      - name: Upload to releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: axera
+          name: Axera
+          target_commitish: ${{ needs.resolve.outputs.sha }}
+          prerelease: true
+          files: artifacts/**/*.bin
+          fail_on_unmatched_files: true
+
+  # Off for now: images go only to this repository's own Axera release.
+  # Neither image has run on silicon, only on qemu-bench's machines (the
+  # AX620U one with a camera's SPL in the flash), and nothing in
+  # OpenIPC/firmware `latest` is an Axera U-Boot yet. Uncomment the job and
+  # the `publish` input once an image has booted on a camera; openipc.org
+  # accepts the report only from workflows it allowlists (OpenIPC/website
+  # service/internal/builds/verify.go), so add build-axera.yml there first.
+  # The concurrency group, shared with the other build-*.yml, keeps a second
+  # run from uploading between this run's upload and its report.
+#  publish:
+#    needs: [resolve, build, qemu_smoke]
+#    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/openipc' }}
+#    runs-on: ubuntu-latest
+#    timeout-minutes: 30
+#    concurrency:
+#      group: publish-firmware-latest
+#      cancel-in-progress: false
+#    permissions:
+#      contents: read
+#      id-token: write
+#    steps:
+#      - name: Download artifacts
+#        uses: actions/download-artifact@v4
+#        with:
+#          path: artifacts
+#          pattern: u-boot-*
+
+#      - name: Upload to OpenIPC/firmware latest release
+#        env:
+#          GH_TOKEN: ${{ secrets.FIRMWARE_RELEASE_TOKEN }}
+#        run: |
+#          set -eu
+#          mkdir published
+#          find artifacts -type f -name 'u-boot-ax*.bin' -exec cp {} published/ \;
+#          # Releases API occasionally returns 502/503. Retry with backoff.
+#          upload() {
+#            local f="$1" i
+#            for i in 1 2 3 4 5; do
+#              if gh release upload latest "$f" --clobber -R OpenIPC/firmware; then
+#                return 0
+#              fi
+#              [ "$i" = "5" ] && return 1
+#              echo "upload attempt $i failed; sleeping $((i*10))s" >&2
+#              sleep $((i*10))
+#            done
+#          }
+#          find published -type f -name '*.bin' | sort | while read -r f; do
+#            echo "publishing $f"
+#            upload "$f"
+#          done
+
+#      # The push script is OpenIPC/firmware's, at a fixed commit: the only
+#      # code this job checks out, since it holds an id-token.
+#      - uses: actions/checkout@v4
+#        with:
+#          repository: OpenIPC/firmware
+#          ref: 7fa63ce694cb5d27c19d4f19058ba2c044849db4
+#          sparse-checkout: .github/scripts
+#          path: firmware
+
+#      # The contract is PUSH.md in OpenIPC/website (source `uboot`, release
+#      # `latest`, one id per run). The digests are of the files uploaded
+#      # above, hashed here, so the push describes exactly those bytes.
+#      - name: Report to openipc.org
+#        env:
+#          AXERA_SHA: ${{ needs.resolve.outputs.sha }}
+#        run: |
+#          set -eu
+#          python3 firmware/.github/scripts/push_build.py \
+#            --source uboot \
+#            --build-id "uboot-axera-$(date -u +%Y%m%dT%H%M%SZ)-${AXERA_SHA::7}" \
+#            --release latest \
+#            --sha "$AXERA_SHA" \
+#            --built-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+#            --assets 'published/*.bin'
