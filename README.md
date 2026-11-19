@@ -13,6 +13,7 @@
   - [Grain Media](#grain-media)
   - [SigmaStar](#sigmastar)
   - [Ingenic](#ingenic)
+  - [Axera](#axera)
 - [Images](#images)
 - [Flash layout](#flash-layout)
 - [What happens at boot](#what-happens-at-boot)
@@ -35,6 +36,7 @@
 | [Grain Media](#grain-media) | `openipc-grainmedia` | [grainmedia](../../releases/tag/grainmedia) | [![grainmedia](https://github.com/OpenIPC/u-boot/actions/workflows/build-grainmedia.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-grainmedia.yml) |
 | [SigmaStar](#sigmastar) | `openipc-sigmastar` | [sigmastar](../../releases/tag/sigmastar) | [![sigmastar](https://github.com/OpenIPC/u-boot/actions/workflows/build-sigmastar.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-sigmastar.yml) |
 | [Ingenic](#ingenic) | `openipc-ingenic` | [ingenic](../../releases/tag/ingenic) | [![ingenic](https://github.com/OpenIPC/u-boot/actions/workflows/build-ingenic.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-ingenic.yml) |
+| [Axera](#axera) | `openipc-axera` | [axera](../../releases/tag/axera) | [![axera](https://github.com/OpenIPC/u-boot/actions/workflows/build-axera.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-axera.yml) |
 
 ### HiSilicon and Goke
 
@@ -341,6 +343,42 @@ Every infinity2m, infinity6, 6b0, 6e and 6c part also builds for SPI NAND,
 - Building needs `mipsel-linux-gnu-` and `lzop`. For `.img` recovery
   files, use `mkimage -A mips`.
 
+### Axera
+
+| SoC | CPU | RAM | Flash | Notes |
+| --- | --- | --- | --- | --- |
+| `ax620u` | Cortex-A7 ×4 | 256 MiB | SPI NAND | target `ax620u-nand`; no Ethernet in U-Boot; tested in qemu only |
+| `ax620e` | Cortex-A53 ×2 (arm64) | 256 MiB | NOR | target `ax620e-nor`, the AX620E family (AX620Q, AX630C); tested in qemu only |
+
+- **The images have not run on silicon**, only on qemu-bench's `ax620u`
+  and `ax620e` machines. They are only in this repository's `axera`
+  release, and nothing is published to OpenIPC/firmware.
+- The vendor's DDR-init first stage is kept, as a binary: it is signed
+  and there is no source. It loads U-Boot behind a 1 KiB Axera header
+  (checksums; the AX620E's also carries the SDK's RSA test key and a
+  signature with it). A part with secure boot fused would refuse these
+  images.
+- **AX620U.** The vendor SPL stays in its own 1 MiB `spl` partition and
+  is not in the image: `u-boot-ax620u-nand.bin` is the 1536 KiB `boot`
+  partition alone, at `0x100000`, not at 0. The layout is
+  `1024k(spl),1536k(boot),512k(env),-(ubi)`, the environment at
+  `0x280000`, then openipc-hisilicon's UBI (UBIFS `rootfs` holding
+  `/boot/fitImage`, `rootfs_data`). There is no Ethernet, SD or USB
+  driver, so U-Boot cannot fetch anything: a camera with broken firmware
+  stops at the prompt, where `loady ${baseaddr}` over the console and
+  `run urwrite` (a `rootfs.ubifs`) or `run ubwrite` (a U-Boot image)
+  restore it. Otherwise update from Linux (`sysupgrade`) or a programmer.
+- **AX620E.** `u-boot-ax620e-nor.bin` is the whole 256 KiB boot
+  partition: the vendor first stage at 0, U-Boot at `0x10000` packed in
+  Axera's own format for the SoC's unpacking engine. OpenIPC's NOR layout
+  follows. Ethernet works (`ub`, `uk`, `ur` over TFTP); there is no SD
+  driver, so no SD recovery.
+- Building needs `arm-linux-gnueabi-` (AX620U) and `aarch64-linux-gnu-`
+  (AX620E, `CROSS_COMPILE_64`), plus `curl`: the AX620E image is packed by
+  the SDK's `ax_gzip`, an x86-64 Linux binary that `build.sh` downloads
+  from a public copy of the SDK at a fixed commit and checks against its
+  SHA-256 (or `AX_GZIP=<path>`).
+
 ## Images
 
 | File | What it is |
@@ -352,7 +390,7 @@ Every infinity2m, infinity6, 6b0, 6e and 6c part also builds for SPI NAND,
 
 Each image already holds whatever the boot ROM needs in front of U-Boot
 (DDR scripts, a first stage, a vendor loader). Write it at offset 0 as it
-is. From a running U-Boot, either this one or a vendor one, with a TFTP
+is (the AX620U's alone goes at `0x100000`, see [Axera](#axera)). From a running U-Boot, either this one or a vendor one, with a TFTP
 server:
 
 ```sh
@@ -538,7 +576,7 @@ gh workflow run build-<vendor>.yml -f release=true -f publish=true   # + OpenIPC
 `publish` needs a `FIRMWARE_RELEASE_TOKEN` secret. Ingenic's publishes
 only its `publish_targets`, the T41 ones by default; SigmaStar's is
 commented out for now, so its images go only to this repository's
-`sigmastar` release. Held SoCs are never released.
+`sigmastar` release, and so is Axera's (`axera` release). Held SoCs are never released.
 
 **Adding a vendor:** push the port on a new `openipc-<vendor>` branch,
 add `build-<vendor>.yml` here, and add a row and a section to this
