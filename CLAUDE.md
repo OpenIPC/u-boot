@@ -348,10 +348,11 @@ The build logic lives here. Other branches call it:
   release takes; `stockspl-<soc>` holds the `-stockspl` image, for the
   smoke test, and is not released.
 - **Smoke test:** the `qemu` job builds qemu-system-aarch64
-  from OpenIPC/qemu-bench at a pinned commit; the source-built first stage
-  needs one with `axera-spi-nor` ending a command at the flash's software
-  reset (qemu-bench#351), or its first read returns zeros
-  (`verify_img_header: magic 0x55543322 != 0x0`). One QEMU run of `-M ax620e`
+  from OpenIPC/qemu-bench at a pinned commit; the source-built AX620E first
+  stage needs one with `axera-spi-nor` ending a command at the flash's
+  software reset (qemu-bench#351), or its first read returns zeros
+  (`verify_img_header: magic 0x55543322 != 0x0`), and gets the AX620Q DDR
+  path from #346's default eFuse chip type; the pin, `e84387f`, has both. One QEMU run of `-M ax620e`
   on a 16 MiB erased NOR holding the image, with
   `-global axera-spi-nor.env-from-flash=on`: the first boot must reach
   `Hit Ctrl-C` (saving the default environment), then `reset` (the

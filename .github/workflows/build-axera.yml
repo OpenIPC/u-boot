@@ -182,10 +182,13 @@ jobs:
 
       - name: Build qemu-system-aarch64
         # OpenIPC/qemu-bench master at a fixed commit, which has the
-        # ax620e machine with its axera-spi-nor env-from-flash property
+        # ax620e machine with its axera-spi-nor env-from-flash property,
+        # a reset command ending a flash session (#351, which the
+        # source-built AX620E first stage needs) and the AX620Q eFuse by
+        # default (#346, chip=), and the ax620u machine
         env:
           QEMU_REPO: https://github.com/OpenIPC/qemu-bench
-          QEMU_REF: f39c96432151564f395f5db77e8ab2035259228a
+          QEMU_REF: e84387fb05ef3c5b42dfb10da6b170e965785034
         run: |
           git init -q qemu-bench
           cd qemu-bench
