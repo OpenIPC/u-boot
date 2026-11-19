@@ -359,7 +359,8 @@ Every infinity2m, infinity6, 6b0, 6e and 6c part also builds for SPI NAND,
   images. On AX620U it is the vendor's binary SPL, left on the flash. On
   AX620E it is the SDK's BL1 SPL, built from source
   (`openipc/ax620e-spl`, from Sipeed's public SDK) and set up to program
-  DDR as the Xiongmai cameras' own first stage does.
+  DDR as the Xiongmai cameras' own first stage does; the cameras' own
+  stays in the tree as a fallback (`openipc/ax620e-spl/stock.bin`).
 - **AX620U.** The vendor SPL stays in its own 1 MiB `spl` partition and
   is not in the image: `u-boot-ax620u-nand.bin` is the 1536 KiB `boot`
   partition alone, at `0x100000`, not at 0. The layout is
@@ -370,10 +371,16 @@ Every infinity2m, infinity6, 6b0, 6e and 6c part also builds for SPI NAND,
   stops at the prompt, where `loady ${baseaddr}` over the console and
   `run urwrite` (a `rootfs.ubifs`) or `run ubwrite` (a U-Boot image)
   restore it. Otherwise update from Linux (`sysupgrade`) or a programmer.
+  Where `openipc-axera` builds the AX620U first stage from source
+  (`openipc/ax620u-spl`), the release also has `spl-ax620u-nand.bin`
+  and the cameras' own, `spl-ax620u-nand-stock.bin`: the first 256 KiB
+  of the `spl` partition, written at `0` with a programmer.
 - **AX620E.** `u-boot-ax620e-nor.bin` is the whole 256 KiB boot
   partition: the first stage at 0, U-Boot at `0x10000` packed in
   Axera's own format for the SoC's unpacking engine. OpenIPC's NOR layout
-  follows. Ethernet works (`ub`, `uk`, `ur` over TFTP); there is no SD
+  follows. `u-boot-ax620e-nor-stockspl.bin` is the same with the
+  cameras' own first stage, should the source-built one not bring a
+  camera up. Ethernet works (`ub`, `uk`, `ur` over TFTP); there is no SD
   driver, so no SD recovery.
 - Building needs `arm-linux-gnueabi-` (AX620U) and `aarch64-linux-gnu-`
   (AX620E, `CROSS_COMPILE_64`), plus `curl`: the AX620E image is packed by
