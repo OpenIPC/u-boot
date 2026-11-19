@@ -426,6 +426,10 @@ if the kernel supports it. U-Boot detects which layout is on the flash.
 | `0x0c0000` | 256 KiB | `env` |
 | `0x100000` | rest | `ubi`: volumes `rootfs` (UBIFS, kernel at `/boot/uImage` or `/boot/fitImage`) and `rootfs_data` |
 
+The Axera AX620U is the exception: its vendor SPL keeps the first 1 MiB,
+so its layout is `1024k(spl),1536k(boot),512k(env),-(ubi)`, with `boot`
+at `0x100000` (see [Axera](#axera)).
+
 OpenIPC firmware, sysupgrade and openipc.org rely on these layouts, and
 they do not change.
 
