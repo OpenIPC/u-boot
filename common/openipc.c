@@ -636,6 +636,27 @@ int firmware_recovery(void) {
 
 #if !defined(OPENIPC_SPI_NAND) && defined(CONFIG_OPENIPC_NOR_SPLIT)
 /*
+ * The update commands of the split layout, in RAM only: a saved environment
+ * keeps an older fwwrite that erased only the file's length, and a saved
+ * fwupd from before the split layout fetches only the uImage and rootfs
+ * pair -- exactly that one takes the firmware file first, and an edited one
+ * is left alone. Recovery runs before the scan, so both call this: a
+ * script.txt that runs fwupd then installs a lone firmware.bin too.
+ */
+static void nor_split_update_cmds(void)
+{
+  const char *fu = env_get("fwupd");
+
+  env_set("fwwrite", OPENIPC_FWWRITE_SPLIT_CMD);
+  if (fu && !strcmp(fu, OPENIPC_FWUPD_LEGACY_CMD))
+    env_set("fwupd", OPENIPC_FWUPD_SPLIT_CMD);
+  if (!env_get("fwfile"))
+    env_set("fwfile", OPENIPC_FW_FILE);
+}
+#endif
+
+#if !defined(OPENIPC_SPI_NAND) && defined(CONFIG_OPENIPC_NOR_SPLIT)
+/*
  * The split layout needs nothing from bootargs: the kernel's device tree has
  * the partitions and the kernel takes the root its firmware split finds. A
  * saved environment still spells out the fixed slots (mtdparts=..., root=
@@ -832,21 +853,8 @@ int firmware_scan(void) {
     if (start < flash->size) {
       sprintf(str, "0x%lx", (ulong)(flash->size - start));
       env_set("fwsize", str);
-      /* RAM only, like the rest of the scan: a saved environment keeps an
-       * older fwwrite that erased only the file's length */
-      env_set("fwwrite", OPENIPC_FWWRITE_SPLIT_CMD);
     }
-    /* A saved fwupd from before the split layout fetches only the pair;
-     * exactly that one takes the firmware file first. An edited one is
-     * left alone. */
-    {
-      const char *fu = env_get("fwupd");
-
-      if (fu && !strcmp(fu, OPENIPC_FWUPD_LEGACY_CMD))
-        env_set("fwupd", OPENIPC_FWUPD_SPLIT_CMD);
-      if (!env_get("fwfile"))
-        env_set("fwfile", OPENIPC_FW_FILE);
-    }
+    nor_split_update_cmds();
   }
 #endif
 
@@ -1090,8 +1098,9 @@ static void altbootcmd_migrate(void) {
  * fwwrite writes only a file that fits fwsize, the firmware area from
  * kernaddr to the end of the chip, and the layout scan sets it. Recovery
  * runs before the scan, so a script.txt that runs fwupd would find no
- * fwsize on a fresh environment and write nothing. Set it from the flash
- * here; the scan sets it again from what it finds.
+ * fwsize on a fresh environment and write nothing, and a saved legacy
+ * fwupd would fetch the fixed slots' pair. Set both up from the flash
+ * here; the scan sets them again from what it finds.
  */
 static void nor_split_fwsize(void)
 {
@@ -1109,6 +1118,7 @@ static void nor_split_fwsize(void)
     env_set("fwsize", str);
   }
   spi_flash_free(flash);
+  nor_split_update_cmds();
 }
 #endif
 
