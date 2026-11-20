@@ -153,4 +153,25 @@
 		cdns,phy-dll-delay-sdclk = <0x0>;
 		cdns,phy-dll-delay-sdclk-hsmmc = <0x17>;
 	};
+
+	/*
+	 * USB: the Cadence USB3 dual-role controller, host only, at high
+	 * speed, behind the Axera glue (its resets and clocks in ap_clk;
+	 * cdns3-axera.c). As the stock U-Boot's tree has it.
+	 */
+	usb {
+		compatible = "axera,cdns-usb";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		usb@4800000 {
+			compatible = "cdns,usb3";
+			reg = <0x4800000 0x10000>, <0x4810000 0x10000>,
+			      <0x4820000 0x10000>;
+			reg-names = "otg", "xhci", "dev";
+			dr_mode = "host";
+			phy_type = "utmi";
+			maximum-speed = "high-speed";
+		};
+	};
 };
