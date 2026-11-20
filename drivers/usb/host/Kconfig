@@ -23,6 +23,14 @@ config USB_XHCI_DWC3
 	  Say Y or if your system has a Dual Role SuperSpeed
 	  USB controller based on the DesignWare USB3 IP Core.
 
+config USB_XHCI_DWC3_AXERA
+	bool "Axera AX620E glue for the DWC3 controller"
+	depends on USB_XHCI_DWC3 && DM_USB && AXERA_AX620E
+	default y
+	help
+	  The clocks, resets and host mode of the AX620E's USB 2.0 DWC3
+	  ("axera,ax620e-dwc3"), set before xhci-dwc3 probes it.
+
 config USB_XHCI_DWC3_OF_SIMPLE
 	bool "DesignWare USB3 DRD Generic OF Simple Glue Layer"
 	depends on DM_USB
