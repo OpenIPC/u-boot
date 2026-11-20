@@ -339,11 +339,15 @@ The build logic lives here. Other branches call it:
   (gcc-aarch64-linux-gnu, build.sh's `CROSS_COMPILE_64` default); the build
   legs also need `curl`, as build.sh fetches the SDK's `ax_gzip` (checked
   against its SHA-256).
-- **Partition fit:** every image is written at 0 with its first stage:
-  `ax620u-nand` the 1 MiB `spl` and 1536 KiB `boot` partitions (2560 KiB,
-  up to the environment), `ax620e-nor` the 256 KiB boot partition.
-  `u-boot-<soc>-stockspl.bin`, the same with the cameras' own first
-  stage (the fallback), is checked against the same limit.
+- **Partition fit:** every image is written at 0 with its first stage,
+  up to the environment: the limit is the built revision's own
+  `CONFIG_ENV_OFFSET` (from `output/build-<soc>/.config`), so a layout
+  change needs no workflow change. `ax620u-nand` is the 768 KiB boot
+  partition of OpenIPC's NAND layout (`0xc0000`; revisions before it
+  built the cameras' 1 MiB `spl` and 1536 KiB `boot`, `0x280000`),
+  `ax620e-nor` the 256 KiB boot partition. `u-boot-<soc>-stockspl.bin`,
+  the same with the cameras' own first stage (the fallback), is checked
+  against the same limit.
 - **Artifacts:** `u-boot-<soc>` holds `u-boot-<soc>.bin` only, what the
   release takes; `stockspl-<soc>` holds the `-stockspl` image, for the
   smoke test, and is not released.
@@ -360,8 +364,11 @@ The build logic lives here. Other branches call it:
   U-Boot's "Warning - bad CRC" printed once only. The model keeps flash
   writes in memory, not in the file, so two QEMU runs would not test the
   saved environment. The same for AX620U on `-M ax620u` (128 MiB erased
-  SPI NAND, the image at 0; the machine starts the first stage at flash
-  0x800, no boot ROM model; the AX620U legs need no qemu-bench change),
+  SPI NAND, the image at 0, U-Boot's header at 0x40000 or, in the
+  cameras' layout of earlier revisions, 0x100000; the machine starts the
+  first stage at flash 0x800, no boot ROM model, so the first stage's
+  header at RAM 0x400 is zeros and its NAND geometry 64 KiB blocks; the
+  AX620U legs need no qemu-bench change),
   and for each SoC's `-stockspl` image: four legs. A leg whose image the
   revision does not build (no `-stockspl`, or an AX620U image of U-Boot
   alone) is skipped with a warning, except AX620E's source one.

@@ -40,8 +40,9 @@ on:
 # openipc/ax620u-spl):
 #   AX620E: u-boot-ax620e-nor.bin, the boot partition (first stage, then
 #     U-Boot packed at 0x10000)
-#   AX620U: u-boot-ax620u-nand.bin, the spl and boot partitions (first
-#     stage and its copies, then U-Boot at 0x100000)
+#   AX620U: u-boot-ax620u-nand.bin, the boot partition of OpenIPC's NAND
+#     layout (first stage and its copy, then U-Boot at 0x40000); before
+#     that, the cameras' 1 MiB spl partition and boot (U-Boot at 0x100000)
 # u-boot-<soc>-stockspl.bin is the same with the cameras' own first stage,
 # kept in the tree as a fallback: a separate artifact, smoke-tested, not
 # released. The release has u-boot-<soc>.bin only.
@@ -76,12 +77,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # AX620U (Cortex-A7, AArch32): SPI NAND, the 1 MiB `spl` and
-          # 1536 KiB `boot` partitions from 0, up to the environment
-          - { soc: ax620u-nand, limit_kb: 2560 }
+          # AX620U (Cortex-A7, AArch32): SPI NAND, the boot partition
+          # from 0, up to the environment
+          - { soc: ax620u-nand }
           # AX620E (Cortex-A53, AArch64): SPI NOR, the 256 KiB boot
           # partition at 0 (first stage, then packed U-Boot at 0x10000)
-          - { soc: ax620e-nor, limit_kb: 256 }
+          - { soc: ax620e-nor }
 
     steps:
       - name: Checkout
@@ -125,7 +126,12 @@ jobs:
           f='output/u-boot-${{ matrix.soc }}.bin'
           [ -f "$f" ] || { echo "missing $f" >&2; exit 1; }
           # Compare bytes: rounding down to KiB would pass an image up to
-          # 1023 bytes into the environment.
+          # 1023 bytes into the environment. The limit is where the
+          # revision's own environment starts (its CONFIG_ENV_OFFSET): the
+          # image is everything before it.
+          limit=$(sed -n 's/^CONFIG_ENV_OFFSET=//p' 'output/build-${{ matrix.soc }}/.config')
+          [ -n "$limit" ] || { echo "no CONFIG_ENV_OFFSET in the build's .config" >&2; exit 1; }
+          limit=$((limit))
           rc=0
           check() {
             size=$(stat -c %s "$1")
@@ -137,7 +143,7 @@ jobs:
           }
           # The image and its stock-first-stage twin
           for f in output/u-boot-${{ matrix.soc }}*.bin; do
-            check "$f" $((${{ matrix.limit_kb }} * 1024))
+            check "$f" "$limit"
           done
           exit $rc
 
@@ -212,7 +218,8 @@ jobs:
   #     GZIPD engine model.
   #   AX620U: a 128 MiB SPI NAND on `-M ax620u`, which starts the first
   #     stage at flash 0x800 (it does not model the boot ROM or DDR
-  #     training); the first stage loads U-Boot from 0x100000.
+  #     training); the first stage loads U-Boot from 0x40000 (from
+  #     0x100000 in the cameras' layout, which earlier revisions build).
   # It must reach the autoboot prompt, then, after `reset` (the
   # watchdog), reach it again having loaded the environment the first
   # boot saved: the models keep flash writes in memory across a reset, not
@@ -293,19 +300,21 @@ jobs:
             ax620u)
               SIZE_MB=128
               MACHINE_ARGS=
-              # The first stage's two headers, U-Boot's at 0x100000: the
-              # image to test (0). U-Boot alone behind its header, at most
-              # the boot partition, is what openipc-axera built before the
-              # image carried the first stage (2): skipped. Anything else
-              # is a broken image (1).
+              # The first stage's two headers, U-Boot's at 0x40000 (OpenIPC's
+              # layout) or at 0x100000 (the cameras', earlier revisions):
+              # the image to test (0). U-Boot alone behind its header, at
+              # most the boot partition, is what openipc-axera built before
+              # the image carried the first stage (2): skipped. Anything
+              # else is a broken image (1).
               rc=0
               python3 - "$IMG" <<'PY' || rc=$?
           import sys
           d = open(sys.argv[1], 'rb').read()
           magic = bytes.fromhex('22335455')
-          if (len(d) > 0x100400 and d[4:8] == magic and d[:0x400] == d[0x400:0x800]
-                  and d[0x100004:0x100008] == magic):
-              sys.exit(0)
+          if d[4:8] == magic and d[:0x400] == d[0x400:0x800]:
+              for uboot in (0x40000, 0x100000):
+                  if len(d) > uboot + 0x400 and d[uboot + 4:uboot + 8] == magic:
+                      sys.exit(0)
           if len(d) <= 0x180000 and d[4:8] == magic and d[:0x400] != d[0x400:0x800]:
               sys.exit(2)
           sys.exit(1)
@@ -313,7 +322,7 @@ jobs:
               case $rc in
                 0) ;;
                 2) skip "$IMG is U-Boot alone, from before the image carried the first stage" ;;
-                *) echo "$IMG: not an AX620U image (headers at 0, 0x400, 0x100000)" >&2; exit 1 ;;
+                *) echo "$IMG: not an AX620U image (headers at 0, 0x400, and 0x40000 or 0x100000)" >&2; exit 1 ;;
               esac ;;
           esac
           set -- "$IMG" 0
