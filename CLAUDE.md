@@ -198,10 +198,9 @@ at a fixed commit and checks its SHA-256 into `output/`, or
 ### Layout and environment
 
 OpenIPC's NAND layout, `768k(boot),256k(env),-(ubi)` on `spi4.0_nand`
-(the AX620U kernel's name for the flash), environment at 0xc0000: the partition
-(`CONFIG_ENV_RANGE`) is 256 KiB, as on openipc-hisilicon and
-openipc-sigmastar, the environment (`CONFIG_ENV_SIZE`) one 128 KiB
-block, so the other is a spare for a bad one. The cameras' own
+(the AX620U kernel's name for the flash), environment at 0xc0000, 256
+KiB, as on openipc-hisilicon and openipc-sigmastar: the environment
+fills its partition, with no spare block. The cameras' own
 layout (`1024k(spl),1536k(boot),512k(env),-(ubi)`, the first stage's
 1 MiB) is not used. The UBI layout is openipc-hisilicon's: UBIFS
 `rootfs` holding `/boot/fitImage`, `rootfs_data` on the rest,
