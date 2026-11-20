@@ -31,7 +31,7 @@ static int oob_shift = 6;
 static int bbm_bytes = 1;
 static int planes = 1;
 static int good_blocks[UBOOT_MAX_BLOCKS] = {
-	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	[0 ... UBOOT_MAX_BLOCKS - 1] = -1,
 };
 static u32 cfg_byte1 = 0x35, cfg_byte2 = 0x31, cfg_byte3 = 1;
 static u32 geometry_set;
@@ -289,6 +289,9 @@ static int map_addr(u32 addr)
 	else
 		cur = (good_blocks[i - 1] + 1) << block_shift;
 	while (first + i <= blk) {
+		/* not past the U-Boot area into the environment */
+		if (cur >= UBOOT_FLASH_END)
+			return -1;
 		if (is_bad_block(cur) == 0)
 			good_blocks[i++] = cur >> block_shift;
 		else
