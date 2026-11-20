@@ -373,15 +373,15 @@ Every infinity2m, infinity6, 6b0, 6e and 6c part also builds for SPI NAND,
   as fallbacks (`stock.bin` there): `build.sh` also writes
   `u-boot-<soc>-<flash>-stockspl.bin`, the same image with them, which
   is not in the release.
-- **AX620U.** `u-boot-ax620u-nand.bin` covers the 1 MiB `spl` partition
-  (the first stage, its copy and the EIP-130 firmware, as the cameras
-  have them) and the 1536 KiB `boot` partition, U-Boot at `0x100000`:
-  2.5 MiB at most, written at 0. `run ubwrite` writes it the same way,
-  U-Boot skipping bad blocks and the first stage at its fixed places
-  (it refuses if one of those blocks is bad); an older image of U-Boot
-  alone updates `boot` only. The layout is
-  `1024k(spl),1536k(boot),512k(env),-(ubi)`, the environment at
-  `0x280000`, then openipc-hisilicon's UBI (UBIFS `rootfs` holding
+- **AX620U.** `u-boot-ax620u-nand.bin` is the whole 768 KiB boot
+  partition of OpenIPC's NAND layout, written at 0: the first stage at 0
+  and its copy at `0x20000`, U-Boot at `0x40000` in three blocks, with a
+  fourth left for a bad one. `run ubwrite` writes it the same way, U-Boot
+  skipping bad blocks and the first stage at its fixed places (it refuses
+  if one of those blocks is bad); an image of U-Boot alone updates U-Boot
+  only, and one for the cameras' own layout (U-Boot at `0x100000`) is
+  refused. The environment is at `0xc0000`, then openipc-hisilicon's UBI
+  (UBIFS `rootfs` holding
   `/boot/fitImage`, `rootfs_data`). Ethernet (an external RTL8201F PHY)
   the SD slot and USB work: a camera with broken firmware fetches `fwupd`
   over TFTP, or takes `rootfs.ubifs.ax620u.img` from an SD card or a USB
@@ -448,13 +448,12 @@ if the kernel supports it. U-Boot detects which layout is on the flash.
 | `0x0c0000` | 256 KiB | `env` |
 | `0x100000` | rest | `ubi`: volumes `rootfs` (UBIFS, kernel at `/boot/uImage` or `/boot/fitImage`) and `rootfs_data` |
 
-The Axera AX620U does not use the table above: its first stage keeps the
-first 1 MiB, so its layout is `1024k(spl),1536k(boot),512k(env),-(ubi)`,
-with `boot` at `0x100000` and `env` at `0x280000` (see [Axera](#axera)).
-Its image covers `spl` and `boot`.
+The Axera AX620U uses it too, its first stage and U-Boot together in
+`boot` (see [Axera](#axera)); the cameras' own layout, whose first stage
+keeps the first 1 MiB, is not used.
 
-OpenIPC firmware, sysupgrade and openipc.org rely on these layouts, the
-AX620U's included, and they do not change.
+OpenIPC firmware, sysupgrade and openipc.org rely on these layouts, and
+they do not change.
 
 ## What happens at boot
 
