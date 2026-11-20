@@ -2,8 +2,9 @@
 /*
  * AX620E camera, as OpenIPC's U-Boot sees it: UART0, the boot SPI NOR on
  * the flash controller (spi4 in the vendor's devicetree), its chip select
- * on GPIO2_A29, and the Ethernet MAC with its own 10/100 PHY. Addresses
- * and clocks are the vendor SDK U-Boot's (arch/arm/dts/ax620e.dtsi).
+ * on GPIO2_A29, the Ethernet MAC with its own 10/100 PHY, the SD slot and
+ * the USB 2.0 host. Addresses and clocks are the vendor SDK U-Boot's
+ * (arch/arm/dts/ax620e.dtsi, AX620E_nor.dts).
  */
 
 /dts-v1/;
@@ -20,6 +21,7 @@
 		serial0 = &uart0;
 		spi0 = &spi4;
 		ethernet0 = &eth0;
+		mmc0 = &sd;
 	};
 
 	chosen {
@@ -71,6 +73,52 @@
 			compatible = "axera,ax620e-eqos";
 			reg = <0x0 0x104c0000 0x0 0x10000>;
 			phy-mode = "rmii";
+		};
+
+		/*
+		 * The SD slot: Cadence SD4HC, 4 bits, 3.3 V. No card detect
+		 * line ("broken-cd", as in the vendor trees): the card is
+		 * looked for. PHY delays as the SDK's and the cameras'
+		 * kernel trees; board_init() sets the card clock and pads.
+		 */
+		sd: mmc@104e0000 {
+			compatible = "cdns,sd4hc";
+			reg = <0x0 0x104e0000 0x0 0x1000>;
+			bus-width = <4>;
+			sdhci-caps-mask = <0x7 0x200000>;
+			cap-sd-highspeed;
+			no-1-8-v;
+			no-sdio;
+			no-mmc;
+			disable-wp;
+			broken-cd;
+			cdns,phy-input-delay-sd-highspeed = <0x2>;
+			cdns,phy-input-delay-legacy = <0x3>;
+			cdns,phy-input-delay-sd-uhs-sdr12 = <0x3>;
+			cdns,phy-input-delay-sd-uhs-sdr25 = <0x2>;
+			cdns,phy-input-delay-sd-uhs-sdr50 = <0x0>;
+			cdns,phy-input-delay-sd-uhs-ddr50 = <0x0>;
+			cdns,phy-dll-delay-sdclk = <0x0>;
+		};
+
+		/*
+		 * USB 2.0: a DWC3 in host mode behind the Axera glue (its
+		 * clocks, resets and host select; dwc3-axera-glue.c).
+		 */
+		usb {
+			compatible = "axera,ax620e-dwc3";
+			#address-cells = <2>;
+			#size-cells = <2>;
+			ranges;
+
+			usb@8000000 {
+				compatible = "snps,dwc3";
+				reg = <0x0 0x08000000 0x0 0x100000>;
+				dr_mode = "host";
+				phy_type = "utmi";
+				maximum-speed = "high-speed";
+				snps,dis-u2-freeclk-exists-quirk;
+			};
 		};
 	};
 };

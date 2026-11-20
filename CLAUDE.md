@@ -36,14 +36,20 @@ git diff --diff-filter=M v2022.10 HEAD      # the mainline files patched
 
 Patched mainline files: `arch/arm/{Kconfig,Makefile}` (`ARCH_AXERA`),
 `arch/arm/dts/Makefile`, `drivers/{gpio,spi,net}/{Kconfig,Makefile}`,
+`drivers/usb/{host,cdns3}/{Kconfig,Makefile}`,
 `drivers/net/dwc_eth_qos.{c,h}` (the `axera,ax620e-eqos` and
 `axera,ax620-eqos` entries), `common/{Kconfig,Makefile}` (`OPENIPC`,
 `PRODUCT_SOC`, `PRODUCT_SOCMODEL`, `OPENIPC_NOR_SPLIT`),
 `drivers/gpio/dwapb_gpio.c` (drops `asm/arch/gpio.h`, as mainline
 00b04933985), `.gitignore` (`/output/`). The AX620U uses mainline drivers plus
-`drivers/net/dwc_eth_qos_ax620u.c` (glue on mainline's EQOS driver);
-the AX620E adds `drivers/gpio/axera_gpio.c`, `drivers/spi/axera_spi.c`
-and `drivers/net/dwc_eth_qos_axera.c`. Both glues are
+`drivers/net/dwc_eth_qos_ax620u.c` (glue on mainline's EQOS driver)
+and `drivers/usb/cdns3/cdns3-axera.c` (`USB_CDNS3_AXERA`, glue on
+mainline's cdns3);
+the AX620E adds `drivers/gpio/axera_gpio.c`, `drivers/spi/axera_spi.c`,
+`drivers/net/dwc_eth_qos_axera.c` and
+`drivers/usb/host/dwc3-axera-glue.c` (`USB_XHCI_DWC3_AXERA`, before
+mainline's xhci-dwc3), and sets the SD card clock and pads in
+`board_init()`. Both Ethernet glues are
 `DWC_ETH_QOS_AXERA`; the SoC picks the file.
 
 ## Build
@@ -151,6 +157,18 @@ at a fixed commit and checks its SHA-256 into `output/`, or
   3.3 V, the stock U-Boot's PHY delays, card detect on GPIO1 2
   (`cd-inverted`); `mmc0`. FAT for `srcmmc` and the recovery
   (`rootfs.ubifs.ax620u.img` or `script.txt` on the card, at boot).
+- USB: mainline `cdns3` (host only, xHCI at 0x4810000) on the Cadence
+  USB3 dual-role controller at 0x4800000 (`otg`/`xhci`/`dev`), high
+  speed, behind `cdns3-axera.c` (`axera,cdns-usb`, the stock U-Boot
+  tree's node). The stock U-Boot has no USB host: the glue is the stock
+  4.19 kernel's (`CONFIG_USB_CDNS3_AXERA`, "axera usb init" at
+  0xc054f490): in ap_clk, reset bits 9-11 of +0x24 for 2 ms, clear +0x44
+  bit 1, set +0x25c bits 20-22, then its clocks from the kernel's clock
+  tables: pclk_usb (+0x14 bit 21), aclk_usb (+0x0c bit 3), usb_ref,
+  usb2phy, stb_predft (32 kHz crystal, +0x00 bit 28 clear), otg_fast
+  (24 MHz crystal, divider 1 at +0x18), lpm_predft (+0x08 bits 18, 17,
+  16, 14, 13), through the set aliases. No VBUS GPIO in either stock
+  tree. Mass storage for `srcusb` and the recovery (after the card).
 - With a medium to fetch from, a firmware the scan finds broken
   (`bootfail`) runs `fwupd` (`run ur`: TFTP `rootfs.ubifs.ax620u`) and
   resets, as on the other OpenIPC platforms. `loady ${baseaddr}` and
@@ -190,7 +208,13 @@ empty flash (`u-boot-ax620u-nand.bin` at 0, the rest erased) fetches
 if=sd,index=1,file=sd.img,format=raw` (a power-of-two size, FAT).
 Checked: that bootfail path to the OpenIPC login, `ping`, `tftpboot`,
 `run ub` (read back and compared), `run ur` over TFTP and from SD
-(`srcmmc`), the SD recovery at boot, the retired-command migration. The
+(`srcmmc`), the SD recovery at boot, the retired-command migration. USB:
+`-drive if=none,id=u0,file=usb.img,format=raw -device
+usb-storage,drive=u0` (the model's xHCI at 0x4810000; its OTG block is a
+plain register bank, so the cdns3 core's wait for "xHCI ready" times out
+after 100 ms and says so, as the stock kernel's does, then carries on);
+checked `usb start`, `run srcusb; run ur` and the USB recovery at boot,
+each to the OpenIPC login. The
 model's PHY is not an RTL8201F (ID 0044.1400), so `board_phy_config()`
 is untested, as is everything clock- or pad-related.
 
@@ -246,7 +270,9 @@ it).
   before reading all of it and the engine unpacks 16 stale bytes. The
   tool pads the payload past U-Boot's end with incompressible filler up
   to three; the stock images are all larger. Keep the image at most
-  0x40000 (the environment); about 55 KiB are left.
+  0x40000 (the environment); about 15 KiB are left (SD and USB took
+  40 KiB of the packed image, with `MMC_WRITE`, `BOOTSTD` and the block
+  cache off).
 
 ### Hardware
 
@@ -269,8 +295,25 @@ it).
 - Watchdog 0 is stopped at boot. Reset: the software chip reset
   (`chip_rst_sw()`), then watchdog 0 with a zero timeout (the kernel's
   restart handler, what QEMU resets on).
-- No SD driver (Cadence SD4HC with an Axera PHY), so no SD recovery;
-  updates over TFTP (`ub`, `uk`, `ur`) or `loady`. No pads are set.
+- SD: mainline `sdhci-cadence` on the Cadence SD4HC at 0x104e0000, 4
+  bit, 3.3 V, the SDK's and the IVG-A6 kernel's PHY delays, no card
+  detect (`broken-cd`, as the vendor trees: the card is looked for, and
+  "Card did not respond" is printed without one); `mmc0`.
+  `board_init()` does what the SDK's `sdhci_ax620e.c` does around it:
+  the card clock (FLASH_SYS_GLB: NPLL 400 MHz / 2, enable bit 9), the
+  CMD/DATA pull-ups and the pads' IO voltage from the detector
+  (PIN_MUX_G9 0x104f1000). The SDK's driver also divides the SDHCI clock
+  itself; mainline's does the same from the capabilities.
+- USB: mainline `xhci-dwc3` on the DWC3 at 0x8000000, host, high speed,
+  behind `dwc3-axera-glue.c` (`axera,ax620e-dwc3`, the SDK's node and
+  glue): FLASH_SYS_GLB clocks (EB0 bits 12/14, EB1 bit 5), PHY/VCC reset
+  (bits 24/25 of +0x14) and host select (+0x40 bit 6 clear). The SDK
+  also sets the flash bus clock to 100 MHz; not here (the Ethernet AXI
+  clock is on it). No VBUS GPIO in the IVG-A6's tree.
+- SD and USB give `srcmmc`, `srcusb` and the recovery at boot (`*.img`
+  uImage wrappers whose load address is the flash offset, or
+  `script.txt`, from the card, then a USB stick), besides TFTP and
+  `loady`. No pads are set but the SD's.
 
 ### Verification (qemu-bench `-M ax620e`)
 
@@ -280,6 +323,13 @@ qemu-system-aarch64 -M ax620e,flash-file=flash.bin \
     -global axera-spi-nor.env-from-flash=on -nographic \
     -netdev user,id=n0,tftp=dir -net nic,netdev=n0
 ```
+
+SD: `-drive if=sd,index=1,file=sd.img,format=raw`; USB: `-drive
+if=none,id=u0,file=usb.img,format=raw -device usb-storage,drive=u0`
+(the model's DWC3 xHCI, polled). Checked with SD and USB: `mmc info`,
+`usb start`/`usb tree`, `fatls`, `run srcmmc` and `run srcusb` with `uk`
+and `ur` (read back), the kernel booted from them, the recovery at boot
+from each onto an erased flash to the OpenIPC login.
 
 Checked (with the stock first stage, before it was built from source):
 first boot saves the default environment, the scan finds the

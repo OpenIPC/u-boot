@@ -49,6 +49,14 @@ config SPL_USB_CDNS3_HOST
 	  Host controller is compliant with XHCI so it will use
 	  standard XHCI driver.
 
+config USB_CDNS3_AXERA
+	bool "Cadence USB3 support on the Axera AX620U"
+	depends on AXERA_AX620U
+	default y
+	help
+	  The resets, PHY controls and clocks of the AX620U's controller
+	  ("axera,cdns-usb"), set before the cdns3 core probes it.
+
 config USB_CDNS3_TI
 	tristate "Cadence USB3 support on TI platforms"
 	default USB_CDNS3
