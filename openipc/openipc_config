@@ -60,6 +60,9 @@ CONFIG_AUTOBOOT_KEYED_CTRLC=y
 
 # OpenIPC boot layer: firmware scan, recovery, boot-limit failsafe
 CONFIG_OPENIPC=y
+# The split NOR layout: the kernel (OpenIPC/linux ingenic-t23, -t31, -t40,
+# -t41) divides one firmware partition itself; NAND builds compile it out
+CONFIG_OPENIPC_NOR_SPLIT=y
 CONFIG_BOOTCOUNT_LIMIT=y
 CONFIG_BOOTCOUNT_GENERIC=y
 CONFIG_SYS_BOOTCOUNT_SINGLEWORD=y
