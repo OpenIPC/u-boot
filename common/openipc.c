@@ -1340,68 +1340,78 @@ U_BOOT_CMD(fwfit, 3, 0, do_fwfit,
 #ifdef OPENIPC_NAND_SPL_SIZE
 /*
  * fwglued <addr> <size>: check the image ubwrite was given and say what
- * to write where, in ubbootaddr/ubbootsize (to the boot partition) and
- * ubsplsize (from <addr> to the spl partition, 0 for none). Nothing is
- * erased here; on failure nothing should be.
+ * to write where: ubbootaddr/ubbootsize, U-Boot, to flash ubbootoff (the
+ * boot partition's area after the first stage's blocks, erased whole:
+ * ubbootarea bytes), and ubsplsize, from <addr> to flash 0 (0 for none).
+ * Nothing is erased here; on failure nothing should be.
  *
- * The image (ax620u-image.py) covers the spl and boot partitions from
- * flash 0: the first stage's boot ROM header at 0 and again at 0x400,
- * then at OPENIPC_NAND_SPL_SIZE U-Boot behind its Axera header, the same
- * magic. The boot ROM finds the first stage and its copies at fixed
- * offsets, block by block, while nand write moves data past a bad block:
- * so every block of spl the image fills must be good, or this refuses (a
- * programmer writes such a flash). U-Boot is read by the first stage
- * skipping bad blocks from the boot partition's start, as nand write
- * writes it. An image of just U-Boot behind its header (the AX620U images
- * before the first stage was built in) still updates the boot partition
- * alone, leaving the first stage as it is.
+ * The image (ax620u-image.py) is the boot partition from flash 0: the
+ * first stage's boot ROM header at 0 and again at 0x400, then at
+ * OPENIPC_NAND_SPL_SIZE U-Boot behind its Axera header, the same magic.
+ * The boot ROM finds the first stage and its copy at fixed offsets, block
+ * by block, while nand write moves data past a bad block: so every block
+ * the first stage fills must be good, or this refuses (a programmer writes
+ * such a flash). U-Boot is read by the first stage skipping bad blocks up
+ * to the environment, as nand write writes it. An image of just U-Boot
+ * behind its header updates U-Boot alone, leaving the first stage as it
+ * is; one for the cameras' own layout (the first stage's 1 MiB, U-Boot at
+ * 0x100000) is refused.
  */
 #define AXERA_MAGIC 0x55543322
 #define AXERA_HEADER 0x400
+#define AXERA_OLD_UBOOT 0x100000
+#define FWGLUED_AREA (OPENIPC_NAND_BOOT_SIZE - OPENIPC_NAND_SPL_SIZE)
 
-static int fwglued_spl_used(const u8 *img, ulong *used) {
+/*
+ * The good bytes of the boot partition's blocks in [from, to); with
+ * strict, a bad block there fails (the first stage's fixed places)
+ */
+static int fwglued_good(loff_t from, loff_t to, bool strict, u64 *good,
+                        ulong *erasesize) {
   struct mtd_info *mtd;
-  ulong end = OPENIPC_NAND_SPL_SIZE;
   loff_t off;
 
   mtd_probe_devices();
-  while (end && !img[end - 1])
-    end--;
-  mtd = get_mtd_device_nm("spl");
+  mtd = get_mtd_device_nm("boot");
   if (IS_ERR(mtd)) {
-    printf("fwglued: no spl partition\n");
+    printf("fwglued: no boot partition\n");
     return CMD_RET_FAILURE;
   }
-  if (mtd->size < OPENIPC_NAND_SPL_SIZE) {
-    printf("fwglued: the spl partition is smaller than the image's\n");
+  if (mtd->size < OPENIPC_NAND_BOOT_SIZE) {
+    printf("fwglued: the boot partition is smaller than the image's\n");
     put_mtd_device(mtd);
     return CMD_RET_FAILURE;
   }
-  end = roundup(end, mtd->erasesize);
-  for (off = 0; off < end; off += mtd->erasesize) {
+  *good = 0;
+  *erasesize = mtd->erasesize;
+  for (off = from; off < to; off += mtd->erasesize) {
     int bad = mtd_block_isbad(mtd, off);
 
-    if (bad) {
-      if (bad < 0)
-        printf("fwglued: spl block at 0x%llx unreadable: %d\n",
-               (unsigned long long)off, bad);
-      else
-        printf("fwglued: spl block at 0x%llx is bad, and the first stage "
-               "has fixed places: write it with a programmer\n",
-               (unsigned long long)off);
+    if (bad < 0) {
+      printf("fwglued: boot block at 0x%llx unreadable: %d\n",
+             (unsigned long long)off, bad);
       put_mtd_device(mtd);
       return CMD_RET_FAILURE;
     }
+    if (bad && strict) {
+      printf("fwglued: boot block at 0x%llx is bad, and the first stage "
+             "has fixed places: write it with a programmer\n",
+             (unsigned long long)off);
+      put_mtd_device(mtd);
+      return CMD_RET_FAILURE;
+    }
+    if (!bad)
+      *good += mtd->erasesize;
   }
   put_mtd_device(mtd);
-  *used = end;
   return CMD_RET_SUCCESS;
 }
 
 static int do_fwglued(struct cmd_tbl *cmdtp, int flag, int argc,
                       char *const argv[]) {
-  ulong addr, size, used = 0;
+  ulong addr, size, used = 0, block;
   const u8 *img;
+  u64 good;
 
   if (argc != 3)
     return CMD_RET_USAGE;
@@ -1412,32 +1422,44 @@ static int do_fwglued(struct cmd_tbl *cmdtp, int flag, int argc,
     return CMD_RET_FAILURE;
   }
   img = map_sysmem(addr, size);
-  if (size > OPENIPC_NAND_SPL_SIZE + AXERA_HEADER &&
-      get_unaligned_le32(img + 4) == AXERA_MAGIC &&
-      !memcmp(img, img + AXERA_HEADER, AXERA_HEADER) &&
-      get_unaligned_le32(img + OPENIPC_NAND_SPL_SIZE + 4) == AXERA_MAGIC) {
-    if (fwglued_spl_used(img, &used))
-      goto fail;
-    addr += OPENIPC_NAND_SPL_SIZE;
-    size -= OPENIPC_NAND_SPL_SIZE;
-  } else if (get_unaligned_le32(img + 4) == AXERA_MAGIC &&
-             size <= OPENIPC_NAND_BOOT_SIZE) {
-    printf("fwglued: U-Boot without the first stage: the boot partition "
-           "only, the first stage stays\n");
-  } else {
+  if (get_unaligned_le32(img + 4) != AXERA_MAGIC) {
     printf("fwglued: not an image of this SoC's (no Axera header)\n");
     goto fail;
   }
-  if (size > OPENIPC_NAND_BOOT_SIZE) {
-    printf("fwglued: U-Boot's %lu bytes do not fit the boot partition\n",
-           size);
+  if (size > AXERA_OLD_UBOOT + AXERA_HEADER &&
+      get_unaligned_le32(img + AXERA_OLD_UBOOT + 4) == AXERA_MAGIC) {
+    printf("fwglued: an image for the cameras' own layout (U-Boot at "
+           "0x%x), not OpenIPC's\n", AXERA_OLD_UBOOT);
     goto fail;
   }
-  if (fwfit_boot(size))
+  if (size > OPENIPC_NAND_SPL_SIZE + AXERA_HEADER &&
+      !memcmp(img, img + AXERA_HEADER, AXERA_HEADER) &&
+      get_unaligned_le32(img + OPENIPC_NAND_SPL_SIZE + 4) == AXERA_MAGIC) {
+    used = OPENIPC_NAND_SPL_SIZE;
+    while (used && !img[used - 1])
+      used--;
+    if (fwglued_good(0, used, true, &good, &block))
+      goto fail;
+    used = roundup(used, block);
+    addr += OPENIPC_NAND_SPL_SIZE;
+    size -= OPENIPC_NAND_SPL_SIZE;
+  } else {
+    printf("fwglued: U-Boot without the first stage: U-Boot only, the "
+           "first stage stays\n");
+  }
+  if (fwglued_good(OPENIPC_NAND_SPL_SIZE, OPENIPC_NAND_BOOT_SIZE, false,
+                   &good, &block))
     goto fail;
+  if (size > good) {
+    printf("fwglued: U-Boot's %lu bytes do not fit the %llu good bytes "
+           "after the first stage\n", size, good);
+    goto fail;
+  }
   unmap_sysmem(img);
   env_set_hex("ubbootaddr", addr);
   env_set_hex("ubbootsize", size);
+  env_set_hex("ubbootoff", OPENIPC_NAND_SPL_SIZE);
+  env_set_hex("ubbootarea", FWGLUED_AREA);
   env_set_hex("ubsplsize", used);
   return CMD_RET_SUCCESS;
 fail:
@@ -1447,6 +1469,7 @@ fail:
 
 U_BOOT_CMD(fwglued, 3, 0, do_fwglued,
            "check an image for ubwrite: the first stage and U-Boot, from 0",
-           "<addr> <size> - sets ubbootaddr, ubbootsize and ubsplsize");
+           "<addr> <size> - sets ubbootaddr, ubbootsize, ubbootoff, "
+           "ubbootarea and ubsplsize");
 #endif
 #endif

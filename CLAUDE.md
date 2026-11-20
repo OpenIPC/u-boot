@@ -65,12 +65,13 @@ sets make's `-j`. For `ax620u-*`: `u-boot.bin` behind its Axera header
 (`openipc/axera-image.py`, checked against the boot partition in the
 target's `CONFIG_MTDPARTS_DEFAULT`), the first stage built from
 `openipc/ax620u-spl` (into `output/build-<target>/spl`), then
-`openipc/ax620u-image.py` puts them together: the `spl` partition (first
-stage, its backup, the EIP-130 firmware) and U-Boot at 0x100000, at most
-up to the environment. `u-boot-<target>-stockspl.bin` is the same with
-the cameras' own first stage (`openipc/ax620u-spl/stock.bin`, the
-fallback; `SPL=stock` puts it in `u-boot-<target>.bin` and builds no
-other).
+`openipc/ax620u-image.py` puts them together as the 768 KiB boot
+partition: the first stage and its backup, then U-Boot at 0x40000 in at
+most three blocks (a fourth is the spare for a bad one).
+`u-boot-<target>-stockspl.bin` is the same with the cameras' own first
+stage (`openipc/ax620u-spl/stock.bin`, changed to load U-Boot from
+0x40000; the fallback; `SPL=stock` puts it in `u-boot-<target>.bin` and
+builds no other).
 Toolchains: `arm-linux-gnueabi-` (`CROSS_COMPILE`), and for `ax620e-*`
 `aarch64-linux-gnu-` (`CROSS_COMPILE_64`); those targets are laid out by
 `openipc/ax620e-image.py` instead, after `build.sh` has built the first
@@ -86,21 +87,24 @@ at a fixed commit and checks its SHA-256 into `output/`, or
 
 ### Boot
 
-- Boot ROM -> **first stage** (`spl`, flash 0, 1 MiB: DDR training,
-  PLLs) -> **U-Boot** (`boot`, 0x100000, 1.5 MiB) -> Linux from UBI.
+- Boot ROM -> **first stage** (flash 0 and its backup at 0x20000: DDR
+  training, PLLs) -> **U-Boot** (0x40000, up to the environment at
+  0xc0000) -> Linux from UBI. Both are in `boot`, OpenIPC's NAND layout.
 - The first stage is `openipc/ax620u-spl` (`README.md` there),
   reconstructed in C from the cameras' -O0 binary, SPI NAND boot only,
   its DDR tables generated from that binary. `ax620u-image.py` writes
   the boot ROM's header (twice, at 0 and 0x400; code at 0x800 and again
   at 0x20000), signed with the SDK test key; given the stock code it
-  reproduces the cameras' header byte for byte (`--check <dump>`).
-  0x40000 and 0x60000 hold the EIP-130 firmware (the header's firmware
-  size and sum match; the SDK's public `eip.bin`, not per camera), which
-  the image carries as the cameras have it
-  (`openipc/ax620u-spl/eip130.bin`). The cameras' own first stage stays
-  as `openipc/ax620u-spl/stock.bin`. Only QEMU has run
-  the rebuilt one: its MMIO writes up to U-Boot equal the stock's.
-- The SPL loads the boot partition, a 1 KiB Axera header and then the
+  reproduces the cameras' header byte for byte (`--check <dump>`). The
+  cameras keep the EIP-130 firmware at 0x40000 and 0x60000, which their
+  first stage loads only on parts with secure boot fused; the image has
+  none, and its header says so (firmware size, sum and places zero). The
+  cameras' own first stage stays as `openipc/ax620u-spl/stock.bin`;
+  `ax620u-image.py --stock` changes six instructions so it loads U-Boot
+  from 0x40000 (`STOCK_PATCHES`) and writes its header again. Only QEMU
+  has run the rebuilt one: its MMIO writes up to U-Boot equal the
+  stock's.
+- The SPL loads U-Boot from 0x40000, a 1 KiB Axera header and then the
   image, to 0x40000000 and jumps to 0x40000400 (`SYS_TEXT_BASE`). It
   checks the header only: magic and its 32-bit LE word sum (+0x00, over
   +0x08..+0x3f8). The image's sum (+0x14) is not checked, by the stock
@@ -112,16 +116,24 @@ at a fixed commit and checks its SHA-256 into `output/`, or
   boot ROM, is another format and does carry the SDK test key and a
   signature, as the cameras' does (`ax620u-image.py`).
 - `ubwrite` (`run ub`, recovery) writes the image as it lies from 0:
-  `fwglued` (`common/openipc.c`, `OPENIPC_NAND_SPL_SIZE`) checks it (the
-  first stage's two headers, U-Boot's at 0x100000), U-Boot goes to `boot`
-  (bad blocks skipped, as the first stage reads it), then the used part of
-  `spl` to `spl`, whose blocks must all be good (the boot ROM wants the
-  first stage and its copies at fixed places; a bad one there means a
-  programmer). An image of U-Boot alone (the AX620U images before the
-  first stage was in them) updates `boot` only. Anything else writes
-  nothing.
+  `fwglued` (`common/openipc.c`, `OPENIPC_NAND_SPL_SIZE`, the first
+  stage's 0x40000) checks it (the first stage's two headers, U-Boot's at
+  0x40000), U-Boot goes to 0x40000 (that area erased to the environment,
+  bad blocks skipped as the first stage reads them, the good ones checked
+  to hold it), then the first stage's used blocks to 0, which must all be
+  good (the boot ROM wants the first stage and its copy at fixed places; a
+  bad one there means a programmer). An image of U-Boot alone updates
+  U-Boot only; one for the cameras' layout (U-Boot at 0x100000) is
+  refused, as is anything else.
 - No SPL here, `SKIP_LOWLEVEL_INIT`; `board_init_f()` runs on
   `SYS_INIT_RAM_ADDR` 0x40f00000.
+- **Size.** U-Boot (with its header) must fit three 128 KiB blocks,
+  0x60000: `ax620u-image.py` fails the build past that. It is built
+  Thumb-2 with LTO (ARM-mode it is about 590 KiB), with `BOOTSTD`, long
+  help, the block cache, `fdt`, `bdinfo`, `iminfo`, `imxtract`,
+  `bootelf`, `mii`, regex and FIT printing off; about 5 KiB are left.
+  FIT itself needs MD5 and SHA-1 (the firmware's `nand-fit.its` hashes
+  with crc32 and sha1).
 
 ### Hardware
 
@@ -185,11 +197,13 @@ at a fixed commit and checks its SHA-256 into `output/`, or
 
 ### Layout and environment
 
-`1024k(spl),1536k(boot),512k(env),-(ubi)` on `spi4.0_nand` (the AX620U
-kernel's name for the flash), environment at 0x280000, 256 KiB in a
-512 KiB range (`fw_env` finds it by scanning). The UBI layout is
-openipc-hisilicon's: UBIFS `rootfs` holding `/boot/fitImage`,
-`rootfs_data` on the rest, `root=ubi0:rootfs ubi.mtd=3,2048`,
+OpenIPC's NAND layout, `768k(boot),256k(env),-(ubi)` on `spi4.0_nand`
+(the AX620U kernel's name for the flash), environment at 0xc0000, 256
+KiB, as on openipc-hisilicon and openipc-sigmastar. The cameras' own
+layout (`1024k(spl),1536k(boot),512k(env),-(ubi)`, the first stage's
+1 MiB) is not used. The UBI layout is openipc-hisilicon's: UBIFS
+`rootfs` holding `/boot/fitImage`, `rootfs_data` on the rest,
+`root=ubi0:rootfs ubi.mtd=2,2048`,
 `mem=87M` (the rest is the vendor media drivers'). `SYS_BOOTMAPSZ`
 (32 MiB) keeps the device tree inside `mem=`: placed at the top of the
 256 MiB, the kernel never starts.
@@ -220,7 +234,11 @@ is untested, as is everything clock- or pad-related.
 
 The machine starts the code at flash 0x800 (no boot ROM model), so the
 first stage must be there: `u-boot-ax620u-nand.bin` at 0 boots from an
-otherwise erased 128 MiB flash, or from a camera's dump. The machine's
+otherwise erased 128 MiB flash (a camera's dump has its own layout: its
+`env` and `ubi` are not OpenIPC's). Its header is not loaded either, so
+the first stage reads RAM 0x400 as zeros and takes 64 KiB NAND blocks;
+the U-Boot area is bounded by address (to 0xc0000), not by a count of
+blocks, so both sizes work. The machine's
 `axera-spi-nand` model needs READID answered after the opcode alone,
 the 0x0b/0x3b cache reads, and a PROGRAM LOAD kept open across the SER
 write that mainline's driver makes after queueing the data (SER 0 ends

@@ -2,10 +2,11 @@
 /*
  * Axera AX620U cameras.
  *
- * Boot chain: boot ROM -> first stage (spl partition, flash 0, 1 MiB: DDR,
- * PLLs; signed; openipc/ax620u-spl, or the cameras' own) -> U-Boot (boot partition, 0x100000,
- * behind the 1 KiB Axera image header; loaded at 0x40000000, entered at
- * 0x40000400 = SYS_TEXT_BASE) -> Linux from UBI.
+ * Boot chain: boot ROM -> first stage (flash 0 and its backup at 0x20000:
+ * DDR, PLLs; signed; openipc/ax620u-spl, or the cameras' own changed to
+ * this layout) -> U-Boot (0x40000, behind the 1 KiB Axera image header;
+ * loaded at 0x40000000, entered at 0x40000400 = SYS_TEXT_BASE) -> Linux
+ * from UBI. Both are in the boot partition of OpenIPC's NAND layout.
  */
 #ifndef __AX620U_H
 #define __AX620U_H
@@ -37,14 +38,15 @@
 /* The SPI NAND's MTD name in the AX620U kernels */
 #define OPENIPC_SFC			"spi4.0_nand"
 /*
- * The first stage owns the first 1 MiB and loads U-Boot from 0x100000.
- * The image covers both from flash 0 (openipc/ax620u-image.py), and
- * ubwrite writes it so (OPENIPC_NAND_SPL_SIZE)
+ * OpenIPC's NAND layout. The first stage has the boot partition's first two
+ * blocks, at places the boot ROM fixes, and loads U-Boot from 0x40000. The
+ * image covers both from flash 0 (openipc/ax620u-image.py), and ubwrite
+ * writes it so (OPENIPC_NAND_SPL_SIZE)
  */
-#define OPENIPC_NAND_MTDPARTS		"1024k(spl),1536k(boot),512k(env),-(ubi)"
-#define OPENIPC_NAND_SPL_SIZE		0x100000
-#define OPENIPC_NAND_UBI_MTD		3
-#define OPENIPC_NAND_BOOT_SIZE		0x180000
+#define OPENIPC_NAND_MTDPARTS		"768k(boot),256k(env),-(ubi)"
+#define OPENIPC_NAND_SPL_SIZE		0x40000
+#define OPENIPC_NAND_UBI_MTD		2
+#define OPENIPC_NAND_BOOT_SIZE		0xc0000
 
 #include "openipc-common.h"
 

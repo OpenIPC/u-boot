@@ -16,8 +16,9 @@
  *     OPENIPC_NAND_MTDPARTS  partition list, ending in "-(ubi)"
  *     OPENIPC_NAND_UBI_MTD   the ubi partition's index, for ubi.mtd=
  *     OPENIPC_NAND_BOOT_SIZE the boot partition's size: ubwrite's limit
- *     OPENIPC_NAND_SPL_SIZE  (optional) the spl partition before boot,
- *                            whose first stage the image carries (AX620U)
+ *     OPENIPC_NAND_SPL_SIZE  (optional) the first stage's blocks at the
+ *                            boot partition's start, the image carrying
+ *                            it before U-Boot (AX620U)
  *   SPI NOR: the layout every OpenIPC NOR camera shares (below); the boot
  *     partition ends at CONFIG_ENV_OFFSET, ubwrite's limit.
  */
@@ -218,14 +219,15 @@
 
 /*
  * ubwrite: the image goes where it is written from flash 0. Where the
- * first stage comes with U-Boot (OPENIPC_NAND_SPL_SIZE, the spl partition
- * before boot: AX620U), fwglued (common/openipc.c) checks the image and
- * splits it: U-Boot to the boot partition, then the first stage to spl;
- * an image of U-Boot alone updates boot only. Else the image is boot's.
+ * first stage comes with U-Boot (OPENIPC_NAND_SPL_SIZE, its blocks at the
+ * boot partition's start: AX620U), fwglued (common/openipc.c) checks the
+ * image and splits it: U-Boot to the rest of the boot partition, then the
+ * first stage to its blocks; an image of U-Boot alone updates U-Boot only.
+ * Else the image is boot's.
  */
 #ifdef OPENIPC_NAND_SPL_SIZE
 #define OPENIPC_NAND_UBWRITE \
-	"ubwrite=if fwglued ${baseaddr} ${filesize}; then if nand erase.part boot && nand write ${ubbootaddr} boot ${ubbootsize}; then if itest ${ubsplsize} -gt 0; then nand erase.part spl && nand write ${baseaddr} spl ${ubsplsize}; fi; fi; else echo ubwrite: nothing written; fi; setenv ubbootaddr; setenv ubbootsize; setenv ubsplsize\0"
+	"ubwrite=if fwglued ${baseaddr} ${filesize}; then if nand erase ${ubbootoff} ${ubbootarea} && nand write ${ubbootaddr} ${ubbootoff} ${ubbootsize}; then if itest ${ubsplsize} -gt 0; then nand erase 0 ${ubsplsize} && nand write ${baseaddr} 0 ${ubsplsize}; fi; fi; else echo ubwrite: nothing written; fi; setenv ubbootaddr; setenv ubbootsize; setenv ubbootoff; setenv ubbootarea; setenv ubsplsize\0"
 /* ubwrite before it took the first stage too */
 #define OPENIPC_RETIRED_UBWRITE \
 	"ubwrite=if itest ${filesize} -gt 0 && itest ${filesize} -le " __stringify(OPENIPC_NAND_BOOT_SIZE) " && fwfit boot ${filesize}; then nand erase.part boot && nand write ${baseaddr} boot ${filesize}; else echo ubwrite: ${filesize} bytes do not fit the boot partition, nothing written; fi\0"
