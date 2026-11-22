@@ -134,6 +134,16 @@ jobs:
             [ "$found" = 1 ] || { echo "missing ${kind} image for ${soc} (${pattern})" >&2; rc=1; }
           }
           check_kind nor 256 "output/*${soc}*-nor.bin"
+          # XM232: the image starts with the 32-byte flash header, its two
+          # signature words then zeros, and u-boot.bin follows at 0x20
+          if [ "$soc" = xm232 ]; then
+            f=output/u-boot-xm232-nor.bin
+            hdr=$(head -c 32 "$f" | od -An -tx1 | tr -d ' \n')
+            if [ "$hdr" != "d2a358873f362eeb$(printf '%048d' 0)" ]; then
+              echo "$f: no XM232 flash header (${hdr})" >&2
+              rc=1
+            fi
+          fi
           exit $rc
 
       - name: Upload artifact
