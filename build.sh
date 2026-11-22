@@ -24,7 +24,8 @@ mkconfig() {
 }
 
 # Xiongmai: U-Boot runs in place from flash, so the image is u-boot.bin as
-# linked, with no compressed loader in front of it.
+# linked, with no compressed loader in front of it (the XM232's: behind a
+# fixed 32-byte header).
 build_xm() {
     soc=$1
     kind=$2
@@ -37,13 +38,23 @@ build_xm() {
     make ${make_opts} olddefconfig </dev/null >/dev/null && \
     make ${make_opts} </dev/null || return 1
 
-    cp "${builddir}/u-boot.bin" "output/u-boot-${soc}-nor.bin"
+    out="output/u-boot-${soc}-nor.bin"
+    case "${soc}" in
+        xm232)
+            # The XM232's flash starts with the 32-byte header its vendor
+            # images carry; U-Boot is linked behind it, at 0x60000020.
+            { printf '\322\243\130\207\077\066\056\353'
+              head -c 24 /dev/zero
+              cat "${builddir}/u-boot.bin"; } > "${out}" ;;
+        *)
+            cp "${builddir}/u-boot.bin" "${out}" ;;
+    esac
 }
 
 build_soc() {
     soc=$1
     case "${soc}" in
-        xm510|xm530|xm550|xm530v200|xm533|xm535d1|xm535d2|xm535w1)
+        xm510|xm530|xm550|xm530v200|xm533|xm535d1|xm535d2|xm535w1|xm232)
             build_xm "${soc}" nor ;;
         *)
             echo "unsupported SoC: ${soc}" >&2
@@ -51,7 +62,7 @@ build_soc() {
     esac
 }
 
-ALL_SOCS="xm510 xm530 xm550 xm530v200 xm533 xm535d1 xm535d2 xm535w1"
+ALL_SOCS="xm510 xm530 xm550 xm530v200 xm533 xm535d1 xm535d2 xm535w1 xm232"
 
 SOCS="$@"
 [ -z "${SOCS}" ] && SOCS="${ALL_SOCS}"

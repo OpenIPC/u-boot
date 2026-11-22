@@ -2,7 +2,7 @@
 /*
  * Xiongmai XM510 / XM530 / XM550 register map, from the vendor U-Boot
  * 2014.04 trees (arch/arm/include/asm/arch-xm/xm5x0.h); the V200
- * series' (XM530V200, XM533, XM535) differences from their U-Boots.
+ * series' (XM530V200, XM533, XM535, XM232) differences from their U-Boots.
  */
 
 #ifndef __MACH_XM_H
