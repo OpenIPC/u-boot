@@ -152,12 +152,17 @@ The build logic lives here. Other branches call it:
 - It is `build-gk710x.yml` for `openipc-anyka`: the same job graph and
   `resolve`/`ref` rules, NOR only (256 KiB boot partition, header
   included; on the EV330 the 0x1200-byte header and first stage).
-- **No `hold`:** all nine SoCs have machines of the same names in
+- **No `hold`:** nine of the ten SoCs have machines of the same names in
   qemu-hisilicon (now OpenIPC/qemu-bench, the repository the `qemu` job
   clones): #161 or later; the EV300L #305 or later; the two AV100s #310 or
-  later, which adds `ak3918av100x` and loads an `ANYKA322` image's U-Boot
-  from flash offset 0x600, not 0x200. Until #310 is on its master the
-  AV100 legs fail, and with them the release.
+  later, which adds `ak3918av100x`. The AV100 ROM copies from flash 0x200
+  like the others, through the secure-boot space (qemu-bench #376; the
+  header's load address is 0x80DFFC00, u-boot #155): an `ANYKA322` image
+  built before #155 no longer boots there, as it does not on the chip.
+- **`ak3918ev331` has no machine of its own.** It is the AK3919EV330's die
+  and 128 MiB, so the smoke step boots it on `ak3919ev330` (the `case` in
+  "Smoke-test in QEMU"). A new target without a same-named machine needs an
+  arm there too.
 - **Smoke test:** two boots of an 8 MiB flash image holding only U-Boot,
   in CPU byte order. It passes on `Hit Ctrl-C`,
   and fails if the second boot reports a bad environment CRC.
