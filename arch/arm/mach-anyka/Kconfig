@@ -41,6 +41,14 @@ config TARGET_AK3919EV330
 	help
 	  AnyCloud V500, 128 MiB.
 
+config TARGET_AK3918EV331
+	bool "AK3918EV331"
+	select AK39_EV330
+	help
+	  AnyCloud V500, 128 MiB: the EV331 packages (AK3916EV331,
+	  AK3918EV331, AK3919EV331), which OpenIPC/firmware builds one
+	  ak3918ev331 image for. The EV330's first stage and U-Boot.
+
 config TARGET_AK3918EV300L
 	bool "AK3918EV300L"
 	select AK39_AV100
