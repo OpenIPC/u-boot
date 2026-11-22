@@ -29,7 +29,8 @@ on:
 
 # The shape of build-sigmastar.yml:
 #   resolve -> build (matrix, one target per leg) + qemu (prep) ->
-#   qemu_smoke (hard gate) -> release (own, `release` input);
+#   qemu_smoke, qemu_smoke_ax630c (hard gates) -> release (own, `release`
+#   input);
 #   publish (OpenIPC/firmware latest + openipc.org report) is commented out:
 #   these images have booted only in QEMU, never on silicon.
 # build.sh takes targets (<soc>-<flash>) as arguments; the matrix calls it
@@ -92,8 +93,8 @@ jobs:
           - { soc: ax620e-nor }
           # AX630C (Cortex-A53, AArch64): eMMC and SD card (Sipeed
           # MaixCAM2). No first stage yet: U-Boot alone, which the board's
-          # own bootloader starts from the SD card. No smoke leg (the smoke
-          # test boots a first stage from flash).
+          # own bootloader starts from the SD card; smoke-tested by
+          # qemu_smoke_ax630c, which starts it with QEMU's loader.
           - { soc: ax630c-emmc }
 
     steps:
@@ -204,7 +205,7 @@ jobs:
             output/stockspl-none.txt
           if-no-files-found: error
 
-  # Build qemu-system-aarch64 once for the smoke leg.
+  # Build qemu-system-aarch64 once for the smoke legs.
   qemu:
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -416,9 +417,151 @@ jobs:
           fi
           echo "PASS: u-boot (${{ matrix.spl }} first stage) reached the autoboot prompt, and its saved environment survived a reset"
 
+  # QEMU smoke test of the AX630C image, U-Boot alone: qemu-bench's
+  # `-M ax620e,chip=ax630c` with QEMU's loader starting it at 0x50000000
+  # (in EL1, as the OpenIPC first stage would; no first stage or boot ROM
+  # runs), a blank 256 MiB eMMC and a card whose FAT p1 has an `Image` but
+  # no device tree, firmware that cannot boot. It must reach the autoboot
+  # prompt, stay at the prompt rather than reset (one banner; a failed
+  # load once reset every boot), and list the eMMC and the card. QEMU's
+  # eMMC has no 1.8 V and the image's device tree asks for it, so U-Boot
+  # has no environment device there: the environment's save and reload
+  # are not tested.
+  # A revision without the target (the build's marker) is skipped with a
+  # warning.
+  qemu_smoke_ax630c:
+    needs: [build, qemu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SOC: ax630c-emmc
+    steps:
+      - name: Download qemu-aarch64
+        uses: actions/download-artifact@v4
+        with:
+          name: qemu-aarch64
+
+      - name: Download u-boot artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: u-boot-${{ env.SOC }}
+
+      - name: Install QEMU runtime deps
+        run: |
+          sudo apt-get update -qq
+          # dosfstools: the card's FAT
+          sudo apt-get install -y -qq --no-install-recommends \
+            libglib2.0-0 libpixman-1-0 libfdt1 zlib1g libslirp0 dosfstools
+          if ldd ./qemu-aarch64 | grep -qi 'not found'; then
+            echo "qemu-aarch64 has unresolved libraries:" >&2
+            ldd ./qemu-aarch64 >&2
+            exit 1
+          fi
+
+      - name: Smoke-test in QEMU
+        timeout-minutes: 3
+        run: |
+          IMG="u-boot-$SOC.bin"
+          if [ ! -f "$IMG" ]; then
+            # only the build's own marker excuses a missing image
+            if [ -f u-boot-none.txt ]; then
+              echo "::warning::$IMG not built by this revision: not tested"
+              exit 0
+            fi
+            echo "missing $IMG" >&2
+            exit 1
+          fi
+          truncate -s 256M /tmp/emmc.img
+          # The card: an MBR, FAT16 p1 from 1 MiB with one file, IMAGE
+          # (8.3, no long name), not a kernel; no device tree
+          truncate -s 32M /tmp/p1.img
+          mkfs.vfat -F 16 /tmp/p1.img > /dev/null
+          python3 - /tmp/sd.img /tmp/p1.img <<'PY'
+          import struct, sys
+          sd, p1 = sys.argv[1:3]
+          v = bytearray(open(p1, 'rb').read())
+          bps, spc, rsvd, nfats, nroot = struct.unpack_from('<HBHBH', v, 11)
+          fatsz = struct.unpack_from('<H', v, 22)[0]
+          root = (rsvd + nfats * fatsz) * bps
+          data = root + nroot * 32
+          body = b'not a kernel\n'
+          e = next(o for o in range(root, data, 32) if v[o] == 0)
+          v[e:e + 32] = (b'IMAGE      ' + bytes([0x20]) + bytes(14) +
+                         struct.pack('<HI', 2, len(body)))
+          for i in range(nfats):
+              struct.pack_into('<H', v, (rsvd + i * fatsz) * bps + 4, 0xffff)
+          v[data:data + len(body)] = body
+          mbr = bytearray(1 << 20)
+          mbr[446:462] = struct.pack('<B3sB3sII', 0, b'\0\0\0', 0x0e,
+                                     b'\0\0\0', 2048, len(v) // 512)
+          mbr[510:512] = b'\x55\xaa'
+          open(sd, 'wb').write(mbr + v)
+          PY
+          # QEMU takes only a power-of-2 card size
+          truncate -s 64M /tmp/sd.img
+          chmod +x ./qemu-aarch64
+          mkfifo /tmp/uart.in /tmp/uart.out
+          ./qemu-aarch64 -M ax620e,chip=ax630c -m 1G -smp 1 \
+            -device loader,file="$IMG",addr=0x50000000,cpu-num=0 \
+            -drive if=sd,index=0,file=/tmp/emmc.img,format=raw \
+            -drive if=sd,index=1,file=/tmp/sd.img,format=raw \
+            -nographic -serial pipe:/tmp/uart \
+            -monitor none > /tmp/qemu.log 2>&1 &
+          QEMU_PID=$!
+          cat /tmp/uart.out > /tmp/uboot.txt &
+          CAT_PID=$!
+          exec 3>/tmp/uart.in
+          # Wait for text in the output, up to 30 s
+          wait_for() {
+            for i in $(seq 1 60); do
+              grep -qF "$1" /tmp/uboot.txt 2>/dev/null && return 0
+              sleep 0.5
+            done
+            return 1
+          }
+          rc=0
+          if ! wait_for 'Hit Ctrl-C'; then
+            rc=1
+          elif ! wait_for 'staying at the prompt'; then
+            rc=2
+          else
+            sleep 1
+            printf 'mmc list\r' >&3
+            wait_for 'mmc@104e0000: 1 (SD)' || rc=3
+            # a reset would be a second banner by now
+            sleep 3
+          fi
+          exec 3>&-
+          kill "$QEMU_PID" "$CAT_PID" 2>/dev/null || true
+          wait 2>/dev/null || true
+          echo "== captured u-boot output =="
+          cat /tmp/uboot.txt
+          echo
+          case $rc in
+            0) ;;
+            1) echo "FAIL: U-Boot did not reach the autoboot prompt" ;;
+            2) echo "FAIL: bootcmd did not stay at the prompt with no bootable firmware" ;;
+            3) echo "FAIL: mmc list did not list the eMMC and the SD controller" ;;
+          esac
+          if [ "$rc" = 0 ] && ! grep -q 'mmc@1b40000: 0' /tmp/uboot.txt; then
+            echo "FAIL: mmc list did not list the eMMC"
+            rc=3
+          fi
+          if [ "$rc" = 0 ] && [ "$(grep -c '^U-Boot 20' /tmp/uboot.txt)" != 1 ]; then
+            echo "FAIL: U-Boot reset instead of staying at the prompt"
+            rc=4
+          fi
+          if [ "$rc" != 0 ]; then
+            echo
+            echo "== qemu stderr =="
+            tail -40 /tmp/qemu.log || true
+            exit 1
+          fi
+          echo "PASS: u-boot ($SOC) reached the autoboot prompt and, with no bootable firmware on the card or the eMMC, stayed at the prompt"
+
   # Mirror every built image to this repository's own Axera release.
   release:
-    needs: [resolve, build, qemu_smoke]
+    needs: [resolve, build, qemu_smoke, qemu_smoke_ax630c]
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -451,7 +594,7 @@ jobs:
   # The concurrency group, shared with the other build-*.yml, keeps a second
   # run from uploading between this run's upload and its report.
 #  publish:
-#    needs: [resolve, build, qemu_smoke]
+#    needs: [resolve, build, qemu_smoke, qemu_smoke_ax630c]
 #    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/openipc' }}
 #    runs-on: ubuntu-latest
 #    timeout-minutes: 30
