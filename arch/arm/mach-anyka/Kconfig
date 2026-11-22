@@ -55,8 +55,9 @@ config TARGET_AK3918AV100
 	select AK39_AV100
 	help
 	  AnyCloud39AV100: AK3918AV100N, AK3918AV100P and KM01N, 64 MiB,
-	  boot header ANYKA322. The EV300L's register map; the mask ROM
-	  copies U-Boot from flash offset 0x600, past a secure-boot area.
+	  boot header ANYKA322. The EV300L's register map; U-Boot starts at
+	  flash offset 0x600, past a secure-boot area the mask ROM copies
+	  with it from 0x200 (load address 0x80DFFC00).
 
 config TARGET_AK3918AV100X
 	bool "AK3918AV100X"

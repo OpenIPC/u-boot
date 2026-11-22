@@ -25,11 +25,16 @@ payload that follows the header to the load address and starts it there.
           just the tag on the EV300L flash seen and in the AV100 SDK's
           vectors.S
 
-AV100: the payload starts at 0x600, not 0x200. The 0x400 bytes between are
-the secure-boot area (ak_secureboot: public key at 0x200, signature at
-0x300, U-Boot at 0x600, the header's length counted from there), left
-zero here as the SDK's vectors.S leaves them in an unsigned image; the
-vendor U-Boot is linked at the load address - 0x600 to match.
+AV100: U-Boot starts at 0x600, not 0x200. The 0x400 bytes between are the
+secure-boot area (ak_secureboot: public key at 0x200, signature at 0x300),
+left zero here as the SDK's vectors.S leaves them in an unsigned image. The
+ROM still copies from 0x200, so the header covers that area too: load
+address <text_base> - 0x400 and length from 0x200, and U-Boot lands at
+<text_base>, the ROM entering through the zeroes (andeq). That is the
+vendor's header on an AK3918AV100N's flash (load 0x80DFFC00, owner report
+r-s9hgnp86 on openipc.org) and on the AK3918AV130's. Load <text_base> with
+the length from 0x600, as this script wrote before, put U-Boot 0x400 too
+high on the chip and left its last 0x400 bytes uncopied: no output at all.
 
 EV330: the ROM loads a 4 KiB first stage into L2 memory, which runs the DDR
 script of its own header and copies 0x40000 bytes from flash offset 0x1200
@@ -70,7 +75,8 @@ EXTRA = {
     "av100": {0x10: 5, 0x18: 1, 0x24: 1},
 }
 
-# Where the payload starts in flash, if not right after the header
+# Where U-Boot starts in flash, if not right after the header. The ROM
+# copies from HEADER_LEN on, whatever lies between.
 PAYLOAD_OFF = {
     "av100": 0x600,
 }
@@ -129,9 +135,10 @@ def main():
         # b <payload>
         struct.pack_into("<I", hdr, 0x00, 0xEA000000 | (start - 8) >> 2)
         hdr[0x04:0x0C] = magic
-        struct.pack_into("<I", hdr, 0x0C, len(uboot))
+        gap = start - HEADER_LEN
+        struct.pack_into("<I", hdr, 0x0C, gap + len(uboot))
         struct.pack_into("<I", hdr, 0x1C, 6)
-        struct.pack_into("<I", hdr, 0x20, text)
+        struct.pack_into("<I", hdr, 0x20, text - gap)
         for off, val in EXTRA.get(family, {}).items():
             struct.pack_into("<I", hdr, off, val)
         body = script(data)
