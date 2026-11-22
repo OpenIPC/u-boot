@@ -43,6 +43,9 @@ on:
 #   AX620U: u-boot-ax620u-nand.bin, the boot partition of OpenIPC's NAND
 #     layout (first stage and its copy, then U-Boot at 0x40000); before
 #     that, the cameras' 1 MiB spl partition and boot (U-Boot at 0x100000)
+#   AX630C: u-boot-ax630c-emmc.bin, U-Boot alone for now (no first stage
+#     yet): the board's own bootloader loads it from the SD card and starts
+#     it at 0x50000000
 # u-boot-<soc>-stockspl.bin is the same with the cameras' own first stage,
 # kept in the tree as a fallback: a separate artifact, smoke-tested, not
 # released. The release has u-boot-<soc>.bin only.
@@ -83,6 +86,11 @@ jobs:
           # AX620E (Cortex-A53, AArch64): SPI NOR, the 256 KiB boot
           # partition at 0 (first stage, then packed U-Boot at 0x10000)
           - { soc: ax620e-nor }
+          # AX630C (Cortex-A53, AArch64): eMMC and SD card (Sipeed
+          # MaixCAM2). No first stage yet: U-Boot alone, which the board's
+          # own bootloader starts from the SD card. No smoke leg (the smoke
+          # test boots a first stage from flash).
+          - { soc: ax630c-emmc }
 
     steps:
       - name: Checkout
@@ -113,7 +121,7 @@ jobs:
           done
 
       # build.sh's defaults: CROSS_COMPILE=arm-linux-gnueabi- (AX620U),
-      # CROSS_COMPILE_64=aarch64-linux-gnu- (AX620E)
+      # CROSS_COMPILE_64=aarch64-linux-gnu- (AX620E, AX630C)
       - name: Build ${{ matrix.soc }}
         run: bash build.sh ${{ matrix.soc }}
 
