@@ -46,6 +46,10 @@ on:
 #   AX630C: u-boot-ax630c-emmc.bin, U-Boot alone for now (no first stage
 #     yet): the board's own bootloader loads it from the SD card and starts
 #     it at 0x50000000
+# A target the revision does not have (no openipc/<soc>_config: a target
+# added here before its code reached openipc-axera) is not built: its leg
+# uploads a marker instead of the image, the smoke test skips it and the
+# release has the other targets.
 # u-boot-<soc>-stockspl.bin is the same with the cameras' own first stage,
 # kept in the tree as a fallback: a separate artifact, smoke-tested, not
 # released. The release has u-boot-<soc>.bin only.
@@ -101,7 +105,21 @@ jobs:
           # moves while the matrix runs.
           ref: ${{ needs.resolve.outputs.sha }}
 
+      # A target the revision does not have is not built (see the top)
+      - name: Check the revision has ${{ matrix.soc }}
+        id: target
+        run: |
+          if [ -f 'openipc/${{ matrix.soc }}_config' ]; then
+            echo build=1 >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::${{ matrix.soc }}: no openipc/${{ matrix.soc }}_config in this revision, not built"
+            echo build=0 >> "$GITHUB_OUTPUT"
+            mkdir -p output
+            echo "not built by this revision" > output/u-boot-none.txt
+          fi
+
       - name: Install dependencies
+        if: ${{ steps.target.outputs.build == '1' }}
         timeout-minutes: 15
         run: |
           # apt mirrors on hosted runners intermittently HANG on the
@@ -123,9 +141,11 @@ jobs:
       # build.sh's defaults: CROSS_COMPILE=arm-linux-gnueabi- (AX620U),
       # CROSS_COMPILE_64=aarch64-linux-gnu- (AX620E, AX630C)
       - name: Build ${{ matrix.soc }}
+        if: ${{ steps.target.outputs.build == '1' }}
         run: bash build.sh ${{ matrix.soc }}
 
       - name: Check partition fit
+        if: ${{ steps.target.outputs.build == '1' }}
         run: |
           # An image larger than its boot partition overflows into the
           # environment and bricks the camera on upgrade. build.sh checks
@@ -155,12 +175,15 @@ jobs:
           done
           exit $rc
 
-      # u-boot-<soc>: the image the release takes
+      # u-boot-<soc>: the image the release takes (its *.bin), or the
+      # marker of a target the revision does not have
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: u-boot-${{ matrix.soc }}
-          path: output/u-boot-${{ matrix.soc }}.bin
+          path: |
+            output/u-boot-${{ matrix.soc }}.bin
+            output/u-boot-none.txt
           if-no-files-found: error
 
       # stockspl-<soc>: the same with the cameras' first stage, for the
