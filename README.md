@@ -85,9 +85,12 @@
 | `xm533` | Cortex-A5 | 64 MiB DDR2 | NOR | |
 | `xm535d1` `xm535w1` | Cortex-A5 | 64 MiB DDR2 | NOR | |
 | `xm535d2` | Cortex-A5 | 128 MiB DDR3 | NOR | |
+| `xm232` | ARMv7 | 64 MiB DDR2 | NOR | 32-byte flash header |
 
 - The boot ROM runs U-Boot in place from SPI NOR, and U-Boot brings up
-  DDR itself, so the image is `u-boot.bin` as linked.
+  DDR itself, so the image is `u-boot.bin` as linked. The XM232's starts
+  with the fixed 32-byte header its vendor images carry, and U-Boot is
+  linked behind it, at 0x60000020, as the vendor's is.
 - Xiongmai bootloaders leave per-block write protection on, under which
   their `sf erase`/`sf write` report success and change nothing. This
   U-Boot clears it.

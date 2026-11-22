@@ -70,6 +70,8 @@ jobs:
           - { soc: xm535d1, kinds: "nor", files: "output/u-boot-xm535d1-nor.bin" }
           - { soc: xm535d2, kinds: "nor", files: "output/u-boot-xm535d2-nor.bin" }
           - { soc: xm535w1, kinds: "nor", files: "output/u-boot-xm535w1-nor.bin" }
+          # XM232: its 32-byte flash header in front of u-boot.bin
+          - { soc: xm232, kinds: "nor", files: "output/u-boot-xm232-nor.bin" }
 
     steps:
       - name: Checkout
