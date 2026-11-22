@@ -424,15 +424,20 @@ with `AXERA_AX630C_EMMC`: `include/configs/ax630c.h`,
   128 MiB to 1 GiB (256M on 1 GiB, 1024M on 4 GiB): `mem=${osmem}`, the
   rest is the CMM pool `load_axera` makes from totalmem and mem=.
 - `firmware_scan()` (`common/openipc.c`, `OPENIPC_MMC`) looks for
-  `Image` on the card's FAT p1 (mmc 1), then for a uImage/FIT at the
-  eMMC's kernel partition (mmc 0, 1 MiB), and sets `medium` (`sd`,
-  `emmc`) and `rootargs` in RAM; `bootcmd` (`run bootflash`) runs
-  `${medium}load` and `${medium}boot`: `booti` of `Image` and
-  `ax630c-maixcam2.dtb` (`fdtfile`) with `root=/dev/mmcblk1p2`, or
-  `bootm` of the eMMC's kernel with `root=/dev/mmcblk0p4
-  blkdevparts=${mmcparts}`. Neither: `bootfail`, the prompt (nothing is
-  fetched and written by itself while the eMMC holds the board's own
-  firmware). Recovery: `script.txt` on the card only.
+  `Image` and `${fdtfile}` on the card's FAT p1 (mmc 1), and for a
+  bootable uImage (header CRC, arm64 kernel) or FIT (a root `/images`
+  node, not a bare device tree) at the eMMC's kernel partition (mmc 0,
+  1 MiB), and sets `medium` (`sd`, `emmc`) and `rootargs` in RAM, the
+  card first; with firmware on both, `emmcargs` too. `bootcmd` (`run
+  bootflash`) runs `${medium}load` and `${medium}boot`: `booti` of
+  `Image` and `ax630c-maixcam2.dtb` (`fdtfile`) with
+  `root=/dev/mmcblk1p2`, or `bootm` of the eMMC's kernel with
+  `root=/dev/mmcblk0p4 blkdevparts=${mmcparts}`. A card that does not
+  load or boot falls back to the eMMC (`emmcargs`, `setargs` run again:
+  it keeps `${rootargs}` unexpanded); what does not boot then leaves
+  U-Boot at the prompt, no reset. Neither found: `bootfail`, the prompt
+  (nothing is fetched and written by itself while the eMMC holds the
+  board's own firmware). Recovery: `script.txt` on the card only.
 
 ### Layout and environment
 
@@ -479,7 +484,9 @@ the DRAM), 512 MiB without a board id and 4 GiB with id 14. QEMU's eMMC
 has no 1.8 V: with the eMMC node's `sdhci-caps-mask` removed (in a test
 copy of U-Boot's and the kernel's device trees) the first boot saves
 the environment, `saveenv`/`reset` keeps it, `fw_printenv`/`fw_setenv`
-in Linux read and write it, a FIT at 1 MiB boots from the eMMC; with it,
+in Linux read and write it, a FIT at 1 MiB boots from the eMMC (also when the card has `Image` but
+no device tree, or an `Image` booti refuses), a bare device tree there
+leaves U-Boot at the prompt; with it,
 U-Boot has no environment device and boots with the defaults. The
 model releases CPU1 by spin-table only under `flash-file=`: with the
 loader it comes up only by PSCI (`psci=1`). Linux's `reboot` does not

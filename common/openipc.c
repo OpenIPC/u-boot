@@ -818,57 +818,153 @@ static struct mmc *openipc_mmc(int dev) {
   return mmc;
 }
 
-/* The card's firmware: Image on its first partition, FAT (the firmware's
- * SD image) */
-static int mmc_sd_firmware(void) {
-  if (!openipc_mmc(OPENIPC_SD_DEV))
-    return 0;
+/* A file on the card's first partition (FAT) */
+static int mmc_sd_has(const char *name) {
   if (fs_set_blk_dev("mmc", __stringify(OPENIPC_SD_DEV) ":1", FS_TYPE_FAT))
     return 0;
-  return fs_exists("Image");
+  return fs_exists(name);
+}
+
+/* The card's firmware: Image and the device tree sdload reads, on its
+ * first partition, FAT (the firmware's SD image) */
+static int mmc_sd_firmware(void) {
+  const char *fdtfile = env_get("fdtfile");
+
+  if (!openipc_mmc(OPENIPC_SD_DEV))
+    return 0;
+  if (!mmc_sd_has("Image"))
+    return 0;
+  if (!fdtfile || !mmc_sd_has(fdtfile)) {
+    printf("SD card: Image, but no %s\n", fdtfile ? fdtfile : "fdtfile");
+    return 0;
+  }
+  return 1;
+}
+
+/* The eMMC kernel partition's first blocks: a uImage header, or a FIT's
+ * structure up to its /images node */
+#define MMC_KERNEL_PEEK 8192
+
+/*
+ * A FIT, not a bare device tree: a node /images under the root. Only the
+ * first blocks are read, so the walk keeps to them (libfdt would trust
+ * totalsize): the root's properties, then its subnodes and theirs until
+ * /images. A FIT's images carry their data, megabytes: mkimage puts
+ * /images before /configurations, and the walk ends in its first image.
+ */
+static int mmc_fit_has_images(const u8 *buf, ulong len) {
+  ulong off = fdt_off_dt_struct(buf);
+  ulong end = off + fdt_size_dt_struct(buf);
+  int depth = 0;
+
+  if (end > len)
+    end = len;
+  while (off + 4 <= end) {
+    u32 tag = get_unaligned_be32(buf + off);
+    const char *name;
+    ulong n;
+
+    off += 4;
+    switch (tag) {
+    case FDT_BEGIN_NODE:
+      name = (const char *)buf + off;
+      n = strnlen(name, end - off);
+      if (n == end - off)
+        return 0;
+      if (depth == 1 && !strcmp(name, FIT_IMAGES_PATH + 1))
+        return 1;
+      depth++;
+      off += ALIGN(n + 1, 4);
+      break;
+    case FDT_PROP:
+      if (off + 8 > end)
+        return 0;
+      off += 8 + ALIGN(get_unaligned_be32(buf + off), 4);
+      break;
+    case FDT_END_NODE:
+      if (--depth <= 0)
+        return 0;
+      break;
+    case FDT_NOP:
+      break;
+    default:
+      return 0;
+    }
+  }
+  return 0;
+}
+
+/*
+ * What emmcboot can bootm: a uImage whose header holds (its CRC, an arm64
+ * kernel), or a FIT with images. A bare device tree, which check_kernel()
+ * would take, is neither.
+ */
+static int mmc_kernel_bootable(const u8 *buf) {
+  const struct image_header *hdr = (const void *)buf;
+
+  if (image_check_magic(hdr))
+    return image_check_hcrc(hdr) && image_check_arch(hdr, IH_ARCH_ARM64) &&
+           (image_check_type(hdr, IH_TYPE_KERNEL) ||
+            image_check_type(hdr, IH_TYPE_KERNEL_NOLOAD));
+  if (fdt_magic(buf) == FDT_MAGIC && !fdt_check_header(buf) &&
+      fdt_totalsize(buf) <= OPENIPC_MMC_KERNEL_SIZE)
+    return mmc_fit_has_images(buf, MMC_KERNEL_PEEK);
+  return 0;
 }
 
 /* The eMMC's: a uImage or FIT at the start of its kernel partition */
 static int mmc_emmc_firmware(void) {
   struct mmc *mmc = openipc_mmc(OPENIPC_EMMC_DEV);
-  ALLOC_CACHE_ALIGN_BUFFER(u8, buf, 512);
+  ALLOC_CACHE_ALIGN_BUFFER(u8, buf, MMC_KERNEL_PEEK);
+  lbaint_t cnt = MMC_KERNEL_PEEK / 512;
   struct blk_desc *desc;
 
   if (!mmc)
     return 0;
   desc = mmc_get_blk_desc(mmc);
-  if (!desc || blk_dread(desc, OPENIPC_MMC_KERNEL_BLK, 1, buf) != 1)
+  if (!desc || blk_dread(desc, OPENIPC_MMC_KERNEL_BLK, cnt, buf) != cnt)
     return 0;
-  return check_kernel(buf);
+  if (mmc_kernel_bootable(buf))
+    return 1;
+  if (check_kernel(buf))
+    printf("eMMC kernel partition: not a bootable uImage or FIT\n");
+  return 0;
 }
 
 /*
  * The card first, then the eMMC: medium selects ${medium}load and
  * ${medium}boot, rootargs is the root (and the eMMC's partitions) for
- * bootargs. RAM only, like the other media's scan.
+ * bootargs. With firmware on both, emmcargs keeps the eMMC's for
+ * bootflash to fall back to should the card's not boot. RAM only, like
+ * the other media's scan.
  */
 static int firmware_scan_mmc(void) {
-  char args[256];
+  const char *parts = env_get("mmcparts");
+  char sd[64], emmc[256];
+  int on_sd, on_emmc;
 
   printf("Looking for the firmware on the SD card, then the eMMC...\n");
-  if (mmc_sd_firmware()) {
-    printf("Firmware on the SD card (mmc %d)\n", OPENIPC_SD_DEV);
+  snprintf(sd, sizeof(sd), "root=/dev/mmcblk%dp2", OPENIPC_SD_DEV);
+  snprintf(emmc, sizeof(emmc), "root=/dev/mmcblk%dp%d%s%s",
+           OPENIPC_EMMC_DEV, OPENIPC_MMC_ROOT_PART,
+           parts ? " blkdevparts=" : "", parts ? parts : "");
+  on_sd = mmc_sd_firmware();
+  on_emmc = mmc_emmc_firmware();
+  env_set("emmcargs", on_sd && on_emmc ? emmc : NULL);
+  if (on_sd) {
+    printf("Firmware on the SD card (mmc %d)%s\n", OPENIPC_SD_DEV,
+           on_emmc ? ", and on the eMMC" : "");
     env_set("medium", "sd");
-    snprintf(args, sizeof(args), "root=/dev/mmcblk%dp2", OPENIPC_SD_DEV);
-  } else if (mmc_emmc_firmware()) {
-    const char *parts = env_get("mmcparts");
-
+    env_set("rootargs", sd);
+  } else if (on_emmc) {
     printf("Firmware on the eMMC (mmc %d)\n", OPENIPC_EMMC_DEV);
     env_set("medium", "emmc");
-    snprintf(args, sizeof(args), "root=/dev/mmcblk%dp%d%s%s",
-             OPENIPC_EMMC_DEV, OPENIPC_MMC_ROOT_PART,
-             parts ? " blkdevparts=" : "", parts ? parts : "");
+    env_set("rootargs", emmc);
   } else {
-    printf("Firmware is absent/corrupt (no Image on the SD card, no kernel on the eMMC)\n");
+    printf("Firmware is absent/corrupt (no Image and device tree on the SD card, no kernel on the eMMC)\n");
     env_set("bootfail", "1");
     return 0;
   }
-  env_set("rootargs", args);
   env_set("bootfail", NULL);
   return 0;
 }

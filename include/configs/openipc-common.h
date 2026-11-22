@@ -174,11 +174,17 @@
 /*
  * No firmware on either: stay at the prompt. Nothing is fetched and
  * written by itself: until the eMMC has OpenIPC's layout, it holds the
- * board's own firmware.
+ * board's own firmware. A card's firmware that does not load or boot
+ * falls back to the eMMC's when the scan found one there too (emmcargs);
+ * what does not boot then leaves U-Boot at the prompt, not in a reset
+ * loop. setargs keeps ${rootargs} unexpanded, so it is run again for the
+ * eMMC.
  */
 #define OPENIPC_RECOVERY_MMC \
-	"fwrecovery=if env exists bootfail; then echo \"*** No firmware on the SD card (Image on its first partition) or the eMMC: staying at the prompt ***\"; fi\0" \
-	"bootflash=if env exists bootfail; then run fwrecovery; else setenv setargs setenv bootargs ${bootargs}; run setargs; run loadkernel && " OPENIPC_BOOTKERNEL "; reset; fi\0"
+	"fwrecovery=if env exists bootfail; then echo \"*** No firmware on the SD card (Image and the device tree on its first partition) or the eMMC: staying at the prompt ***\"; fi\0" \
+	"bootflash=if env exists bootfail; then run fwrecovery; else setenv setargs setenv bootargs ${bootargs}; run setargs; run loadkernel && " OPENIPC_BOOTKERNEL "; " \
+	"if test \"${medium}\" = sd && env exists emmcargs; then echo \"*** The firmware on the SD card did not boot: trying the eMMC ***\"; setenv medium emmc; setenv rootargs ${emmcargs}; run setargs; run loadkernel && " OPENIPC_BOOTKERNEL "; fi; " \
+	"echo \"*** The firmware on ${medium} did not boot: staying at the prompt ***\"; fi\0"
 
 #define OPENIPC_FWUPD "fwupd=run ur; run uk\0"
 
