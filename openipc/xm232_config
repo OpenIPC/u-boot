@@ -1,3 +1,6 @@
 CONFIG_TARGET_XM232=y
 CONFIG_SYS_TEXT_BASE=0x60000020
 CONFIG_PRODUCT_SOC="xm232"
+# build.sh puts the 32-byte flash header in front of u-boot.bin: the two
+# together must fit the 256 KiB boot partition, ahead of the environment
+CONFIG_BOARD_SIZE_LIMIT=262112
