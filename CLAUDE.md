@@ -434,7 +434,9 @@ refuses an area that is neither blank (one byte value) nor an
 environment: on a MaixCAM2 still in its own layout 0xc0000 is its
 DDR/ATF partition, so U-Boot boots with the defaults and `saveenv`
 fails there instead of overwriting it. The first boot saves the
-defaults on a blank area. `ukwrite`/`urwrite` write the kernel and
+defaults on a blank area. No `env erase` (`CMD_ERASEENV` off): the
+MMC backend erases whole erase groups (512 KiB and more), which reach
+into the boot partition before 0xc0000. `ukwrite`/`urwrite` write the kernel and
 root partitions; `ubwrite` waits for the first stage. Linux reads the
 environment with `/dev/mmcblk0 0xc0000 0x40000` in `fw_env.config`.
 

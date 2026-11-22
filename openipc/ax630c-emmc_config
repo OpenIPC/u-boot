@@ -92,7 +92,10 @@ CONFIG_CMD_SOURCE=y
 CONFIG_CMD_SETEXPR=y
 CONFIG_CMD_EDITENV=y
 CONFIG_CMD_SAVEENV=y
-CONFIG_CMD_ERASEENV=y
+# No env erase: env/mmc.c erases whole erase groups (512 KiB and more on
+# eMMC), past the 256 KiB environment into the boot partition before it.
+# saveenv writes the area alone.
+# CONFIG_CMD_ERASEENV is not set
 CONFIG_CMD_ENV_EXISTS=y
 CONFIG_CMD_MEMORY=y
 CONFIG_CMD_CRC32=y
