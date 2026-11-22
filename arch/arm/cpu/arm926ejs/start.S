@@ -81,12 +81,22 @@ cpu_init_crit:
 	 * flush D cache before disabling it
 	 */
 	mov	r0, #0
+#ifdef CONFIG_ARCH_GRAINMEDIA
+	/*
+	 * The FA626TE has no ARM926 test-and-clean (c7, c10, 3): it is an
+	 * undefined instruction there. U-Boot runs with the D-cache off, so
+	 * invalidate both caches and the TLB, as the vendor U-Boot does.
+	 */
+	mcr	p15, 0, r0, c7, c7, 0	/* invalidate I and D Cache */
+	mcr	p15, 0, r0, c8, c7, 0	/* invalidate TLB */
+#else
 flush_dcache:
 	mrc	p15, 0, r15, c7, c10, 3
 	bne	flush_dcache
 
 	mcr	p15, 0, r0, c8, c7, 0	/* invalidate TLB */
 	mcr	p15, 0, r0, c7, c5, 0	/* invalidate I Cache */
+#endif
 
 	/*
 	 * disable MMU and D cache
