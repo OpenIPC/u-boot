@@ -10,7 +10,8 @@
  * CONFIG_EXTRA_ENV_SETTINGS, CONFIG_BOOTARGS or CONFIG_BOOTCOMMAND itself:
  *
  *   OPENIPC_BASEADDR      where kernels and images are loaded
- *   OPENIPC_OSMEM         the kernel's mem=, e.g. "87M"
+ *   OPENIPC_OSMEM         the kernel's mem=, e.g. "87M"; without it the
+ *                         board sets osmem itself, from the DRAM size
  *   OPENIPC_SFC           the flash's MTD name in the kernel (mtdparts=)
  *   SPI NAND (CONFIG_ENV_IS_IN_NAND):
  *     OPENIPC_NAND_MTDPARTS  partition list, ending in "-(ubi)"
@@ -21,6 +22,16 @@
  *                            it before U-Boot (AX620U)
  *   SPI NOR: the layout every OpenIPC NOR camera shares (below); the boot
  *     partition ends at CONFIG_ENV_OFFSET, ubwrite's limit.
+ *   eMMC and SD card (CONFIG_ENV_IS_IN_MMC):
+ *     OPENIPC_EMMC_DEV, OPENIPC_SD_DEV  their U-Boot mmc numbers, the same
+ *                            as the kernel's mmcblk ones
+ *     OPENIPC_MMC_PARTS      the eMMC's partition list (blkdevparts=)
+ *     OPENIPC_MMC_KERNEL_BLK, OPENIPC_MMC_KERNEL_BLKS, OPENIPC_MMC_KERNEL_SIZE
+ *                            its kernel partition, in blocks and bytes
+ *     OPENIPC_MMC_ROOT_PART, OPENIPC_MMC_ROOT_BLK
+ *                            its root partition: number in the list, block
+ *     OPENIPC_KERNEL_ADDR, OPENIPC_FDT_ADDR, OPENIPC_FDTFILE
+ *                            the card's Image and device tree (booti)
  */
 
 #ifndef __OPENIPC_COMMON_H
@@ -60,7 +71,7 @@
  * openipc-hisilicon branch; openipc_helper() migrates an environment that
  * still carries it.
  */
-#define OPENIPC_ALTBOOTCMD "run fwrecovery; echo \"*** Boot limit exceeded -- entering FAILSAFE (network + SSH only) ***\"; setenv setargs setenv bootargs ${bootargs} failsafe; run setargs; if " OPENIPC_LOADKERNEL "; then bootm ${baseaddr}; fi"
+#define OPENIPC_ALTBOOTCMD "run fwrecovery; echo \"*** Boot limit exceeded -- entering FAILSAFE (network + SSH only) ***\"; setenv setargs setenv bootargs ${bootargs} failsafe; run setargs; if " OPENIPC_LOADKERNEL "; then " OPENIPC_BOOTKERNEL "; fi"
 #define OPENIPC_ALTBOOTCMD_RETIRED "echo \"*** Boot limit exceeded -- forcing firmware recovery ***\"; run fwupd"
 
 /*
@@ -90,7 +101,9 @@
  */
 #define OPENIPC_RETIRED_COMMON OPENIPC_RECOVERY_FETCH OPENIPC_RECOVERY_PROMPT
 
-#if defined(CONFIG_CMD_NET) || defined(CONFIG_MMC) || defined(CONFIG_USB_STORAGE)
+#if defined(CONFIG_ENV_IS_IN_MMC)
+#define OPENIPC_RECOVERY OPENIPC_RECOVERY_MMC
+#elif defined(CONFIG_CMD_NET) || defined(CONFIG_MMC) || defined(CONFIG_USB_STORAGE)
 #define OPENIPC_RECOVERY OPENIPC_RECOVERY_FETCH
 #else
 #define OPENIPC_RECOVERY OPENIPC_RECOVERY_PROMPT
@@ -100,9 +113,25 @@
  * source selection and the medium-agnostic update commands. The selected
  * medium provides ubfile/ubwrite/ukwrite/urwrite/loadkernel/mtdids/
  * mtdparts/bootargs. */
+/* What boots the loaded kernel (the MMC medium has its own) */
+#ifndef OPENIPC_BOOTKERNEL
+#define OPENIPC_BOOTKERNEL "bootm ${baseaddr}"
+#endif
+
+/* The card recovery and srcmmc read from (mmc 0 unless the board says) */
+#ifndef OPENIPC_SD_DEV
+#define OPENIPC_SD_DEV 0
+#endif
+
+#ifdef OPENIPC_OSMEM
+#define OPENIPC_ENV_OSMEM "osmem=" OPENIPC_OSMEM "\0"
+#else
+#define OPENIPC_ENV_OSMEM ""
+#endif
+
 #define OPENIPC_ENV_COMMON \
 	"baseaddr=" __stringify(OPENIPC_BASEADDR) "\0" \
-	"osmem=" OPENIPC_OSMEM "\0" \
+	OPENIPC_ENV_OSMEM \
 	"board_name\0" \
 	"board=" CONFIG_PRODUCT_SOC "\0" \
 	"vendor=" VENDOR "\0" \
@@ -113,7 +142,7 @@
 	"bootnfs=setenv setargs setenv bootargs ${bootargsnfs}; run setargs; ${source} ${baseaddr} uImage.${soc}; bootm ${baseaddr}\0" \
 	"source=tftpboot\0" \
 	"srcnet=setenv source tftpboot\0" \
-	"srcmmc=setenv source fatload mmc 0\0" \
+	"srcmmc=setenv source fatload mmc " __stringify(OPENIPC_SD_DEV) "\0" \
 	"srcusb=usb start; setenv source fatload usb 0\0" \
 	"ub=${source} ${baseaddr} ${ubfile} && run ubwrite\0" \
 	"uk=if ${source} ${baseaddr} uImage.${soc}; then run ukwrite; elif ${source} ${baseaddr} fitImage.${soc}; then run ukwrite; fi\0" \
@@ -123,7 +152,62 @@
 	"altbootcmd=" OPENIPC_ALTBOOTCMD "\0" \
 	OPENIPC_RECOVERY
 
-#ifndef CONFIG_ENV_IS_IN_NAND
+#if defined(CONFIG_ENV_IS_IN_MMC)
+
+/* ---------- eMMC and SD card ---------- */
+
+/*
+ * The firmware boots from the card when it carries one (FAT p1 Image, the
+ * firmware's SD image), else from the eMMC; firmware_scan()
+ * (common/openipc.c) looks every boot and sets, in RAM, medium (sd or
+ * emmc) and rootargs (root=, and the eMMC's blkdevparts=). loadkernel and
+ * the boot go through ${medium}load and ${medium}boot: booti of the
+ * card's Image and device tree, or bootm of the eMMC's kernel partition
+ * (a uImage or FIT).
+ */
+#define CONFIG_BOOTARGS "mem=\\${osmem} console=ttyS0,115200 panic=20 \\${rootargs} rootfstype=ext4 rw rootwait \\${extras}"
+
+#define OPENIPC_LOADKERNEL "run ${medium}load"
+#undef OPENIPC_BOOTKERNEL
+#define OPENIPC_BOOTKERNEL "run ${medium}boot"
+
+/*
+ * No firmware on either: stay at the prompt. Nothing is fetched and
+ * written by itself: until the eMMC has OpenIPC's layout, it holds the
+ * board's own firmware.
+ */
+#define OPENIPC_RECOVERY_MMC \
+	"fwrecovery=if env exists bootfail; then echo \"*** No firmware on the SD card (Image on its first partition) or the eMMC: staying at the prompt ***\"; fi\0" \
+	"bootflash=if env exists bootfail; then run fwrecovery; else setenv setargs setenv bootargs ${bootargs}; run setargs; run loadkernel && " OPENIPC_BOOTKERNEL "; reset; fi\0"
+
+#define OPENIPC_FWUPD "fwupd=run ur; run uk\0"
+
+/* A write of ${filesize} bytes from ${baseaddr} to the eMMC block <blk>,
+ * at most <max> bytes */
+#define OPENIPC_MMC_WRITE(what, blk, max) \
+	"if itest ${filesize} -gt 0 && itest ${filesize} -le " __stringify(max) "; then " \
+	"setexpr mmcblks ${filesize} + 0x1ff; setexpr mmcblks ${mmcblks} / 0x200; " \
+	"mmc dev " __stringify(OPENIPC_EMMC_DEV) " && mmc write ${baseaddr} " __stringify(blk) " ${mmcblks}; setenv mmcblks; " \
+	"else echo " what ": ${filesize} bytes do not fit, nothing written; fi"
+
+#define OPENIPC_ENV_MEDIUM \
+	"ubfile=u-boot-" CONFIG_PRODUCT_SOC "-emmc.bin\0" \
+	"urfile=rootfs.ext4." CONFIG_PRODUCT_SOC "\0" \
+	"ubwrite=echo ubwrite: the eMMC boot partition needs the OpenIPC first stage, not built yet; nothing written\0" \
+	"ukwrite=" OPENIPC_MMC_WRITE("ukwrite", OPENIPC_MMC_KERNEL_BLK, OPENIPC_MMC_KERNEL_SIZE) "\0" \
+	"urwrite=" OPENIPC_MMC_WRITE("urwrite", OPENIPC_MMC_ROOT_BLK, 0x7fffffff) "\0" \
+	"kernel_addr_r=" __stringify(OPENIPC_KERNEL_ADDR) "\0" \
+	"fdt_addr_r=" __stringify(OPENIPC_FDT_ADDR) "\0" \
+	"fdtfile=" OPENIPC_FDTFILE "\0" \
+	"sdload=fatload mmc " __stringify(OPENIPC_SD_DEV) ":1 ${kernel_addr_r} Image && fatload mmc " __stringify(OPENIPC_SD_DEV) ":1 ${fdt_addr_r} ${fdtfile}\0" \
+	"sdboot=booti ${kernel_addr_r} - ${fdt_addr_r}\0" \
+	"emmcload=mmc dev " __stringify(OPENIPC_EMMC_DEV) " && mmc read ${baseaddr} " __stringify(OPENIPC_MMC_KERNEL_BLK) " " __stringify(OPENIPC_MMC_KERNEL_BLKS) "\0" \
+	"emmcboot=bootm ${baseaddr}\0" \
+	"loadkernel=" OPENIPC_LOADKERNEL "\0" \
+	"mmcparts=mmcblk" __stringify(OPENIPC_EMMC_DEV) ":" OPENIPC_MMC_PARTS "\0" \
+	"bootargs=" CONFIG_BOOTARGS
+
+#elif !defined(CONFIG_ENV_IS_IN_NAND)
 
 /* ---------- SPI NOR ---------- */
 
@@ -255,7 +339,7 @@
 	"mtdparts=" SFC ":" OPENIPC_NAND_MTDPARTS "\0" \
 	"bootargs=" CONFIG_BOOTARGS
 
-#endif /* CONFIG_ENV_IS_IN_NAND */
+#endif /* CONFIG_ENV_IS_IN_MMC, NAND */
 
 #ifndef OPENIPC_RETIRED_MEDIUM
 #define OPENIPC_RETIRED_MEDIUM ""

@@ -10,11 +10,13 @@
 
 #include <common.h>
 #include <cpu_func.h>
+#include <fdtdec.h>
 #include <init.h>
 #include <linux/delay.h>
 #include <asm/armv8/mmu.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
+#include <asm/system.h>
 #include <linux/bitops.h>
 #include <linux/sizes.h>
 #include <mach/ax620e.h>
@@ -72,6 +74,59 @@ int arch_cpu_init(void)
 	return 0;
 }
 
+#ifdef CONFIG_AXERA_AX630C_EMMC
+/*
+ * The AX630C boards' LPDDR4, 0.5 to 4 GiB, by the board id the first
+ * stage reads from the ADC and leaves in misc_info (the Sipeed SDK's
+ * bl1 board.c get_board_id(), the same values in openipc/ax620e-spl):
+ * the MaixCAM2 SOM's ids on an AX630C or AX631. 0 for any other.
+ */
+static phys_size_t ax630c_board_ram_size(void)
+{
+	struct ax_misc_info *mi = (void *)AX_MISC_INFO_ADDR;
+
+	if (mi->chip_type != AX_CHIP_AX630C && mi->chip_type != AX_CHIP_AX631)
+		return 0;
+	switch (mi->phy_board_id) {
+	case AX_BOARD_MAIXCAM2_0_5G:
+		return SZ_512M;
+	case AX_BOARD_MAIXCAM2_1G:
+		return SZ_1G;
+	case AX_BOARD_MAIXCAM2_2G:
+		return SZ_2G;
+	case AX_BOARD_MAIXCAM2_4G:
+		return SZ_4G;
+	}
+	return 0;
+}
+
+/*
+ * Not probed: on a board started from its own U-Boot, the ATF and OP-TEE
+ * in the DRAM may be secure memory, which a probe would write to. Without
+ * a known board id, the size is the device tree's.
+ */
+int dram_init(void)
+{
+	gd->ram_size = ax630c_board_ram_size();
+	if (!gd->ram_size) {
+		if (fdtdec_setup_mem_size_base())
+			gd->ram_size = SZ_512M;
+		gd->ram_base = AX_DDR_BASE;
+	}
+	ax620e_mem_map[0].size = gd->ram_size;
+	return 0;
+}
+
+/*
+ * U-Boot itself (relocated to the top, its heap, the buffers it reads
+ * into) stays below 4 GiB, where the SD/eMMC controllers' 32-bit DMA
+ * reaches: the 4 GiB board's DRAM goes on to 0x140000000.
+ */
+ulong board_get_usable_ram_top(ulong total_size)
+{
+	return min_t(ulong, gd->ram_top, SZ_4G);
+}
+#else
 /*
  * The DDR: 256 MiB in the AX620Q package, at 0x40000000. U-Boot needs no
  * more, and the kernel's share is mem= in the environment.
@@ -83,6 +138,7 @@ int dram_init(void)
 	ax620e_mem_map[0].size = gd->ram_size;
 	return 0;
 }
+#endif
 
 int dram_init_banksize(void)
 {
@@ -122,6 +178,12 @@ int print_cpuinfo(void)
 	struct ax_misc_info *mi = (void *)AX_MISC_INFO_ADDR;
 
 	printf("SoC:   Axera AX620E (chip type %u)\n", mi->chip_type);
+#ifdef CONFIG_AXERA_AX630C_EMMC
+	printf("Board: id %u%s, U-Boot in EL%u\n", mi->phy_board_id,
+	       ax630c_board_ram_size() ? "" :
+	       " (not a MaixCAM2's: DRAM size from the device tree)",
+	       current_el());
+#endif
 	return 0;
 }
 #endif

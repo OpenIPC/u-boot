@@ -5,13 +5,14 @@
 # A target is <soc>-<flash>, e.g. ax620u-nand; the image is
 # output/u-boot-<soc>-<flash>.bin, written at flash 0 (for the Axera SoCs
 # also u-boot-<soc>-<flash>-stockspl.bin, the same with the cameras' own
-# first stage). Failures are collected: every requested target is attempted and the script exits non-zero if any of them failed.
+# first stage; for the AX630C, which has none yet, u-boot-ax630c.bin, the
+# U-Boot its own bootloader starts from the SD card). Failures are collected: every requested target is attempted and the script exits non-zero if any of them failed.
 
 cd "$(dirname "$0")"
 
 export ARCH=arm
 export CROSS_COMPILE=${CROSS_COMPILE:-arm-linux-gnueabi-}
-# The AArch64 SoCs (AX620E)
+# The AArch64 SoCs (AX620E, AX630C)
 CROSS_COMPILE_64=${CROSS_COMPILE_64:-aarch64-linux-gnu-}
 
 BOOT_SRCDIR=$(pwd)
@@ -127,6 +128,20 @@ ax620e_image() {
     pack "u-boot-${target}-stockspl.bin" --signed "${stock}"
 }
 
+# AX630C (eMMC and SD card): no OpenIPC first stage for it yet, so no
+# image for the eMMC's boot partition (u-boot-<target>.bin). The board's
+# own U-Boot loads this one from the SD card's first partition and starts
+# it (go) at CONFIG_SYS_TEXT_BASE: output/u-boot-<soc>.bin, U-Boot as it
+# is linked.
+ax630c_image() {
+    target=$1
+    builddir=$2
+    out=output/u-boot-${target%%-*}.bin
+    text=$(sed -n 's/^CONFIG_SYS_TEXT_BASE=//p' "${builddir}/.config")
+    cp "${builddir}/u-boot.bin" "${out}" || return 1
+    echo "${out}: $(stat -c %s "${out}") bytes, to be loaded and started at ${text}"
+}
+
 build_target() {
     target=$1
     config=openipc/${target}_config
@@ -136,7 +151,7 @@ build_target() {
     [ -f "${config}" ] || { echo "unsupported target: ${target}" >&2; return 1; }
 
     case "${target}" in
-        ax620e-*) cross=${CROSS_COMPILE_64} ;;
+        ax620e-*|ax630c-*) cross=${CROSS_COMPILE_64} ;;
         *) cross=${CROSS_COMPILE} ;;
     esac
     make_opts="${make_opts} CROSS_COMPILE=${cross}"
@@ -149,6 +164,7 @@ build_target() {
 
     case "${target}" in
         ax620e-*) ax620e_image "${target}" "${builddir}" ;;
+        ax630c-*) ax630c_image "${target}" "${builddir}" ;;
         ax620u-*) ax620u_image "${target}" "${builddir}" ;;
         *) echo "${target}: no image layout" >&2; return 1 ;;
     esac
