@@ -406,7 +406,8 @@ with `AXERA_AX630C_EMMC`: `include/configs/ax630c.h`,
   changes nothing; `psci=0` turns it off.
 - DRAM: the board id the first stage leaves in misc_info (0x740: chip
   type AX630C/AX631, ADC board id 2/5/10/14 = 0.5/1/2/4 GiB, the
-  MaixCAM2 SOMs); without one the device tree's 1 GiB. Not probed: the
+  MaixCAM2 SOMs); without one the device tree's 512 MiB, the smallest
+  SOM (less than a larger board has, never more). Not probed: the
   ATF/OP-TEE memory may be secure. U-Boot stays below 4 GiB
   (`board_get_usable_ram_top()`, 32-bit SDHCI DMA). `totalmem` is the
   DRAM size; `osmem`, when the environment has none, a quarter of it,
@@ -464,7 +465,7 @@ qemu-system-aarch64 -M ax620e,chip=ax630c -m 1G -smp 1 -nographic \
 The loader starts U-Boot in EL1, as the OpenIPC first stage would.
 Checked: the firmware's SD image autoboots to the OpenIPC login with
 `mem=` and the vendor modules loaded (CMM pool from mem= to the end of
-the DRAM), 1 GiB without a board id and 4 GiB with id 14. QEMU's eMMC
+the DRAM), 512 MiB without a board id and 4 GiB with id 14. QEMU's eMMC
 has no 1.8 V: with the eMMC node's `sdhci-caps-mask` removed (in a test
 copy of U-Boot's and the kernel's device trees) the first boot saves
 the environment, `saveenv`/`reset` keeps it, `fw_printenv`/`fw_setenv`

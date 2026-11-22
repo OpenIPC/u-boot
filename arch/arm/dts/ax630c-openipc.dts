@@ -28,13 +28,13 @@
 	};
 
 	/*
-	 * The smallest common MaixCAM2, 1 GiB: dram_init() takes this only
+	 * The smallest MaixCAM2 SOM, 512 MiB: dram_init() takes this only
 	 * when the first stage left no MaixCAM2 board id (0.5/1/2/4 GiB) in
-	 * misc_info
+	 * misc_info. Less than a larger board has, never more than it has.
 	 */
 	memory@40000000 {
 		device_type = "memory";
-		reg = <0x0 0x40000000 0x0 0x40000000>;
+		reg = <0x0 0x40000000 0x0 0x20000000>;
 	};
 
 	soc {
