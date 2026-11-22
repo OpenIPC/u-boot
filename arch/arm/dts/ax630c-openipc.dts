@@ -1,0 +1,116 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * AX630C board with eMMC and an SD slot (Sipeed MaixCAM2), as OpenIPC's
+ * U-Boot sees it: UART0, the Ethernet MAC with the SoC's own 10/100 PHY,
+ * the eMMC and the TF slot on the two Cadence SD4HC controllers.
+ * Addresses, bus widths, capability masks and PHY delays are the Sipeed
+ * SDK U-Boot's (arch/arm/dts/AX620E_emmc.dts) and the OpenIPC kernel's
+ * (ax630c-maixcam2.dts); mmc0 is the eMMC and mmc1 the card, as in both.
+ */
+
+/dts-v1/;
+
+/ {
+	model = "Axera AX630C (OpenIPC)";
+	compatible = "sipeed,maixcam2", "axera,ax630c", "axera,ax620e";
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	aliases {
+		serial0 = &uart0;
+		ethernet0 = &eth0;
+		mmc0 = &emmc;
+		mmc1 = &sd;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	/*
+	 * The smallest MaixCAM2 SOM, 512 MiB: dram_init() takes this only
+	 * when the first stage left no MaixCAM2 board id (0.5/1/2/4 GiB) in
+	 * misc_info. Less than a larger board has, never more than it has.
+	 */
+	memory@40000000 {
+		device_type = "memory";
+		reg = <0x0 0x40000000 0x0 0x20000000>;
+	};
+
+	soc {
+		compatible = "simple-bus";
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+		u-boot,dm-pre-reloc;
+
+		uart0: serial@4880000 {
+			compatible = "snps,dw-apb-uart";
+			reg = <0x0 0x04880000 0x0 0x400>;
+			reg-shift = <2>;
+			reg-io-width = <4>;
+			clock-frequency = <208000000>;
+			u-boot,dm-pre-reloc;
+		};
+
+		eth0: ethernet@104c0000 {
+			compatible = "axera,ax620e-eqos";
+			reg = <0x0 0x104c0000 0x0 0x10000>;
+			phy-mode = "rmii";
+		};
+
+		/*
+		 * The eMMC: 8 bits, its I/O at 1.8 V only (the 3.3/3.0 V and
+		 * SDR104 capabilities masked, the 8-bit one added, as the
+		 * SDK's U-Boot and the kernel do). board_init() sets the card
+		 * clock as the SDK's sdhci_ax620e.c does.
+		 */
+		emmc: mmc@1b40000 {
+			compatible = "cdns,sd4hc";
+			reg = <0x0 0x01b40000 0x0 0x1000>;
+			bus-width = <8>;
+			sdhci-caps-mask = <0x2 0x03200000>;
+			sdhci-caps = <0x0 0x00040000>;
+			non-removable;
+			no-sd;
+			no-sdio;
+			cap-mmc-highspeed;
+			cdns,phy-input-delay-sd-highspeed = <2>;
+			cdns,phy-input-delay-legacy = <4>;
+			cdns,phy-input-delay-sd-uhs-sdr12 = <1>;
+			cdns,phy-input-delay-sd-uhs-sdr25 = <2>;
+			cdns,phy-input-delay-sd-uhs-sdr50 = <1>;
+			cdns,phy-input-delay-sd-uhs-ddr50 = <2>;
+			cdns,phy-input-delay-mmc-highspeed = <2>;
+			cdns,phy-input-delay-mmc-ddr = <2>;
+			cdns,phy-dll-delay-sdclk = <0>;
+			cdns,phy-dll-delay-sdclk-hsmmc = <23>;
+			cdns,phy-dll-delay-strobe = <18>;
+		};
+
+		/*
+		 * The TF slot: 4 bits, 3.3 V, no card detect line
+		 * ("broken-cd", as in the vendor trees: the card is looked
+		 * for). board_init() sets the card clock and pads.
+		 */
+		sd: mmc@104e0000 {
+			compatible = "cdns,sd4hc";
+			reg = <0x0 0x104e0000 0x0 0x1000>;
+			bus-width = <4>;
+			sdhci-caps-mask = <0x7 0x200000>;
+			cap-sd-highspeed;
+			no-1-8-v;
+			no-sdio;
+			no-mmc;
+			disable-wp;
+			broken-cd;
+			cdns,phy-input-delay-sd-highspeed = <0x2>;
+			cdns,phy-input-delay-legacy = <0x3>;
+			cdns,phy-input-delay-sd-uhs-sdr12 = <0x3>;
+			cdns,phy-input-delay-sd-uhs-sdr25 = <0x2>;
+			cdns,phy-input-delay-sd-uhs-sdr50 = <0x0>;
+			cdns,phy-input-delay-sd-uhs-ddr50 = <0x0>;
+			cdns,phy-dll-delay-sdclk = <0x0>;
+		};
+	};
+};

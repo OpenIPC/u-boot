@@ -19,6 +19,7 @@ v2022.10**, the same release as the other `openipc-*` branches, plus:
 | --- | --- | --- |
 | AX620U (`axera,ax620x`, 4x Cortex-A7, AArch32) | `ax620u-nand` | qemu-bench `-M ax620u` to OpenIPC's userspace; **no silicon** |
 | AX620E family (AX620Q/AX630C, 2x Cortex-A53, AArch64) | `ax620e-nor` | qemu-bench `-M ax620e` to OpenIPC's userspace and back; **no silicon** |
+| AX630C (Sipeed MaixCAM2: eMMC, TF slot, 0.5-4 GiB) | `ax630c-emmc` | started by the board's own U-Boot from the card; qemu-bench `-M ax620e,chip=ax630c` to OpenIPC's userspace from the card; **no silicon** |
 
 `git show origin/openipc-hisilicon:CLAUDE.md` covers the OpenIPC layer
 (default environment, `common/openipc.c`, env compatibility); it applies
@@ -57,6 +58,7 @@ mainline's xhci-dwc3), and sets the SD card clock and pads in
 ```sh
 ./build.sh                 # every openipc/<target>_config
 ./build.sh ax620u-nand     # -> output/u-boot-ax620u-nand{,-stockspl}.bin
+./build.sh ax630c-emmc     # -> output/u-boot-ax630c-emmc.bin (for the SD card)
 ```
 
 `build.sh` runs `olddefconfig` on `openipc/<target>_config` (a complete
@@ -369,3 +371,127 @@ chip type qemu-bench's `chip=` reports) and on the AX630C one a qemu-bench
 without `chip=` gives (an eFuse of zeros). QEMU's DDR models accept any
 settings: only a camera tests the DDR. The `-stockspl` image boots the
 same way (env save, `reset`, env loaded, kernel to login).
+
+## AX630C (`ax630c-emmc`)
+
+The AX620E port (`arch/arm/mach-axera/ax620e`, `board/axera/ax620e`)
+with `AXERA_AX630C_EMMC`: `include/configs/ax630c.h`,
+`arch/arm/dts/ax630c-openipc.dts`, the environment in the eMMC.
+
+### Boot
+
+- No OpenIPC first stage for the eMMC yet, so no boot partition image.
+  The board's own chain (boot ROM, its first stage, ATF, OP-TEE, its
+  U-Boot 2020.04) starts this U-Boot from the card:
+  `output/u-boot-ax630c-emmc.bin` is `u-boot.bin` as linked, loaded and
+  started at `SYS_TEXT_BASE` 0x50000000 (clear of the stock U-Boot at
+  0x5C000400, its ATF at 0x40040000 and OP-TEE at 0x44200000; 4 KiB
+  aligned). At the stock prompt (`dcache off` first: its MMU tables are
+  where this U-Boot relocates to):
+
+  ```
+  fatload mmc 1:1 0x50000000 u-boot-ax630c-emmc.bin
+  dcache off
+  icache off
+  go 0x50000000
+  ```
+
+- Started that way it runs in whatever EL the stock U-Boot ran in (EL2
+  is expected under the ATF, not confirmed). In EL2, or with `psci=1` in
+  the environment, `ft_board_setup()` gives the kernel's device tree a
+  PSCI node, `enable-method = "psci"` on the CPUs and no-map
+  reserved-memory for the ATF (0x40040000, 256 KiB) and OP-TEE
+  (0x44200000, 32 MiB): the OpenIPC device tree has spin-table CPUs and
+  knows of neither. In EL1 (the OpenIPC first stage to come, QEMU) it
+  changes nothing; `psci=0` turns it off.
+- The same two ranges (`ax630c_secure[]`, `arch/arm/mach-axera/ax620e/soc.c`)
+  stay out of U-Boot's own MMU map when it is entered above EL1:
+  `dram_init()` splits the DRAM's Normal region around them (the EL is
+  known then, the environment is not). With `psci=1` in EL1,
+  `misc_init_r()` makes them invalid in the live tables
+  (`mmu_change_region_attr()`). Either way `board_lmb_reserve()` keeps
+  `fatload`, `bootm`'s device tree and initrd out of them ("Reading
+  file would overwrite reserved memory"); `psci=0` does not map them
+  back. A cacheable mapping of TrustZone memory would let the core
+  prefetch from it (an external abort).
+- DRAM: the board id the first stage leaves in misc_info (0x740: chip
+  type AX630C/AX631, ADC board id 2/5/10/14 = 0.5/1/2/4 GiB, the
+  MaixCAM2 SOMs); without one the device tree's 512 MiB, the smallest
+  SOM (less than a larger board has, never more). Not probed: the
+  ATF/OP-TEE memory may be secure. U-Boot stays below 4 GiB
+  (`board_get_usable_ram_top()`, 32-bit SDHCI DMA). `totalmem` is the
+  DRAM size; `osmem`, when the environment has none, a quarter of it,
+  128 MiB to 1 GiB (256M on 1 GiB, 1024M on 4 GiB): `mem=${osmem}`, the
+  rest is the CMM pool `load_axera` makes from totalmem and mem=.
+- `firmware_scan()` (`common/openipc.c`, `OPENIPC_MMC`) looks for
+  `Image` and `${fdtfile}` on the card's FAT p1 (mmc 1), and for a
+  bootable uImage (header CRC, arm64 kernel) or FIT (a root `/images`
+  node, not a bare device tree) at the eMMC's kernel partition (mmc 0,
+  1 MiB), and sets `medium` (`sd`, `emmc`) and `rootargs` in RAM, the
+  card first; with firmware on both, `emmcargs` too. `bootcmd` (`run
+  bootflash`) runs `${medium}load` and `${medium}boot`: `booti` of
+  `Image` and `ax630c-maixcam2.dtb` (`fdtfile`) with
+  `root=/dev/mmcblk1p2`, or `bootm` of the eMMC's kernel with
+  `root=/dev/mmcblk0p4 blkdevparts=${mmcparts}`. A card that does not
+  load or boot falls back to the eMMC (`emmcargs`, `setargs` run again:
+  it keeps `${rootargs}` unexpanded); what does not boot then leaves
+  U-Boot at the prompt, no reset. Neither found: `bootfail`, the prompt
+  (nothing is fetched and written by itself while the eMMC holds the
+  board's own firmware). Recovery: `script.txt` on the card only.
+
+### Layout and environment
+
+The eMMC user area, no partition table (the boot ROM reads the first
+stage from 0): `768k(boot),256k(env),16384k(kernel),-(rootfs)`
+(`mmcparts`, the kernel's `blkdevparts=`, which needs
+`CONFIG_CMDLINE_PARTITION`). The environment at 0xc0000, 256 KiB,
+`ENV_IS_IN_MMC` on mmc 0. `mmc_get_env_addr()` (`common/openipc.c`)
+refuses an area that is neither blank (one byte value) nor an
+environment: on a MaixCAM2 still in its own layout 0xc0000 is its
+DDR/ATF partition, so U-Boot boots with the defaults and `saveenv`
+fails there instead of overwriting it. The first boot saves the
+defaults on a blank area. No `env erase` (`CMD_ERASEENV` off): the
+MMC backend erases whole erase groups (512 KiB and more), which reach
+into the boot partition before 0xc0000. `ukwrite`/`urwrite` write the kernel and
+root partitions; `ubwrite` waits for the first stage. Linux reads the
+environment with `/dev/mmcblk0 0xc0000 0x40000` in `fw_env.config`.
+
+### Hardware
+
+- eMMC: mainline `sdhci-cadence` on the SD4HC at 0x1b40000, 8 bits, the
+  SDK's capability mask (1.8 V only) and PHY delays; `board_init()` sets
+  its card clock (CPU_SYS_GLB: NPLL 400 MHz / 2) as the SDK's
+  `sdhci_ax620e.c`. The TF slot as on the AX620E (0x104e0000, mmc 1
+  here). No HS200 in U-Boot.
+- UART0, Ethernet (the SoC's own PHY) as on the AX620E. No USB.
+
+### Verification (qemu-bench `-M ax620e,chip=ax630c`)
+
+```sh
+qemu-system-aarch64 -M ax620e,chip=ax630c -m 1G -smp 1 -nographic \
+    -device loader,file=u-boot-ax630c-emmc.bin,addr=0x50000000,cpu-num=0 \
+    -drive if=sd,index=0,file=emmc.img,format=raw \
+    -drive if=sd,index=1,file=sdcard.img,format=raw -nic user
+# a MaixCAM2 board id: chip type at 0x784, board id at 0x79c
+#   -device loader,addr=0x784,data=4,data-len=4 \
+#   -device loader,addr=0x79c,data=14,data-len=4 -m 4G
+```
+
+The loader starts U-Boot in EL1, as the OpenIPC first stage would.
+Checked: the firmware's SD image autoboots to the OpenIPC login with
+`mem=` and the vendor modules loaded (CMM pool from mem= to the end of
+the DRAM), 512 MiB without a board id and 4 GiB with id 14. QEMU's eMMC
+has no 1.8 V: with the eMMC node's `sdhci-caps-mask` removed (in a test
+copy of U-Boot's and the kernel's device trees) the first boot saves
+the environment, `saveenv`/`reset` keeps it, `fw_printenv`/`fw_setenv`
+in Linux read and write it, a FIT at 1 MiB boots from the eMMC (also when the card has `Image` but
+no device tree, or an `Image` booti refuses), a bare device tree there
+leaves U-Boot at the prompt; with it,
+U-Boot has no environment device and boots with the defaults. The
+model releases CPU1 by spin-table only under `flash-file=`: with the
+loader it comes up only by PSCI (`psci=1`). Linux's `reboot` does not
+reset the model (only its watchdog does; U-Boot's `reset` uses it).
+With `flash-file=` (any file) the loader starts U-Boot in EL3: the
+secure ranges are then out of the map (`md` there aborts, a
+translation fault), as with `psci=1` in EL1.
+

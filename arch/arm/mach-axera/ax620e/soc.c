@@ -10,11 +10,15 @@
 
 #include <common.h>
 #include <cpu_func.h>
+#include <fdtdec.h>
+#include <env.h>
 #include <init.h>
+#include <lmb.h>
 #include <linux/delay.h>
 #include <asm/armv8/mmu.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
+#include <asm/system.h>
 #include <linux/bitops.h>
 #include <linux/sizes.h>
 #include <mach/ax620e.h>
@@ -23,7 +27,8 @@ DECLARE_GLOBAL_DATA_PTR;
 
 static struct mm_region ax620e_mem_map[] = {
 	{
-		/* Normal memory over the DRAM there is: dram_init() sizes it */
+		/* Normal memory over the DRAM there is: dram_init() sizes it
+		 * (and, on the AX630C, may split it in three) */
 		.virt = AX_DDR_BASE,
 		.phys = AX_DDR_BASE,
 		.size = SZ_256M,
@@ -40,7 +45,11 @@ static struct mm_region ax620e_mem_map[] = {
 	}, {
 		/* List terminator */
 		0,
-	}
+	},
+#ifdef CONFIG_AXERA_AX630C_EMMC
+	/* Room for the DRAM's other two pieces around the secure ranges */
+	{ 0, }, { 0, },
+#endif
 };
 
 struct mm_region *mem_map = ax620e_mem_map;
@@ -72,6 +81,151 @@ int arch_cpu_init(void)
 	return 0;
 }
 
+#ifdef CONFIG_AXERA_AX630C_EMMC
+/*
+ * The AX630C boards' LPDDR4, 0.5 to 4 GiB, by the board id the first
+ * stage reads from the ADC and leaves in misc_info (the Sipeed SDK's
+ * bl1 board.c get_board_id(), the same values in openipc/ax620e-spl):
+ * the MaixCAM2 SOM's ids on an AX630C or AX631. 0 for any other.
+ */
+static phys_size_t ax630c_board_ram_size(void)
+{
+	struct ax_misc_info *mi = (void *)AX_MISC_INFO_ADDR;
+
+	if (mi->chip_type != AX_CHIP_AX630C && mi->chip_type != AX_CHIP_AX631)
+		return 0;
+	switch (mi->phy_board_id) {
+	case AX_BOARD_MAIXCAM2_0_5G:
+		return SZ_512M;
+	case AX_BOARD_MAIXCAM2_1G:
+		return SZ_1G;
+	case AX_BOARD_MAIXCAM2_2G:
+		return SZ_2G;
+	case AX_BOARD_MAIXCAM2_4G:
+		return SZ_4G;
+	}
+	return 0;
+}
+
+/*
+ * The board's ATF and OP-TEE, resident under this U-Boot when the board's
+ * own chain started it (the Sipeed SDK's partition_ab.mak: ATF_IMG_ADDR,
+ * ATF_IMG_PKG_SIZE, OPTEE_IMAGE_ADDR, OPTEE_RESERVED_SIZE). The memory map
+ * leaves them out, U-Boot's loads keep out of them (board_lmb_reserve())
+ * and ft_board_setup() reserves them for the kernel.
+ */
+const struct fdt_memory ax630c_secure[AX630C_SECURE_REGIONS] = {
+	{ .start = AX630C_ATF_BASE,
+	  .end = AX630C_ATF_BASE + AX630C_ATF_SIZE - 1 },
+	{ .start = AX630C_OPTEE_BASE,
+	  .end = AX630C_OPTEE_BASE + AX630C_OPTEE_SIZE - 1 },
+};
+
+/*
+ * Entered above EL1, U-Boot was started from the board's own chain, with
+ * its ATF and OP-TEE in the DRAM; psci=1 in the environment says so
+ * where the EL does not (a firmware that hands over in EL1). psci=0 does
+ * not map them back: unmapped, they cost U-Boot nothing.
+ */
+bool ax630c_secure_resident(void)
+{
+	const char *p;
+
+	if (current_el() > 1)
+		return true;
+	if (!(gd->flags & GD_FLG_ENV_READY))
+		return false;
+	p = env_get("psci");
+	return p && (*p == '1' || *p == 'y');
+}
+
+/*
+ * The DRAM's Normal mapping, without the secure ranges when that firmware
+ * is there: a cacheable mapping of TrustZone memory lets the core
+ * prefetch from it, an external abort. Known from the EL already, before
+ * the MMU is on (initr_caches(), after relocation, takes this map); the
+ * environment is not, so psci=1 unmaps them later
+ * (ax630c_secure_late()).
+ */
+static void ax630c_mem_map(void)
+{
+	struct mm_region *m = ax620e_mem_map;
+	struct mm_region dram = m[0], regs = m[1];
+	phys_addr_t start = AX_DDR_BASE, end = AX_DDR_BASE + gd->ram_size;
+	int i, n = 0;
+
+	if (current_el() > 1) {
+		for (i = 0; i < AX630C_SECURE_REGIONS; i++) {
+			dram.virt = dram.phys = start;
+			dram.size = ax630c_secure[i].start - start;
+			m[n++] = dram;
+			start = ax630c_secure[i].end + 1;
+		}
+	}
+	dram.virt = dram.phys = start;
+	dram.size = end - start;
+	m[n++] = dram;
+	m[n++] = regs;
+	memset(&m[n], 0, sizeof(m[n]));
+}
+
+/*
+ * psci=1 with U-Boot in EL1: the map is in use already, so the secure
+ * ranges go invalid in it now (misc_init_r(), the environment loaded).
+ */
+void ax630c_secure_late(void)
+{
+	int i;
+
+	if (current_el() > 1 || !ax630c_secure_resident() || !dcache_status())
+		return;
+	for (i = 0; i < AX630C_SECURE_REGIONS; i++)
+		mmu_change_region_attr(ax630c_secure[i].start,
+				       ax630c_secure[i].end + 1 -
+				       ax630c_secure[i].start,
+				       PTE_TYPE_FAULT);
+}
+
+/* No load, initrd or device tree copy into that firmware's memory */
+void board_lmb_reserve(struct lmb *lmb)
+{
+	int i;
+
+	if (!ax630c_secure_resident())
+		return;
+	for (i = 0; i < AX630C_SECURE_REGIONS; i++)
+		lmb_reserve(lmb, ax630c_secure[i].start,
+			    ax630c_secure[i].end + 1 - ax630c_secure[i].start);
+}
+
+/*
+ * Not probed: on a board started from its own U-Boot, the ATF and OP-TEE
+ * in the DRAM may be secure memory, which a probe would write to. Without
+ * a known board id, the size is the device tree's: the smallest MaixCAM2,
+ * 512 MiB.
+ */
+int dram_init(void)
+{
+	gd->ram_size = ax630c_board_ram_size();
+	if (!gd->ram_size) {
+		if (fdtdec_setup_mem_size_base())
+			gd->ram_size = SZ_512M;
+		gd->ram_base = AX_DDR_BASE;
+	}
+	ax630c_mem_map();
+	return 0;
+}
+
+/*
+ * U-Boot itself (relocated to the top, its heap, the buffers it reads
+ * into) stays below 4 GiB, where the SD/eMMC controllers' 32-bit DMA
+ * reaches: the 4 GiB board's DRAM goes on to 0x140000000.
+ */
+ulong board_get_usable_ram_top(ulong total_size)
+{
+	return min_t(ulong, gd->ram_top, SZ_4G);
+}
+#else
 /*
  * The DDR: 256 MiB in the AX620Q package, at 0x40000000. U-Boot needs no
  * more, and the kernel's share is mem= in the environment.
@@ -83,6 +237,7 @@ int dram_init(void)
 	ax620e_mem_map[0].size = gd->ram_size;
 	return 0;
 }
+#endif
 
 int dram_init_banksize(void)
 {
@@ -122,6 +277,12 @@ int print_cpuinfo(void)
 	struct ax_misc_info *mi = (void *)AX_MISC_INFO_ADDR;
 
 	printf("SoC:   Axera AX620E (chip type %u)\n", mi->chip_type);
+#ifdef CONFIG_AXERA_AX630C_EMMC
+	printf("Board: id %u%s, U-Boot in EL%u\n", mi->phy_board_id,
+	       ax630c_board_ram_size() ? "" :
+	       " (not a MaixCAM2's: DRAM size from the device tree)",
+	       current_el());
+#endif
 	return 0;
 }
 #endif

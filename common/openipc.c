@@ -1,4 +1,5 @@
 #include <asm/byteorder.h>
+#include <blk.h>
 #include <asm/unaligned.h>
 #include <command.h>
 #include <common.h>
@@ -26,6 +27,12 @@
 #if defined(CONFIG_FMC_SPI_NAND) || defined(CONFIG_JZ_SFC_NAND) || \
     defined(CONFIG_NAND_MS_SPINAND) || defined(CONFIG_MTD_SPI_NAND)
 #define OPENIPC_SPI_NAND
+#endif
+/* The eMMC and the SD card (Axera AX630C); else the SPI NOR */
+#if defined(CONFIG_ENV_IS_IN_MMC)
+#define OPENIPC_MMC
+#elif !defined(OPENIPC_SPI_NAND)
+#define OPENIPC_SPI_NOR
 #endif
 #ifdef CONFIG_ENV_IS_IN_NAND
 #include <nand.h>
@@ -110,7 +117,7 @@ static int __maybe_unused check_kernel(void *buf) {
   return 0;
 }
 
-#ifndef OPENIPC_SPI_NAND
+#ifdef OPENIPC_SPI_NOR
 
 static uint64_t get_squashfs_size(void *buf) {
   uint32_t magic = get_unaligned_be32(buf);
@@ -224,7 +231,7 @@ static int scan_spi_device(struct spi_flash *flash, ulong *kernel_off, ulong *ro
   return 0;
 }
 
-#endif /* !OPENIPC_SPI_NAND */
+#endif /* OPENIPC_SPI_NOR */
 
 #if (defined(CONFIG_MMC) || defined(CONFIG_USB_STORAGE)) && defined(CONFIG_FS_FAT)
 #define RECOVERY_KERNEL 0
@@ -233,20 +240,25 @@ static int scan_spi_device(struct spi_flash *flash, ulong *kernel_off, ulong *ro
 static const char *recovery_if, *recovery_part;
 
 /* The first partition, else the whole medium (a card formatted without a
- * partition table); the one that worked is remembered for the calls after. */
+ * partition table); the one that worked is remembered for the calls after.
+ * The card is mmc OPENIPC_SD_DEV, the stick usb 0. */
 static int recovery_mount(const char *ifname) {
+  int mmc = !strcmp(ifname, "mmc");
+  const char *first = mmc ? __stringify(OPENIPC_SD_DEV) ":1" : "0:1";
+  const char *whole = mmc ? __stringify(OPENIPC_SD_DEV) : "0";
+
   if (recovery_if != ifname) {
     recovery_if = ifname;
     recovery_part = NULL;
   }
   if (recovery_part)
     return fs_set_blk_dev(ifname, recovery_part, FS_TYPE_FAT) ? -1 : 0;
-  if (!fs_set_blk_dev(ifname, "0:1", FS_TYPE_FAT)) {
-    recovery_part = "0:1";
+  if (!fs_set_blk_dev(ifname, first, FS_TYPE_FAT)) {
+    recovery_part = first;
     return 0;
   }
-  if (!fs_set_blk_dev(ifname, "0", FS_TYPE_FAT)) {
-    recovery_part = "0";
+  if (!fs_set_blk_dev(ifname, whole, FS_TYPE_FAT)) {
+    recovery_part = whole;
     return 0;
   }
   return -1;
@@ -419,7 +431,7 @@ static int recovery_write(const char *name, int type) {
 
   return 1;
 }
-#else
+#elif defined(OPENIPC_SPI_NOR)
 static struct spi_flash *recovery_flash;
 
 static int recovery_flash_holds(ulong addr, const void *data, ulong len) {
@@ -629,15 +641,18 @@ static int recovery_try(void) {
    * to the image and rootfs_data takes the rest. */
   sprintf(name, "rootfs.ubifs.%s.img", CONFIG_PRODUCT_SOC);
   return recovery_write(name, RECOVERY_ROOTFS) > 0;
-#else
+#elif defined(OPENIPC_SPI_NOR)
   return recovery_images() > 0;
+#else
+  /* eMMC: script.txt only, for now. The card is the firmware itself. */
+  return 0;
 #endif
 }
 
 int firmware_recovery(void) {
   int found = 0;
 
-#ifndef OPENIPC_SPI_NAND
+#ifdef OPENIPC_SPI_NOR
   recovery_flash = spi_flash_probe(CONFIG_SF_DEFAULT_BUS, CONFIG_SF_DEFAULT_CS,
                                    CONFIG_SF_DEFAULT_SPEED,
                                    CONFIG_SF_DEFAULT_MODE);
@@ -647,7 +662,7 @@ int firmware_recovery(void) {
 
 #ifdef CONFIG_MMC
 	{
-		struct mmc *mmc = find_mmc_device(0);
+		struct mmc *mmc = find_mmc_device(OPENIPC_SD_DEV);
 
 		if (mmc && !mmc_init(mmc) && !recovery_mount("mmc"))
 			found |= recovery_try();
@@ -660,7 +675,7 @@ int firmware_recovery(void) {
 #endif
 
   fs_close();
-#ifndef OPENIPC_SPI_NAND
+#ifdef OPENIPC_SPI_NOR
   spi_flash_free(recovery_flash);
 #endif
 
@@ -793,8 +808,220 @@ static int nor_split_header_bad(struct spi_flash *flash, ulong kernel_off)
 }
 #endif
 
+#ifdef OPENIPC_MMC
+/* An MMC device that answers, or NULL */
+static struct mmc *openipc_mmc(int dev) {
+  struct mmc *mmc = find_mmc_device(dev);
+
+  if (!mmc || mmc_init(mmc))
+    return NULL;
+  return mmc;
+}
+
+/* A file on the card's first partition (FAT) */
+static int mmc_sd_has(const char *name) {
+  if (fs_set_blk_dev("mmc", __stringify(OPENIPC_SD_DEV) ":1", FS_TYPE_FAT))
+    return 0;
+  return fs_exists(name);
+}
+
+/* The card's firmware: Image and the device tree sdload reads, on its
+ * first partition, FAT (the firmware's SD image) */
+static int mmc_sd_firmware(void) {
+  const char *fdtfile = env_get("fdtfile");
+
+  if (!openipc_mmc(OPENIPC_SD_DEV))
+    return 0;
+  if (!mmc_sd_has("Image"))
+    return 0;
+  if (!fdtfile || !mmc_sd_has(fdtfile)) {
+    printf("SD card: Image, but no %s\n", fdtfile ? fdtfile : "fdtfile");
+    return 0;
+  }
+  return 1;
+}
+
+/* The eMMC kernel partition's first blocks: a uImage header, or a FIT's
+ * structure up to its /images node */
+#define MMC_KERNEL_PEEK 8192
+
+/*
+ * A FIT, not a bare device tree: a node /images under the root. Only the
+ * first blocks are read, so the walk keeps to them (libfdt would trust
+ * totalsize): the root's properties, then its subnodes and theirs until
+ * /images. A FIT's images carry their data, megabytes: mkimage puts
+ * /images before /configurations, and the walk ends in its first image.
+ */
+static int mmc_fit_has_images(const u8 *buf, ulong len) {
+  ulong off = fdt_off_dt_struct(buf);
+  ulong end = off + fdt_size_dt_struct(buf);
+  int depth = 0;
+
+  if (end > len)
+    end = len;
+  while (off + 4 <= end) {
+    u32 tag = get_unaligned_be32(buf + off);
+    const char *name;
+    ulong n;
+
+    off += 4;
+    switch (tag) {
+    case FDT_BEGIN_NODE:
+      name = (const char *)buf + off;
+      n = strnlen(name, end - off);
+      if (n == end - off)
+        return 0;
+      if (depth == 1 && !strcmp(name, FIT_IMAGES_PATH + 1))
+        return 1;
+      depth++;
+      off += ALIGN(n + 1, 4);
+      break;
+    case FDT_PROP:
+      if (off + 8 > end)
+        return 0;
+      off += 8 + ALIGN(get_unaligned_be32(buf + off), 4);
+      break;
+    case FDT_END_NODE:
+      if (--depth <= 0)
+        return 0;
+      break;
+    case FDT_NOP:
+      break;
+    default:
+      return 0;
+    }
+  }
+  return 0;
+}
+
+/*
+ * What emmcboot can bootm: a uImage whose header holds (its CRC, an arm64
+ * kernel), or a FIT with images. A bare device tree, which check_kernel()
+ * would take, is neither.
+ */
+static int mmc_kernel_bootable(const u8 *buf) {
+  const struct image_header *hdr = (const void *)buf;
+
+  if (image_check_magic(hdr))
+    return image_check_hcrc(hdr) && image_check_arch(hdr, IH_ARCH_ARM64) &&
+           (image_check_type(hdr, IH_TYPE_KERNEL) ||
+            image_check_type(hdr, IH_TYPE_KERNEL_NOLOAD));
+  if (fdt_magic(buf) == FDT_MAGIC && !fdt_check_header(buf) &&
+      fdt_totalsize(buf) <= OPENIPC_MMC_KERNEL_SIZE)
+    return mmc_fit_has_images(buf, MMC_KERNEL_PEEK);
+  return 0;
+}
+
+/* The eMMC's: a uImage or FIT at the start of its kernel partition */
+static int mmc_emmc_firmware(void) {
+  struct mmc *mmc = openipc_mmc(OPENIPC_EMMC_DEV);
+  ALLOC_CACHE_ALIGN_BUFFER(u8, buf, MMC_KERNEL_PEEK);
+  lbaint_t cnt = MMC_KERNEL_PEEK / 512;
+  struct blk_desc *desc;
+
+  if (!mmc)
+    return 0;
+  desc = mmc_get_blk_desc(mmc);
+  if (!desc || blk_dread(desc, OPENIPC_MMC_KERNEL_BLK, cnt, buf) != cnt)
+    return 0;
+  if (mmc_kernel_bootable(buf))
+    return 1;
+  if (check_kernel(buf))
+    printf("eMMC kernel partition: not a bootable uImage or FIT\n");
+  return 0;
+}
+
+/*
+ * The card first, then the eMMC: medium selects ${medium}load and
+ * ${medium}boot, rootargs is the root (and the eMMC's partitions) for
+ * bootargs. With firmware on both, emmcargs keeps the eMMC's for
+ * bootflash to fall back to should the card's not boot. RAM only, like
+ * the other media's scan.
+ */
+static int firmware_scan_mmc(void) {
+  const char *parts = env_get("mmcparts");
+  char sd[64], emmc[256];
+  int on_sd, on_emmc;
+
+  printf("Looking for the firmware on the SD card, then the eMMC...\n");
+  snprintf(sd, sizeof(sd), "root=/dev/mmcblk%dp2", OPENIPC_SD_DEV);
+  snprintf(emmc, sizeof(emmc), "root=/dev/mmcblk%dp%d%s%s",
+           OPENIPC_EMMC_DEV, OPENIPC_MMC_ROOT_PART,
+           parts ? " blkdevparts=" : "", parts ? parts : "");
+  on_sd = mmc_sd_firmware();
+  on_emmc = mmc_emmc_firmware();
+  env_set("emmcargs", on_sd && on_emmc ? emmc : NULL);
+  if (on_sd) {
+    printf("Firmware on the SD card (mmc %d)%s\n", OPENIPC_SD_DEV,
+           on_emmc ? ", and on the eMMC" : "");
+    env_set("medium", "sd");
+    env_set("rootargs", sd);
+  } else if (on_emmc) {
+    printf("Firmware on the eMMC (mmc %d)\n", OPENIPC_EMMC_DEV);
+    env_set("medium", "emmc");
+    env_set("rootargs", emmc);
+  } else {
+    printf("Firmware is absent/corrupt (no Image and device tree on the SD card, no kernel on the eMMC)\n");
+    env_set("bootfail", "1");
+    return 0;
+  }
+  env_set("bootfail", NULL);
+  return 0;
+}
+
+/*
+ * The environment's area on the eMMC: 0 blank (one byte value all over, as
+ * erased or never written), 1 an environment (its CRC holds), -1 anything
+ * else or unreadable. A board's own firmware may have its own layout there
+ * (the MaixCAM2's has its ATF or DDR parameters at 0xc0000).
+ */
+static int mmc_env_area(struct mmc *mmc) {
+  struct blk_desc *desc = mmc_get_blk_desc(mmc);
+  lbaint_t blk = CONFIG_ENV_OFFSET / 512, cnt = CONFIG_ENV_SIZE / 512;
+  env_t *ep;
+  u8 *buf;
+  ulong i;
+  int ret = -1;
+
+  if (!desc)
+    return -1;
+  buf = malloc_cache_aligned(CONFIG_ENV_SIZE);
+  if (!buf)
+    return -1;
+  if (blk_dread(desc, blk, cnt, buf) == cnt) {
+    for (i = 1; i < CONFIG_ENV_SIZE && buf[i] == buf[0]; i++)
+      ;
+    ep = (env_t *)buf;
+    if (i == CONFIG_ENV_SIZE && (buf[0] == 0x00 || buf[0] == 0xff))
+      ret = 0;
+    else if (crc32(0, ep->data, ENV_SIZE) == ep->crc)
+      ret = 1;
+  }
+  free(buf);
+  return ret;
+}
+
+/*
+ * env/mmc.c asks this for the environment's offset, to load and to save:
+ * an area that is neither blank nor an environment is not touched, so
+ * saveenv never writes over a board's own firmware. Loading it gives the
+ * default environment, as a bad CRC would.
+ */
+int mmc_get_env_addr(struct mmc *mmc, int copy, u32 *env_addr) {
+  if (mmc_env_area(mmc) < 0) {
+    printf("eMMC 0x%x: neither blank nor an environment, left alone\n",
+           CONFIG_ENV_OFFSET);
+    return -1;
+  }
+  *env_addr = CONFIG_ENV_OFFSET;
+  return 0;
+}
+#endif /* OPENIPC_MMC */
+
 int firmware_scan(void) {
-#ifdef OPENIPC_SPI_NAND
+#ifdef OPENIPC_MMC
+  return firmware_scan_mmc();
+#elif defined(OPENIPC_SPI_NAND)
   u8 buf[64];
   int ret;
 
@@ -1102,6 +1329,12 @@ static int env_crc_is_blank(void) {
 
   if (len != sizeof(crc))
     return 0;
+#elif defined(OPENIPC_MMC)
+  {
+    struct mmc *mmc = find_mmc_device(CONFIG_SYS_MMC_ENV_DEV);
+
+    return mmc && !mmc_init(mmc) && mmc_env_area(mmc) == 0;
+  }
 #else
   return 0;
 #endif

@@ -12,6 +12,15 @@ config AXERA_AX620E
 
 if AXERA_AX620E
 
+config AXERA_AX630C_EMMC
+	bool "AX630C board with eMMC and an SD slot (Sipeed MaixCAM2)"
+	help
+	  The AX630C with 0.5 to 4 GiB of LPDDR4, its eMMC and SD slot on
+	  the Cadence SD4HC controllers and the environment in the eMMC
+	  (include/configs/ax630c.h). For now started by the board's stock
+	  U-Boot from the SD card. Without it: the AX620Q SPI NOR cameras
+	  (include/configs/ax620e.h).
+
 config SYS_SOC
 	default "ax620e"
 
@@ -19,6 +28,7 @@ config SYS_BOARD
 	default "ax620e"
 
 config SYS_CONFIG_NAME
+	default "ax630c" if AXERA_AX630C_EMMC
 	default "ax620e"
 
 endif
