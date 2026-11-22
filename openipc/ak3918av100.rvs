@@ -7,9 +7,9 @@
 # "addr = value" writes, "delay n" waits, "poll addr value" waits for the
 # value (the ini's "0x66668881,1" followed by that pair, which the
 # EV300L's burn tool wrote as three words), "raw" is a pair copied as it is
-# (the ROM operations 0x66668882 "PQST" and 0x66668880), "end" closes it.
+# (the ROM operation 0x66668882 "PQST"), "end" closes it.
 # The EV300L flash seen has this script but for 0x080000dc and 0x21000004
-# and without the last two operations (openipc/ak3918ev300l.rvs).
+# (openipc/ak3918ev300l.rvs).
 # The boot header leaves PLL2, the peripherals' clock, at its reset value.
 
 0x21000014 = 0x00423e71
@@ -46,6 +46,7 @@ delay 0x000000c8
 0x21000084 = 0x88900c08
 0x21000024 = 0x00000001
 raw 0x66668882 0x54535150
-raw 0x66668880 0x00000001
-0x21000024 = 0xfffffffb
+# The vendor's table ends here, as both AV100 flashes seen show and as the
+# EV300L's does. SDK_CPU_DDR2.ini goes on with a 0x66668880 op and
+# 0x21000024 = 0xfffffffb, which its burn tool does not write.
 end 0x00000000
