@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this branch is
 
 `openipc-xm` is OpenIPC's U-Boot for Xiongmai's own camera SoCs: XM510, XM530
-and XM550, and the V200 series (XM530V200, XM533, XM535). It is **mainline U-Boot v2022.10**, the same release as
+and XM550, and the V200 series (XM530V200, XM533, XM535, XM232). It is **mainline U-Boot v2022.10**, the same release as
 `openipc-hisilicon`, with:
 
 - the OpenIPC boot layer, carried over from `openipc-hisilicon`;
@@ -75,6 +75,10 @@ controller's read window until it relocates:
   0x60000000.
 - **V200 series:** `SYS_TEXT_BASE=0x60000000`, the window itself, as their
   vendor U-Boots are linked; qemu starts them there.
+- **XM232:** `SYS_TEXT_BASE=0x60000020`. Its flash starts with a fixed
+  32-byte header (two signature words, then zeros) that every vendor image
+  carries; `build.sh` puts it in front of `u-boot.bin`, and qemu's `xm232`
+  enters behind it.
 
 The link address must equal the run address, because `relocate.S` does no
 position-independent fixups. The only RAM before DDR is a 4 KiB SRAM at
@@ -98,9 +102,9 @@ position-independent fixups. The only RAM before DDR is a 4 KiB SRAM at
 
 ## The V200 series
 
-XM530V200, XM533 and XM535 (`TARGET_XM530V200`/`XM533`/`XM535`, all
-`XM_V200`) share the XM530's flash controller, UART, timer and board file,
-and differ in:
+XM530V200, XM533, XM535 and XM232 (`TARGET_XM530V200`/`XM533`/`XM535`/
+`XM232`, all `XM_V200`) share the XM530's flash controller, UART, timer and
+board file, and differ in:
 
 - **DDR:** a DesignWare uMCTL2 at 0x20050000 (PHY 0x20058000, glue
   0x2005C000), not the uPCTL. `arch/arm/mach-xm/v200.c` keeps each vendor
@@ -114,6 +118,11 @@ and differ in:
   - XM535D2: DDR3-1866, 128 MiB (`xm535d2`).
   - XM535W1: DDR2-1066, 64 MiB (`xm535w1`): the D1's program at its own PLL C,
     less four writes the W1's older (2024) routine does not make.
+  - XM232: DDR2-1333, 64 MiB (`xm232`), from its U-Boot 2016.11: the same
+    `ddr_init(1333, 0, 64)` call as the D1's, but that tree's routine, with
+    its own order and extra PHY and glue writes. Its PLL code sets A and C
+    only. qemu-bench's `xm232` runs the vendor U-Boot and this one to the
+    same 102 PLL and DDR writes.
   The XM535 chips are distinct (`XM535D1`/`D2`/`W1` under `TARGET_XM535`), as
   the vendor's U-Boots and firmware are, and `soc` names the chip; nothing
   probes which one is fitted.

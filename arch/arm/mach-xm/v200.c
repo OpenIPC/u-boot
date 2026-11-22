@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * V200 series (XM530V200, XM533, XM535) PLL and DDR
+ * V200 series (XM530V200, XM533, XM535, XM232) PLL and DDR
  * bring-up, from their vendor U-Boot 2014.04 builds (2023-2025, linked at
- * 0x60000000): the PLLs, then a DesignWare uMCTL2 at 0x20050000 with its
- * PHY at +0x8000 and +0xC000, where the XM530 has a uPCTL at 0x100B0000.
+ * 0x60000000) and the XM232's U-Boot 2016.11 (linked at 0x60000020): the
+ * PLLs, then a DesignWare uMCTL2 at 0x20050000 with its PHY at +0x8000 and
+ * +0xC000, where the XM530 has a uPCTL at 0x100B0000.
  *
  * Each vendor build calls one DDR routine with fixed arguments:
  *
@@ -11,6 +12,8 @@
  *   XM535D2   (X9-WE2Q)          DDR3-1866   ddr_init(1866, 0, 1), 4 ports
  *   XM535D1   (X6E-WEQ)          DDR2-1333   ddr_init(1333, 0, 64)
  *   XM533W1   (X3-WQ-B)          DDR2-1066   ddr_init(1066, 0, 64)
+ *   XM232W1   (X6S-WEQ-H)        DDR2-1333   ddr_init(1333, 0, 64), the
+ *                                            2016 routine's own order
  *
  * The routines branch on nothing but those arguments and on status
  * polls; the training results they read back are only read. So each one
@@ -95,6 +98,7 @@ static void pll_start(ulong ctrl, ulong frac, u32 fracval, u32 ctrlval)
 	wait_set(ctrl, PLL_LOCKED);
 }
 
+#ifndef CONFIG_TARGET_XM232
 static void clk_set(u32 c30, u32 c38, u32 c3c, u32 c34)
 {
 	writel(c30, SYS(0x30));
@@ -103,7 +107,32 @@ static void clk_set(u32 c30, u32 c38, u32 c3c, u32 c34)
 	writel(c34, SYS(0x34));
 	writel(0x1007, SYS(0x70));
 }
+#endif
 
+#ifdef CONFIG_TARGET_XM232
+/*
+ * XM232: PLL A, then PLL C for DDR2-1333; PLL D is left as it is, and the
+ * clock dividers are written without the 0x70 enable.
+ */
+void xm_pll_init(void)
+{
+	writel(1, SYS(0x00));
+	writel(0x01290101, SYS(0x30));
+	writel(0x123, SYS(0x38));
+	writel(0x347, SYS(0x3C));
+	writel(0x947, SYS(0x34));
+	pll_start(SYS(0x08), SYS(0x0C), 0x24860000, 0x000a8000);	/* A */
+	writel(5, SYS(0x310));
+	writel(0x415, SYS(0x60));
+	writel(0x19191918, SYS(0x64));
+	writel(0, SYS(0x70));
+	writel(0x503, SYS(0x58));
+	pll_start(SYS(0x18), SYS(0x1C), 0x2c5eeeef, 0x000a8000);	/* C: DDR2-1333 */
+	writel(readl(SYS(0x60)) | 0x100, SYS(0x60));
+	writel(4, SYS(0x04));
+	writel(0, SYS(0x00));
+}
+#else
 void xm_pll_init(void)
 {
 	writel(1, SYS(0x00));
@@ -130,6 +159,7 @@ void xm_pll_init(void)
 	writel(4, SYS(0x04));
 	writel(0, SYS(0x00));
 }
+#endif /* CONFIG_TARGET_XM232 */
 #endif
 
 enum ddr_op { OP_W, OP_OR, OP_BIC, OP_POLL_EQ, OP_POLL_SET, OP_DELAY };
@@ -480,6 +510,112 @@ static const struct ddr_step ddr_program[] = {
 	DDR_W(0x200000dc, 0x00000005),
 	DDR_POLL_EQ(0x200000dc, 0x00000005),
 	DDR_W(0x20000080, 0x00000000),
+#elif defined(CONFIG_TARGET_XM232)
+	/*
+	 * XM232: vendor ddr_init(1333, 0, 64), U-Boot 2016.11. The XM533's
+	 * steps and more: the PHY glue's +0x0C around the DFI bring-up, the
+	 * PHY's +0x2F0/+0x3F0 and +0x200/+0x300 before training, and a pulse
+	 * on +0x30 with +0x60 set; its 1333 settings at the end.
+	 */
+	DDR_W(0x20000080, 0x00000001),
+	DDR_W(0x200000dc, 0x00000000),
+	DDR_DELAY(1),
+	DDR_W(0x200000dc, 0x00000001),
+	DDR_POLL_EQ(0x200000dc, 0x00000001),
+	DDR_W(0x2005c00c, 0x00000000),
+	DDR_W(0x2005c004, 0x00000004),
+	DDR_POLL_EQ(0x2005c004, 0x00000004),
+	DDR_W(0x2005808c, 0x0003597f),
+	DDR_W(0x20058000, 0x00000387),
+	DDR_W(0x20058010, 0x08000000),
+	DDR_W(0x2005800c, 0x09090909),
+	DDR_W(0x20058008, 0x00000000),
+	DDR_W(0x200580b8, 0x2580c480),
+	DDR_W(0x200580b8, 0x32a8c480),
+	DDR_W(0x20058000, 0x00000387),
+	DDR_W(0x20058210, 0x001be200),
+	DDR_W(0x20058310, 0x001be200),
+	DDR_W(0x200580c0, 0x00000000),
+	DDR_W(0x2005801c, 0x0303031b),
+	DDR_W(0x20058058, 0x20000411),
+	DDR_W(0x2005c004, 0x0000000c),
+	DDR_POLL_EQ(0x2005c004, 0x0000000c),
+	DDR_W(0x2005c004, 0x0000000d),
+	DDR_POLL_EQ(0x2005c004, 0x0000000d),
+	DDR_W(0x20050000, 0x00040000),
+	DDR_OR(0x20050240, 0x06000000),
+	DDR_W(0x20050244, 0x00000001),
+	DDR_W(0x20058014, 0x18000000),
+	DDR_BIC(0x20058204, 0x00001fff),
+	DDR_BIC(0x20058304, 0x00001fff),
+	DDR_W(0x200500dc, 0x11030000),
+	DDR_W(0x200500e0, 0x00000000),
+	DDR_W(0x20050100, 0x0c101b0f),
+	DDR_W(0x20050104, 0x00040510),
+	DDR_W(0x20050108, 0x0405050a),
+	DDR_W(0x20050110, 0x05020505),
+	DDR_W(0x20050190, 0x06030002),
+	DDR_W(0x20050064, 0x00300040),
+	DDR_W(0x20050194, 0x00000000),
+	DDR_W(0x200500d0, 0x00400080),
+	DDR_W(0x200500d4, 0x00030001),
+	DDR_W(0x200501b0, 0x00000000),
+	DDR_W(0x200501b0, 0x00000020),
+	DDR_W(0x20050204, 0x003f0808),
+	DDR_W(0x2005020c, 0x00000000),
+	DDR_W(0x20050210, 0x00001f1f),
+	DDR_W(0x20050214, 0x06060606),
+	DDR_W(0x20050218, 0x0f0f0f06),
+	DDR_W(0x20050240, 0x06020608),
+	DDR_W(0x20050244, 0x00000000),
+	DDR_W(0x20050404, 0x00004100),
+	DDR_W(0x200504b4, 0x00004200),
+	DDR_W(0x20050564, 0x00000300),
+	DDR_W(0x20050408, 0x00004100),
+	DDR_W(0x200504b8, 0x00004200),
+	DDR_W(0x20050568, 0x00000300),
+	DDR_W(0x2005c004, 0x0000000f),
+	DDR_POLL_EQ(0x2005c004, 0x0000000f),
+	DDR_W(0x20050320, 0x00000000),
+	DDR_POLL_SET(0x200501bc, 0x00000001),
+	DDR_W(0x2005c00c, 0x00000001),
+	DDR_W(0x200501b0, 0x00000041),
+	DDR_W(0x20050320, 0x00000001),
+	DDR_POLL_SET(0x20050324, 0x00000001),
+	DDR_POLL_SET(0x20050004, 0x00000001),
+	DDR_W(0x20050320, 0x00000000),
+	DDR_BIC(0x20050250, 0x00000004),
+	DDR_W(0x20050320, 0x00000001),
+	DDR_POLL_SET(0x20050324, 0x00000001),
+	DDR_DELAY(10),
+	DDR_W(0x200582f0, 0x007fe000),
+	DDR_W(0x200583f0, 0x007fe000),
+	DDR_W(0x20058200, 0x7f8820a0),
+	DDR_W(0x20058300, 0x7f8820a0),
+	DDR_W(0x20050060, 0x00000001),
+	DDR_W(0x20050030, 0x00000020),
+	DDR_DELAY(1),
+	DDR_W(0x20050030, 0x00000000),
+	DDR_DELAY(1),
+	DDR_W(0x20058004, 0x00004688),
+	DDR_W(0x20058004, 0x00004689),
+	DDR_POLL_EQ(0x20058174, 0x00000403),
+	DDR_W(0x20058004, 0x00004688),
+	DDR_W(0x20058004, 0x00004680),
+	DDR_W(0x20050060, 0x00000000),
+	DDR_DELAY(1),
+	DDR_W(0x20050490, 0x00000001),
+	DDR_W(0x20050540, 0x00000001),
+	DDR_W(0x200505f0, 0x00000001),
+	DDR_W(0x2005808c, 0x0007597f),
+	DDR_W(0x20058234, 0x1a001a00),
+	DDR_W(0x20058334, 0x1a001a00),
+	DDR_W(0x200580a4, 0x3f3f0004),
+	DDR_W(0x200580a4, 0x3f3f0000),
+	DDR_W(0x2005808c, 0x0003597f),
+	DDR_W(0x200000dc, 0x00000005),
+	DDR_POLL_EQ(0x200000dc, 0x00000005),
+	DDR_W(0x20000080, 0x00000000),
 #else
 	/* XM533: vendor ddr_init(1066, 0, 64) */
 	DDR_W(0x20000080, 0x00000001),
@@ -576,9 +712,10 @@ static const struct ddr_step ddr_program[] = {
 };
 
 /*
- * After the bring-up the XM535 builds write and read back two patterns at
- * the start of DRAM, and reset the SoC if either does not stick. Done here
- * for all three: a failed bring-up then retries rather than hangs later.
+ * After the bring-up the XM535 and XM232 builds write and read back two
+ * patterns at the start of DRAM, and reset the SoC if either does not
+ * stick. Done here for all of them: a failed bring-up then retries rather
+ * than hangs later.
  */
 static bool ddr_holds(u32 a, u32 b)
 {

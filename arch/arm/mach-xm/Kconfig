@@ -53,6 +53,15 @@ config TARGET_XM535
 	  on the 64 MiB D1 and W1, DDR3 on the 128 MiB D2, on a DesignWare
 	  uMCTL2.
 
+config TARGET_XM232
+	bool "XM232"
+	select XM_SFC_V2
+	select XM_V200
+	help
+	  XM232 (its U-Boot says XM232W1): one core, 64 MiB of DDR2-1333
+	  on a DesignWare uMCTL2. Its flash starts with a 32-byte header,
+	  so U-Boot runs in place from 0x60000020.
+
 endchoice
 
 config XM_SFC_V2
@@ -61,7 +70,7 @@ config XM_SFC_V2
 config XM_V200
 	bool
 	help
-	  The V200 series (XM530V200, XM533, XM535): a DesignWare uMCTL2 for DDR, a
+	  The V200 series (XM530V200, XM533, XM535, XM232): a DesignWare uMCTL2 for DDR, a
 	  24 MHz reference clock, and U-Boot linked at the flash window.
 
 config XM_DDR3
