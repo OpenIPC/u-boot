@@ -69,6 +69,7 @@ jobs:
           - { soc: ak3918av100x, files: "output/u-boot-ak3918av100x-*.bin" }
           - { soc: ak3918ev330, files: "output/u-boot-ak3918ev330-*.bin" }
           - { soc: ak3919ev330, files: "output/u-boot-ak3919ev330-*.bin" }
+          - { soc: ak3918ev331, files: "output/u-boot-ak3918ev331-*.bin" }
 
     steps:
       - name: Checkout
@@ -184,7 +185,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        soc: [ak3918ev200, ak3916ev300, ak3918ev300, ak3919ev300, ak3918ev300l, ak3918av100, ak3918av100x, ak3918ev330, ak3919ev330]
+        soc: [ak3918ev200, ak3916ev300, ak3918ev300, ak3919ev300, ak3918ev300l, ak3918av100, ak3918av100x, ak3918ev330, ak3919ev330, ak3918ev331]
     steps:
       - name: Download qemu-arm
         uses: actions/download-artifact@v4
@@ -224,7 +225,13 @@ jobs:
           img[:len(u)] = u
           open(sys.argv[2], 'wb').write(img)
           PY
-          FLASH="-M ${soc},flash-file=/tmp/flash.bin"
+          # The EV331 parts are the AK3919EV330's die and memory, and
+          # qemu-bench models them as that machine.
+          case "$soc" in
+          ak3918ev331) machine=ak3919ev330 ;;
+          *) machine=$soc ;;
+          esac
+          FLASH="-M ${machine},flash-file=/tmp/flash.bin"
           chmod +x ./qemu-arm
           # Two boots: the first finds an erased environment and saves the
           # default one; the second must load it back.
