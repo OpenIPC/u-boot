@@ -58,7 +58,7 @@ mainline's xhci-dwc3), and sets the SD card clock and pads in
 ```sh
 ./build.sh                 # every openipc/<target>_config
 ./build.sh ax620u-nand     # -> output/u-boot-ax620u-nand{,-stockspl}.bin
-./build.sh ax630c-emmc     # -> output/u-boot-ax630c.bin (for the SD card)
+./build.sh ax630c-emmc     # -> output/u-boot-ax630c-emmc.bin (for the SD card)
 ```
 
 `build.sh` runs `olddefconfig` on `openipc/<target>_config` (a complete
@@ -383,14 +383,14 @@ with `AXERA_AX630C_EMMC`: `include/configs/ax630c.h`,
 - No OpenIPC first stage for the eMMC yet, so no boot partition image.
   The board's own chain (boot ROM, its first stage, ATF, OP-TEE, its
   U-Boot 2020.04) starts this U-Boot from the card:
-  `output/u-boot-ax630c.bin` is `u-boot.bin` as linked, loaded and
+  `output/u-boot-ax630c-emmc.bin` is `u-boot.bin` as linked, loaded and
   started at `SYS_TEXT_BASE` 0x50000000 (clear of the stock U-Boot at
   0x5C000400, its ATF at 0x40040000 and OP-TEE at 0x44200000; 4 KiB
   aligned). At the stock prompt (`dcache off` first: its MMU tables are
   where this U-Boot relocates to):
 
   ```
-  fatload mmc 1:1 0x50000000 u-boot-ax630c.bin
+  fatload mmc 1:1 0x50000000 u-boot-ax630c-emmc.bin
   dcache off
   icache off
   go 0x50000000
@@ -451,7 +451,7 @@ environment with `/dev/mmcblk0 0xc0000 0x40000` in `fw_env.config`.
 
 ```sh
 qemu-system-aarch64 -M ax620e,chip=ax630c -m 1G -smp 1 -nographic \
-    -device loader,file=u-boot-ax630c.bin,addr=0x50000000,cpu-num=0 \
+    -device loader,file=u-boot-ax630c-emmc.bin,addr=0x50000000,cpu-num=0 \
     -drive if=sd,index=0,file=emmc.img,format=raw \
     -drive if=sd,index=1,file=sdcard.img,format=raw -nic user
 # a MaixCAM2 board id: chip type at 0x784, board id at 0x79c

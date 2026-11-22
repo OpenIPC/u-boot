@@ -6,7 +6,7 @@ CONFIG_ARCH_AXERA=y
 CONFIG_AXERA_AX620E=y
 CONFIG_AXERA_AX630C_EMMC=y
 # Loaded here and started with go by the board's own U-Boot (output/
-# u-boot-ax630c.bin on the card). Clear of what that U-Boot occupies
+# u-boot-ax630c-emmc.bin on the card). Clear of what that U-Boot occupies
 # (0x5C000000 on), its ATF (0x40040000) and OP-TEE (0x44200000, 32 MiB);
 # 4 KiB aligned (arm64 relocates by whole pages)
 CONFIG_SYS_TEXT_BASE=0x50000000

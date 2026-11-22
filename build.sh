@@ -5,8 +5,8 @@
 # A target is <soc>-<flash>, e.g. ax620u-nand; the image is
 # output/u-boot-<soc>-<flash>.bin, written at flash 0 (for the Axera SoCs
 # also u-boot-<soc>-<flash>-stockspl.bin, the same with the cameras' own
-# first stage; for the AX630C, which has none yet, u-boot-ax630c.bin, the
-# U-Boot its own bootloader starts from the SD card). Failures are collected: every requested target is attempted and the script exits non-zero if any of them failed.
+# first stage; for the AX630C, which has none yet, U-Boot alone, which
+# its own bootloader starts from the SD card). Failures are collected: every requested target is attempted and the script exits non-zero if any of them failed.
 
 cd "$(dirname "$0")"
 
@@ -128,15 +128,15 @@ ax620e_image() {
     pack "u-boot-${target}-stockspl.bin" --signed "${stock}"
 }
 
-# AX630C (eMMC and SD card): no OpenIPC first stage for it yet, so no
-# image for the eMMC's boot partition (u-boot-<target>.bin). The board's
-# own U-Boot loads this one from the SD card's first partition and starts
-# it (go) at CONFIG_SYS_TEXT_BASE: output/u-boot-<soc>.bin, U-Boot as it
-# is linked.
+# AX630C (eMMC and SD card): no OpenIPC first stage for it yet, so
+# output/u-boot-<target>.bin is U-Boot as it is linked. The board's own
+# U-Boot loads it from the SD card's first partition and starts it (go) at
+# CONFIG_SYS_TEXT_BASE. Once a first stage exists, this name becomes the
+# eMMC boot partition image, as for the other targets.
 ax630c_image() {
     target=$1
     builddir=$2
-    out=output/u-boot-${target%%-*}.bin
+    out=output/u-boot-${target}.bin
     text=$(sed -n 's/^CONFIG_SYS_TEXT_BASE=//p' "${builddir}/.config")
     cp "${builddir}/u-boot.bin" "${out}" || return 1
     echo "${out}: $(stat -c %s "${out}") bytes, to be loaded and started at ${text}"
