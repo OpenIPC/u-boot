@@ -404,6 +404,16 @@ with `AXERA_AX630C_EMMC`: `include/configs/ax630c.h`,
   (0x44200000, 32 MiB): the OpenIPC device tree has spin-table CPUs and
   knows of neither. In EL1 (the OpenIPC first stage to come, QEMU) it
   changes nothing; `psci=0` turns it off.
+- The same two ranges (`ax630c_secure[]`, `arch/arm/mach-axera/ax620e/soc.c`)
+  stay out of U-Boot's own MMU map when it is entered above EL1:
+  `dram_init()` splits the DRAM's Normal region around them (the EL is
+  known then, the environment is not). With `psci=1` in EL1,
+  `misc_init_r()` makes them invalid in the live tables
+  (`mmu_change_region_attr()`). Either way `board_lmb_reserve()` keeps
+  `fatload`, `bootm`'s device tree and initrd out of them ("Reading
+  file would overwrite reserved memory"); `psci=0` does not map them
+  back. A cacheable mapping of TrustZone memory would let the core
+  prefetch from it (an external abort).
 - DRAM: the board id the first stage leaves in misc_info (0x740: chip
   type AX630C/AX631, ADC board id 2/5/10/14 = 0.5/1/2/4 GiB, the
   MaixCAM2 SOMs); without one the device tree's 512 MiB, the smallest
@@ -474,4 +484,7 @@ U-Boot has no environment device and boots with the defaults. The
 model releases CPU1 by spin-table only under `flash-file=`: with the
 loader it comes up only by PSCI (`psci=1`). Linux's `reboot` does not
 reset the model (only its watchdog does; U-Boot's `reset` uses it).
+With `flash-file=` (any file) the loader starts U-Boot in EL3: the
+secure ranges are then out of the map (`md` there aborts, a
+translation fault), as with `psci=1` in EL1.
 

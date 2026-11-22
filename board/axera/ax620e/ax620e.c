@@ -143,17 +143,11 @@ static bool ax630c_has_psci(void)
 	return current_el() > 1;
 }
 
-/* The board's ATF and OP-TEE (the Sipeed SDK's partition_ab.mak:
- * ATF_IMG_ADDR, ATF_IMG_PKG_SIZE, OPTEE_IMAGE_ADDR, OPTEE_RESERVED_SIZE) */
-static const struct fdt_memory ax630c_secure[] = {
-	{ .start = 0x40040000, .end = 0x4007ffff },
-	{ .start = 0x44200000, .end = 0x461fffff },
-};
-
 /*
  * With that firmware there, the kernel brings up its second CPU by PSCI
  * and keeps out of the ATF's and OP-TEE's memory: /psci, the CPUs'
- * enable-method, and two no-map reserved-memory nodes.
+ * enable-method, and two no-map reserved-memory nodes (ax630c_secure[],
+ * the ranges U-Boot's own memory map and loads leave out too).
  */
 int ft_board_setup(void *blob, struct bd_info *bd)
 {
@@ -185,7 +179,7 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 		}
 	}
 
-	for (i = 0; i < ARRAY_SIZE(ax630c_secure); i++)
+	for (i = 0; i < AX630C_SECURE_REGIONS; i++)
 		if (fdtdec_add_reserved_memory(blob, i ? "optee" : "atf",
 					       &ax630c_secure[i], NULL, 0, NULL,
 					       FDTDEC_RESERVED_MEMORY_NO_MAP) < 0)
@@ -208,6 +202,7 @@ int board_init(void)
 int misc_init_r(void)
 {
 #ifdef CONFIG_AXERA_AX630C_EMMC
+	ax630c_secure_late();
 	ax630c_osmem();
 #endif
 	return openipc_helper();

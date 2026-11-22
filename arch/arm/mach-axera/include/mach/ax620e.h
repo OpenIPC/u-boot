@@ -7,6 +7,8 @@
 #ifndef __MACH_AX620E_H
 #define __MACH_AX620E_H
 
+#include <linux/types.h>
+
 #define AX_DDR_BASE			0x40000000
 
 /* CoreSight system counter: CNTCR, CNTFID0 */
@@ -65,6 +67,21 @@
 #define AX_BOARD_MAIXCAM2_1G		5
 #define AX_BOARD_MAIXCAM2_2G		10
 #define AX_BOARD_MAIXCAM2_4G		14
+
+/*
+ * The AX630C boards' own ATF and OP-TEE in the DRAM, when their own boot
+ * chain started U-Boot (arch/arm/mach-axera/ax620e/soc.c: ax630c_secure[])
+ */
+#define AX630C_ATF_BASE			0x40040000
+#define AX630C_ATF_SIZE			0x40000
+#define AX630C_OPTEE_BASE		0x44200000
+#define AX630C_OPTEE_SIZE		0x2000000
+#define AX630C_SECURE_REGIONS		2
+
+struct fdt_memory;
+extern const struct fdt_memory ax630c_secure[AX630C_SECURE_REGIONS];
+bool ax630c_secure_resident(void);
+void ax630c_secure_late(void);
 
 struct ax_misc_info {
 	u32 pub_key_hash[8];
