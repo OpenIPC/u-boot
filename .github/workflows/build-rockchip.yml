@@ -340,12 +340,16 @@ jobs:
           fi
           echo "PASS: $IMG reached the autoboot prompt, got DHCP and a ping answer, and its saved environment survived a reset"
 
-  # Mirror every built image to this repository's own Rockchip release.
+  # Replace this repository's own Rockchip release with this run's images.
   release:
     needs: [resolve, build, qemu_smoke]
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # One release at a time: two dispatches would interleave their uploads
+    concurrency:
+      group: release-rockchip
+      cancel-in-progress: false
     permissions:
       contents: write
     steps:
@@ -354,6 +358,18 @@ jobs:
         with:
           path: artifacts
           pattern: u-boot-*
+
+      # The release is this run's images and nothing else, its tag on the
+      # commit they were built from: uploading over the old one would keep
+      # images this revision does not build, and the tag would stay where
+      # it was first made.
+      - name: Remove the previous release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view rockchip -R "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release delete rockchip -R "$GITHUB_REPOSITORY" --cleanup-tag --yes
+          fi
 
       - name: Upload to releases
         uses: softprops/action-gh-release@v2
