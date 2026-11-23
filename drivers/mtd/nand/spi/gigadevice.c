@@ -167,7 +167,10 @@ static const struct spinand_info gigadevice_spinand_table[] = {
 		     0,
 		     SPINAND_ECCINFO(&gd5fxgqxxexxg_ooblayout,
 				     gd5fxgq4xexxg_ecc_get_status)),
-	/* Backported from mainline: the 2 Gbit GD5F1GQ4UExxG (RV1109 cameras) */
+	/*
+	 * Backported from mainline: the 2 Gbit sibling of the GD5F1GQ4UExxG
+	 * (the RV1109 cameras' SPI NAND)
+	 */
 	SPINAND_INFO("GD5F2GQ4UExxG", 0xd2,
 		     NAND_MEMORG(1, 2048, 128, 64, 2048, 1, 1, 1),
 		     NAND_ECCREQ(8, 512),
