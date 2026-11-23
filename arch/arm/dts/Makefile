@@ -166,6 +166,18 @@ dtb-$(CONFIG_ROCKCHIP_RK3399) += \
 dtb-$(CONFIG_ROCKCHIP_RK3568) += \
 	rk3568-evb.dtb
 
+dtb-$(CONFIG_ROCKCHIP_RV1106) += \
+	rv1106-openipc-nand.dtb \
+	rv1106-openipc-nor.dtb
+
+dtb-$(CONFIG_ROCKCHIP_RV1103B) += \
+	rv1103b-openipc-nand.dtb \
+	rv1103b-openipc-nor.dtb
+
+dtb-$(CONFIG_ROCKCHIP_RV1126) += \
+	rv1126-openipc-nand.dtb \
+	rv1126-openipc-nor.dtb
+
 dtb-$(CONFIG_ROCKCHIP_RV1108) += \
 	rv1108-elgin-r1.dtb \
 	rv1108-evb.dtb

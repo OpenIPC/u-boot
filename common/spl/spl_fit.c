@@ -9,6 +9,8 @@
 #include <fpga.h>
 #include <gzip.h>
 #include <image.h>
+#include <lzma/LzmaTypes.h>
+#include <lzma/LzmaTools.h>
 #include <log.h>
 #include <malloc.h>
 #include <mapmem.h>
@@ -258,7 +260,7 @@ static int spl_load_fit_image(struct spl_load_info *info, ulong sector,
 			debug("%s ", genimg_get_type_name(type));
 	}
 
-	if (IS_ENABLED(CONFIG_SPL_GZIP)) {
+	if (IS_ENABLED(CONFIG_SPL_GZIP) || IS_ENABLED(CONFIG_SPL_LZMA)) {
 		fit_image_get_comp(fit, node, &image_comp);
 		debug("%s ", genimg_get_comp_name(image_comp));
 	}
@@ -338,6 +340,15 @@ static int spl_load_fit_image(struct spl_load_info *info, ulong sector,
 			return -EIO;
 		}
 		length = size;
+	} else if (IS_ENABLED(CONFIG_SPL_LZMA) && image_comp == IH_COMP_LZMA) {
+		/* backported from mainline (v2023.01: "spl: fit: support for lzma") */
+		SizeT lzsize = CONFIG_SYS_BOOTM_LEN;
+
+		if (lzmaBuffToBuffDecompress(load_ptr, &lzsize, src, length)) {
+			puts("Uncompressing error\n");
+			return -EIO;
+		}
+		length = lzsize;
 	} else {
 		memcpy(load_ptr, src, length);
 	}

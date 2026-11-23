@@ -1,0 +1,42 @@
+if ROCKCHIP_RV1126
+
+config TARGET_OPENIPC_RV1126
+	bool "OpenIPC RV1126 / RV1109 camera"
+	default y
+	help
+	  An RV1126 or RV1109 camera booting OpenIPC firmware from SPI NOR
+	  or SPI NAND.
+
+config SYS_BOARD
+	default "rv11xx"
+
+config SYS_VENDOR
+	default "rockchip"
+
+config SYS_SOC
+	default "rockchip"
+
+config SYS_CONFIG_NAME
+	default "rv1126"
+
+config SYS_MALLOC_F_LEN
+	default 0x2000
+
+config ROCKCHIP_BOOT_MODE_REG
+	default 0xfe020200
+
+# SPL: at DRAM 0, where the mask ROM puts it; its BSS and stack below the
+# DDR blob's ATAGs at 0x1fe000, U-Boot at 0x600000
+config SPL_MAX_SIZE
+	default 0x28000
+
+config SPL_BSS_START_ADDR
+	default 0x180000
+
+config SPL_BSS_MAX_SIZE
+	default 0x20000
+
+config SPL_STACK
+	default 0x1f0000
+
+endif

@@ -1,0 +1,42 @@
+if ROCKCHIP_RV1103B
+
+config TARGET_OPENIPC_RV1103B
+	bool "OpenIPC RV1103B / RV1106B camera"
+	default y
+	help
+	  An RV1103B or RV1106B camera booting OpenIPC firmware from SPI NOR
+	  or SPI NAND.
+
+config SYS_BOARD
+	default "rv11xx"
+
+config SYS_VENDOR
+	default "rockchip"
+
+config SYS_SOC
+	default "rockchip"
+
+config SYS_CONFIG_NAME
+	default "rv1103b"
+
+config SYS_MALLOC_F_LEN
+	default 0x2000
+
+config ROCKCHIP_BOOT_MODE_REG
+	default 0x20160200
+
+# SPL: at DRAM 0, where the mask ROM puts it; its BSS and stack below the
+# DDR blob's ATAGs at 0x1fe000, U-Boot above them at 0x200000
+config SPL_MAX_SIZE
+	default 0x28000
+
+config SPL_BSS_START_ADDR
+	default 0x180000
+
+config SPL_BSS_MAX_SIZE
+	default 0x20000
+
+config SPL_STACK
+	default 0x1f0000
+
+endif

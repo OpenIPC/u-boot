@@ -1,0 +1,63 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * OpenIPC RV1126 / RV1109 camera, SPI NOR on the SFC.
+ */
+/dts-v1/;
+#include "rv1126-openipc.dtsi"
+
+/ {
+	model = "OpenIPC RV1126";
+	compatible = "openipc,rv1126", "rockchip,rv1126";
+
+	aliases {
+		serial2 = &uart2;
+		spi0 = &sfc;
+		ethernet0 = &gmac;
+		gpio3 = &gpio3;
+		mmc0 = &sdmmc;
+	};
+};
+
+&sfc {
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <75000000>;
+		spi-rx-bus-width = <4>;
+		spi-tx-bus-width = <1>;
+		u-boot,dm-pre-reloc;
+	};
+};
+
+/*
+ * Ethernet as the RV1109 SPI NAND cameras have it (their kernel device
+ * tree): RMII to a PHY at MDIO address 0, the SoC driving its 50 MHz
+ * reference from the M0 pins, the PHY reset on GPIO3_C5, active low
+ */
+&gmac {
+	phy-mode = "rmii";
+	clock_in_out = "output";
+	assigned-clocks = <&cru CLK_GMAC_SRC>, <&cru CLK_GMAC_TX_RX>;
+	assigned-clock-parents = <&cru CLK_GMAC_SRC_M0>, <&cru RMII_MODE_CLK>;
+	assigned-clock-rates = <50000000>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&rmiim0_pins &gmac_clk_m0_drv_level0_pins>;
+	snps,reset-gpio = <&gpio3 RK_PC5 GPIO_ACTIVE_LOW>;
+	snps,reset-active-low;
+	snps,reset-delays-us = <0 50000 50000>;
+	phy-handle = <&phy0>;
+	status = "okay";
+};
+
+&mdio {
+	phy0: ethernet-phy@0 {
+		compatible = "ethernet-phy-ieee802.3-c22";
+		reg = <0>;
+	};
+};
+
+&sdmmc {
+	bus-width = <4>;
+	cap-sd-highspeed;
+	status = "okay";
+};

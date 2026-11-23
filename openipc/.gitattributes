@@ -1,0 +1,2 @@
+# rkbin's DDR-init blobs are binaries: no end-of-line conversion
+*.bin binary

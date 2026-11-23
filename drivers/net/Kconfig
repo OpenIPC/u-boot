@@ -201,6 +201,15 @@ config DWC_ETH_QOS
 	  Of Service) IP block. The IP supports many options for bus type,
 	  clocking/reset structure, and feature list.
 
+config DWC_ETH_QOS_ROCKCHIP
+	bool "Synopsys DWC Ethernet QOS device support for Rockchip RV11xx"
+	depends on DWC_ETH_QOS && (ROCKCHIP_RV1106 || ROCKCHIP_RV1103B || ROCKCHIP_RV1126)
+	select DM_RESET
+	help
+	  The Ethernet MAC of Rockchip's RV1106/RV1103 and RV1103B/RV1106B
+	  (RMII to the SoC's own 10/100 PHY) and RV1126/RV1109 (an external
+	  PHY on RMII or RGMII).
+
 config DWC_ETH_QOS_IMX
 	bool "Synopsys DWC Ethernet QOS device support for IMX"
 	depends on DWC_ETH_QOS
