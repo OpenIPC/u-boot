@@ -1,0 +1,373 @@
+name: Build rockchip
+
+on:
+  # Pull requests against this branch change the workflow itself; they
+  # build the current openipc-rockchip.  Code changes reach it through
+  # workflow_call from the caller on openipc-rockchip, which passes the
+  # revision to build.  Only workflow_dispatch can release.
+  pull_request:
+    branches: [openipc]
+    paths:
+      - .github/workflows/build-rockchip.yml
+  workflow_call:
+    inputs:
+      ref:
+        description: openipc-rockchip revision to build
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Publish to this repo's Rockchip release
+        type: boolean
+        default: false
+      # Publishing to OpenIPC/firmware is off: see the end of this file.
+
+# The shape of build-axera.yml:
+#   resolve -> build (matrix, one SoC name per leg) + qemu ->
+#   qemu_smoke (hard gate) -> release (own, `release` input).
+# build.sh takes SoC names as arguments and builds each as a NOR and a
+# NAND image, u-boot-<soc>-<flash>.bin: the boot partition, written at
+# flash 0, its ID block (rkbin's DDR-init blob, in the tree, and the SPL)
+# and u-boot.itb behind it. Nothing private is needed.
+#   NOR: the ID block at 0x8000, everything before the environment at
+#     0x40000
+#   NAND: the ID block in blocks 0 and 1, u-boot.itb at 0x40000, within
+#     the 768 KiB boot partition (OpenIPC's 768k(boot),256k(env),-(ubi))
+# The RV1103 is built from the RV1106's sources and the RV1109 from the
+# RV1126's; only CONFIG_PRODUCT_SOC differs, which picks the file
+# `run ubwrite` fetches.
+# A SoC the revision does not build (not in build.sh's ALL_SOCS: a SoC
+# added here before its code reached openipc-rockchip) is not built: its
+# leg uploads a marker instead of the images, the smoke test skips it and
+# the release has the others.
+
+jobs:
+  # Resolve the openipc-rockchip revision this run builds from. The
+  # workflow lives on the openipc branch, so github.sha is the openipc
+  # commit, not the revision being built; release provenance must name the
+  # commit that build.sh actually compiled.
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.rev.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || 'openipc-rockchip' }}
+          path: src
+
+      - name: Resolve revision
+        id: rev
+        run: echo "sha=$(git -C src rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        # RV1106 / RV1103 (Cortex-A7, RKNS ID block, the SoC's own PHY),
+        # RV1103B / RV1106B (its peripherals from 0x20000000),
+        # RV1126 / RV1109 (header v1 ID block, an external PHY)
+        soc: [rv1106, rv1103, rv1103b, rv1126, rv1109]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # The commit resolve recorded, not the ref again: every leg then
+          # builds the revision the release names, even if the branch
+          # moves while the matrix runs.
+          ref: ${{ needs.resolve.outputs.sha }}
+
+      # A SoC the revision does not build is not built (see the top)
+      - name: Check the revision has ${{ matrix.soc }}
+        id: target
+        run: |
+          if [ -f build.sh ] &&
+             grep -Eq '^ALL_SOCS=".*\b${{ matrix.soc }}\b' build.sh; then
+            echo build=1 >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::${{ matrix.soc }}: not in this revision's build.sh, not built"
+            echo build=0 >> "$GITHUB_OUTPUT"
+            mkdir -p output
+            echo "not built by this revision" > output/u-boot-none.txt
+          fi
+
+      - name: Install dependencies
+        if: ${{ steps.target.outputs.build == '1' }}
+        timeout-minutes: 15
+        run: |
+          # apt mirrors on hosted runners intermittently HANG on the
+          # mirrorlist fetch (not just fail). Bound each attempt with its own
+          # `timeout` so a hang is killed fast and the retry actually fires.
+          # binman: swig and python3-dev for pylibfdt, pyelftools, and
+          # lzma_alone for the LZMA-compressed u-boot.itb
+          install() {
+            sudo timeout 180 apt-get update && \
+            sudo timeout 240 apt-get install -y --no-install-recommends \
+              build-essential gcc-arm-linux-gnueabi device-tree-compiler \
+              bison flex bc libssl-dev python3 python3-dev \
+              python3-setuptools python3-pyelftools swig lzma-alone
+          }
+          for i in 1 2 3 4; do
+            install && break
+            [ "$i" = 4 ] && { echo "apt failed after 4 attempts" >&2; exit 1; }
+            echo "apt attempt $i failed/timed out; retrying in $((i*10))s" >&2
+            sleep $((i*10))
+          done
+
+      # build.sh's default: CROSS_COMPILE=arm-linux-gnueabi-
+      - name: Build ${{ matrix.soc }}
+        if: ${{ steps.target.outputs.build == '1' }}
+        run: sh build.sh ${{ matrix.soc }}
+
+      - name: Check partition fit
+        if: ${{ steps.target.outputs.build == '1' }}
+        run: |
+          # An image larger than its boot partition overflows into the
+          # environment and bricks the camera on upgrade. build.sh checks
+          # this too; this is the gate on the artifact. The limit is where
+          # each build's own environment starts (its CONFIG_ENV_OFFSET):
+          # 0x40000 on NOR, 0xc0000 on NAND. Compare bytes: rounding down
+          # to KiB would pass an image up to 1023 bytes into it.
+          rc=0
+          for flash in nor nand; do
+            f="output/u-boot-${{ matrix.soc }}-$flash.bin"
+            [ -f "$f" ] || { echo "missing $f" >&2; rc=1; continue; }
+            limit=$(sed -n 's/^CONFIG_ENV_OFFSET=//p' \
+                    "output/build-${{ matrix.soc }}-$flash/.config")
+            [ -n "$limit" ] || { echo "no CONFIG_ENV_OFFSET for $f" >&2; rc=1; continue; }
+            size=$(stat -c %s "$f")
+            echo "- $f: [${size}/$((limit)) bytes]"
+            if [ "$size" -gt $((limit)) ]; then
+              echo "-- size exceeded by: $((size - limit)) bytes" >&2
+              rc=1
+            fi
+          done
+          exit $rc
+
+      # u-boot-<soc>: the two images the release takes, or the marker of a
+      # SoC the revision does not build
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: u-boot-${{ matrix.soc }}
+          path: |
+            output/u-boot-${{ matrix.soc }}-nor.bin
+            output/u-boot-${{ matrix.soc }}-nand.bin
+            output/u-boot-none.txt
+          if-no-files-found: error
+
+  # Build qemu-system-arm once for the smoke legs.
+  qemu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Install QEMU build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            build-essential ninja-build meson pkg-config \
+            libglib2.0-dev libpixman-1-dev libfdt-dev zlib1g-dev \
+            libslirp-dev python3 python3-venv
+
+      - name: Build qemu-system-arm
+        # OpenIPC/qemu-bench at a fixed commit with the rv1106, rv1103,
+        # rv1103b, rv1126 and rv1109 machines, the CRU's global soft reset
+        # (U-Boot's `reset`), the RV1126's v1 ID block and flash-type=
+        # picking NOR or NAND (OpenIPC/qemu-bench#380)
+        env:
+          QEMU_REPO: https://github.com/OpenIPC/qemu-bench
+          QEMU_REF: 61ef9310938deed7577753adb313476653504931
+        run: |
+          git init -q qemu-bench
+          cd qemu-bench
+          git remote add origin "$QEMU_REPO"
+          git fetch -q --depth 1 origin "$QEMU_REF"
+          git checkout -q "$QEMU_REF"
+          bash qemu/setup.sh
+          cp qemu-src/build/qemu-system-arm "$GITHUB_WORKSPACE/qemu-arm"
+          chmod +x "$GITHUB_WORKSPACE/qemu-arm"
+
+      - name: Upload qemu-arm
+        uses: actions/upload-artifact@v4
+        with:
+          name: qemu-arm
+          path: qemu-arm
+
+  # QEMU smoke test, every image on its SoC's qemu-bench machine, which
+  # stands in for the mask ROM (it skips the DDR blob and starts the SPL
+  # from the ID block), at 0 of otherwise erased flash:
+  #   NOR: a 16 MiB mx25l12805d
+  #   NAND: a 128 MiB w25n01gv (RV1106, RV1103B), a 256 MiB gd5f2gq4ub
+  #     (RV1126, the RV1109 camera's part)
+  # It must reach the autoboot prompt; probe the Ethernet MAC and get an
+  # address by DHCP and an answer to ping from QEMU's user network; then,
+  # after `reset` (the CRU's global soft reset), reach the prompt again
+  # having loaded the environment the first boot saved. The models keep
+  # flash writes in memory across a reset, so both boots are one QEMU run.
+  # A SoC the revision does not build (the build's marker) is skipped with
+  # a warning. The ID-block offsets the real mask ROM accepts are not
+  # tested: qemu-bench's stand-in tries several.
+  qemu_smoke:
+    needs: [build, qemu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        soc: [rv1106, rv1103, rv1103b, rv1126, rv1109]
+        flash: [nor, nand]
+    steps:
+      - name: Download qemu-arm
+        uses: actions/download-artifact@v4
+        with:
+          name: qemu-arm
+
+      - name: Download u-boot artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: u-boot-${{ matrix.soc }}
+
+      - name: Install QEMU runtime deps
+        run: |
+          # qemu-arm is built once in the `qemu` job and downloaded here,
+          # so this leg needs the shared libraries it links against.
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            libglib2.0-0 libpixman-1-0 libfdt1 zlib1g libslirp0
+          if ldd ./qemu-arm | grep -qi 'not found'; then
+            echo "qemu-arm has unresolved libraries:" >&2
+            ldd ./qemu-arm >&2
+            exit 1
+          fi
+
+      - name: Smoke-test in QEMU
+        timeout-minutes: 8
+        run: |
+          SOC='${{ matrix.soc }}'
+          IMG="u-boot-$SOC-${{ matrix.flash }}.bin"
+          if [ ! -f "$IMG" ]; then
+            # only the build's own marker excuses a missing image
+            if [ -f u-boot-none.txt ]; then
+              echo "::warning::$IMG not built by this revision: not tested"
+              exit 0
+            fi
+            echo "missing $IMG" >&2
+            exit 1
+          fi
+          case '${{ matrix.flash }}' in
+            nor) SIZE_MB=16; PART=mx25l12805d ;;
+            nand)
+              case $SOC in
+                rv1126|rv1109) SIZE_MB=256; PART=gd5f2gq4ub ;;
+                *) SIZE_MB=128; PART=w25n01gv ;;
+              esac ;;
+          esac
+          python3 - /tmp/flash.bin $((SIZE_MB << 20)) "$IMG" <<'PY'
+          import sys
+          img = bytearray(b'\xff' * int(sys.argv[2]))
+          u = open(sys.argv[3], 'rb').read()
+          img[:len(u)] = u
+          open(sys.argv[1], 'wb').write(img)
+          PY
+          chmod +x ./qemu-arm
+          mkfifo /tmp/uart.in /tmp/uart.out
+          ./qemu-arm -M "$SOC,flash-file=/tmp/flash.bin,flash-type=$PART" \
+            -nic user -nographic -serial pipe:/tmp/uart \
+            -monitor none > /tmp/qemu.log 2>&1 &
+          QEMU_PID=$!
+          cat /tmp/uart.out > /tmp/uboot.txt &
+          CAT_PID=$!
+          exec 3>/tmp/uart.in
+          # Wait for the n-th occurrence of a text, up to 3 minutes: the
+          # NOR images scan the flash for firmware before the prompt
+          wait_for() {
+            for i in $(seq 1 360); do
+              [ "$(grep -c "$2" /tmp/uboot.txt 2>/dev/null)" -ge "$1" ] && return 0
+              sleep 0.5
+            done
+            return 1
+          }
+          send() { printf '%s\r' "$1" >&3; }
+          rc=0
+          if wait_for 1 'Hit Ctrl-C'; then
+            # Ctrl-C a few times: one that lands after the countdown stops
+            # the boot command instead
+            for i in 1 2 3 4; do printf '\003' >&3; sleep 0.3; done
+            send 'setenv autoload no'
+            sleep 0.5
+            send 'dhcp'
+            wait_for 1 'DHCP client bound' || rc=3
+            send 'ping 10.0.2.2'
+            [ $rc = 0 ] && { wait_for 1 'is alive' || rc=4; }
+            send 'reset'
+            [ $rc = 0 ] && { wait_for 2 'Hit Ctrl-C' || rc=2; }
+          else
+            rc=1
+          fi
+          exec 3>&-
+          kill "$QEMU_PID" "$CAT_PID" 2>/dev/null || true
+          wait 2>/dev/null || true
+          echo "== captured u-boot output =="
+          cat /tmp/uboot.txt
+          echo
+          case $rc in
+            0) ;;
+            1|2) echo "FAIL: boot $rc did not reach the autoboot prompt" ;;
+            3) echo "FAIL: no DHCP lease" ;;
+            4) echo "FAIL: ping 10.0.2.2 got no answer" ;;
+          esac
+          if [ $rc = 0 ] && ! grep -q 'eth0: ethernet@' /tmp/uboot.txt; then
+            echo "FAIL: the Ethernet MAC did not probe"
+            rc=5
+          fi
+          # The first boot finds an erased environment and saves the
+          # default one; the second must load it back
+          if [ $rc = 0 ] && [ "$(grep -c 'Warning - bad CRC' /tmp/uboot.txt)" != 1 ]; then
+            echo "FAIL: the environment saved on the first boot did not load after reset"
+            rc=6
+          fi
+          if [ $rc != 0 ]; then
+            echo
+            echo "== qemu stderr =="
+            tail -40 /tmp/qemu.log || true
+            exit 1
+          fi
+          echo "PASS: $IMG reached the autoboot prompt, got DHCP and a ping answer, and its saved environment survived a reset"
+
+  # Mirror every built image to this repository's own Rockchip release.
+  release:
+    needs: [resolve, build, qemu_smoke]
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: u-boot-*
+
+      - name: Upload to releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: rockchip
+          name: Rockchip
+          target_commitish: ${{ needs.resolve.outputs.sha }}
+          prerelease: true
+          files: artifacts/**/*.bin
+          fail_on_unmatched_files: true
+
+  # No publish job: images go only to this repository's own Rockchip
+  # release. None has run on silicon, only on qemu-bench's machines; the
+  # mask ROM's ID-block offsets in particular are unverified. Add a
+  # publish job (as build-hisilicon.yml has it, with openipc.org's
+  # allowlist in OpenIPC/website service/internal/builds/verify.go) once
+  # an image has booted on a camera.

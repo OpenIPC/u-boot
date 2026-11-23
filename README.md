@@ -14,6 +14,7 @@
   - [SigmaStar](#sigmastar)
   - [Ingenic](#ingenic)
   - [Axera](#axera)
+  - [Rockchip](#rockchip)
 - [Images](#images)
 - [Flash layout](#flash-layout)
 - [What happens at boot](#what-happens-at-boot)
@@ -37,6 +38,7 @@
 | [SigmaStar](#sigmastar) | `openipc-sigmastar` | [sigmastar](../../releases/tag/sigmastar) | [![sigmastar](https://github.com/OpenIPC/u-boot/actions/workflows/build-sigmastar.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-sigmastar.yml) |
 | [Ingenic](#ingenic) | `openipc-ingenic` | [ingenic](../../releases/tag/ingenic) | [![ingenic](https://github.com/OpenIPC/u-boot/actions/workflows/build-ingenic.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-ingenic.yml) |
 | [Axera](#axera) | `openipc-axera` | [axera](../../releases/tag/axera) | [![axera](https://github.com/OpenIPC/u-boot/actions/workflows/build-axera.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-axera.yml) |
+| [Rockchip](#rockchip) | `openipc-rockchip` | [rockchip](../../releases/tag/rockchip) | [![rockchip](https://github.com/OpenIPC/u-boot/actions/workflows/build-rockchip.yml/badge.svg)](https://github.com/OpenIPC/u-boot/actions/workflows/build-rockchip.yml) |
 
 ### HiSilicon and Goke
 
@@ -404,6 +406,33 @@ Every infinity2m, infinity6, 6b0, 6e and 6c part also builds for SPI NAND,
   from a public copy of the SDK at a fixed commit and checks against its
   SHA-256 (or `AX_GZIP=<path>`).
 
+### Rockchip
+
+| SoC | CPU | RAM | Flash | Notes |
+| --- | --- | --- | --- | --- |
+| `rv1106` `rv1103` | Cortex-A7 | 64–256 MiB | NOR, NAND | the same die; Ethernet (the SoC's own PHY) and SD; tested in qemu only |
+| `rv1103b` | Cortex-A7 | 64 MiB | NOR, NAND | the RV1103B / RV1106B die; Ethernet (the SoC's own PHY) and SD; tested in qemu only |
+| `rv1126` `rv1109` | Cortex-A7 ×4 / ×2 | external | NOR, NAND | the same die; Ethernet (RMII to an external PHY, as the RV1109 camera has it) and SD; tested in qemu only |
+
+- **The images have not run on silicon**, only on qemu-bench's machines,
+  whose mask ROM stand-in tries several ID-block offsets. Where the real
+  mask ROM looks is unverified: the images put the ID block at `0x8000`
+  on NOR (the usual 32 KiB of Rockchip images; Xiongmai's cameras have it
+  at `0x10000`) and in blocks 0 and 1 on NAND. Have USB maskrom recovery
+  (`rkdeveloptool`) at hand. They are only in this repository's
+  `rockchip` release, and nothing is published to OpenIPC/firmware.
+- Each image is the boot partition, written at 0: the ID block, rkbin's
+  DDR-init blob (in the tree, redistributable) and the SPL, then
+  `u-boot.itb`, U-Boot and its device tree, LZMA. On NOR all of it ends
+  before the environment at `0x40000`; on NAND, `u-boot.itb` is at
+  `0x40000` in the 768 KiB boot partition.
+- U-Boot has no gzip: the kernel is a zImage in a FIT or uImage,
+  uncompressed (it decompresses itself). On NAND it is
+  `/boot/fitImage` or `/boot/uImage` in the UBIFS rootfs.
+- The console is the kernel's `ttyFIQ0` (`console=ttyFIQ0,115200`), the
+  vendor kernels' FIQ debugger; `osmem` defaults to all of the DRAM, as
+  the Rockchip kernels reserve their media memory themselves.
+
 ## Images
 
 | File | What it is |
@@ -609,7 +638,8 @@ gh workflow run build-<vendor>.yml -f release=true -f publish=true   # + OpenIPC
 `publish` needs a `FIRMWARE_RELEASE_TOKEN` secret. Ingenic's publishes
 only its `publish_targets`, the T41 ones by default; SigmaStar's is
 commented out for now, so its images go only to this repository's
-`sigmastar` release, and so is Axera's (`axera` release). Held SoCs are never released.
+`sigmastar` release, and so is Axera's (`axera` release). Rockchip's
+has none yet (`rockchip` release). Held SoCs are never released.
 
 **Adding a vendor:** push the port on a new `openipc-<vendor>` branch,
 add `build-<vendor>.yml` here, and add a row and a section to this
