@@ -77,6 +77,15 @@ static int spl_node_to_boot_device(int node)
 	if (!uclass_get_device_by_of_offset(UCLASS_SPI_FLASH, node, &parent))
 		return BOOT_DEVICE_SPI;
 
+	/*
+	 * A flash on a SPI bus that no SPL SPI-flash driver takes -- SPI NAND,
+	 * which a board's own loader reads (OpenIPC RV11xx)
+	 */
+	if (!uclass_get_device_by_of_offset(UCLASS_SPI,
+					    fdt_parent_offset(gd->fdt_blob, node),
+					    &parent))
+		return BOOT_DEVICE_SPI;
+
 	return -1;
 }
 
