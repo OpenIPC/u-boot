@@ -331,6 +331,21 @@ config ROCKCHIP_RV1103B
 	  The mask ROM loads the ID block's DDR-init blob, then its SPL, into
 	  DRAM at 0.
 
+config ROCKCHIP_RV1126
+	bool "Support Rockchip RV1126 / RV1109"
+	select CPU_V7A
+	select SUPPORT_SPL
+	select SPL
+	# the SPI NAND is nand0, registered by the board (board_nand_init)
+	select SYS_NAND_SELF_INIT if MTD_SPI_NAND
+	imply ROCKCHIP_COMMON_BOARD
+	help
+	  The Rockchip RV1126 (four Cortex-A7) and RV1109 (two), camera SoCs
+	  with an NPU and video encoders. The mask ROM loads the ID block's
+	  DDR-init blob, then its SPL, into DRAM at 0. Backported from
+	  mainline v2023.04, without its TPL: rkbin's DDR blob initialises
+	  the DRAM, as on the RV1106.
+
 config ROCKCHIP_USB_UART
 	bool "Route uart output to usb pins"
 	help
@@ -477,5 +492,6 @@ source "arch/arm/mach-rockchip/rk3399/Kconfig"
 source "arch/arm/mach-rockchip/rk3568/Kconfig"
 source "arch/arm/mach-rockchip/rv1106/Kconfig"
 source "arch/arm/mach-rockchip/rv1103b/Kconfig"
+source "arch/arm/mach-rockchip/rv1126/Kconfig"
 source "arch/arm/mach-rockchip/rv1108/Kconfig"
 endif

@@ -1,0 +1,196 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * RV1126 / RV1109 as OpenIPC's U-Boot sees it: the CRUs and GRFs, UART2,
+ * the SFC with the boot flash, the Ethernet MAC (its PHY is the board's),
+ * GPIO3 and the SD slot with its pins. Addresses, clocks and pins are
+ * mainline's (v2023.04 arch/arm/dts/rv1126.dtsi and rv1126-pinctrl.dtsi);
+ * the SFC and the MAC, which mainline lacks, are the vendor SDK's
+ * (rockchip-linux/u-boot next-dev), and the RMII pin groups the vendor
+ * kernel's. The NVM power domain the SFC sits in is on: the mask ROM
+ * booted from it.
+ */
+
+#include <dt-bindings/clock/rockchip,rv1126-cru.h>
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/pinctrl/rockchip.h>
+
+/ {
+	#address-cells = <1>;
+	#size-cells = <1>;
+
+	compatible = "rockchip,rv1126";
+
+	xin24m: oscillator {
+		compatible = "fixed-clock";
+		clock-frequency = <24000000>;
+		clock-output-names = "xin24m";
+		#clock-cells = <0>;
+	};
+
+	grf: syscon@fe000000 {
+		compatible = "rockchip,rv1126-grf", "syscon", "simple-mfd";
+		reg = <0xfe000000 0x20000>;
+	};
+
+	pmugrf: syscon@fe020000 {
+		compatible = "rockchip,rv1126-pmugrf", "syscon", "simple-mfd";
+		reg = <0xfe020000 0x1000>;
+	};
+
+	pmucru: clock-controller@ff480000 {
+		compatible = "rockchip,rv1126-pmucru";
+		reg = <0xff480000 0x1000>;
+		rockchip,grf = <&grf>;
+		#clock-cells = <1>;
+		#reset-cells = <1>;
+	};
+
+	cru: clock-controller@ff490000 {
+		compatible = "rockchip,rv1126-cru";
+		reg = <0xff490000 0x1000>;
+		clocks = <&xin24m>;
+		clock-names = "xin24m";
+		rockchip,grf = <&grf>;
+		#clock-cells = <1>;
+		#reset-cells = <1>;
+	};
+
+	/* The console; the debug UART code sets its pins (M1) */
+	uart2: serial@ff570000 {
+		compatible = "rockchip,rv1126-uart", "snps,dw-apb-uart";
+		reg = <0xff570000 0x100>;
+		clock-frequency = <24000000>;
+		clocks = <&cru SCLK_UART2>, <&cru PCLK_UART2>;
+		clock-names = "baudclk", "apb_pclk";
+		reg-shift = <2>;
+		reg-io-width = <4>;
+		status = "disabled";
+	};
+
+	/* The board picks the PHY's interface, clocks, pins and reset */
+	gmac: ethernet@ffc40000 {
+		compatible = "rockchip,rv1126-gmac", "snps,dwmac-4.20a";
+		reg = <0xffc40000 0x10000>;
+		rockchip,grf = <&grf>;
+		clocks = <&cru CLK_GMAC_SRC>, <&cru CLK_GMAC_TX_RX>,
+			 <&cru CLK_GMAC_TX_RX>, <&cru CLK_GMAC_REF>,
+			 <&cru ACLK_GMAC>, <&cru PCLK_GMAC>,
+			 <&cru CLK_GMAC_TX_RX>, <&cru CLK_GMAC_PTPREF>;
+		clock-names = "stmmaceth", "mac_clk_rx",
+			      "mac_clk_tx", "clk_mac_ref",
+			      "aclk_mac", "pclk_mac",
+			      "clk_mac_speed", "ptp_ref";
+		resets = <&cru SRST_GMAC_A>;
+		reset-names = "stmmaceth";
+		status = "disabled";
+
+		mdio: mdio {
+			compatible = "snps,dwmac-mdio";
+			#address-cells = <0x1>;
+			#size-cells = <0x0>;
+		};
+	};
+
+	sdmmc: mmc@ffc60000 {
+		compatible = "rockchip,rv1126-dw-mshc", "rockchip,rk3288-dw-mshc";
+		reg = <0xffc60000 0x4000>;
+		clocks = <&cru HCLK_SDMMC>, <&cru CLK_SDMMC>,
+			 <&cru SCLK_SDMMC_DRV>, <&cru SCLK_SDMMC_SAMPLE>;
+		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+		fifo-depth = <0x100>;
+		max-frequency = <200000000>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&sdmmc0_clk &sdmmc0_cmd &sdmmc0_det &sdmmc0_bus4>;
+		status = "disabled";
+	};
+
+	sfc: spi@ffc90000 {
+		compatible = "rockchip,sfc";
+		reg = <0xffc90000 0x4000>;
+		clocks = <&cru SCLK_SFC>, <&cru HCLK_SFC>;
+		clock-names = "clk_sfc", "hclk_sfc";
+		assigned-clocks = <&cru SCLK_SFC>;
+		assigned-clock-rates = <80000000>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		status = "disabled";
+	};
+
+	pinctrl: pinctrl {
+		compatible = "rockchip,rv1126-pinctrl";
+		rockchip,grf = <&grf>;
+		rockchip,pmu = <&pmugrf>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		pcfg_pull_none: pcfg-pull-none {
+			bias-disable;
+		};
+
+		pcfg_pull_none_drv_level_0: pcfg-pull-none-drv-level-0 {
+			bias-disable;
+			drive-strength = <0>;
+		};
+
+		/* rk_gpio numbers the bank from the name before "@" */
+		gpio3: gpio3@ff640000 {
+			compatible = "rockchip,gpio-bank";
+			reg = <0xff640000 0x100>;
+			clocks = <&cru PCLK_GPIO3>, <&cru DBCLK_GPIO3>;
+			gpio-ranges = <&pinctrl 0 96 32>;
+			gpio-controller;
+			#gpio-cells = <2>;
+		};
+
+		/* RMII on its M0 pins, and the M0 reference clock out */
+		rmii {
+			rmiim0_pins: rmiim0-pins {
+				rockchip,pins =
+					<3 RK_PC4 2 &pcfg_pull_none_drv_level_0>,
+					<3 RK_PC3 2 &pcfg_pull_none>,
+					<3 RK_PB6 2 &pcfg_pull_none>,
+					<3 RK_PB7 2 &pcfg_pull_none>,
+					<3 RK_PC1 2 &pcfg_pull_none>,
+					<3 RK_PC2 2 &pcfg_pull_none>,
+					<3 RK_PB3 2 &pcfg_pull_none_drv_level_0>,
+					<3 RK_PB4 2 &pcfg_pull_none_drv_level_0>,
+					<3 RK_PB5 2 &pcfg_pull_none_drv_level_0>;
+			};
+
+			gmac_clk_m0_drv_level0_pins: gmac-clk-m0-drv-level0-pins {
+				rockchip,pins =
+					<3 RK_PC0 2 &pcfg_pull_none_drv_level_0>;
+			};
+		};
+
+		pcfg_pull_up_drv_level_2: pcfg-pull-up-drv-level-2 {
+			bias-pull-up;
+			drive-strength = <2>;
+		};
+
+		sdmmc0 {
+			sdmmc0_bus4: sdmmc0-bus4 {
+				rockchip,pins =
+					<1 RK_PA4 1 &pcfg_pull_up_drv_level_2>,
+					<1 RK_PA5 1 &pcfg_pull_up_drv_level_2>,
+					<1 RK_PA6 1 &pcfg_pull_up_drv_level_2>,
+					<1 RK_PA7 1 &pcfg_pull_up_drv_level_2>;
+			};
+
+			sdmmc0_clk: sdmmc0-clk {
+				rockchip,pins =
+					<1 RK_PB0 1 &pcfg_pull_up_drv_level_2>;
+			};
+
+			sdmmc0_cmd: sdmmc0-cmd {
+				rockchip,pins =
+					<1 RK_PB1 1 &pcfg_pull_up_drv_level_2>;
+			};
+
+			sdmmc0_det: sdmmc0-det {
+				rockchip,pins = <0 RK_PA3 1 &pcfg_pull_none>;
+			};
+		};
+	};
+};
