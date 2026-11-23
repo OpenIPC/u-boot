@@ -301,6 +301,21 @@ config ROCKCHIP_RV1108
 	  The Rockchip RV1108 is a ARM-based SoC with a single-core Cortex-A7
 	  and a DSP.
 
+config ROCKCHIP_RV1106
+	bool "Support Rockchip RV1106 / RV1103"
+	select CPU_V7A
+	select SUPPORT_SPL
+	select SPL
+	select ARM_ZERO_CNTVOFF
+	# the SPI NAND is nand0, registered by the board (board_nand_init)
+	select SYS_NAND_SELF_INIT if MTD_SPI_NAND
+	imply ROCKCHIP_COMMON_BOARD
+	help
+	  The Rockchip RV1106 and RV1103 (the same die in smaller packages,
+	  with less DDR) are camera SoCs with a single Cortex-A7, an NPU and
+	  a video encoder. The mask ROM loads the ID block's DDR-init blob,
+	  then its SPL, into DRAM at 0.
+
 config ROCKCHIP_USB_UART
 	bool "Route uart output to usb pins"
 	help
@@ -445,5 +460,6 @@ source "arch/arm/mach-rockchip/rk3328/Kconfig"
 source "arch/arm/mach-rockchip/rk3368/Kconfig"
 source "arch/arm/mach-rockchip/rk3399/Kconfig"
 source "arch/arm/mach-rockchip/rk3568/Kconfig"
+source "arch/arm/mach-rockchip/rv1106/Kconfig"
 source "arch/arm/mach-rockchip/rv1108/Kconfig"
 endif

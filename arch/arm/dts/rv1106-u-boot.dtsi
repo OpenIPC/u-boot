@@ -1,0 +1,83 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * What U-Boot's SPL and its pre-relocation stage need of the RV1106: the
+ * console, the CRU and GRF, the SFC and its flash.
+ */
+
+/ {
+	chosen {
+		stdout-path = "serial2:115200n8";
+		u-boot,spl-boot-order = "same-as-spl";
+	};
+};
+
+&uart2 {
+	u-boot,dm-pre-reloc;
+	clock-frequency = <24000000>;
+	status = "okay";
+};
+
+&cru {
+	u-boot,dm-pre-reloc;
+};
+
+&grf {
+	u-boot,dm-pre-reloc;
+};
+
+&sfc {
+	u-boot,dm-pre-reloc;
+	status = "okay";
+};
+
+/*
+ * u-boot.itb, the FIT the SPL loads from the boot partition: U-Boot,
+ * LZMA-compressed for the NOR layout's 256 KiB boot partition, and its
+ * device tree. build.sh puts it behind the ID block.
+ */
+/ {
+	binman: binman {
+		filename = "u-boot.itb";
+
+		fit {
+			description = "OpenIPC U-Boot";
+			#address-cells = <1>;
+
+			images {
+				uboot {
+					description = "U-Boot";
+					type = "standalone";
+					os = "U-Boot";
+					arch = "arm";
+					compression = "lzma";
+					load = <CONFIG_SYS_TEXT_BASE>;
+					entry = <CONFIG_SYS_TEXT_BASE>;
+
+					u-boot-nodtb {
+						compress = "lzma";
+					};
+				};
+
+				fdt {
+					description = "U-Boot's device tree";
+					type = "flat_dt";
+					compression = "lzma";
+
+					u-boot-dtb {
+						compress = "lzma";
+					};
+				};
+			};
+
+			configurations {
+				default = "conf";
+
+				conf {
+					description = "OpenIPC U-Boot";
+					firmware = "uboot";
+					fdt = "fdt";
+				};
+			};
+		};
+	};
+};

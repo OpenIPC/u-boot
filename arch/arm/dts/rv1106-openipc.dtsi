@@ -1,0 +1,181 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * RV1106 / RV1103 as OpenIPC's U-Boot sees it: the CRU and GRF, UART2, the
+ * SFC with the boot flash, the Ethernet MAC with the SoC's own 10/100 PHY,
+ * and the SD slot with its pins. Addresses, clocks, resets and pins are the
+ * vendor SDK's (rockchip-linux/u-boot next-dev, arch/arm/dts/rv1106.dtsi and
+ * rv1106-pinctrl.dtsi); the rest of the SoC is the kernel's business, and
+ * the full tree would not fit the NOR layout's 256 KiB boot partition.
+ */
+
+#include <dt-bindings/clock/rv1106-cru.h>
+#include <dt-bindings/pinctrl/rockchip.h>
+
+/ {
+	#address-cells = <1>;
+	#size-cells = <1>;
+
+	compatible = "rockchip,rv1106";
+
+	xin24m: oscillator {
+		compatible = "fixed-clock";
+		clock-frequency = <24000000>;
+		clock-output-names = "xin24m";
+		#clock-cells = <0>;
+	};
+
+	grf: syscon@ff000000 {
+		compatible = "rockchip,rv1106-grf", "syscon", "simple-mfd";
+		reg = <0xff000000 0x68000>;
+
+		/* The SD clock's drive and sample phases */
+		grf_cru: grf-clock-controller {
+			compatible = "rockchip,rv1106-grf-cru";
+			#clock-cells = <1>;
+		};
+	};
+
+	pmuioc: syscon@ff388000 {
+		compatible = "rockchip,rv1106-pmuioc", "syscon";
+		reg = <0xff388000 0x1000>;
+	};
+
+	cru: clock-controller@ff3a0000 {
+		compatible = "rockchip,rv1106-cru";
+		reg = <0xff3a0000 0x20000>;
+		rockchip,grf = <&grf>;
+		#clock-cells = <1>;
+		#reset-cells = <1>;
+
+		assigned-clocks =
+			<&cru PLL_GPLL>, <&cru PLL_CPLL>,
+			<&cru ARMCLK>,
+			<&cru ACLK_PERI_ROOT>, <&cru HCLK_PERI_ROOT>,
+			<&cru PCLK_PERI_ROOT>, <&cru ACLK_BUS_ROOT>,
+			<&cru PCLK_TOP_ROOT>, <&cru PCLK_PMU_ROOT>,
+			<&cru HCLK_PMU_ROOT>;
+		assigned-clock-rates =
+			<1188000000>, <1000000000>,
+			<816000000>,
+			<400000000>, <200000000>,
+			<100000000>, <300000000>,
+			<100000000>, <100000000>,
+			<200000000>;
+	};
+
+	/* The console; the debug UART code sets its pins (M1) */
+	uart2: serial@ff4c0000 {
+		compatible = "rockchip,rv1106-uart", "snps,dw-apb-uart";
+		reg = <0xff4c0000 0x100>;
+		reg-shift = <2>;
+		reg-io-width = <4>;
+		clock-frequency = <24000000>;
+		clocks = <&cru SCLK_UART2>, <&cru PCLK_UART2>;
+		clock-names = "baudclk", "apb_pclk";
+		status = "disabled";
+	};
+
+	ioc: syscon@ff538000 {
+		compatible = "rockchip,rv1106-ioc", "syscon";
+		reg = <0xff538000 0x40000>;
+	};
+
+	gmac: ethernet@ffa80000 {
+		compatible = "rockchip,rv1106-gmac", "snps,dwmac-4.20a";
+		reg = <0xffa80000 0x10000>;
+		rockchip,grf = <&grf>;
+		clocks = <&cru CLK_GMAC0_TX_50M_O>, <&cru CLK_GMAC0_REF_50M>,
+			 <&cru ACLK_MAC>, <&cru PCLK_MAC>;
+		clock-names = "stmmaceth", "clk_mac_ref",
+			      "aclk_mac", "pclk_mac";
+		resets = <&cru SRST_A_MAC>;
+		reset-names = "stmmaceth";
+		phy-mode = "rmii";
+		clock_in_out = "input";
+		phy-handle = <&rmii_phy>;
+		status = "disabled";
+
+		mdio: mdio {
+			compatible = "snps,dwmac-mdio";
+			#address-cells = <0x1>;
+			#size-cells = <0x0>;
+
+			rmii_phy: ethernet-phy@2 {
+				compatible = "ethernet-phy-id0044.1400",
+					     "ethernet-phy-ieee802.3-c22";
+				reg = <2>;
+				clocks = <&cru CLK_MACPHY>;
+				resets = <&cru SRST_MACPHY>;
+				phy-is-integrated;
+			};
+		};
+	};
+
+	sdmmc: mmc@ffaa0000 {
+		compatible = "rockchip,rv1106-dw-mshc", "rockchip,rk3288-dw-mshc";
+		reg = <0xffaa0000 0x4000>;
+		clocks = <&cru HCLK_SDMMC>, <&cru CCLK_SRC_SDMMC>,
+			 <&grf_cru SCLK_SDMMC_DRV>, <&grf_cru SCLK_SDMMC_SAMPLE>;
+		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+		fifo-depth = <0x100>;
+		max-frequency = <200000000>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&sdmmc0_clk &sdmmc0_cmd &sdmmc0_det &sdmmc0_bus4>;
+		status = "disabled";
+	};
+
+	sfc: spi@ffac0000 {
+		compatible = "rockchip,sfc";
+		reg = <0xffac0000 0x4000>;
+		clocks = <&cru SCLK_SFC>, <&cru HCLK_SFC>;
+		clock-names = "clk_sfc", "hclk_sfc";
+		assigned-clocks = <&cru SCLK_SFC>;
+		assigned-clock-rates = <75000000>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		status = "disabled";
+	};
+
+	pinctrl: pinctrl {
+		compatible = "rockchip,rv1106-pinctrl";
+		rockchip,grf = <&ioc>;
+		rockchip,pmu = <&pmuioc>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		pcfg_pull_up: pcfg-pull-up {
+			bias-pull-up;
+		};
+
+		pcfg_pull_up_drv_level_2: pcfg-pull-up-drv-level-2 {
+			bias-pull-up;
+			drive-strength = <2>;
+		};
+
+		sdmmc0 {
+			sdmmc0_bus4: sdmmc0-bus4 {
+				rockchip,pins =
+					<3 RK_PA3 1 &pcfg_pull_up_drv_level_2>,
+					<3 RK_PA2 1 &pcfg_pull_up_drv_level_2>,
+					<3 RK_PA7 1 &pcfg_pull_up_drv_level_2>,
+					<3 RK_PA6 1 &pcfg_pull_up_drv_level_2>;
+			};
+
+			sdmmc0_clk: sdmmc0-clk {
+				rockchip,pins =
+					<3 RK_PA4 1 &pcfg_pull_up_drv_level_2>;
+			};
+
+			sdmmc0_cmd: sdmmc0-cmd {
+				rockchip,pins =
+					<3 RK_PA5 1 &pcfg_pull_up_drv_level_2>;
+			};
+
+			sdmmc0_det: sdmmc0-det {
+				rockchip,pins =
+					<3 RK_PA1 1 &pcfg_pull_up>;
+			};
+		};
+	};
+};
