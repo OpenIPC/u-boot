@@ -255,6 +255,7 @@ static ulong rv1103b_crypto_set_clk(struct rv1103b_clk_priv *priv,
 	case HCLK_RK_RNG_NS:
 	case HCLK_RK_RNG_S:
 		rv1103b_peri_set_clk(priv, LSCLK_PERI_SRC, rate);
+		break;
 	case CLK_CORE_CRYPTO:
 		rk_clrsetreg(&cru->clksel_con[35],
 			     CLK_CORE_CRYPTO_SEL_MASK,
@@ -730,7 +731,7 @@ static ulong rv1103b_uart_set_rate(struct rv1103b_clk_priv *priv,
 		reg = 10;
 		rk_clrsetreg(&cru->clksel_con[5],
 			     CLK_UART0_SRC_DIV_MASK,
-			     div << CLK_UART0_SRC_DIV_SHIFT);
+			     (div - 1) << CLK_UART0_SRC_DIV_SHIFT);
 		rk_clrsetreg(&cru->clksel_con[32],
 			     CLK_UART0_SEL_MASK,
 			     uart_src << CLK_UART0_SEL_SHIFT);
@@ -739,7 +740,7 @@ static ulong rv1103b_uart_set_rate(struct rv1103b_clk_priv *priv,
 		reg = 11;
 		rk_clrsetreg(&cru->clksel_con[5],
 			     CLK_UART1_SRC_DIV_MASK,
-			     div << CLK_UART1_SRC_DIV_SHIFT);
+			     (div - 1) << CLK_UART1_SRC_DIV_SHIFT);
 		rk_clrsetreg(&cru->clksel_con[32],
 			     CLK_UART1_SEL_MASK,
 			     uart_src << CLK_UART1_SEL_SHIFT);
@@ -748,7 +749,7 @@ static ulong rv1103b_uart_set_rate(struct rv1103b_clk_priv *priv,
 		reg = 12;
 		rk_clrsetreg(&cru->clksel_con[5],
 			     CLK_UART2_SRC_DIV_MASK,
-			     div << CLK_UART2_SRC_DIV_SHIFT);
+			     (div - 1) << CLK_UART2_SRC_DIV_SHIFT);
 		rk_clrsetreg(&cru->clksel_con[32],
 			     CLK_UART2_SEL_MASK,
 			     uart_src << CLK_UART2_SEL_SHIFT);
