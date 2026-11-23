@@ -645,7 +645,7 @@ static ulong rv1106_pwm_get_clk(struct rv1106_clk_priv *priv, ulong clk_id)
 	case CLK_PWM_SEL_100M:
 		return 100 * MHz;
 	case CLK_PWM_SEL_50M:
-		return 100 * MHz;
+		return 50 * MHz;
 	case CLK_PWM_SEL_24M:
 		return OSC_HZ;
 	default:
@@ -870,7 +870,7 @@ static ulong rv1106_uart_set_rate(struct rv1106_clk_priv *priv,
 	} else if (priv->cpll_hz % rate == 0) {
 		clk_src = CLK_UART_SRC_SEL_CPLL;
 		uart_src = CLK_UART_SEL_SRC;
-		div = DIV_ROUND_UP(priv->gpll_hz, rate);
+		div = DIV_ROUND_UP(priv->cpll_hz, rate);
 	} else if (rate == OSC_HZ) {
 		clk_src = CLK_UART_SRC_SEL_GPLL;
 		uart_src = CLK_UART_SEL_XIN24M;
