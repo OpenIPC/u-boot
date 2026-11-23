@@ -182,7 +182,7 @@ jobs:
         # picking NOR or NAND (OpenIPC/qemu-bench#380)
         env:
           QEMU_REPO: https://github.com/OpenIPC/qemu-bench
-          QEMU_REF: 61ef9310938deed7577753adb313476653504931
+          QEMU_REF: 9d4c1a447b0574a60a78229acd2b01482c152029
         run: |
           git init -q qemu-bench
           cd qemu-bench
