@@ -14,6 +14,8 @@
 #include <linux/sizes.h>
 
 #define CONFIG_SYS_SDRAM_BASE		0
+/* The most DRAM there can be: the registers begin at 0xfe000000, and mainline keeps 16 MiB below them free */
+#define RV11XX_SDRAM_MAX		0xfd000000
 /* board_init_f()'s stack and global data: above U-Boot, below baseaddr */
 #define CONFIG_SYS_INIT_RAM_ADDR	0x00300000
 #define CONFIG_SYS_INIT_RAM_SIZE	0x00100000

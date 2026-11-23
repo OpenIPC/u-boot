@@ -63,7 +63,13 @@ int dram_init(void)
 	 * Without ATAGs (a DDR blob that leaves none): the smallest RV1103's
 	 * 64 MiB, safe on every part
 	 */
-	gd->ram_size = size ? size : SZ_64M;
+	if (!size)
+		size = SZ_64M;
+	/*
+	 * No more than fits below the registers (a 4 GiB RV1126 reports
+	 * 4 GiB, which would wrap ram_top to 0 on this 32-bit CPU)
+	 */
+	gd->ram_size = min_t(u64, size, RV11XX_SDRAM_MAX);
 	return 0;
 }
 
