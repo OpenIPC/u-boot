@@ -162,6 +162,19 @@ unsigned long notrace timer_read_counter(void)
 }
 
 /*
+ * Stop the tick before Linux. This timer (0x080000B4/B8, timer 0 to the
+ * kernel) is also PWM0's counter, and Linux, which ticks on timers 1 and 7,
+ * never stops it. The vendor's ak_pwm_char refuses a timer it finds
+ * enabled ("timer/pwm0 is used"), which on the AK3918EV300L takes PWM0
+ * away from the ISP that alternates two sensors behind a MIPI switch with
+ * it (OpenIPC/u-boot#162). U-Boot waits on nothing after this.
+ */
+void board_quiesce_devices(void)
+{
+	writel(0, AK_SYS_TIMER1_CTRL2);
+}
+
+/*
  * The watchdog, armed the way the vendor U-Boots do it: an 8 s count,
  * enable, enable and feed; then again with a count of 1, which is what
  * resets the part at once. A single write of count 1 with enable and feed
