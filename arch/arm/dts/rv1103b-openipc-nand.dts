@@ -1,0 +1,40 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * OpenIPC RV1103B / RV1106B camera, SPI NAND on the FSPI.
+ */
+/dts-v1/;
+#include "rv1103b-openipc.dtsi"
+
+/ {
+	model = "OpenIPC RV1103B";
+	compatible = "openipc,rv1103b", "rockchip,rv1103b";
+
+	aliases {
+		serial0 = &uart0;
+		spi0 = &sfc;
+		ethernet0 = &gmac;
+		mmc0 = &sdmmc0;
+	};
+};
+
+&sfc {
+	flash@0 {
+		compatible = "spi-nand";
+		reg = <0>;
+		spi-max-frequency = <75000000>;
+		spi-rx-bus-width = <4>;
+		spi-tx-bus-width = <1>;
+		u-boot,dm-pre-reloc;
+	};
+};
+
+/* The SoC's own 10/100 PHY on RMII */
+&gmac {
+	status = "okay";
+};
+
+&sdmmc0 {
+	bus-width = <4>;
+	cap-sd-highspeed;
+	status = "okay";
+};

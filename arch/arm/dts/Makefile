@@ -170,6 +170,10 @@ dtb-$(CONFIG_ROCKCHIP_RV1106) += \
 	rv1106-openipc-nand.dtb \
 	rv1106-openipc-nor.dtb
 
+dtb-$(CONFIG_ROCKCHIP_RV1103B) += \
+	rv1103b-openipc-nand.dtb \
+	rv1103b-openipc-nor.dtb
+
 dtb-$(CONFIG_ROCKCHIP_RV1108) += \
 	rv1108-elgin-r1.dtb \
 	rv1108-evb.dtb
