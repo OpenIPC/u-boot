@@ -265,9 +265,10 @@ firmware. Remove the card and the camera boots from flash.
 | --- | --- | --- | --- | --- |
 | `gm8136` | FA626TE (ARMv5) | 128 MiB | NOR | GM8136S; the same image runs GM8136 with external DDR |
 | `gm8135` | FA626TE (ARMv5) | 64 MiB | NOR | GM8135S |
+| `gm8126` | FA626TE (ARMv5) | 128 MiB | NOR | run under QEMU only; the first stage is our own, stored byte-swapped |
 
-- The image holds the SDK's first stage, nsboot, built from source. One
-  build serves every package because nsboot picks the DDR table by the
+- The GM813x images hold the SDK's first stage, nsboot, built from source.
+  One build serves every package because nsboot picks the DDR table by the
   chip's package ID.
 
 ### SigmaStar

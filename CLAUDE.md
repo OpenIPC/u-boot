@@ -40,7 +40,7 @@ own branch:
   the same OpenIPC layer. CI: `build-fullhan.yml`, called from that
   branch's `ci.yml`. Its own `CLAUDE.md` covers the boot header and its
   DDR scripts, the vendor ramboots and the kernel hand-off.
-- `openipc-grainmedia`: U-Boot for Grain Media GM8135S, GM8136 and
+- `openipc-grainmedia`: U-Boot for Grain Media GM8126, GM8135S, GM8136 and
   GM8136S, on the same mainline release with the same OpenIPC layer,
   plus the SDK's nsboot, built from source in the tree. CI:
   `build-grainmedia.yml`, called from that branch's `ci.yml`. Its own
@@ -267,7 +267,7 @@ The build logic lives here. Other branches call it:
   header, nsboot, U-Boot).
 - **Images are not machines:** one image serves several packages, so the
   smoke matrix boots `gm8136` on both `gm8136` and `gm8136s`, `gm8135` on
-  `gm8135s`. Keep the build matrix, the smoke matrix and the README's list
+  `gm8135s`, `gm8126` on `gm8126`. Keep the build matrix, the smoke matrix and the README's list
   in step.
 - **Smoke test:** two boots of an 8 MiB flash image holding only the
   image; qemu-hisilicon runs nsboot from it. It passes on `Hit Ctrl-C`,
