@@ -165,9 +165,10 @@ jobs:
 
   # QEMU smoke test -- boots each freshly-built image from flash through
   # qemu-hisilicon's Grain Media machines, whose boot ROM stand-in loads
-  # nsboot from the image into SRAM: nsboot sets up DDR for the machine's
-  # package and loads U-Boot, which must reach the autoboot prompt. One
-  # image serves every package, so gm8136 boots on both the gm8136
+  # the first stage from the image into SRAM (the SDK's nsboot, or gm8126's
+  # own): it sets up DDR for the machine's package and loads U-Boot, which
+  # must reach the autoboot prompt. One GM813x image serves every package,
+  # so gm8136 boots on both the gm8136
   # (external DDR) and gm8136s machines, gm8135 on gm8135s, gm8126 on its
   # own.
   #
