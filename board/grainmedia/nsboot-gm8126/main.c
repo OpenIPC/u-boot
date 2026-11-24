@@ -168,8 +168,9 @@ static void ddr_init(void)
 	for (i = 0; i < 4; i++)
 		REG(DDRC + t[i].off) = t[i].val;
 	REG(DDRC + 0x04) = 1;
-	while (!(REG(DDRC + 0x04) & 0x100))
-		;
+	for (i = 0; !(REG(DDRC + 0x04) & 0x100); i++)
+		if (i > 10000000)
+			stop("DDR controller does not get ready\n");
 	/* the static memory controller's bank, as the vendor leaves it */
 	REG(0x10000000) = 0x10000040;
 	REG(0x10000004) = 0x010ff0f1;
@@ -273,12 +274,13 @@ void main(void)
 	u32 hdr[4], at;
 
 	ddr_remap();
-	ddr_init();
 	/* the clocks U-Boot's lowlevel_init() turns on */
 	REG(PMU + 0x38) &= 0xfffff7b3;
 	REG(PMU + 0x3c) &= 0xffffadde;
+	/* the console first: it runs from SRAM, and DDR may not come up */
 	uart_init();
 	puts("\nOpenIPC GM8126 nsboot\n");
+	ddr_init();
 	if (ddr_test())
 		stop("DDR test failed\n");
 	clocks();

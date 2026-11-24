@@ -260,12 +260,13 @@ static int ftmac110_reset(struct eth_device *dev)
 
 static int ftmac110_probe(struct eth_device *dev, struct bd_info *bis)
 {
-	debug("ftmac110: probe\n");
+	struct ftmac110_chip *chip = dev->priv;
 
 	if (ftmac110_reset(dev))
 		return -1;
 
-	return 0;
+	/* the link is looked for here only: the next command tries again */
+	return chip->lnkup ? 0 : -1;
 }
 
 static void ftmac110_halt(struct eth_device *dev)
@@ -294,8 +295,6 @@ static int ftmac110_send(struct eth_device *dev, void *pkt, int len)
 		return 0;
 	}
 
-	len = max(60, len);
-
 	txd = &chip->txd[chip->txd_idx];
 	ctrl = le64_to_cpu(txd->ctrl);
 	if (ctrl & FTMAC110_TXD_OWNER) {
@@ -305,7 +304,11 @@ static int ftmac110_send(struct eth_device *dev, void *pkt, int len)
 		return 0;
 	}
 
-	memcpy(txd->vbuf, (void *)pkt, len);
+	memcpy(txd->vbuf, pkt, len);
+	if (len < 60) {
+		memset(txd->vbuf + len, 0, 60 - len);
+		len = 60;
+	}
 	dma_map_single(txd->vbuf, len, DMA_TO_DEVICE);
 
 	/* clear control bits */

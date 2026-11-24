@@ -20,6 +20,8 @@ import sys
 MAGIC = 0x805A474D
 HDR = 0x100
 NSBOOT_OFF = 0x1000
+# what the vendor's loader reads from after the header
+NSBOOT_MAX = 20 * 1024
 
 
 def image(data, name):
@@ -36,6 +38,9 @@ def main():
     uboot_off = int(sys.argv[3], 0)
     env_off = int(sys.argv[4], 0)
 
+    if len(nsboot) - HDR > NSBOOT_MAX:
+        sys.exit("nsboot is %d bytes, over %d" %
+                 (len(nsboot) - HDR, NSBOOT_MAX))
     if NSBOOT_OFF + len(nsboot) > uboot_off:
         sys.exit("nsboot ends past U-Boot's 0x%x" % uboot_off)
     end = uboot_off + len(uboot)
