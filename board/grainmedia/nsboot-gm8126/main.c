@@ -36,6 +36,7 @@ typedef unsigned char u8;
 void fcs_irq(void);
 void fcs_wait(void);
 void fcs_handler(void);
+void jump_to_zero(void);
 
 static void set(u32 a, u32 v)
 {
@@ -237,9 +238,12 @@ static void cs(int on)
 
 static u8 spi(u8 v)
 {
+	u32 n = 0;
+
 	REG(SSP0 + 0x18) = v;
 	while (!(REG(SSP0 + 0x0c) & 0x1f0))
-		;
+		if (n++ > 1000000)
+			stop("SPI timed out\n");
 	return REG(SSP0 + 0x18);
 }
 
@@ -254,7 +258,7 @@ static void spi_init(void)
 	REG(SSP0 + 0x00) = 0x102c;		/* SPI master, mode 0 */
 	REG(SSP0 + 0x10) = 0;
 	REG(SSP0 + 0x04) = (7 << 16) | 5;	/* 8-bit frames */
-	REG(SSP0 + 0x08) = 0xd;
+	REG(SSP0 + 0x08) = 0xf;			/* on, data out, FIFOs clear */
 }
 
 static void spi_read(u32 from, u8 *to, u32 len)
@@ -298,6 +302,5 @@ void main(void)
 		stop("\n");
 	}
 	spi_read(at + IMAGE_HDR, (u8 *)0, hdr[2]);
-	((void (*)(void))0)();
-	stop("U-Boot returned\n");
+	jump_to_zero();
 }

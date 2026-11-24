@@ -286,6 +286,7 @@ static int ftmac110_send(struct eth_device *dev, void *pkt, int len)
 	struct ftmac110_regs *regs = chip->regs;
 	struct ftmac110_desc *txd;
 	uint64_t ctrl;
+	ulong ts;
 
 	if (!chip->lnkup)
 		return 0;
@@ -296,12 +297,15 @@ static int ftmac110_send(struct eth_device *dev, void *pkt, int len)
 	}
 
 	txd = &chip->txd[chip->txd_idx];
-	ctrl = le64_to_cpu(txd->ctrl);
+	ts = get_timer(0);
+	do {
+		ctrl = le64_to_cpu(*(volatile uint64_t *)&txd->ctrl);
+	} while ((ctrl & FTMAC110_TXD_OWNER) && get_timer(ts) < 100);
 	if (ctrl & FTMAC110_TXD_OWNER) {
 		/* kick-off Tx DMA */
 		writel(0xffffffff, &regs->txpd);
 		printf("ftmac110: out of txd\n");
-		return 0;
+		return -ETIMEDOUT;
 	}
 
 	memcpy(txd->vbuf, pkt, len);
