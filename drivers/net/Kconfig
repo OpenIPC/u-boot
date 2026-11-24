@@ -403,6 +403,18 @@ config FTGMAC100
 	  offers high-priority transmit queue for QoS and CoS
 	  applications.
 
+config FTMAC110
+	bool "Ftmac110 Ethernet Support without driver model"
+	depends on !DM_ETH
+	help
+	  The FTMAC110 driver U-Boot had until v2022.10, for boards without
+	  driver model: the board calls ftmac110_initialize().
+
+config FTMAC110_BASE
+	hex "FTMAC110 register base"
+	depends on FTMAC110
+	default 0x92500000 if ARCH_GRAINMEDIA
+
 config FTGMAC100_NODM
 	bool "Ftgmac100 Ethernet Support without driver model"
 	depends on !DM_ETH

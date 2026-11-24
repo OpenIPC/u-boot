@@ -525,6 +525,18 @@ config FSL_ESPI
 	  access the SPI interface and SPI NOR flash on platforms embedding
 	  this Freescale eSPI IP core.
 
+config FTSSP010_SPI_NODM
+	bool "Faraday FTSSP010 as an SPI master"
+	depends on !DM_SPI
+	help
+	  The synchronous serial port Grain Media's GM8126 has its boot flash
+	  on, under the legacy (non-DM) SPI API. The chip select is a GPIO.
+
+config FTSSP010_BASE
+	hex "FTSSP010 register base"
+	depends on FTSSP010_SPI_NODM
+	default 0x98200000 if ARCH_GRAINMEDIA
+
 config FTSPI020
 	bool "Faraday FTSPI020 SPI flash controller"
 	depends on !DM_SPI

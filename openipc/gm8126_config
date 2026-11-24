@@ -1,0 +1,15 @@
+CONFIG_PRODUCT_SOC="gm8126"
+CONFIG_GRAINMEDIA_GM8126=y
+# The flash is on an FTSSP010 with a GPIO select, the MAC an FTMAC110
+# CONFIG_FTSPI020 is not set
+CONFIG_FTSSP010_SPI_NODM=y
+CONFIG_SF_DEFAULT_MODE=0x0
+# CONFIG_FTGMAC100_NODM is not set
+CONFIG_FTMAC110=y
+# The SD host is an FTSDC010, not an SDHCI: no driver here yet
+# CONFIG_MMC is not set
+# CONFIG_CMD_MMC is not set
+# The kernel takes a device tree
+CONFIG_CMD_FDT=y
+# a kernel with its initramfs; the vendor one is 9.6 MiB
+CONFIG_SYS_BOOTM_LEN=0x2000000
