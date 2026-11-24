@@ -30,6 +30,7 @@
 #define GM_PMU_PLL2		GM_PMU_REG(0x34)
 #define GM_PMU_GATE_AHB		GM_PMU_REG(0x38)	/* 1 = gated */
 #define GM_PMU_GATE_APB		GM_PMU_REG(0x3C)
+#define GM_GATE_WDT		BIT(15)
 #define GM_PMU_PINMUX3		GM_PMU_REG(0x5C)
 #define GM_PMU_MAC		GM_PMU_REG(0x6C)
 #define GM_PMU_CLK_DIV1		GM_PMU_REG(0x74)

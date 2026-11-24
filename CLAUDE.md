@@ -65,6 +65,9 @@ The generation before, and another register map (`GRAINMEDIA_GM8126`,
 - **Clocks.** PLL1 (PMU 0x30) is written with MUL at 11:3 and reads back
   shifted left by one. The UARTs run from 30 MHz / (PMU 0x78[23:18] + 1),
   PLL2 if PMU 0x28 bit 15; nsboot sets 16, what the vendor kernel assumes.
+- **Clock gates** (PMU 0x38 / 0x3C, 1 = stopped) cover the watchdog too
+  (0x3C bit 15): `reset_cpu()` needs it on, as the vendor kernel's
+  `arch_reset()` does. qemu-bench's model enforces the gates.
 - **Ethernet** (`drivers/net/ftmac110.c`) is the driver mainline removed in
   2e808fadf6b, with one fix: the receive descriptor's old status is
   cleared, not ORed into. Its receive buffers must be 2 bytes off a word.

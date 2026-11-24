@@ -91,7 +91,8 @@ int arch_cpu_init(void)
 	clrbits_le32(GM_PMU_REG(0x08), 0xfff00000);	/* PLL charge pumps */
 	setbits_le32(GM_PMU_REG(0x0c), BIT(12));	/* ISP off */
 	writel(0xf87ff2e3, GM_PMU_GATE_AHB);
-	writel(0xfbffadde, GM_PMU_GATE_APB);	/* SSP0 and GPIO0 stay on */
+	/* SSP0, GPIO0 and, for reset_cpu(), the watchdog stay on */
+	writel(0xfbffadde & ~GM_GATE_WDT, GM_PMU_GATE_APB);
 	setbits_le32(GM_PMU_REG(0x6c), BIT(17));	/* the sensor's clock */
 	setbits_le32(GM_PMU_REG(0x7c), 0xf);		/* TV encoder off */
 	setbits_le32(GM_PMU_REG(0x90), 0x00780000);	/* ADC off */
@@ -116,6 +117,7 @@ int timer_init(void)
 
 void reset_cpu(void)
 {
+	clrbits_le32(GM_PMU_GATE_APB, GM_GATE_WDT);
 	writel(0, GM_WDT_CR);
 	writel(1, GM_WDT_LOAD);
 	writel(GM_WDT_KICK, GM_WDT_RESTART);
