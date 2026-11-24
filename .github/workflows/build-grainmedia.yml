@@ -62,6 +62,7 @@ jobs:
         include:
           - { soc: gm8136, files: "output/u-boot-gm8136-*.bin" }
           - { soc: gm8135, files: "output/u-boot-gm8135-*.bin" }
+          - { soc: gm8126, files: "output/u-boot-gm8126-*.bin" }
 
     steps:
       - name: Checkout
@@ -164,10 +165,12 @@ jobs:
 
   # QEMU smoke test -- boots each freshly-built image from flash through
   # qemu-hisilicon's Grain Media machines, whose boot ROM stand-in loads
-  # nsboot from the image into SRAM: nsboot sets up DDR for the machine's
-  # package and loads U-Boot, which must reach the autoboot prompt. One
-  # image serves every package, so gm8136 boots on both the gm8136
-  # (external DDR) and gm8136s machines, gm8135 on gm8135s.
+  # the first stage from the image into SRAM (the SDK's nsboot, or gm8126's
+  # own): it sets up DDR for the machine's package and loads U-Boot, which
+  # must reach the autoboot prompt. One GM813x image serves every package,
+  # so gm8136 boots on both the gm8136
+  # (external DDR) and gm8136s machines, gm8135 on gm8135s, gm8126 on its
+  # own.
   #
   # The second boot must load the environment the first saved, which
   # proves the driver's writes land where its reads find them.
@@ -182,6 +185,7 @@ jobs:
           - { soc: gm8136, machine: gm8136 }
           - { soc: gm8136, machine: gm8136s }
           - { soc: gm8135, machine: gm8135s }
+          - { soc: gm8126, machine: gm8126 }
     steps:
       - name: Download qemu-arm
         uses: actions/download-artifact@v4
