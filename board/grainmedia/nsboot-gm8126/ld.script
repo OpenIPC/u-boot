@@ -1,0 +1,19 @@
+OUTPUT_ARCH(arm)
+ENTRY(_start)
+SECTIONS
+{
+	. = 0x94300000;
+	.text : { *(.text.start) *(.text*) *(.rodata*) }
+	. = ALIGN(4);
+	.data : { *(.data*) }
+	. = ALIGN(4);
+	__bss_start = .;
+	.bss : { *(.bss*) *(COMMON) }
+	. = ALIGN(4);
+	__bss_end = .;
+	/* below the mailbox at +0x8000 */
+	_irq_stack_top = 0x94307000;
+	_stack_top = 0x94308000;
+	ASSERT(__bss_end < 0x94306000, "nsboot too large for the SRAM")
+	/DISCARD/ : { *(.ARM.*) *(.comment) *(.note*) *(.eh_frame*) }
+}

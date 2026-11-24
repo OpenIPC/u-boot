@@ -39,6 +39,16 @@ build_nsboot() {
         </dev/null >/dev/null || { rm -f "${NSBOOT}"; return 1; }
 }
 
+# GM8126: our own first stage, its vendor sources are not public.
+NSBOOT_GM8126=${BOOT_SRCDIR}/output/build-nsboot-gm8126/nsboot.bin
+
+build_nsboot_gm8126() {
+    rm -rf output/build-nsboot-gm8126
+    cp -r board/grainmedia/nsboot-gm8126 output/build-nsboot-gm8126 && \
+    make -C output/build-nsboot-gm8126 CROSS_COMPILE="${NSBOOT_CROSS_COMPILE}" \
+        </dev/null >/dev/null || { rm -f "${NSBOOT_GM8126}"; return 1; }
+}
+
 # gm-image.py puts the NOR system header at 0, nsboot at 0x1000 and
 # U-Boot at UBOOT_OFFSET, before the environment.
 UBOOT_OFFSET=0x8000
@@ -48,21 +58,29 @@ build_grainmedia() {
     builddir=${BOOT_SRCDIR}/output/build-${soc}-nor
     make_opts="-C ${BOOT_SRCDIR} O=${builddir} -j$(nproc)"
 
-    build_nsboot || return 1
+    if [ "${soc}" = gm8126 ]; then
+        build_nsboot_gm8126 || return 1
+        nsboot=${NSBOOT_GM8126}
+        image=openipc/gm8126-image.py
+    else
+        build_nsboot || return 1
+        nsboot=${NSBOOT}
+        image=openipc/gm-image.py
+    fi
     rm -rf "${builddir}"
     mkconfig "${builddir}" openipc/openipc_config openipc/${soc}_config && \
     make ${make_opts} olddefconfig </dev/null >/dev/null && \
     make ${make_opts} </dev/null || return 1
 
     env=$(sed -n 's/^CONFIG_ENV_OFFSET=//p' "${builddir}/.config")
-    python3 openipc/gm-image.py "${NSBOOT}" "${builddir}/u-boot.bin" \
+    python3 "${image}" "${nsboot}" "${builddir}/u-boot.bin" \
         "${UBOOT_OFFSET}" "${env}" "output/u-boot-${soc}-nor.bin"
 }
 
 build_soc() {
     soc=$1
     case "${soc}" in
-        gm8135|gm8136)
+        gm8126|gm8135|gm8136)
             build_grainmedia "${soc}" ;;
         *)
             echo "unsupported SoC: ${soc}" >&2
@@ -70,7 +88,7 @@ build_soc() {
     esac
 }
 
-ALL_SOCS="gm8136 gm8135"
+ALL_SOCS="gm8136 gm8135 gm8126"
 
 SOCS="$@"
 [ -z "${SOCS}" ] && SOCS="${ALL_SOCS}"

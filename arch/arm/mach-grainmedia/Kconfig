@@ -4,6 +4,21 @@ if ARCH_GRAINMEDIA
 # the package) and GM8135S (64 MiB). nsboot and U-Boot tell them apart
 # by the PMU's package ID, so a single image serves all three.
 
+choice
+	prompt "Grain Media SoC"
+	default GRAINMEDIA_GM813X
+
+config GRAINMEDIA_GM813X
+	bool "GM8135S, GM8136, GM8136S"
+
+config GRAINMEDIA_GM8126
+	bool "GM8126"
+	help
+	  The generation before the GM813x: the same core, other addresses,
+	  the flash on an FTSSP010 and an FTMAC110 Ethernet.
+
+endchoice
+
 config SYS_SOC
 	default "grainmedia"
 
@@ -11,9 +26,11 @@ config SYS_VENDOR
 	default "grainmedia"
 
 config SYS_BOARD
+	default "gm8126" if GRAINMEDIA_GM8126
 	default "grainmedia"
 
 config SYS_CONFIG_NAME
+	default "gm8126" if GRAINMEDIA_GM8126
 	default "grainmedia"
 
 endif

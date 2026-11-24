@@ -48,6 +48,30 @@ both `gm8136`. **Every image runs on every package**: nsboot and U-Boot
 read the package from the PMU. The images differ only in `soc=`. There
 are no `TARGET_*` symbols.
 
+### GM8126
+
+The generation before, and another register map (`GRAINMEDIA_GM8126`,
+`soc-gm8126.c`, `mach/gm8126.h`, `board/grainmedia/gm8126`,
+`include/configs/gm8126.h`). From the GM8136 SDK's U-Boot 2013.01
+(`board/gm/gm8126`) and a GM8126 camera's flash, run under qemu-bench.
+
+- **Flash byte order.** The mask ROM and the vendor loaders shift 32-bit
+  SPI frames, so the flash holds every word byte-swapped. We use 8-bit
+  frames (`drivers/spi/ftssp010_nodm.c`): only the header and nsboot
+  (below 0x8000) are swapped, by `openipc/gm8126-image.py`.
+- **First stage**: `board/grainmedia/nsboot-gm8126`, written here; no vendor
+  source is public. DDR tables and order are the vendor binary's, the clock
+  change is `FCS_go()`'s. It reads the "bootm" address from the header.
+- **Clocks.** PLL1 (PMU 0x30) is written with MUL at 11:3 and reads back
+  shifted left by one. The UARTs run from 30 MHz / (PMU 0x78[23:18] + 1),
+  PLL2 if PMU 0x28 bit 15; nsboot sets 16, what the vendor kernel assumes.
+- **Ethernet** (`drivers/net/ftmac110.c`) is the driver mainline removed in
+  2e808fadf6b, with one fix: the receive descriptor's old status is
+  cleared, not ORed into. Its receive buffers must be 2 bytes off a word.
+- **Not on silicon**: the mask ROM taking our nsboot, DDR, the frequency
+  change, the PHY. Passing a device tree is not tested (no such kernel).
+- No SD (FTSDC010): the vendor U-Boot has none.
+
 ## Relationship to mainline
 
 ```sh
@@ -72,7 +96,7 @@ git diff --diff-filter=M v2022.10 HEAD         # the mainline files we patched
 
 - `arch/arm/{Kconfig,Makefile}`: the `ARCH_GRAINMEDIA` hook.
 - `common/{Kconfig,Makefile}`: `OPENIPC`, `PRODUCT_SOC`, `PRODUCT_SOCMODEL`.
-- `drivers/spi/{Kconfig,Makefile}`: `FTSPI020`.
+- `drivers/spi/{Kconfig,Makefile}`: `FTSPI020`, `FTSSP010_SPI_NODM`.
 - `drivers/spi/spi-mem-nodm.c`: `spi_mem_exec_op()` is weak, so that
   `ftspi020.c` provides its own. The FTSPI020 runs whole commands (opcode,
   address width, dummy cycles, data count) and cannot take the generic
