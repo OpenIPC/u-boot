@@ -757,18 +757,6 @@ int firmware_scan(void) {
     env_set("mtds", mtds);
     sprintf(mtdparts, "%s:%s", mtdids ? mtdids : "", mtds);
     env_set("mtdparts", mtdparts);
-
-    /*
-     * A rootfs packed inside the 2 MiB kernel slot (firmware.bin): the pair
-     * gets the lite slots, or its kernel could run into its new rootfs.
-     * mtdparts keeps the sizes found.
-     */
-    if (kernel_off && rootfs_off > kernel_off && rootfs_off - kernel_off < 0x200000) {
-      env_set("kernsize", "0x200000");
-      sprintf(str, "0x%08lx", kernel_off + 0x200000);
-      env_set("rootaddr", str);
-      env_set("rootsize", "0x500000");
-    }
   }
 
   if (kernel_off && rootfs_off) {
