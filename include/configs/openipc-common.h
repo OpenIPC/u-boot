@@ -38,8 +38,6 @@
 #define OPENIPC_ROOTADDR	0x250000
 #define OPENIPC_ROOTSIZE	0x500000
 
-#define OPENIPC_FW_FILE		"firmware.${soc}"
-
 #define OPENIPC_BOOTARGSNFS "mem=\\${osmem} gmmem=\\${gmmem} console=ttyS0,115200 panic=20 root=/dev/nfs rootfstype=nfs ip=${ipaddr}:::255.255.255.0::eth0 nfsroot=${serverip}:${nfsroot},v3,nolock rw \\${extras}"
 
 /* NOR partition list; the reserved 'mtdparts' variable holds the full
@@ -82,7 +80,6 @@
 	"ub=${source} ${baseaddr} ${ubfile} && run ubwrite\0" \
 	"uk=if ${source} ${baseaddr} uImage.${soc}; then run ukwrite; elif ${source} ${baseaddr} fitImage.${soc}; then run ukwrite; fi\0" \
 	"ur=${source} ${baseaddr} ${urfile} && run urwrite\0" \
-	OPENIPC_FWUPD \
 	"bootlimit=2\0" \
 	"altbootcmd=" OPENIPC_ALTBOOTCMD "\0" \
 	"fwrecovery=if env exists bootfail; then run fwupd; sleep 5; reset; fi\0" \
@@ -94,14 +91,11 @@
 #define CONFIG_BOOTARGS "mem=\\${osmem} gmmem=\\${gmmem} console=ttyS0,115200 panic=20 root=/dev/mtdblock3 rootfstype=squashfs init=/init mtdparts=\\${mtdparts} \\${extras}"
 
 /*
- * Recovery: the rootfs is fetched first so its size selects the NOR schema.
- * It starts from the lite layout, not from what the scan found: on a camera
- * that still holds its vendor firmware the scan reports the vendor's
- * offsets, and writing OpenIPC there could leave the kernel write erasing
- * the start of the new rootfs.
+ * Recovery: firmware.bin, the kernel and the rootfs in one image, when the
+ * server has one that fits from kernaddr to the end of the chip (fwsize); else
+ * the rootfs, then the kernel, the rootfs first so its size selects the NOR
+ * schema.
  */
-#define OPENIPC_FWUPD "fwupd=run mtdslite; run ur; run uk\0"
-
 #define OPENIPC_LOADKERNEL "sf probe 0; sf read ${baseaddr} ${kernaddr} ${kernsize}"
 #define OPENIPC_ENV_MEDIUM \
 	"ubfile=u-boot-" CONFIG_PRODUCT_SOC "-nor.bin\0" \
@@ -111,11 +105,14 @@
 	"rootaddr=" __stringify(OPENIPC_ROOTADDR) "\0" \
 	"rootsize=" __stringify(OPENIPC_ROOTSIZE) "\0" \
 	"mtdslite=setenv kernaddr " __stringify(OPENIPC_KERNADDR) "; setenv kernsize 0x200000; setenv rootaddr 0x250000; setenv rootsize 0x500000\0" \
-	"mtdsultimate=setenv kernsize 0x300000; setenv rootaddr 0x350000; setenv rootsize 0xa00000\0" \
+	"mtdsultimate=setenv kernaddr " __stringify(OPENIPC_KERNADDR) "; setenv kernsize 0x300000; setenv rootaddr 0x350000; setenv rootsize 0xa00000\0" \
 	"ubwrite=sf probe 0; sf erase 0x0 ${kernaddr}; sf write ${baseaddr} 0x0 ${filesize}\0" \
 	"ukwrite=sf probe 0; sf erase ${kernaddr} ${kernsize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0" \
-	"urwrite=sf probe 0; if itest ${filesize} -gt 500000; then run mtdsultimate; fi; sf erase ${rootaddr} ${rootsize}; sf write ${baseaddr} ${rootaddr} ${filesize}\0" \
-	"fwwrite=sf probe 0; sf erase ${kernaddr} ${filesize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0" \
+	"urwrite=sf probe 0; run mtdslite; if itest ${filesize} -gt 500000; then run mtdsultimate; fi; sf erase ${rootaddr} ${rootsize}; sf write ${baseaddr} ${rootaddr} ${filesize}\0" \
+	"fwfile=firmware.bin." CONFIG_PRODUCT_SOC "\0" \
+	"fwsize=0x7b0000\0" \
+	"fwwrite=itest ${filesize} -gt 0 && itest ${filesize} -le ${fwsize} && sf probe 0 && sf erase ${kernaddr} ${fwsize} && sf write ${baseaddr} ${kernaddr} ${filesize}\0" \
+	"fwupd=if ${source} ${baseaddr} ${fwfile} && run fwwrite; then true; else run ur; run uk; fi\0" \
 	"loadkernel=" OPENIPC_LOADKERNEL "\0" \
 	"mtdids=" SFC "\0" \
 	"mtds=" OPENIPC_MTDPARTS "\0" \
