@@ -121,7 +121,7 @@
 	"fwfile=firmware.bin." CONFIG_PRODUCT_SOC "\0" \
 	"fwsize=0x7b0000\0" \
 	"fwwrite=itest ${filesize} -gt 0 && itest ${filesize} -le ${fwsize} && sf probe 0 && sf erase ${kernaddr} ${fwsize} && sf write ${baseaddr} ${kernaddr} ${filesize}\0" \
-	"fwupd=if ${source} ${baseaddr} ${fwfile} && run fwwrite; then true; else run ur; run uk; fi\0" \
+	"fwupd=if ${source} ${baseaddr} ${fwfile} && run fwwrite; then true; else run mtdslite; run ur; run uk; fi\0" \
 	"loadkernel=" OPENIPC_LOADKERNEL "\0" \
 	"mtdids=" SFC "\0" \
 	"mtds=" OPENIPC_MTDPARTS "\0" \
