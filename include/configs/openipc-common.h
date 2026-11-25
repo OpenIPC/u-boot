@@ -120,11 +120,11 @@
 	"mtdsultimate=setenv kernaddr " __stringify(OPENIPC_KERNADDR) "; setenv kernsize 0x300000; setenv rootaddr 0x350000; setenv rootsize 0xa00000\0" \
 	"ubwrite=sf probe 0; sf erase 0x0 ${kernaddr}; sf write ${baseaddr} 0x0 ${filesize}\0" \
 	"ukwrite=sf probe 0; sf erase ${kernaddr} ${kernsize}; sf write ${baseaddr} ${kernaddr} ${filesize}\0" \
-	"urwrite=sf probe 0; if itest ${filesize} -gt 500000; then run mtdsultimate; fi; sf erase ${rootaddr} ${rootsize}; sf write ${baseaddr} ${rootaddr} ${filesize}\0" \
+	"urwrite=sf probe 0; run mtdslite; if itest ${filesize} -gt 500000; then run mtdsultimate; fi; sf erase ${rootaddr} ${rootsize}; sf write ${baseaddr} ${rootaddr} ${filesize}\0" \
 	"fwfile=firmware.bin." CONFIG_PRODUCT_SOC "\0" \
 	"fwsize=0x7b0000\0" \
 	"fwwrite=itest ${filesize} -gt 0 && itest ${filesize} -le ${fwsize} && sf probe 0 && sf erase ${kernaddr} ${fwsize} && sf write ${baseaddr} ${kernaddr} ${filesize}\0" \
-	"fwupd=if ${source} ${baseaddr} ${fwfile} && run fwwrite; then true; else run mtdslite; run ur; run uk; fi\0" \
+	"fwupd=if ${source} ${baseaddr} ${fwfile} && run fwwrite; then true; else run ur; run uk; fi\0" \
 	"loadkernel=" OPENIPC_LOADKERNEL "\0" \
 	"mtdids=" SFC "\0" \
 	"mtds=" OPENIPC_MTDPARTS "\0" \
