@@ -107,7 +107,7 @@
  */
 #define OPENIPC_LOADKERNEL "sf probe 0; sf read ${baseaddr} ${kernaddr} ${kernsize}"
 #define OPENIPC_ENV_MEDIUM \
-	"ubfile=u-boot-" CONFIG_PRODUCT_SOC "-nor.bin\0" \
+	"ubfile=u-boot-" CONFIG_PRODUCT_SOCMODEL "-nor.bin\0" \
 	"urfile=rootfs.squashfs." CONFIG_PRODUCT_SOC "\0" \
 	"kernaddr=" __stringify(OPENIPC_KERNADDR) "\0" \
 	"kernsize=" __stringify(OPENIPC_KERNSIZE) "\0" \

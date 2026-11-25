@@ -2,6 +2,7 @@
 # the parameters of OpenIPC's hardware-tested V851s U-Boot (mainline
 # 2024.10), the Kconfig defaults
 CONFIG_PRODUCT_SOC="v851s"
+CONFIG_PRODUCT_SOCMODEL="v851s"
 CONFIG_MACH_SUN8I_V851S=y
 CONFIG_DEFAULT_DEVICE_TREE="sun8i-v851s-openipc"
 CONFIG_IDENT_STRING=" Allwinner V851s"

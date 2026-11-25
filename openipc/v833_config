@@ -1,7 +1,9 @@
 # V833: 128 MiB of DDR3 in the package, the vendor's parameters (the v833
 # lindenis board's sys_config.fex); tpr13 bit 0 clear: the rank, width
 # and size are scanned
-CONFIG_PRODUCT_SOC="v833"
+# OpenIPC's firmware builds one image for the family
+CONFIG_PRODUCT_SOC="v83x"
+CONFIG_PRODUCT_SOCMODEL="v833"
 CONFIG_MACH_SUN8I_V831=y
 CONFIG_DEFAULT_DEVICE_TREE="sun8i-v831-openipc"
 CONFIG_IDENT_STRING=" Allwinner V83x"
