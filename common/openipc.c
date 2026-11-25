@@ -618,6 +618,7 @@ int firmware_scan(void) {
     rootfs_size = 0xa00000;
 #endif
 
+  env_set_hex("fwsize", flash->size - (kernel_off ? kernel_off : env_get_hex("kernaddr", OPENIPC_KERNADDR)));
   spi_flash_free(flash);
 
   if (kernel_off) {
