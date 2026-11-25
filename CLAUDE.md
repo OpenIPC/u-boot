@@ -40,7 +40,7 @@ Patched mainline files: `arch/arm/{Kconfig,Makefile}` (`ARCH_AXERA`),
 `drivers/usb/{host,cdns3}/{Kconfig,Makefile}`,
 `drivers/net/dwc_eth_qos.{c,h}` (the `axera,ax620e-eqos` and
 `axera,ax620-eqos` entries), `common/{Kconfig,Makefile}` (`OPENIPC`,
-`PRODUCT_SOC`, `PRODUCT_SOCMODEL`, `OPENIPC_NOR_SPLIT`),
+`PRODUCT_SOC`, `PRODUCT_SOCMODEL`),
 `drivers/gpio/dwapb_gpio.c` (drops `asm/arch/gpio.h`, as mainline
 00b04933985), `.gitignore` (`/output/`). The AX620U uses mainline drivers plus
 `drivers/net/dwc_eth_qos_ax620u.c` (glue on mainline's EQOS driver)
