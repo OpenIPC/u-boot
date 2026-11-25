@@ -62,8 +62,7 @@ Patched mainline files:
   the GRF interface select and the CRU speed clock for an external PHY;
   Linux's `snps,reset-gpio`), the way `openipc-axera` has
   `dwc_eth_qos_axera.c`;
-- `common/{Kconfig,Makefile}` (`OPENIPC`, `PRODUCT_SOC`, `PRODUCT_SOCMODEL`,
-  `OPENIPC_NOR_SPLIT`), `.gitignore` (`/output/`);
+- `common/{Kconfig,Makefile}` (`OPENIPC`, `PRODUCT_SOC`, `PRODUCT_SOCMODEL`), `.gitignore` (`/output/`);
 - `scripts/dtc/pylibfdt/Makefile`: the version without the `u-boot-`
   prefix, which current setuptools rejects.
 - `drivers/pinctrl/rockchip/`: mainline's v2022.10..v2023.04 change to the
