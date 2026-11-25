@@ -5,4 +5,3 @@ CONFIG_MMC_SDHCI=y
 
 # The split NOR layout: the kernel (OpenIPC/linux goke-gk7205v500)
 # divides one firmware partition from its own device tree.
-CONFIG_OPENIPC_NOR_SPLIT=y

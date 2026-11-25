@@ -46,4 +46,3 @@ CONFIG_MII=y
 
 # The split NOR layout: the kernel (OpenIPC/linux hisilicon-hi3516av100)
 # divides one firmware partition from its own device tree.
-CONFIG_OPENIPC_NOR_SPLIT=y

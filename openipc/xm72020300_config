@@ -10,4 +10,3 @@ CONFIG_CMD_MMC=y
 CONFIG_MMC_SDHCI=y
 # Split NOR layout: uImage + squashfs in one partition (OpenIPC/firmware
 # board/gk7205v200/post-image.sh)
-CONFIG_OPENIPC_NOR_SPLIT=y

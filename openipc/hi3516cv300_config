@@ -40,4 +40,3 @@ CONFIG_MMC=y
 CONFIG_CMD_MMC=y
 # Split NOR layout: uImage + squashfs in one partition (OpenIPC/firmware
 # general/scripts/post-image-split.sh)
-CONFIG_OPENIPC_NOR_SPLIT=y
