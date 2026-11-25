@@ -1,6 +1,8 @@
 # V831: 64 MiB of DDR2 in the package, the vendor's parameters (the
 # v831 reference boards' sys_config.fex, the same on every V831 flash seen)
-CONFIG_PRODUCT_SOC="v831"
+# OpenIPC's firmware builds one image for the family
+CONFIG_PRODUCT_SOC="v83x"
+CONFIG_PRODUCT_SOCMODEL="v831"
 CONFIG_MACH_SUN8I_V831=y
 CONFIG_DEFAULT_DEVICE_TREE="sun8i-v831-openipc"
 CONFIG_IDENT_STRING=" Allwinner V83x"
