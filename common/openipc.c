@@ -687,86 +687,6 @@ int firmware_recovery(void) {
 }
 #endif
 
-#if !defined(OPENIPC_SPI_NAND) && !defined(OPENIPC_MMC)
-/*
- * The split layout: a uImage at the kernel offset and the root squashfs at the
- * next 64 KiB block after it, in one "firmware" partition the kernel divides
- * at boot. The fixed-slot layout also starts with a uImage, but its squashfs
- * sits at the slot boundary.
- */
-static int nor_split_layout(struct spi_flash *flash, ulong kernel_off, ulong rootfs_off)
-{
-  image_header_t hdr;
-
-  /*
-   * A squashfs at a fixed rootfs slot is fixed slots, even when the uImage
-   * before it ends in the kernel slot's last block and so looks split: a
-   * kernel from before the split layout needs its mtdparts and root=. A
-   * split image of that size loses nothing, as the kernel finds the split
-   * itself and ignores both.
-   */
-  if (rootfs_off - kernel_off == 0x200000 || rootfs_off - kernel_off == 0x300000)
-    return 0;
-  if (!kernel_off || !rootfs_off ||
-      spi_flash_read(flash, kernel_off, sizeof(hdr), &hdr) ||
-      !image_check_magic(&hdr) || !image_check_hcrc(&hdr))
-    return 0;
-  return rootfs_off == kernel_off + ALIGN(image_get_image_size(&hdr), 0x10000);
-}
-
-/*
- * Whether the split layout's kernel is whole: its header and its data CRC,
- * read back from the flash. The scan clears bootfail for a split image, and
- * a kernel with a sound header but a damaged payload would then fail bootm
- * with nothing asking for recovery -- the boot-limit fallback retries the
- * same image. Checked here, it is handed to recovery like a missing one.
- * Without the memory to check, the kernel is taken as it is; bootm still
- * checks it.
- */
-static int nor_split_kernel_ok(struct spi_flash *flash, ulong kernel_off)
-{
-  const ulong chunk = 0x10000;
-  image_header_t hdr;
-  ulong len, off, n;
-  u32 crc = 0;
-  u8 *buf;
-  int ok = 1;
-
-  if (spi_flash_read(flash, kernel_off, sizeof(hdr), &hdr) ||
-      !image_check_hcrc(&hdr))
-    return 0;
-  len = image_get_data_size(&hdr);
-  if (kernel_off + sizeof(hdr) > flash->size ||
-      len > flash->size - kernel_off - sizeof(hdr))
-    return 0;
-  buf = malloc_cache_aligned(chunk);
-  if (!buf)
-    return 1;
-  for (off = 0; ok && off < len; off += n) {
-    n = min(len - off, chunk);
-    if (spi_flash_read(flash, kernel_off + sizeof(hdr) + off, n, buf))
-      ok = 0;
-    else
-      crc = crc32(crc, buf, n);
-  }
-  free(buf);
-  return ok && crc == image_get_dcrc(&hdr);
-}
-
-/*
- * A uImage whose header fails its CRC: bootm refuses it whatever verify
- * says, so it boots nothing in either layout. Its size field cannot be
- * trusted either, which is why nor_split_layout does not take it as split.
- */
-static int nor_split_header_bad(struct spi_flash *flash, ulong kernel_off)
-{
-  image_header_t hdr;
-
-  return kernel_off && !spi_flash_read(flash, kernel_off, sizeof(hdr), &hdr) &&
-         image_check_magic(&hdr) && !image_check_hcrc(&hdr);
-}
-#endif
-
 #ifdef OPENIPC_MMC
 /* An MMC device that answers, or NULL */
 static struct mmc *openipc_mmc(int dev) {
@@ -1032,7 +952,6 @@ int firmware_scan(void) {
   ulong rootfs_off = 0;
   uint64_t kernel_size = 0;
   uint64_t rootfs_size = 0;
-  int bad_header = 0, split, kernel_ok = 1;
 
   printf("Automatic flash layout detection...\n");
 
@@ -1067,12 +986,6 @@ int firmware_scan(void) {
     else if (kernel_size == 0x300000 && rootfs_size < 0xa00000 && flash->size > 0x800000)
       rootfs_size = 0xa00000;
   }
-
-  split = nor_split_layout(flash, kernel_off, rootfs_off);
-  if (split)
-    kernel_ok = nor_split_kernel_ok(flash, kernel_off);
-  else
-    bad_header = nor_split_header_bad(flash, kernel_off);
 
   env_set_hex("fwsize", flash->size - (kernel_off ? kernel_off : env_get_hex("kernaddr", OPENIPC_KERNADDR)));
   spi_flash_free(flash);
@@ -1113,49 +1026,9 @@ int firmware_scan(void) {
     env_set("mtds", mtds);
     sprintf(mtdparts, "%s:%s", mtdids ? mtdids : "", mtds);
     env_set("mtdparts", mtdparts);
-
-    /*
-     * A rootfs packed inside the 2 MiB kernel slot (firmware.bin): the pair
-     * gets the lite slots, or its kernel could run into its new rootfs.
-     * mtdparts keeps the sizes found.
-     */
-    if (kernel_off && rootfs_off > kernel_off && rootfs_off - kernel_off < 0x200000) {
-      env_set("kernsize", "0x200000");
-      sprintf(str, "0x%08lx", kernel_off + 0x200000);
-      env_set("rootaddr", str);
-      env_set("rootsize", "0x500000");
-    }
-    /*
-     * root= and mtdparts= are always on the command line. A build of this
-     * bootloader that saved its environment after the scan could have
-     * stored a split boot's bootargs without them; put them back, in RAM,
-     * when both are missing. A command line that names either is the
-     * owner's and is left alone.
-     */
-    {
-      const char *ba = env_get("bootargs");
-      char buf[1024];
-
-      if (ba && !strstr(ba, "root=") && !strstr(ba, "mtdparts=") &&
-          strlen(ba) + 64 < sizeof(buf)) {
-        snprintf(buf, sizeof(buf), "%s root=/dev/mtdblock3 mtdparts=${mtdparts}", ba);
-        env_set("bootargs", buf);
-      }
-    }
   }
 
-  /* bootm checks the uImage's data CRC; a verify=n saved by an older
-   * bootloader must not skip it. RAM only, like the rest of the scan. */
-  if (split)
-    env_set("verify", NULL);
-
-  if (!kernel_ok) {
-    printf("Firmware is absent/corrupt (kernel at 0x%lx fails its CRC)\n", kernel_off);
-    env_set("bootfail", "1");
-  } else if (bad_header) {
-    printf("Firmware is absent/corrupt (kernel header at 0x%lx fails its CRC)\n", kernel_off);
-    env_set("bootfail", "1");
-  } else if (kernel_off && rootfs_off) {
+  if (kernel_off && rootfs_off) {
     env_set("bootfail", NULL);
   } else {
     printf("Firmware is absent/corrupt (kernel=0x%lx, rootfs=0x%lx)\n", kernel_off, rootfs_off);
