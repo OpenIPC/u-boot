@@ -15,9 +15,11 @@ EXTRA_CFLAGS += -I$(TOPDIR) \
 	-I$(DDR_TOP_DIR)/include/hal/ddrt \
 	-I$(DDR_TOP_DIR)/include/hal/phy
 
-obj-y   := ddrtrn_uboot_cmd_loc.o
-obj-y   += ddrtrn_uboot_cmd_ctl.o
-obj-y   += ddrtrn_cmd_parsing.o
+# The `ddr` console command and the training code it runs from SRAM (38 KB on
+# hi3519dv500): only with CMD_DDR_TRAINING. DDR is trained before U-Boot runs.
+obj-$(CONFIG_CMD_DDR_TRAINING)	+= ddrtrn_uboot_cmd_loc.o
+obj-$(CONFIG_CMD_DDR_TRAINING)	+= ddrtrn_uboot_cmd_ctl.o
+obj-$(CONFIG_CMD_DDR_TRAINING)	+= ddrtrn_cmd_parsing.o
 obj-y   += ../common/ddrtrn_boot.o
 obj-y   += ../../api/ddrtrn_api_low_power.o
 obj-y   += ../../training/ddrtrn_phy.o
