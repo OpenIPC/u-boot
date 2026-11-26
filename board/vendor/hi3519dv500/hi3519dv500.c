@@ -479,6 +479,16 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 		fdt_delprop(blob, chosen, "linux,initrd-end");
 	}
 
+	/*
+	 * The bottom of DRAM is the secure loader's: its DTB slot, the secondary
+	 * core's stub and BL31 (0x40010000, 128 KB) up to 0x40030000, which is
+	 * where the vendor DTB's /memory starts. bootm's memory fixup restates
+	 * /memory from 0x40000000, so keep Linux off it here: BL31 answers the
+	 * kernel's PSCI calls from there (bl31_handoff.c).
+	 */
+	if (fdt_add_mem_rsv(blob, 0x40000000, 0x30000) < 0)
+		puts("cannot reserve the secure loader's DRAM in the DTB\n");
+
 	return 0;
 }
 #endif
