@@ -55,7 +55,7 @@
 | `gk7206v11a` | Cortex-A7 ×2 | 128 MiB | NOR, NAND | not yet booted on hardware |
 | `gk7206v12a` | Cortex-A7 ×2 | 256 MiB | NOR, NAND | not yet booted on hardware |
 | `hi3516cv610` `hi3516cv608` | Cortex-A7 ×2 | 64 MiB | NOR | signed boot image, `boot-*.bin` |
-| `hi3519dv500` | Cortex-A55 (arm64) | external | NOR | signed boot image, 512 KiB boot partition |
+| `hi3519dv500` | Cortex-A55 (arm64) | external | NOR, NAND | signed boot image, 512 KiB NOR boot partition |
 | `hi3516cv300` | ARM926 | external | NOR, NAND | |
 | `hi3516ev100` | ARM926 | — | NOR | |
 | `hi3518ev200` | ARM926 | 64 MiB | NOR | |
@@ -67,10 +67,10 @@
 | `hi3515av100` `hi3520av100` `hi3520dv100` `hi3520dv200` | ARMv7 | external | NOR | DVR/NVR |
 | `hi3536cv100` `hi3536dv100` | ARMv7 | external | NOR | NVR |
 
-- hi3519dv500: the boot partition is 512 KiB, so env is at `0x80000` and
-  firmware at `0xc0000`. Its images are
-  `boot-hi3519dv500-{dmeb,dmebpro}-nor.bin`. Building it also needs
-  `aarch64-linux-gnu-` (`CROSS_COMPILE64`).
+- hi3519dv500: on NOR the boot partition is 512 KiB, so env is at `0x80000`
+  and firmware at `0xc0000`; on NAND it is the usual `768k(boot),256k(env),-(ubi)`.
+  Its images are `boot-hi3519dv500-{dmeb,dmebpro}-{nor,nand}.bin`. Building
+  it also needs `aarch64-linux-gnu-` (`CROSS_COMPILE64`).
 - Some SoCs can also recover from a USB stick.
 - Publishing replaces the same-named images that OpenIPC/u-boot-xmedia,
   u-boot-hi3516cv6xx and u-boot-hi3519dv500 used to put in
