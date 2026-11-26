@@ -200,8 +200,25 @@
 
 #define CONFIG_BOOTCOMMAND "run bootflash"
 
+/*
+ * Boot logo (infinity2m NVRs, CONFIG_CMD_MS_BOOTLOGO): a baseline JPEG in
+ * the flash at $logoaddr ($logosize bytes), shown on HDMI and VGA from
+ * preboot. firmware_scan() sets $logoaddr to the end of the flash when it
+ * is not saved, and gives that range its own "logo" partition.
+ */
+#ifdef CONFIG_CMD_MS_BOOTLOGO
+#define OPENIPC_ENV_LOGO \
+	"logosize=0x20000\0" \
+	"showlogo=if test -n \"${logoaddr}\"; then sf probe 0 && " \
+	"sf read ${baseaddr} ${logoaddr} ${logosize} && bootlogo ${baseaddr}; fi\0"
+#else
+#define OPENIPC_ENV_LOGO ""
+#endif
+
+/* OPENIPC_ENV_MEDIUM ends in bootargs, with no NUL: it stays last */
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	OPENIPC_ENV_COMMON \
+	OPENIPC_ENV_LOGO \
 	OPENIPC_ENV_MEDIUM
 
 #endif /* __OPENIPC_COMMON_H */

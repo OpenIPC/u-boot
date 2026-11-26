@@ -74,6 +74,7 @@ git diff --diff-filter=M v2022.10 HEAD         # the mainline files we patched
 | SPI NOR on the FSP, non-DM | `drivers/mtd/spi/ms_sflash.c` (`MS_SFLASH`). It provides `spi_flash_probe()` and fills `mtd->_read/_write/_erase`, as `ak_sflash` does on `openipc-anyka` |
 | Ethernet, non-DM | `drivers/net/ms_emac.c` (`MS_EMAC`) |
 | SD card on SDIO0, non-DM | `drivers/mmc/ms_sdmmc.c` (`MMC_MS_SDMMC`), registered from `board_mmc_init()` |
+| Boot logo on HDMI/VGA, infinity2m (SSR621Q) | `bootlogo` (`cmd/ms_bootlogo.c`, `CMD_MS_BOOTLOGO`), `drivers/video/sigmastar/ms_disp.c` (`MS_DISP`: register programs in `ms_disp_tbl.h`, generated from the vendor display/HDMI TX drivers by `openipc/tools/disp-regdump`; MOP window 0 by hand), `lib/tjpgd/` (ChaN's TJpgDec R0.03, `TJPGD`); env `showlogo`/`logosize`, `preboot`; `$logoaddr` also cuts a `logo` partition off `rootfs_data` in `common/openipc.c` |
 | xz decompression | `lib/xz/` (xz-embedded, 0BSD, with CRC64; `XZ`), `include/linux/xz.h`, `unxz()` in `include/unxz.h` |
 | Memory map, console, timer | `include/configs/sigmastar.h`, ending in `#include "openipc-common.h"` |
 | OpenIPC boot layer | `common/openipc.c`, `include/openipc.h` (as on `openipc-anyka`), `include/configs/openipc-common.h` (SigmaStar rewrite, NOR only, same env commands) |
