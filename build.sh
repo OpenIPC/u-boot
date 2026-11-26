@@ -120,6 +120,25 @@ hi3519dv500 dmebpro Hi3519DV500-DMEBPRO_4L_flyby_DDR4_2666M-2GB_16bitx2-A55_1G.b
 # hi3519dv500: SPI NAND boards (e.g. W25N04KV on the Taobao DMEBPRO kit).
 BOOTIMG_NAND_SOCS="hi3519dv500"
 
+# hi3519dv500 NAND: the secure loader reads U-Boot through the flash
+# controller's boot-mode window, which ends at 0x60000 (an image reaching past
+# it stops after "System startup" on a W25N04KV kit). So the image has to end
+# there, and the BL31 U-Boot hands the secure loader goes after it, in the
+# rest of the 768k boot partition: a header (magic "BL31", length, crc32,
+# reserved; little-endian) and bl31.bin. U-Boot reads it from there at boot
+# (board/vendor/hi3519dv500/bl31_handoff.c).
+append_bl31_nand() {
+    python3 - "$1" board/vendor/hi3519dv500/bl31.bin <<'EOF'
+import struct, sys, zlib
+img, bl31 = sys.argv[1], open(sys.argv[2], "rb").read()
+data = open(img, "rb").read()
+if len(data) > 0x60000:
+    sys.exit("%s is %d bytes, past the 0x60000 the secure loader reads" % (img, len(data)))
+hdr = struct.pack("<4I", 0x31334c42, len(bl31), zlib.crc32(bl31) & 0xffffffff, 0)
+open(img, "wb").write(data + b"\xff" * (0x60000 - len(data)) + hdr + bl31)
+EOF
+}
+
 bootimg_rows() {
     echo "${BOOTIMG_TABLE}" | awk -v soc="$1" '$1 == soc'
 }
@@ -188,6 +207,9 @@ build_bootimg() {
         (cd ${packer}/oem && python3 oem_quick_build.py >/dev/null) && \
         test -f ${packer}/image/oem/boot_image.bin && \
         mv ${packer}/image/oem/boot_image.bin output/${out} || return 1
+        if [ "${soc}" = hi3519dv500 ] && [ "${flash}" = nand ]; then
+            append_bl31_nand output/${out} || return 1
+        fi
     done
     st=$?
     # Put the default back whether or not every row packed: a row that fails

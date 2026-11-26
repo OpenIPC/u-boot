@@ -1,0 +1,26 @@
+bl31.bin -- the BL31 that bootm (bl31_handoff.c) hands the Hi3519DV500 secure
+loader before it starts the kernel. Linked into U-Boot by bl31_blob.S.
+
+Built from the vendor SDK's ARM Trusted Firmware, not taken from a flash dump:
+
+  SDK      Hi3519DV500_SDK_V2.0.1.1, package/open_source.tgz
+  sources  open_source/arm-trusted-firmware/arm-trusted-firmware-2.7.tar.gz
+           + open_source/arm-trusted-firmware/arm-trusted-firmware-2.7.patch
+  command  make CROSS_COMPILE=aarch64-linux-gnu- PLAT=hi3519dv500 SPD=none \
+                CCI_UP=0 BL33_SEC=0 bl31
+           (the SDK's own: open_source/arm-trusted-firmware/Makefile, no TEE)
+  compiler aarch64-linux-gnu-gcc 16.2.0
+  change   --no-warn-rwx-segments added to the `--fatal-warnings -O1` line of
+           TF-A's Makefile: binutils 2.39 and later warn that bl31.elf has an
+           RWX LOAD segment, which TF-A 2.7 links as fatal (TF-A fixed this
+           upstream after 2.7)
+  output   build/hi3519dv500/release/bl31.bin, 28945 bytes
+  sha256   920fbc52a370fc9a1dfc65083c35bdbd35877c611989149f1d42c68a9942340c
+
+The vendor patch itself carries one prebuilt object,
+plat/vendor/hi3519dv500/drivers/nmi/nmi_private.o, which the build links as is.
+
+It is the same size as the BL31 a Taobao Hi3519DV500 kit shipped in its `bl31`
+NAND partition (28945 bytes; vendor build, differing only in code generation),
+and it loads at the secure loader's BL31_BASE, 0x40010000 (BL31_BASE in
+gsl_hi3519dv500/include/platform.h and in TF-A's plat/vendor/hi3519dv500).

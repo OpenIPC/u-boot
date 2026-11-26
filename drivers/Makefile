@@ -87,6 +87,7 @@ obj-$(CONFIG_CPU) += cpu/
 obj-y += crypto/
 obj-$(CONFIG_FASTBOOT) += fastboot/
 obj-y += misc/
+obj-$(CONFIG_TARGET_HI3519DV500_FAMILY) += ipc/
 obj-$(CONFIG_MMC) += mmc/
 obj-$(CONFIG_NVME) += nvme/
 obj-$(CONFIG_PCI_ENDPOINT) += pci_endpoint/

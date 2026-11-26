@@ -304,6 +304,18 @@ static void boot_jump_linux(bootm_headers_t *images, int flag)
 
 	announce_and_cleanup(fake);
 
+#ifdef CONFIG_TARGET_HI3519DV500_FAMILY
+	/* Not jumped into: the secure loader starts BL31 and BL31 the kernel,
+	 * which otherwise has nothing behind its PSCI calls
+	 * (board/vendor/hi3519dv500/bl31_handoff.c). Returns only on failure. */
+	if (!fake) {
+		void hi3519dv500_boot_linux(ulong entry, ulong fdt);
+
+		hi3519dv500_boot_linux(images->ep, (ulong)images->ft_addr);
+		return;
+	}
+#endif
+
 	if (!fake) {
 #ifdef CONFIG_ARMV8_PSCI
 		armv8_setup_psci();
