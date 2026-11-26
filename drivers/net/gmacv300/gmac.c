@@ -420,6 +420,7 @@ _error_alloc_rx_fq:
 #define PHY_ID_KSZ8081		0x00221560
 #define PHY_ID_KSZ9031		0x00221620
 #define PHY_ID_RTL8201		0x001c1100
+#define PHY_ID_RTL8211F		0x001cc910
 #define PHY_ID_MASK		0xFFFFFFF0
 
 /* MMD: MDIO Manageable Device */
@@ -540,16 +541,57 @@ static int phy_fixup(const char *devname, unsigned int phyaddr, enum if_mode phy
 	return 0;
 }
 
-static void gmac_net_adjust_speed(struct gmac_netdev_local *ld,
-		  unsigned int *link_stat, int is_duplex_half)
+/*
+ * RTL8211F: the speed and duplex the PHY actually runs at, from PHYSR
+ * (page 0xa43, register 0x1a). miiphy_speed() reports 1000 whenever the
+ * link partner advertises 1000BASE-T, which is wrong when the PHY does not
+ * advertise it or has downshifted to 100M over a two-pair cable: the MAC
+ * is then set to 1000M and no frame gets through. Returns 0 on success.
+ */
+#define RTL8211F_PAGE_SELECT	0x1f
+#define RTL8211F_PHYSR_PAGE	0xa43
+#define RTL8211F_PHYSR		0x1a
+#define RTL8211F_PHYSR_DUPLEX	BIT(3)
+#define RTL8211F_PHYSR_SPEED(v)	(((v) >> 4) & 0x3)
+
+static int rtl8211f_resolved(const char *devname, int phyaddr,
+			     int *speed, int *duplex)
 {
-	char *mii_name = g_gmac_board_info[ld->index].mii_name;
-	int phy_addr = g_gmac_board_info[ld->index].phy_addr;
-	int speed, port_mode;
+	unsigned short v = 0;
+	int ret;
+
+	if (miiphy_write(devname, phyaddr, RTL8211F_PAGE_SELECT,
+			 RTL8211F_PHYSR_PAGE))
+		return -1;
+	ret = miiphy_read(devname, phyaddr, RTL8211F_PHYSR, &v);
+	miiphy_write(devname, phyaddr, RTL8211F_PAGE_SELECT, 0);
+	if (ret)
+		return -1;
+
+	switch (RTL8211F_PHYSR_SPEED(v)) {
+	case 0:
+		*speed = _10BASET;
+		break;
+	case 1:
+		*speed = _100BASET;
+		break;
+	case 2:
+		*speed = _1000BASET;
+		break;
+	default:
+		return -1;
+	}
+	*duplex = (v & RTL8211F_PHYSR_DUPLEX) ? FULL : HALF;
+	return 0;
+}
+
+static void gmac_net_adjust_speed(struct gmac_netdev_local *ld,
+		  unsigned int *link_stat, int is_duplex_half, int speed)
+{
+	int port_mode;
 	unsigned int stat = *link_stat;
 	enum speed_mode speed_mode = SPEED_MODE_100M;
 
-	speed = miiphy_speed(mii_name, phy_addr);
 	switch (speed) {
 	case _10BASET:
 		stat |= GMAC_SPD_10M;
@@ -590,6 +632,7 @@ static int gmac_net_adjust_link(struct gmac_netdev_local *ld)
 	enum if_mode phy_mode = g_gmac_board_info[ld->index].phy_intf;
 	unsigned int stat = INVALID_LINK_STATUS;
 	int phy_duplex;
+	int phy_speed;
 	int is_duplex_half = 1;
 	u32 phy_id = 0;
 
@@ -603,13 +646,17 @@ static int gmac_net_adjust_link(struct gmac_netdev_local *ld)
 
 	stat |= miiphy_link(mii_name, phy_addr) ? GMAC_LINKED : 0;
 
-	phy_duplex = miiphy_duplex(mii_name, phy_addr);
+	if ((phy_id & PHY_ID_MASK) != PHY_ID_RTL8211F ||
+	    rtl8211f_resolved(mii_name, phy_addr, &phy_speed, &phy_duplex)) {
+		phy_speed = miiphy_speed(mii_name, phy_addr);
+		phy_duplex = miiphy_duplex(mii_name, phy_addr);
+	}
 	if (phy_duplex == FULL) {
 		stat |= GMAC_DUP_FULL;
 		is_duplex_half = 0;
 	}
 
-	gmac_net_adjust_speed(ld, &stat, is_duplex_half);
+	gmac_net_adjust_speed(ld, &stat, is_duplex_half, phy_speed);
 
 	return stat;
 }
@@ -875,6 +922,8 @@ static int gmac_send(struct eth_device *dev, void *packet, int length)
 #ifdef CFG_NET_PINCTRL
 static void gmac_config_rgmii0(void)
 {
+	writel(VALUE_MDCK0, PHY_ADDR_MDCK0);
+	writel(VALUE_MDIO0, PHY_ADDR_MDIO0);
 	writel(VALUE_EPHY0_CLK, PHY_ADDR_EPHY0_CLK);
 	writel(VALUE_EPHY0_RSTN, PHY_ADDR_EPHY0_RSTN);
 	writel(VALUE_RGMII0_TXCKOUT, PHY_ADDR_RGMII0_TXCKOUT);
@@ -893,6 +942,8 @@ static void gmac_config_rgmii0(void)
 
 static void gmac_config_rmii0(void)
 {
+	writel(VALUE_MDCK0, PHY_ADDR_MDCK0);
+	writel(VALUE_MDIO0, PHY_ADDR_MDIO0);
 	writel(VALUE_EPHY0_CLK, PHY_ADDR_EPHY0_CLK);
 	writel(VALUE_EPHY0_RSTN, PHY_ADDR_EPHY0_RSTN);
 	writel(VALUE_RMII0_CLK, PHY_ADDR_RMII0_CLK);

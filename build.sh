@@ -83,8 +83,11 @@ build_v500() {
 
 # Signed boot images: the boot ROM of these SoCs starts a GSL first stage,
 # which trains DDR from a register table and loads U-Boot. image_tool packs
-# the three into boot-<soc>[-<model>]-nor.bin, one per DDR binning; U-Boot
-# itself is the same for all of a SoC's binnings and is built once.
+# the three into boot-<soc>[-<model>]-<flash>.bin, one per DDR binning; U-Boot
+# itself is the same for all of a SoC's binnings and is built once per flash
+# type. Every SoC gets a NOR image; those in BOOTIMG_NAND_SOCS also get a NAND
+# one, whose U-Boot adds openipc/nand_config (nand/ubi commands, env in NAND,
+# the UBI layout of openipc-common.h).
 #
 #   soc  model  reginfo/<table>  arch  packer  gsl
 #
@@ -114,12 +117,16 @@ hi3519dv500 dmeb    Hi3519DV500-DMEB_6L_T_DDR4_2666M-2GB_16bitx2-A55_1G.bin     
 hi3519dv500 dmebpro Hi3519DV500-DMEBPRO_4L_flyby_DDR4_2666M-2GB_16bitx2-A55_1G.bin   arm64 image_tool_hi3519dv500 gsl_hi3519dv500
 "
 
+# hi3519dv500: SPI NAND boards (e.g. W25N04KV on the Taobao DMEBPRO kit).
+BOOTIMG_NAND_SOCS="hi3519dv500"
+
 bootimg_rows() {
     echo "${BOOTIMG_TABLE}" | awk -v soc="$1" '$1 == soc'
 }
 
 build_bootimg() {
     soc=$1
+    flash=${2:-nor}
     rows=$(bootimg_rows ${soc})
     arch=$(echo "${rows}" | awk 'NR == 1 {print $4}')
     cc=${CROSS_COMPILE}
@@ -133,13 +140,17 @@ build_bootimg() {
     mkdir -p ${BOOT_BUILDDIR}
     cat ${BOOT_SRCDIR}/openipc/openipc_config > ${BOOT_BUILDDIR}/.config && \
     cat ${BOOT_SRCDIR}/openipc/${soc}_config >> ${BOOT_BUILDDIR}/.config && \
+    { [ "${flash}" = nor ] || cat ${BOOT_SRCDIR}/openipc/nand_config >> ${BOOT_BUILDDIR}/.config; } && \
     echo "CONFIG_PRODUCT_SOC=\"${soc}\"" >> ${BOOT_BUILDDIR}/.config && \
     make ${MAKE_OPTS} CROSS_COMPILE=${cc} olddefconfig </dev/null >/dev/null && \
     make ${MAKE_OPTS} CROSS_COMPILE=${cc} ddr_training_clean </dev/null >/dev/null && \
     make ${MAKE_OPTS} CROSS_COMPILE=${cc} KCFLAGS="-DVENDOR_HISILICON" </dev/null && \
     make ${MAKE_OPTS} CROSS_COMPILE=${cc} u-boot-z.bin </dev/null && \
-    make ${MAKE_OPTS} CROSS_COMPILE=${cc} u-boot-z.clean </dev/null && \
-    cp ${BOOT_BUILDDIR}/u-boot-${soc}.bin output/smoke-${soc}.bin || return 1
+    make ${MAKE_OPTS} CROSS_COMPILE=${cc} u-boot-z.clean </dev/null || return 1
+    # The QEMU smoke test boots the NOR build.
+    if [ "${flash}" = nor ]; then
+        cp ${BOOT_BUILDDIR}/u-boot-${soc}.bin output/smoke-${soc}.bin || return 1
+    fi
 
     # The packer reads one fixed input/gsl.bin. A row that names a prebuilt
     # GSL swaps it in for its own image only, so the tracked default is put
@@ -168,8 +179,8 @@ build_bootimg() {
             (cd ${gsl} && make CROSS_COMPILE=${cc} CHIP=${soc} </dev/null >/dev/null) && \
             cp ${gsl}/pub/gsl.bin ${packer}/input/gsl.bin || return 1
         fi
-        out=boot-${soc}-${model}-nor.bin
-        [ "${model}" = - ] && out=boot-${soc}-nor.bin
+        out=boot-${soc}-${model}-${flash}.bin
+        [ "${model}" = - ] && out=boot-${soc}-${flash}.bin
         # The packer reports failures but still exits 0: check its output.
         rm -f ${packer}/image/oem/boot_image.bin
         cp ${BOOT_BUILDDIR}/u-boot-${soc}.bin ${packer}/input/u-boot-original.bin && \
@@ -312,8 +323,11 @@ build_xmorca() {
 build_soc() {
     soc=$1
     if [ -n "$(bootimg_rows ${soc})" ]; then
-        build_bootimg ${soc}
-        return
+        build_bootimg ${soc} nor || return 1
+        case " ${BOOTIMG_NAND_SOCS} " in
+            *" ${soc} "*) build_bootimg ${soc} nand || return 1 ;;
+        esac
+        return 0
     fi
     case "${soc}" in
         hi3516cv500|hi3516dv300|hi3516av300)
