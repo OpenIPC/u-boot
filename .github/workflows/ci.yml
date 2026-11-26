@@ -13,9 +13,7 @@ on:
 
 jobs:
   build:
-    # @ci/rockchip until build-rockchip.yml is on openipc (its PR), then
-    # @openipc as the other vendors' callers
-    uses: OpenIPC/u-boot/.github/workflows/build-rockchip.yml@ci/rockchip
+    uses: OpenIPC/u-boot/.github/workflows/build-rockchip.yml@openipc
     # github.sha: on pull_request the merge of the PR into the current
     # base, so the PR is built as it would land; on push, that commit.
     with:
