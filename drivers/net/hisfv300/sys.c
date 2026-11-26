@@ -44,6 +44,8 @@
 #if defined(CONFIG_HI3520D)
 #define HIETH_SYSCTL_REG       (SYS_CTRL_REG_BASE + PERIPHCTRL24)
 #define ETH_INTERNAL_PHY_RESET bit(2)
+/* no clock gate of its own: the vendor driver only pulses the reset bit */
+#define ETH_INTERNAL_PHY_CLK_EN 0
 #define HIETH_EFUSE_REG        (CRG_REG_BASE + EFUSE_CTRL_CRG)
 #define HIETH_EFUSE_DATA_REG   (EFUSE_REG_BASE + EFUSE_DATA_SEL)
 #elif defined(CONFIG_HI3536DV100)

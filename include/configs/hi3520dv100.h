@@ -104,6 +104,13 @@
 #define HIETH_MII_RMII_MODE_D       HISFV_MII_MODE
 #define HISFV_PHY_U                 1
 #define HISFV_PHY_D                 0
+/* Hi3520DV200's up port is its internal FE PHY, which answers at the
+ * address written to PERIPHCTRL24: 3, as the vendor U-Boot sets it */
+#ifdef CONFIG_TARGET_HI3520DV200
+#define INNER_PHY
+#define INNER_PHY_ADDR_U            3
+#define INNER_PHY_ADDR_D            2
+#endif
 #endif
 
 /* USB OHCI */
