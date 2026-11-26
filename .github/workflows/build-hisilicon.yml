@@ -353,8 +353,11 @@ jobs:
           [ "$soc" = hi3519dv500 ] && QEMU=./qemu-aarch64
           chmod +x ./qemu-arm ./qemu-aarch64
 
-          # Every image the leg built and would publish: the boot-image SoCs
-          # have one per board (hi3516cv610: five, hi3519dv500: two).
+          # Every NOR image the leg built and would publish, plus the NAND
+          # boot images: the boot-image SoCs have one per board (hi3516cv610:
+          # five, hi3519dv500: two NOR and two NAND). The machine models carry
+          # no NAND chip, so a NAND boot image probes "0 MiB" and still has to
+          # reach the prompt. The u-boot-*-nand.bin builds are not booted.
           smoke() {
             img=$1
             echo "== booting $img =="
@@ -395,7 +398,7 @@ jobs:
 
           rc=0
           n=0
-          for img in u-boot-${soc}-nor.bin boot-${soc}*-nor.bin; do
+          for img in u-boot-${soc}-nor.bin boot-${soc}*-nor.bin boot-${soc}*-nand.bin; do
             [ -f "$img" ] || continue
             n=$((n + 1))
             smoke "$img" || rc=1
