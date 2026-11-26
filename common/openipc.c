@@ -759,7 +759,6 @@ int firmware_scan(void) {
   }
 
   env_set_hex("fwsize", flash->size - (kernel_off ? kernel_off : env_get_hex("kernaddr", OPENIPC_KERNADDR)));
-  uint64_t flash_size = flash->size;
   spi_flash_free(flash);
 
   if (kernel_off) {
@@ -795,24 +794,6 @@ int firmware_scan(void) {
     sprintf(mtds, "%dk(u-boot),%dk(env),%lldk(kernel),%lldk(rootfs),%lldk@0x%lx(firmware),-(rootfs_data)",
             CONFIG_ENV_OFFSET / 1024, CONFIG_ENV_SIZE / 1024, kernel_size / 1024, rootfs_size / 1024,
             (kernel_size + rootfs_size) / 1024, kernel_off);
-#ifdef CONFIG_CMD_MS_BOOTLOGO
-    /*
-     * A boot logo at the end of the flash ($logoaddr, by default the last
-     * $logosize bytes): rootfs_data stops there, so formatting it never
-     * erases the logo.
-     */
-    ulong logo_off = env_get_hex("logoaddr", 0);
-    uint64_t data_off = kernel_off + kernel_size + rootfs_size;
-
-    if (!logo_off) {
-      logo_off = (flash_size - env_get_hex("logosize", 0x20000)) & ~0xffffUL;
-      env_set_hex("logoaddr", logo_off);
-    }
-
-    if (logo_off > data_off && logo_off < flash_size && !(logo_off & 0xffff))
-      sprintf(strrchr(mtds, ',') + 1, "%lldk(rootfs_data),%lldk(logo)",
-              (logo_off - data_off) / 1024, (flash_size - logo_off) / 1024);
-#endif
     env_set("mtds", mtds);
     sprintf(mtdparts, "%s:%s", mtdids ? mtdids : "", mtds);
     env_set("mtdparts", mtdparts);

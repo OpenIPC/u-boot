@@ -1,1 +1,1 @@
-obj-y += ms_disp.o
+obj-y += ms_disp.o ms_logo.o

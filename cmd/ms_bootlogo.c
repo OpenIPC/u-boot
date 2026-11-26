@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * bootlogo: a baseline JPEG on the SigmaStar infinity2m HDMI and VGA
- * outputs (the SSR621Q NVR die), decoded by TJpgDec straight into NV12 at
- * the top of DRAM -- outside the kernel's LX_MEM, so the picture stays up
- * while Linux boots, until its display driver takes over.
+ * bootlogo: a picture on the SigmaStar infinity2m HDMI and VGA outputs (the
+ * SSR621Q NVR die), in NV12 at the top of DRAM.
  *
- *   bootlogo <addr> [mode]
+ *   bootlogo [mode]          the OpenIPC logo, drawn at the mode's size
+ *   bootlogo <addr> [mode]   a baseline JPEG at addr (loaded there by any
+ *                            command: sf read, tftp, fatload ...), decoded
+ *                            by TJpgDec; its width a multiple of 16
+ *   bootlogo modes           the modes
  *
  * mode: 1080p60 (default, or $dispmode), 1080p50, 720p60, 720p50,
- * 1280x1024, 1024x768, 1440x900. The picture is scaled to fit and
- * centred; its width must be a multiple of 16.
+ * 1280x1024, 1024x768, 1440x900. A JPEG is scaled to fit and centred.
  */
 #include <common.h>
 #include <command.h>
@@ -86,48 +87,28 @@ static int logo_out(JDEC *jd, void *bitmap, JRECT *r)
 	return 1;
 }
 
-static int do_bootlogo(struct cmd_tbl *cmdtp, int flag, int argc,
-		       char *const argv[])
+/* Decode the JPEG at src into NV12 at buf; its size in *w, *h. */
+static int logo_jpeg(const u8 *src, phys_addr_t buf, int *w, int *h)
 {
-	const char *mode;
-	struct logo l = { 0 };
-	phys_addr_t buf;
+	struct logo l = { .src = src, .len = JPEG_MAX };
 	JDEC jd;
 	JRESULT jr;
 	void *pool;
-	int dw, dh, ret, i;
 
-	if (argc < 2)
-		return CMD_RET_USAGE;
-	if (!strcmp(argv[1], "modes")) {
-		for (i = 0; ms_disp_mode_name(i); i++)
-			printf("%s\n", ms_disp_mode_name(i));
-		return 0;
-	}
-	mode = argc > 2 ? argv[2] : env_get("dispmode");
-	if (!mode)
-		mode = "1080p60";
-
-	l.src = map_sysmem(hextoul(argv[1], NULL), JPEG_MAX);
-	l.len = JPEG_MAX;
-	if (l.src[0] != 0xff || l.src[1] != 0xd8) {
-		printf("bootlogo: no JPEG at %s\n", argv[1]);
-		return CMD_RET_FAILURE;
+	if (src[0] != 0xff || src[1] != 0xd8) {
+		printf("bootlogo: no JPEG there\n");
+		return -EINVAL;
 	}
 	pool = malloc(TJPGD_POOL);
 	if (!pool)
-		return CMD_RET_FAILURE;
+		return -ENOMEM;
 	jr = jd_prepare(&jd, logo_in, pool, TJPGD_POOL, &l);
-	if (jr != JDR_OK || (jd.width & 15) || (jd.height & 1)) {
+	if (jr != JDR_OK || (jd.width & 15) || (jd.height & 1) ||
+	    (u32)jd.width * jd.height * 3 / 2 > LOGO_BUF_SIZE) {
 		printf("bootlogo: JPEG not usable (%d, %ux%u)\n", jr,
 		       jd.width, jd.height);
 		free(pool);
-		return CMD_RET_FAILURE;
-	}
-	buf = gd->bd->bi_dram[0].start + gd->bd->bi_dram[0].size - LOGO_BUF_SIZE;
-	if ((u32)jd.width * jd.height * 3 / 2 > LOGO_BUF_SIZE) {
-		free(pool);
-		return CMD_RET_FAILURE;
+		return -EINVAL;
 	}
 	l.w = jd.width;
 	l.y = map_sysmem(buf, LOGO_BUF_SIZE);
@@ -136,23 +117,75 @@ static int do_bootlogo(struct cmd_tbl *cmdtp, int flag, int argc,
 	free(pool);
 	if (jr != JDR_OK) {
 		printf("bootlogo: decode failed (%d)\n", jr);
-		return CMD_RET_FAILURE;
+		return -EINVAL;
 	}
-	flush_dcache_range(buf, buf + LOGO_BUF_SIZE);
+	*w = jd.width;
+	*h = jd.height;
+	return 0;
+}
 
-	ret = ms_disp_start(mode, &dw, &dh);
-	if (ret) {
+static int is_mode(const char *s)
+{
+	int w, h;
+
+	return !ms_disp_mode_size(s, &w, &h);
+}
+
+static int do_bootlogo(struct cmd_tbl *cmdtp, int flag, int argc,
+		       char *const argv[])
+{
+	const char *mode = NULL, *addr = NULL;
+	phys_addr_t buf;
+	int w, h, dw, dh, i;
+	u8 *p;
+
+	if (argc > 1 && !strcmp(argv[1], "modes")) {
+		for (i = 0; ms_disp_mode_name(i); i++)
+			printf("%s\n", ms_disp_mode_name(i));
+		return 0;
+	}
+	for (i = 1; i < argc; i++) {
+		if (is_mode(argv[i]))
+			mode = argv[i];
+		else if (!addr)
+			addr = argv[i];
+		else
+			return CMD_RET_USAGE;
+	}
+	if (!mode)
+		mode = env_get("dispmode");
+	if (!mode)
+		mode = "1080p60";
+	if (ms_disp_mode_size(mode, &dw, &dh)) {
 		printf("bootlogo: unknown mode %s (bootlogo modes)\n", mode);
 		return CMD_RET_FAILURE;
 	}
-	ret = ms_disp_show(buf, jd.width, jd.height);
-	if (ret)
+
+	buf = gd->bd->bi_dram[0].start + gd->bd->bi_dram[0].size - LOGO_BUF_SIZE;
+	if (addr) {
+		if (logo_jpeg(map_sysmem(hextoul(addr, NULL), JPEG_MAX), buf,
+			      &w, &h))
+			return CMD_RET_FAILURE;
+	} else {
+		w = dw;
+		h = dh;
+		p = map_sysmem(buf, LOGO_BUF_SIZE);
+		if (ms_logo_draw(p, p + w * h, w, h)) {
+			printf("bootlogo: drawing failed\n");
+			return CMD_RET_FAILURE;
+		}
+	}
+	flush_dcache_range(buf, buf + LOGO_BUF_SIZE);
+
+	if (ms_disp_start(mode, &dw, &dh) || ms_disp_show(buf, w, h))
 		return CMD_RET_FAILURE;
-	printf("bootlogo: %ux%u on %s\n", jd.width, jd.height, mode);
+	printf("bootlogo: %s %ux%u on %s\n", addr ? "JPEG" : "OpenIPC logo",
+	       w, h, mode);
 	return 0;
 }
 
 U_BOOT_CMD(bootlogo, 3, 0, do_bootlogo,
-	   "show a JPEG on HDMI and VGA (SigmaStar infinity2m)",
-	   "<addr> [mode]  - baseline JPEG at addr; mode as 'bootlogo modes'\n"
-	   "bootlogo modes        - the output modes");
+	   "boot logo on HDMI and VGA (SigmaStar infinity2m)",
+	   "[mode]         - the OpenIPC logo\n"
+	   "bootlogo <addr> [mode]  - the baseline JPEG at addr\n"
+	   "bootlogo modes          - the output modes (default $dispmode, else 1080p60)");

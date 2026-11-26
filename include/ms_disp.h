@@ -15,5 +15,9 @@ int ms_disp_start(const char *mode, int *width, int *height);
 int ms_disp_show(phys_addr_t nv12, int width, int height);
 /* the modes ms_disp_start knows, NULL after the last */
 const char *ms_disp_mode_name(int i);
+/* a mode's size, without starting it */
+int ms_disp_mode_size(const char *mode, int *width, int *height);
+/* Draw the OpenIPC logo on navy into an NV12 frame (w a multiple of 2). */
+int ms_logo_draw(u8 *luma, u8 *chroma, int w, int h);
 
 #endif

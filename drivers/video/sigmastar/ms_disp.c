@@ -56,16 +56,34 @@ const char *ms_disp_mode_name(int i)
 	return i < ARRAY_SIZE(ms_disp_modes) ? ms_disp_modes[i].name : NULL;
 }
 
-int ms_disp_start(const char *mode, int *width, int *height)
+static int mode_find(const char *mode)
 {
-	const struct ms_disp_op *op;
 	int m;
 
 	for (m = 0; m < ARRAY_SIZE(ms_disp_modes); m++)
 		if (!strcmp(mode, ms_disp_modes[m].name))
-			break;
-	if (m == ARRAY_SIZE(ms_disp_modes))
-		return -EINVAL;
+			return m;
+	return -EINVAL;
+}
+
+int ms_disp_mode_size(const char *mode, int *width, int *height)
+{
+	int m = mode_find(mode);
+
+	if (m < 0)
+		return m;
+	*width = ms_disp_modes[m].width;
+	*height = ms_disp_modes[m].height;
+	return 0;
+}
+
+int ms_disp_start(const char *mode, int *width, int *height)
+{
+	const struct ms_disp_op *op;
+	int m = mode_find(mode);
+
+	if (m < 0)
+		return m;
 
 	for (op = ms_disp_prog; op < ms_disp_prog + ARRAY_SIZE(ms_disp_prog);
 	     op++) {

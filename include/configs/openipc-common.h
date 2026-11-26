@@ -201,16 +201,15 @@
 #define CONFIG_BOOTCOMMAND "run bootflash"
 
 /*
- * Boot logo (infinity2m NVRs, CONFIG_CMD_MS_BOOTLOGO): a baseline JPEG in
- * the flash at $logoaddr ($logosize bytes), shown on HDMI and VGA from
- * preboot. firmware_scan() sets $logoaddr to the end of the flash when it
- * is not saved, and gives that range its own "logo" partition.
+ * Boot logo (infinity2m NVRs, CONFIG_CMD_MS_BOOTLOGO), from preboot: the
+ * OpenIPC logo drawn by bootlogo. To show a JPEG instead, load it into RAM
+ * and pass its address, e.g.
+ *   setenv showlogo 'tftp ${baseaddr} logo.jpg && bootlogo ${baseaddr} || bootlogo'
+ * The kernel's command line does not change either way.
  */
 #ifdef CONFIG_CMD_MS_BOOTLOGO
 #define OPENIPC_ENV_LOGO \
-	"logosize=0x20000\0" \
-	"showlogo=if test -n \"${logoaddr}\"; then sf probe 0 && " \
-	"sf read ${baseaddr} ${logoaddr} ${logosize} && bootlogo ${baseaddr}; fi\0"
+	"showlogo=bootlogo\0"
 #else
 #define OPENIPC_ENV_LOGO ""
 #endif
