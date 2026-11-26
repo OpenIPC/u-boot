@@ -73,7 +73,13 @@
 #define CONFIG_HISFC350_REG_BASE_ADDRESS    SFC_REG_BASE
 #define CONFIG_HISFC350_BUFFER_BASE_ADDRESS SFC_MEM_BASE
 #define CONFIG_HISFC350_PERIPHERY_REGBASE   CRG_REG_BASE
+/* Hi3520DV200 boards carry their NOR on CS1 (the Xiongmai NBD6808T-PL,
+ * whose kernel DT says flash@1, and the lab board): probe both, CS1 first */
+#ifdef CONFIG_TARGET_HI3520DV200
+#define CONFIG_HISFC350_CHIP_NUM            2
+#else
 #define CONFIG_HISFC350_CHIP_NUM            1
+#endif
 #define SFC_ADDR_MODE_REG                   0x8c
 #define CONFIG_SPI_NOR_MAX_CHIP_NUM         1
 #define CONFIG_SPI_NOR_QUIET_TEST
