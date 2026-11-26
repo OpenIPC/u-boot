@@ -54,7 +54,16 @@
  */
 #ifdef CONFIG_SS_MMA_BOOTARGS
 #define OPENIPC_MEMARGS_HEAD ""
+#ifdef CONFIG_SS_INFINITY2M
+/*
+ * The i2m SDK's kernels also take the MMA heap out of memblock
+ * (KERNEL_BOOT_ENV in project/configs/nvr/i2m): without it mi_sys dies at
+ * load (BUG in MI_SYSCFG_CmdqAllocateBuffer).
+ */
+#define OPENIPC_MEMARGS_TAIL " LX_MEM=\\${memlx} mma_heap=mma_heap_name0,miu=0,sz=\\${memsz} cma=2M mma_memblock_remove=1"
+#else
 #define OPENIPC_MEMARGS_TAIL " LX_MEM=\\${memlx} mma_heap=mma_heap_name0,miu=0,sz=\\${memsz} cma=2M"
+#endif
 #else
 #define OPENIPC_MEMARGS_HEAD "mem=\\${osmem} "
 #define OPENIPC_MEMARGS_TAIL ""

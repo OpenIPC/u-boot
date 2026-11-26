@@ -166,9 +166,19 @@ static const struct ss_mem_row ss_mem_table[] = {
 	/* The SDK's set_config by package: QFN128 128 MiB, QFN88 64 MiB */
 	{ 128, "0x7FE0000", "0x5000000" },
 	{ 0,   "0x3FE0000", "0x2000000" },
-#elif defined(CONFIG_SS_I6C_FAMILY) || defined(CONFIG_SS_INFINITY2M) || \
-      defined(CONFIG_SS_IFADO)
-	/* infinity2m has no OpenIPC values; its kernel wants 1 MiB alignment */
+#elif defined(CONFIG_SS_INFINITY2M)
+	/*
+	 * The i2m SDK's (KERNEL_BOOT_ENV, project/configs/nvr/i2m): LX_MEM
+	 * ends where its memory map (board/i2m/mmap/MMAP_I2M_<size>.h) starts.
+	 * mi_sys takes its command queue and the other fixed buffers from
+	 * there, and with the whole DDR given to the kernel it dies at load
+	 * (BUG in MI_SYSCFG_CmdqAllocateBuffer).
+	 */
+	{ 256, "0xF400000", "0xA000000" },
+	{ 128, "0x7F00000", "0x4600000" },
+	{ 0,   "0x3F00000", "0x2000000" },
+#elif defined(CONFIG_SS_I6C_FAMILY) || defined(CONFIG_SS_IFADO)
+	/* these kernels want 1 MiB alignment */
 	{ 256, "0x10000000", "0x0A000000" },
 	{ 128, "0x8000000",  "0x4600000" },
 	{ 0,   "0x4000000",  "0x2000000" },
