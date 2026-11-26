@@ -299,8 +299,10 @@ Every infinity2m, infinity6, 6b0, 6e and 6c part also builds for SPI NAND,
   IPL is at `0` and the table at `0xF000` (infinity6c: `0x9000`).
 - The infinity6, Iford, Ifado and Ifliegen images have **not run on silicon**, only
   under qemu: CI boots every leg, NOR and NAND, on its own qemu-hisilicon machine.
-  They are only in this repository's `sigmastar` release. Cameras get `u-boot-ssc*`
-  from OpenIPC/u-boot-sigmastar.
+  The NOR images of the SoCs openipc.org installs (`publish_targets`) are
+  published to OpenIPC/firmware `latest`; the SPI NAND ones only to this
+  repository's `sigmastar` release, since the `u-boot-*-nand.bin` on `latest`
+  are OpenIPC/u-boot-sigmastar's, in the layout firmware's NAND packages use.
 - The SPI NAND images are openipc-hisilicon's layout, `768k(boot),256k(env),-(ubi)`:
   the die's CIS, its vendor stages one copy each and U-Boot in the 768 KiB boot
   partition, the environment at `0xC0000`, then one UBI device whose UBIFS
@@ -636,11 +638,12 @@ gh workflow run build-<vendor>.yml -f release=true                   # + this re
 gh workflow run build-<vendor>.yml -f release=true -f publish=true   # + OpenIPC/firmware latest and openipc.org
 ```
 
-`publish` needs a `FIRMWARE_RELEASE_TOKEN` secret. Ingenic's publishes
-only its `publish_targets`, the T41 ones by default; SigmaStar's is
-commented out for now, so its images go only to this repository's
-`sigmastar` release, and so is Axera's (`axera` release). Rockchip's
-has none yet (`rockchip` release). Held SoCs are never released.
+`publish` needs a `FIRMWARE_RELEASE_TOKEN` secret. Ingenic's and
+SigmaStar's publish only their `publish_targets`: the T41 ones, and
+SigmaStar's NOR images of the SoCs openipc.org installs, by default.
+Axera's is commented out for now, so its images go only to this
+repository's `axera` release. Rockchip's has none yet (`rockchip`
+release). Held SoCs are never released.
 
 **Adding a vendor:** push the port on a new `openipc-<vendor>` branch,
 add `build-<vendor>.yml` here, and add a row and a section to this
