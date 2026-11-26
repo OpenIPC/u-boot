@@ -9,8 +9,8 @@
  *                            by TJpgDec; its width a multiple of 16
  *   bootlogo modes           the modes
  *
- * mode: 1080p60 (default, or $dispmode), 1080p50, 720p60, 720p50,
- * 1280x1024, 1024x768, 1440x900. A JPEG is scaled to fit and centred.
+ * mode: 720p60 (default, or $dispmode: the mode the most monitors accept),
+ * 720p50, 1080p60, 1080p50, 1280x1024, 1024x768, 1440x900. A JPEG is scaled to fit and centred.
  */
 #include <common.h>
 #include <command.h>
@@ -155,7 +155,7 @@ static int do_bootlogo(struct cmd_tbl *cmdtp, int flag, int argc,
 	if (!mode)
 		mode = env_get("dispmode");
 	if (!mode)
-		mode = "1080p60";
+		mode = "720p60";
 	if (ms_disp_mode_size(mode, &dw, &dh)) {
 		printf("bootlogo: unknown mode %s (bootlogo modes)\n", mode);
 		return CMD_RET_FAILURE;
@@ -188,4 +188,4 @@ U_BOOT_CMD(bootlogo, 3, 0, do_bootlogo,
 	   "boot logo on HDMI and VGA (SigmaStar infinity2m)",
 	   "[mode]         - the OpenIPC logo\n"
 	   "bootlogo <addr> [mode]  - the baseline JPEG at addr\n"
-	   "bootlogo modes          - the output modes (default $dispmode, else 1080p60)");
+	   "bootlogo modes          - the output modes (default $dispmode, else 720p60)");

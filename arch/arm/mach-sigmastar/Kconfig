@@ -273,6 +273,6 @@ config CMD_MS_BOOTLOGO
 	  bootlogo [mode]: draw the OpenIPC logo (from its outlines, no
 	  picture file) on HDMI and VGA. bootlogo <addr> [mode]: decode the
 	  baseline JPEG at addr and show it, scaled to fit, instead (mode:
-	  $dispmode, else 1080p60).
+	  $dispmode, else 720p60, which most monitors accept).
 
 endif
