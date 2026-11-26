@@ -1648,6 +1648,38 @@ struct spi_nand_info fmc_spi_nand_flash_table[] = {
 		.driver  = &spi_driver_general,
 	},
 
+	/* Winbond 3.3V W25N04KVZEIR 4Gbit: the W25N02KV with twice the blocks
+	 * (Linux spinand: same ops and OOB layout, 4096 x 128 KiB blocks) */
+	{
+		.name      = "W25N04KVZEIR",
+		.id        = {0xef, 0xAA, 0x23},
+		.id_len    = _3B,
+		.chipsize  = _512M,
+		.erasesize = _128K,
+		.pagesize  = _2K,
+		.oobsize   = _128B,
+		.badblock_pos = BBP_FIRST_PAGE,
+		.read      = {
+			&read_std(1, INFINITE, 24), /* 24MHz */
+			&read_fast(1, INFINITE, 104),  /* 104MHz */
+			&read_dual(1, INFINITE, 104),  /* 104MHz */
+			&read_dual_addr(1, INFINITE, 104),  /* 104MHz */
+			&read_quad(1, INFINITE, 104),  /* 104MHz */
+			&read_quad_addr(2, INFINITE, 104), /* 104MHz */
+			0
+		},
+		.write     = {
+			&write_std(0, 256, 104), /* 104MHz */
+			&write_quad(0, 256, 104),  /* 104MHz */
+			0
+		},
+		.erase     = {
+			&erase_sector_128k(0, _128K, 104), /* 104MHz */
+			0
+		},
+		.driver  = &spi_driver_general,
+	},
+
 	/* ATO ATO25D1GA 1Gbit */
 	{
 		.name      = "ATO25D1GA",
