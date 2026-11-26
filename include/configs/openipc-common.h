@@ -27,13 +27,41 @@
  * Kernel lowmem (mem=). The rest of DDR is the vendor MMZ, which
  * load_xiongmai places from the FIRST kernel argument, so mem= has to stay
  * first in every bootargs below.
+ *
+ * On the V200 series and XM232 the MMZ holds the whole open media pipeline
+ * (libxmv200 on openxiongmai's modules): each value below is the largest
+ * Linux share with which that pipeline starts the chip's streams and a
+ * JPEG snapshot, measured in qemu-bench. A saved environment keeps its own
+ * osmem.
  */
 #if defined(CONFIG_TARGET_XM510)
 #define OPENIPC_OSMEM		"18M"
 #elif defined(CONFIG_TARGET_XM550)
 #define OPENIPC_OSMEM		"80M"
-#elif defined(CONFIG_TARGET_XM530V200) || defined(CONFIG_XM535D2)
-#define OPENIPC_OSMEM		"64M"	/* of 128 MiB */
+#elif defined(CONFIG_TARGET_XM530V200)
+/* of 128 MiB, as the vendor's own environment: 2 x SC2336 spliced to
+ * 2304x2592 with a snapshot fit to 56M, the snapshot fails at 60M */
+#define OPENIPC_OSMEM		"48M"
+#elif defined(CONFIG_TARGET_XM533)
+/* of 64 MiB: a 5 MP SC500AI (2880x1624) with a snapshot fits to 20M, its
+ * snapshot fails at 22M */
+#define OPENIPC_OSMEM		"20M"
+#elif defined(CONFIG_XM535D1)
+/* of 64 MiB: 2 x SC2336 spliced to 1920x2160 with a snapshot fits to 22M,
+ * its snapshot fails at 24M */
+#define OPENIPC_OSMEM		"22M"
+#elif defined(CONFIG_XM535D2)
+/* of 128 MiB: three cameras' six streams with a snapshot fit to 68M,
+ * the snapshot fails at 72M */
+#define OPENIPC_OSMEM		"68M"
+#elif defined(CONFIG_XM535W1)
+/* of 64 MiB: a 5 MP SC500AI with a snapshot fits to 28M, its snapshot
+ * fails at 32M */
+#define OPENIPC_OSMEM		"28M"
+#elif defined(CONFIG_TARGET_XM232)
+/* of 64 MiB: 2 x SC2336 spliced to 1920x2160 with a snapshot fits at 32M;
+ * at the vendor's 33M the snapshot fails */
+#define OPENIPC_OSMEM		"32M"
 #else
 #define OPENIPC_OSMEM		"32M"
 #endif

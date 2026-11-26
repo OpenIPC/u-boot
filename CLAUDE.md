@@ -188,6 +188,14 @@ PHY/MDIO timing are acked instantly. A change to those needs a real board.
 
 - `mem=` must stay the **first** kernel argument. `load_xiongmai` places the
   vendor MMZ from `$1` of `/proc/cmdline`.
+- `osmem` (`OPENIPC_OSMEM`) is per chip. On the V200 series and XM232 the rest
+  of DDR, the MMZ, holds the open media pipeline (libxmv200), and each value is
+  the largest Linux share with which that pipeline starts the chip's streams
+  and a JPEG snapshot, measured in qemu-bench with the chip's largest sensor
+  libxmv200 supports on it where that works (XM533 and XM535W1: SC500AI) and
+  its reference board otherwise. Too large a share shows as "mmz: out of
+  memory" and "venc N: create failed". Change a value only with the same
+  measurement; a saved environment keeps its own `osmem`.
 - The MTD name is `xm_sfc`, the vendor kernel driver's (`SFC` in
   `openipc-common.h`).
 - The boot counter is a DRAM word:
