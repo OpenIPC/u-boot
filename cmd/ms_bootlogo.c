@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * bootlogo: a picture on the SigmaStar infinity2m HDMI and VGA outputs (the
- * SSR621Q NVR die), in NV12 at the top of DRAM.
+ * SSR621Q NVR die), in NV12 in the top 8 MiB of DRAM. That memory is part
+ * of what Linux gets, but the kernel's MMA heap (mma_heap= in the default
+ * bootargs) is reserved at the top of it during early boot, so the picture
+ * stays up until the media stack allocates from the heap and takes the
+ * display over.
  *
  *   bootlogo [mode]          the OpenIPC logo, drawn at the mode's size
  *   bootlogo <addr> [mode]   a baseline JPEG at addr (loaded there by any
@@ -176,9 +180,15 @@ static int do_bootlogo(struct cmd_tbl *cmdtp, int flag, int argc,
 		}
 	}
 	flush_dcache_range(buf, buf + LOGO_BUF_SIZE);
+	ss_miu_flush();		/* the display reads it by DMA */
 
-	if (ms_disp_start(mode, &dw, &dh) || ms_disp_show(buf, w, h))
+	if (ms_disp_start(mode, &dw, &dh))
 		return CMD_RET_FAILURE;
+	if (ms_disp_show(buf, w, h)) {
+		printf("bootlogo: %ux%u cannot be shown on %s (at most 8192 and\n"
+		       "          less than twice the screen's size)\n", w, h, mode);
+		return CMD_RET_FAILURE;
+	}
 	printf("bootlogo: %s %ux%u on %s\n", addr ? "JPEG" : "OpenIPC logo",
 	       w, h, mode);
 	return 0;

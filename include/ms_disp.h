@@ -11,7 +11,8 @@
 /* Start the output, "1080p60" etc.; the mode's size comes back. */
 int ms_disp_start(const char *mode, int *width, int *height);
 /* Show an NV12 picture (luma, then interleaved chroma; pitch = width,
- * a multiple of 16) in the window, scaled by the display to fit, centred. */
+ * a multiple of 16) in the window, scaled by the display to fit, centred.
+ * -ERANGE: larger than 8192, or more than twice the screen's size. */
 int ms_disp_show(phys_addr_t nv12, int width, int height);
 /* the modes ms_disp_start knows, NULL after the last */
 const char *ms_disp_mode_name(int i);

@@ -117,10 +117,13 @@ static void mop_write(u8 reg, u16 mask, u16 val)
 int ms_disp_show(phys_addr_t nv12, int w, int h)
 {
 	int dw, dh, x, y;
-	u32 y16 = nv12 >> 4, c16 = (nv12 + w * h) >> 4;
+	u32 y16 = nv12 >> 4, c16 = (nv12 + w * h) >> 4, hr, vr;
 
-	if (!cur_w || (w & 15) || (h & 1) || nv12 & 15)
+	if (!cur_w || (w & 15) || (h & 1) || nv12 & 15 || w <= 0 || h <= 0)
 		return -EINVAL;
+	/* the source size fields are 13 bits */
+	if (w > 0x2000 || h > 0x2000)
+		return -ERANGE;
 	/* fit, keeping the aspect: the MOP scales (4.12, source/destination) */
 	if ((u64)w * cur_h > (u64)h * cur_w) {
 		dw = cur_w;
@@ -131,6 +134,11 @@ int ms_disp_show(phys_addr_t nv12, int w, int h)
 	}
 	x = (cur_w - dw) / 2;
 	y = (cur_h - dh) / 2;
+	/* 4.12 ratios in 13 bits: the MOP shrinks by less than 2 */
+	hr = dw == w ? 0x1000 : (u32)w * 4096 / dw;
+	vr = dh == h ? 0x1000 : (u32)h * 4096 / dh;
+	if (hr > 0x1fff || vr > 0x1fff)
+		return -ERANGE;
 
 	mop_write(0x0b, 0x1fff, w - 1);			/* source size */
 	mop_write(0x0c, 0x1fff, h - 1);
@@ -138,8 +146,8 @@ int ms_disp_show(phys_addr_t nv12, int w, int h)
 	mop_write(0x07, 0x1fff, x + dw - 1);
 	mop_write(0x08, 0x1fff, y);
 	mop_write(0x09, 0x1fff, y + dh - 1);
-	mop_write(0x0d, 0x1fff, dw == w ? 0x1000 : w * 4096 / dw);
-	mop_write(0x0e, 0x1fff, dh == h ? 0x1000 : h * 4096 / dh);
+	mop_write(0x0d, 0x1fff, hr);
+	mop_write(0x0e, 0x1fff, vr);
 	mop_write(0x02, 0xffff, y16 & 0xffff);		/* luma, 16 B units */
 	mop_write(0x03, 0x0fff, y16 >> 16);
 	mop_write(0x04, 0xffff, c16 & 0xffff);		/* chroma */
