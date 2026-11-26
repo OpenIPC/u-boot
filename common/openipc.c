@@ -309,6 +309,72 @@ static int recovery_recreate_volume(const char *name, const char *size,
   return ret;
 }
 
+/* UBIFS on-flash format (fs/ubifs/ubifs-media.h) */
+#define RECOVERY_UBIFS_MAGIC    0x06101831
+#define RECOVERY_UBIFS_CRC_INIT 0xffffffff
+#define RECOVERY_UBIFS_CH_SIZE  24
+#define RECOVERY_UBIFS_SB_NODE  6
+#define RECOVERY_UBIFS_MST_NODE 7
+
+/* A UBIFS node of the given type at img + off, whose CRC holds */
+static int recovery_ubifs_node(const u8 *img, ulong size, ulong off, int type) {
+  const u8 *ch = img + off;
+  u32 len;
+
+  if (off >= size || size - off < RECOVERY_UBIFS_CH_SIZE)
+    return 0;
+  len = get_unaligned_le32(ch + 16);
+  return get_unaligned_le32(ch) == RECOVERY_UBIFS_MAGIC && ch[20] == type &&
+         len >= RECOVERY_UBIFS_CH_SIZE && len <= size - off &&
+         crc32_le(RECOVERY_UBIFS_CRC_INIT, ch + 8, len - 8) ==
+             get_unaligned_le32(ch + 4);
+}
+
+/*
+ * A whole mkfs.ubifs image made for this UBI device: its superblock and
+ * master node check, its LEBs are the device's, and it is as long as the
+ * superblock says (mkfs.ubifs writes every LEB in full, so a cut file is
+ * shorter). Returns the LEB size, or 0.
+ */
+static int recovery_ubifs_check(const u8 *img, ulong size) {
+  struct ubi_device_info di;
+  u32 leb, cnt;
+
+  if (!recovery_ubifs_node(img, size, 0, RECOVERY_UBIFS_SB_NODE) ||
+      ubi_get_device_info(0, &di))
+    return 0;
+  leb = get_unaligned_le32(img + 36);
+  cnt = get_unaligned_le32(img + 40);
+  if (leb != di.leb_size || !cnt || (u64)leb * cnt != size ||
+      !recovery_ubifs_node(img, size, leb, RECOVERY_UBIFS_MST_NODE))
+    return 0;
+  return leb;
+}
+
+/* The rootfs volume holds this image already: the same LEBs, the same data */
+static int recovery_rootfs_holds(const u8 *img, ulong size, int leb) {
+  struct ubi_volume_desc *desc;
+  struct ubi_volume_info vi;
+  ulong off;
+  char *buf;
+  int same;
+
+  desc = ubi_open_volume_nm(0, "rootfs", UBI_READONLY);
+  if (IS_ERR(desc))
+    return 0;
+  ubi_get_volume_info(desc, &vi);
+  same = vi.usable_leb_size == leb && (u64)vi.size * leb == size;
+  buf = same ? malloc(leb) : NULL;
+  if (!buf)
+    same = 0;
+  for (off = 0; same && off < size; off += leb)
+    same = !ubi_read(desc, off / leb, buf, 0, leb) &&
+           !memcmp(buf, img + off, leb);
+  free(buf);
+  ubi_close_volume(desc);
+  return same;
+}
+
 static int recovery_write(const char *name, int type) {
   struct image_header hdr;
   loff_t actread;
@@ -346,6 +412,12 @@ static int recovery_write(const char *name, int type) {
     }
   }
 
+  /* The size comes from the file or its header: either can be anything */
+  if (size > recovery_ram_room()) {
+    printf("Recovery: %s (%lu bytes) does not fit the free RAM\n", name, size);
+    return -1;
+  }
+
   ret = rfs_read(name, CONFIG_SYS_LOAD_ADDR, 0, size, &actread);
   if (ret || actread != size) {
     printf("Recovery: failed to read %s\n", name);
@@ -360,6 +432,19 @@ static int recovery_write(const char *name, int type) {
 
   if (type == RECOVERY_ROOTFS) {
     char size_str[24];
+    int leb = recovery_ubifs_check((const u8 *)CONFIG_SYS_LOAD_ADDR, size);
+
+    /* Nothing is removed for a file that is not this flash's UBIFS */
+    if (leb <= 0) {
+      printf("Recovery: %s is not a whole UBIFS image for this flash, "
+             "nothing written\n", name);
+      return -1;
+    }
+    /* A card left in must not rewrite the NAND on every boot */
+    if (recovery_rootfs_holds((const u8 *)CONFIG_SYS_LOAD_ADDR, size, leb)) {
+      printf("Recovery: %s is already installed\n", name);
+      return 0;
+    }
 
     /* The volume is sized to the image; if it does not fit, the data
      * volume is dropped (UBI volumes cannot be resized) */
