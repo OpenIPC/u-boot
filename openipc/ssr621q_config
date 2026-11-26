@@ -1,2 +1,7 @@
 CONFIG_TARGET_SSR621Q=y
 CONFIG_PRODUCT_SOC="ssr621q"
+# The NVR die: HDMI/VGA boot logo (bootlogo, $logoaddr), from preboot
+CONFIG_MS_DISP=y
+CONFIG_CMD_MS_BOOTLOGO=y
+CONFIG_USE_PREBOOT=y
+CONFIG_PREBOOT="run showlogo"

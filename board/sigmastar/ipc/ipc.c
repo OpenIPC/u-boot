@@ -5,6 +5,7 @@
  */
 
 #include <common.h>
+#include <env.h>
 #include <init.h>
 #include <net.h>
 #include <netdev.h>
@@ -24,6 +25,17 @@ int misc_init_r(void)
 {
 #ifdef CONFIG_SS_MMA_BOOTARGS
 	ss_set_mem_env();
+#endif
+#ifdef CONFIG_CMD_MS_BOOTLOGO
+	/*
+	 * An environment saved by an earlier U-Boot has neither, and a saved
+	 * environment is not merged with the new defaults: give it the logo
+	 * too, without saving. "setenv showlogo true" turns the logo off.
+	 */
+	if (!env_get("showlogo"))
+		env_set("showlogo", "bootlogo");
+	if (!env_get("preboot"))
+		env_set("preboot", "run showlogo");
 #endif
 	return openipc_helper();
 }

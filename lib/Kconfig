@@ -604,6 +604,12 @@ config LZMA
 	  ratio and fairly fast decompression speed. See also
 	  CONFIG_CMD_LZMADEC which provides a decode command.
 
+config TJPGD
+	bool "TJpgDec, a small baseline JPEG decoder"
+	help
+	  ChaN's Tiny JPEG Decompressor (R0.03), for boot logos on targets
+	  with no room for a full JPEG library.
+
 config XZ
 	bool "Enable xz decompression support"
 	help

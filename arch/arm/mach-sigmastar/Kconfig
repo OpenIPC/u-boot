@@ -257,4 +257,22 @@ config SYS_BOARD
 config SYS_CONFIG_NAME
 	default "sigmastar"
 
+config MS_DISP
+	bool "infinity2m display: HDMI and VGA output for a boot logo"
+	depends on SS_INFINITY2M
+	help
+	  Starts the display pipe and the HDMI transmitter at a fixed mode
+	  and shows one picture, from register programs generated from
+	  SigmaStar's display and HDMI TX drivers.
+
+config CMD_MS_BOOTLOGO
+	bool "bootlogo: the OpenIPC logo, or a JPEG, on HDMI/VGA"
+	depends on MS_DISP
+	select TJPGD
+	help
+	  bootlogo [mode]: draw the OpenIPC logo (from its outlines, no
+	  picture file) on HDMI and VGA. bootlogo <addr> [mode]: decode the
+	  baseline JPEG at addr and show it, scaled to fit, instead (mode:
+	  $dispmode, else 720p60, which most monitors accept).
+
 endif

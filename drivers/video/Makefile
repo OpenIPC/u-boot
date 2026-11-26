@@ -71,3 +71,5 @@ obj-$(CONFIG_VIDEO_ZYNQMP_DPSUB) += zynqmp_dpsub.o
 
 obj-y += bridge/
 obj-y += sunxi/
+
+obj-$(CONFIG_MS_DISP) += sigmastar/

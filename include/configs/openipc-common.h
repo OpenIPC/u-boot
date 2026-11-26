@@ -200,8 +200,24 @@
 
 #define CONFIG_BOOTCOMMAND "run bootflash"
 
+/*
+ * Boot logo (infinity2m NVRs, CONFIG_CMD_MS_BOOTLOGO), from preboot: the
+ * OpenIPC logo drawn by bootlogo. To show a JPEG instead, load it into RAM
+ * and pass its address, e.g.
+ *   setenv showlogo 'tftp ${baseaddr} logo.jpg && bootlogo ${baseaddr} || bootlogo'
+ * The kernel's command line does not change either way.
+ */
+#ifdef CONFIG_CMD_MS_BOOTLOGO
+#define OPENIPC_ENV_LOGO \
+	"showlogo=bootlogo\0"
+#else
+#define OPENIPC_ENV_LOGO ""
+#endif
+
+/* OPENIPC_ENV_MEDIUM ends in bootargs, with no NUL: it stays last */
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	OPENIPC_ENV_COMMON \
+	OPENIPC_ENV_LOGO \
 	OPENIPC_ENV_MEDIUM
 
 #endif /* __OPENIPC_COMMON_H */
