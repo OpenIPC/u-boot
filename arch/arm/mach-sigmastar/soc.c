@@ -200,6 +200,33 @@ void ss_set_mem_env(void)
 		row++;
 	env_set("memlx", row->memlx);
 	env_set("memsz", row->memsz);
+#ifdef CONFIG_SS_INFINITY2M
+	/*
+	 * mma_memblock_remove=1 is in the default bootargs (openipc-common.h),
+	 * but an environment saved by an earlier build keeps its own: give
+	 * those the flag too, at every boot and without saving, when they pass
+	 * the MMA heap and do not set it already.
+	 */
+	{
+		static const char *const vars[] = { "bootargs", "bootargsnfs" };
+		static const char flag[] = " mma_memblock_remove=1";
+		char buf[CONFIG_SYS_CBSIZE];
+		int i;
+
+		for (i = 0; i < ARRAY_SIZE(vars); i++) {
+			const char *v = env_get(vars[i]);
+
+			if (!v || !strstr(v, "mma_heap=") ||
+			    strstr(v, "mma_memblock_remove"))
+				continue;
+			if (strlen(v) + sizeof(flag) > sizeof(buf))
+				continue;
+			strcpy(buf, v);
+			strcat(buf, flag);
+			env_set(vars[i], buf);
+		}
+	}
+#endif
 }
 #endif
 
