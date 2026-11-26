@@ -148,37 +148,38 @@ void set_inner_phy_addr(u32 phyaddr)
 #endif
 
 #if defined(INNER_PHY) && defined(CONFIG_HI3520D)
+#define MDIO_RWCTRL           0x1100
+#define MDIO_RWCTRL_FINISH    bit(15)
+#define MDIO_RWCTRL_WRITE     bit(13)
+#define MDIO_RWCTRL_FRQDIV    (2 << 5)
+#define INNER_PHY_MDIO_TRIES  1000 /* of 10us: 10ms */
+
+/* Write a register of the internal PHY, at the address set_inner_phy_addr()
+ * gave it (phyaddru overrides INNER_PHY_ADDR_U). Gives up after 10ms. */
+static int inner_phy_write(u32 regnum, u32 val)
+{
+	u32 phy = readl(HIETH_SYSCTL_REG) & 0x1f;
+	int tries = INNER_PHY_MDIO_TRIES;
+
+	writel((val << 16) | MDIO_RWCTRL_WRITE | (phy << 8) |
+	       MDIO_RWCTRL_FRQDIV | (regnum & 0x1f), REG_BASE_SF + MDIO_RWCTRL);
+	do {
+		udelay(10); /* delay 10us */
+		if (readl(REG_BASE_SF + MDIO_RWCTRL) & MDIO_RWCTRL_FINISH)
+			return 0;
+	} while (--tries);
+
+	printf("internal PHY %u: MDIO write to reg %u timed out\n", phy, regnum);
+	return -1;
+}
+
 void revise_led_shine(void)
 {
-#define MDIO_RWCTRL      0x1100
-#define tmp_mdio_ready() \
-	(readl(REG_BASE_SF + MDIO_RWCTRL) & bit(15))
-
-	unsigned int reg_value;
-	/* select page 7 */
-	do {
-		reg_value = 0x0007235f;
-		writel(reg_value, REG_BASE_SF + MDIO_RWCTRL);
-		udelay(10); /* delay 10us */
-	} while (!tmp_mdio_ready());
-
-	/* enable LED modify function */
-	do {
-		reg_value = 0xc03c2353;
-		writel(reg_value, REG_BASE_SF + MDIO_RWCTRL);
-		udelay(10); /* delay 10us */
-	} while (!tmp_mdio_ready());
-
-	/* set green LED shine all the while when link up,
-	 * yellow LED blink when data coming
-	 */
-	do {
-		reg_value = 0x00382351;
-		writel(reg_value, REG_BASE_SF + MDIO_RWCTRL);
-		udelay(10); /* delay 10us */
-	} while (!tmp_mdio_ready());
-
-	return;
+	/* page 7: enable LED modify function, then set green LED shine all
+	 * the while when link up, yellow LED blink when data coming */
+	if (inner_phy_write(31, 0x0007) || inner_phy_write(19, 0xc03c))
+		return;
+	inner_phy_write(17, 0x0038);
 }
 #else
 void revise_led_shine(void)
@@ -189,31 +190,11 @@ void revise_led_shine(void)
 #if defined(INNER_PHY) && defined(CONFIG_HI3520D)
 void set_phy_valtage(void)
 {
-#define MDIO_RWCTRL      0x1100
-#define tmp_mdio_ready() \
-	(readl(REG_BASE_SF + MDIO_RWCTRL) & bit(15))
-
-	unsigned int reg_value;
-	/* select page 1 */
-	do {
-		reg_value = 0x0001235f;
-		writel(reg_value, REG_BASE_SF + MDIO_RWCTRL);
-		udelay(10); /* delay 10us */
-	} while (!tmp_mdio_ready());
-
-	/* set fe-phy in lower valtage */
-	do {
-		reg_value = 0x94482352;
-		writel(reg_value, REG_BASE_SF + MDIO_RWCTRL);
-		udelay(10); /* delay 10us */
-	} while (!tmp_mdio_ready());
-
-	/* select page 0 */
-	do {
-		reg_value = 0x0000235f;
-		writel(reg_value, REG_BASE_SF + MDIO_RWCTRL);
-		udelay(10); /* delay 10us */
-	} while (!tmp_mdio_ready());
+	/* page 1: set fe-phy in lower valtage, then back to page 0 */
+	if (inner_phy_write(31, 0x0001))
+		return;
+	inner_phy_write(18, 0x9448);
+	inner_phy_write(31, 0x0000);
 }
 #else
 void set_phy_valtage(void)
