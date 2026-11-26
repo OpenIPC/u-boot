@@ -79,6 +79,8 @@
 #define CONFIG_HIGMAC_PHY1_ADDR             2
 #define CONFIG_HIGMAC_PHY1_INTERFACE_MODE   2
 #define CONFIG_HIGMAC_DESC_NUM              64
+/* this GMAC's descriptors are 4 words (16 bytes), as the vendor U-Boot has it */
+#define CONFIG_HIGMAC_DESC_4_WORD
 #endif
 
 /* USB OHCI */
