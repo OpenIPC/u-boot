@@ -319,11 +319,15 @@ On the later dies:
 - No `mem=`. `LX_MEM=${memlx} mma_heap=...,sz=${memsz} cma=2M`, the arguments
   of OpenIPC/u-boot-sigmastar, whose saved environments have to keep working.
   `ss_set_mem_env()` sets `memlx` and `memsz` at every boot, before the
-  environment is used, from its table of those values by DDR size. infinity2m has
-  no such table upstream; its row uses infinity6c's, since its kernel warns
-  about an LX_MEM that is not 1 MiB aligned.
+  environment is used, from its table of those values by DDR size. infinity2m
+  has no such table upstream; its rows are the i2m SDK's (`LX_MEM` ends where
+  the SDK's memory map starts), and it also passes `mma_memblock_remove=1`:
+  without either, mi_sys fails at load.
 - `CONFIG_ENV_OFFSET`/`SIZE` are those of OpenIPC/u-boot-sigmastar, so a
-  saved environment loads as it is. Its `bootcmd` and `bootargs` are kept.
+  saved environment loads as it is. Its `bootcmd` and `bootargs` are kept,
+  with one exception: on infinity2m `ss_set_mem_env()` adds
+  `mma_memblock_remove=1`, without saving, to a saved `bootargs` or
+  `bootargsnfs` that passes the MMA heap but lacks it.
 - **Flash on infinity6c:** its IPL leaves the chip select in software, held
   high (QSPI bank `0x17` reg `0x0a` = 3), and the vendor's driver frames each
   flash command by hand. `ms_sflash` does the same and leaves that state to the
