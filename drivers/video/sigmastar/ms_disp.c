@@ -132,6 +132,9 @@ int ms_disp_show(phys_addr_t nv12, int w, int h)
 		dh = cur_h;
 		dw = (w * cur_h / h) & ~1;
 	}
+	/* so thin that it would fit in less than 2 lines or columns */
+	if (dw < 2 || dh < 2)
+		return -ERANGE;
 	x = (cur_w - dw) / 2;
 	y = (cur_h - dh) / 2;
 	/* 4.12 ratios in 13 bits: the MOP shrinks by less than 2 */
