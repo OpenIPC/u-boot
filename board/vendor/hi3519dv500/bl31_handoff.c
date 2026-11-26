@@ -44,12 +44,15 @@
 #define BL31_ADDR	0x40010000UL	/* the GSL's BL31_BASE */
 #define BL31_SIZE	0x20000UL	/* and its BL31_SIZE */
 
+/* How long the secure loader and BL31 get to answer each message. */
+#define IPC_BOOT_TIMEOUT_MS	5000
+
 static bool bl31_ready;
 
 #ifdef CONFIG_FMC_SPI_NAND
 /* Where build.sh puts it: a header, then bl31.bin. */
-#define BL31_NAND_OFFSET	0x60000
-#define BL31_NAND_LIMIT		0x60000	/* to the end of the 768k boot partition */
+#define BL31_NAND_OFFSET	0x60000	/* in the image, i.e. counting good blocks */
+#define BL31_NAND_END		0xc0000	/* the end of the 768k boot partition */
 #define BL31_NAND_MAGIC		0x31334c42	/* "BL31" */
 
 struct bl31_nand_hdr {
@@ -59,12 +62,31 @@ struct bl31_nand_hdr {
 	__le32 reserved;
 };
 
+/*
+ * Where the image's 0x60000 is on the chip: `nand write`, which put the image
+ * there, skips bad blocks, so each one before it moves BL31 a block further.
+ */
+static loff_t bl31_nand_start(struct mtd_info *mtd)
+{
+	loff_t off = 0, good = 0;
+
+	while (good < BL31_NAND_OFFSET) {
+		if (off >= BL31_NAND_END)
+			return -1;
+		if (!nand_block_isbad(mtd, off))
+			good += mtd->erasesize;
+		off += mtd->erasesize;
+	}
+	return off;
+}
+
 static int bl31_load(void)
 {
 	struct mtd_info *mtd = get_nand_dev_by_index(0);
 	const size_t hlen = sizeof(struct bl31_nand_hdr);
 	size_t n = hlen + BL31_SIZE;
 	struct bl31_nand_hdr *hdr;
+	loff_t start;
 	u32 len;
 	u8 *buf;
 	int ret = -1;
@@ -73,10 +95,15 @@ static int bl31_load(void)
 		puts("BL31: no NAND\n");
 		return -1;
 	}
+	start = bl31_nand_start(mtd);
+	if (start < 0) {
+		puts("BL31: too many bad blocks in the boot partition\n");
+		return -1;
+	}
 	buf = malloc(n);
 	if (!buf)
 		return -1;
-	if (nand_read_skip_bad(mtd, BL31_NAND_OFFSET, &n, NULL, BL31_NAND_LIMIT,
+	if (nand_read_skip_bad(mtd, start, &n, NULL, BL31_NAND_END - start,
 			       buf)) {
 		puts("BL31: cannot read it from NAND\n");
 		goto out;
@@ -84,8 +111,8 @@ static int bl31_load(void)
 	hdr = (struct bl31_nand_hdr *)buf;
 	len = le32_to_cpu(hdr->len);
 	if (le32_to_cpu(hdr->magic) != BL31_NAND_MAGIC || !len || len > BL31_SIZE) {
-		printf("BL31: none at NAND 0x%x; write a boot image that carries it\n",
-		       BL31_NAND_OFFSET);
+		printf("BL31: none at NAND 0x%llx; write a boot image that carries it\n",
+		       (unsigned long long)start);
 		goto out;
 	}
 	if (crc32(0, buf + hlen, len) != le32_to_cpu(hdr->crc)) {
@@ -160,8 +187,10 @@ static int ipc_boot_send(uint32_t cmd, ulong a, ulong b, int args)
 	for (;;) {
 		struct ipc_share_msg ack;
 
-		if (ipc_recv_msg(IPC_NODE_CORE1, &ack, 1) < 0)
+		if (ipc_recv_msg(IPC_NODE_CORE1, &ack, IPC_BOOT_TIMEOUT_MS) < 0) {
+			printf("BL31: no answer to message 0x%x\n", cmd);
 			return -1;
+		}
 		switch (ack.cmd) {
 		case IPC_CMD_ACK:
 			return 0;

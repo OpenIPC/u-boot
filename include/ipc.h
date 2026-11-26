@@ -40,6 +40,6 @@ struct ipc_share_msg {
 };
 
 int ipc_send_msg(uint32_t node, const struct ipc_share_msg *msg);
-int ipc_recv_msg(uint32_t node, struct ipc_share_msg *msg, int block);
+int ipc_recv_msg(uint32_t node, struct ipc_share_msg *msg, ulong timeout_ms);
 
 #endif /* __IPC_H */

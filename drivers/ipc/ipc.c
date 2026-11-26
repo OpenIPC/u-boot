@@ -8,6 +8,8 @@
 
 #include <common.h>
 #include <ipc.h>
+#include <time.h>
+#include <watchdog.h>
 #include <asm/io.h>
 
 static int ipc_send_msg_int(uint32_t node)
@@ -77,22 +79,24 @@ static int do_ipc_recv_msg(struct ipc_share_msg *msg)
 }
 
 /*
- * ipc_recv_msg - Receive a message for @node.
- *
- * @block: wait for one to arrive
- * Return: the length of the message, or a negative error.
+ * Wait up to timeout_ms for a message on node and read it; 0 does not wait.
+ * Returns the payload length, or -1 on a bad message or when nothing came:
+ * the other side may never answer, and a boot that hangs here says nothing.
  */
-int ipc_recv_msg(uint32_t node, struct ipc_share_msg *msg, int block)
+int ipc_recv_msg(uint32_t node, struct ipc_share_msg *msg, ulong timeout_ms)
 {
+	ulong start = get_timer(0);
 	int ret;
 
 	if (!msg || node >= IPC_INT_MAX) {
 		printf("ipc: bad receive on node %u\n", node);
 		return -1;
 	}
-	if (block)
-		while (!ipc_has_msg(node))
-			;
+	while (!ipc_has_msg(node)) {
+		if (get_timer(start) >= timeout_ms)
+			return -1;
+		WATCHDOG_RESET();
+	}
 	ret = do_ipc_recv_msg(msg);
 	ipc_msg_received(node);
 	return ret ? ret : (int)msg->len;
