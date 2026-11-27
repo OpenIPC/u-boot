@@ -26,3 +26,43 @@ smoke:
 # Smoke-tested by a job of its own (qemu_smoke_ax630c), not the matrix: the
 # qemu job has to run when it is selected.
 smoke_extra: [ax630c-emmc]
+
+# What only some legs build, from which a change narrows to those legs.
+# Every leg shares arch/arm/mach-axera/ (but for its SoC directory),
+# openipc-common.h and build.sh, so those (and anything else not named
+# here) reach every leg.
+#   config/board: CONFIG_SYS_CONFIG_NAME and CONFIG_SYS_VENDOR/SYS_BOARD
+#          after `make olddefconfig`: the AX630C builds the AX620E's board
+#   paths: the fragment and device tree, the SoC's directory under
+#          mach-axera (CONFIG_SYS_SOC: ax620e for the AX630C too), and what
+#          build.sh's <soc>_image packs: the first stage (openipc/<soc>-spl/,
+#          its stock.bin inside), the image scripts and the signing key
+owners:
+  ax620u-nand:
+    config: ax620u
+    board: axera/ax620u
+    paths:
+      - openipc/ax620u-nand_config
+      - arch/arm/dts/ax620u-nand.dts
+      - arch/arm/mach-axera/ax620u/
+      - openipc/ax620u-spl/
+      - openipc/ax620u-image.py
+      - openipc/axera-image.py
+      - openipc/axera-sdk-test-key.pem
+  ax620e-nor:
+    config: ax620e
+    board: axera/ax620e
+    paths:
+      - openipc/ax620e-nor_config
+      - arch/arm/dts/ax620e-openipc.dts
+      - arch/arm/mach-axera/ax620e/
+      - openipc/ax620e-spl/
+      - openipc/ax620e-image.py
+      - openipc/axera-sdk-test-key.pem
+  ax630c-emmc:
+    config: ax630c
+    board: axera/ax620e
+    paths:
+      - openipc/ax630c-emmc_config
+      - arch/arm/dts/ax630c-openipc.dts
+      - arch/arm/mach-axera/ax620e/
