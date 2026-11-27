@@ -111,11 +111,12 @@ their wall clock queued, not building.
 - `workflow_dispatch` and pull requests into `openipc` build every leg.
 - A pull request into `openipc-<vendor>` builds the legs its merge commit can
   reach. Docs, `.github/` and `openipc/tools/` build nothing. Paths a leg owns
-  (`owners` in the vendor's file; only hisilicon has one so far) build that
-  leg. Anything else builds every leg. The `ci:full` label forces every leg.
+  (`owners` in the vendor's file: hisilicon, novatek, axera and grainmedia
+  have one) build that leg. Anything else builds every leg. The `ci:full` label forces every leg.
 - A green pull request run leaves `refs/ci/built/<vendor>/<tree>` (or
   `...-from-<base tree>` when narrowed). The push that lands it finds the
   marker and builds nothing. Any other push builds what its range reaches.
+  `ci-prune.yml` deletes markers older than 30 days every Monday.
 - A new push to a pull request cancels its earlier run. Dispatches queue.
 - `owners` values are what `make olddefconfig` resolves, not what the
   fragment says. Check a new leg's values with

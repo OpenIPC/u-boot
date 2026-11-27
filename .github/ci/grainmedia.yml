@@ -14,3 +14,42 @@ smoke:
     - { soc: gm8136, machine: gm8136s }
     - { soc: gm8135, machine: gm8135s }
     - { soc: gm8126, machine: gm8126 }
+
+# What only some legs build, from which a change narrows to those legs.
+# Every leg shares openipc_config, mach-grainmedia's lowlevel_init.S,
+# openipc-common.h and build.sh, so those (and anything else not named
+# here) reach every leg.
+#   config/board: CONFIG_SYS_CONFIG_NAME and CONFIG_SYS_VENDOR/SYS_BOARD
+#          after `make olddefconfig`: the GM813x pair builds `grainmedia`
+#   paths: the fragment, the SoC's mach-grainmedia files, the first stage
+#          build.sh builds for it (nsboot, or nsboot-gm8126) and its image
+#          script
+owners:
+  gm8136:
+    config: grainmedia
+    board: grainmedia/grainmedia
+    paths:
+      - openipc/gm8136_config
+      - arch/arm/mach-grainmedia/soc.c
+      - arch/arm/mach-grainmedia/include/mach/grainmedia.h
+      - board/grainmedia/nsboot/
+      - openipc/gm-image.py
+  gm8135:
+    config: grainmedia
+    board: grainmedia/grainmedia
+    paths:
+      - openipc/gm8135_config
+      - arch/arm/mach-grainmedia/soc.c
+      - arch/arm/mach-grainmedia/include/mach/grainmedia.h
+      - board/grainmedia/nsboot/
+      - openipc/gm-image.py
+  gm8126:
+    config: gm8126
+    board: grainmedia/gm8126
+    paths:
+      - openipc/gm8126_config
+      - arch/arm/mach-grainmedia/soc-gm8126.c
+      - arch/arm/mach-grainmedia/include/mach/gm8126.h
+      - drivers/spi/ftssp010_nodm.c
+      - board/grainmedia/nsboot-gm8126/
+      - openipc/gm8126-image.py
