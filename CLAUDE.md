@@ -264,3 +264,5 @@ that only reports it).
   `grainmedia: nsboot:`, `spi:`, `net:`, `openipc:`, `ci:`).
 - Commit bodies say what was verified, and where: the QEMU machine, or a
   board.
+
+<!-- CI selection test: docs-only change, expected to build nothing. -->
