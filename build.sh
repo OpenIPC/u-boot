@@ -1,5 +1,6 @@
 #!/bin/sh
 #
+# CI selection test: touches build.sh, expected to build every leg.
 # Build U-Boot for the SoCs named on the command line, or for every
 # supported SoC when invoked without arguments. Failures are collected:
 # every requested SoC is attempted and the script exits non-zero if any
