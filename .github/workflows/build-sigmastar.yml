@@ -26,18 +26,23 @@ on:
         type: boolean
         default: false
       # The NOR images of the SoCs openipc.org installs, each booted under
-      # OpenIPC/qemu-bench on its own machine with firmware's current
-      # packages: the split image from 0x50000 to login, the split install
-      # written by this U-Boot, the fixed slots, and a camera on the vendor
-      # U-Boot moved to this one with its overlay kept. Not NAND: the
+      # OpenIPC/qemu-bench on its own machine. The SigmaStar ones with
+      # firmware's current packages: the split image from 0x50000 to login,
+      # the split install written by this U-Boot, the fixed slots, and a
+      # camera on the vendor U-Boot moved to this one with its overlay kept.
+      # The infinity3 ones (msc313e, msc316dc, msc316dm) on the fixed slots
+      # only, with local builds of firmware's boards for them: their 3.18
+      # kernel cannot split firmware.bin, and firmware published none for
+      # them before OpenIPC/firmware#2969. Not NAND: the
       # u-boot-*-nand.bin on `latest` are OpenIPC/u-boot-sigmastar's, in the
       # vendor layout that firmware's NAND packages are built for.
       publish_targets:
         description: Targets to publish (space-separated matrix soc names, NOR only)
         type: string
         default: >-
-          ssc325 ssc333 ssc335 ssc335de ssc337 ssc337de ssc30kd ssc30kq
-          ssc338q ssc377 ssc377d ssc377de ssc377qe ssc378de ssc378qe
+          msc313e msc316dc msc316dm ssc325 ssc333 ssc335 ssc335de ssc337
+          ssc337de ssc30kd ssc30kq ssc338q ssc377 ssc377d ssc377de ssc377qe
+          ssc378de ssc378qe
 
 # The shape of build-hisilicon.yml:
 #   build (matrix, every SoC) -> qemu (prep) -> qemu_smoke (hard gate) ->
