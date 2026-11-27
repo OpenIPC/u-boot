@@ -42,13 +42,20 @@ jobs:
           gh api --paginate "repos/$REPO/git/matching-refs/ci/built/" \
             --jq '.[] | "\(.ref) \(.object.sha)"' > markers.txt
           while read -r ref sha; do
-            date=$(gh api "repos/$REPO/git/commits/$sha" --jq .committer.date) || date=
-            if [ -n "$date" ] && [ "$(date -u -d "$date" +%s)" -ge "$cutoff" ]; then
+            # A marker whose age cannot be read is kept, not taken for old:
+            # the run fails and the next one retries it.
+            if ! date=$(gh api "repos/$REPO/git/commits/$sha" --jq .committer.date) ||
+               ! when=$(date -u -d "$date" +%s); then
+              echo "kept $ref: cannot read the age of $sha" >&2
+              failed=$((failed + 1))
+              continue
+            fi
+            if [ "$when" -ge "$cutoff" ]; then
               kept=$((kept + 1))
               continue
             fi
             if gh api -X DELETE "repos/$REPO/git/$ref" --silent; then
-              echo "deleted $ref (${date:-commit unreadable})"
+              echo "deleted $ref ($date)"
               deleted=$((deleted + 1))
             else
               failed=$((failed + 1))
