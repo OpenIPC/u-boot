@@ -26,14 +26,15 @@ on:
         type: boolean
         default: false
       # The NOR images of the SoCs openipc.org installs, each booted under
-      # OpenIPC/qemu-bench on its own machine with firmware's current
-      # packages: the split image from 0x50000 to login, the split install
-      # written by this U-Boot, the fixed slots, and a camera on the vendor
-      # U-Boot moved to this one with its overlay kept. Not NAND: the
+      # OpenIPC/qemu-bench on its own machine. The SigmaStar ones with
+      # firmware's current packages: the split image from 0x50000 to login,
+      # the split install written by this U-Boot, the fixed slots, and a
+      # camera on the vendor U-Boot moved to this one with its overlay kept.
+      # msc313e on the fixed slots only, with a local msc313e_lite build: its
+      # 3.18 kernel cannot split firmware.bin, and firmware published none
+      # for it before OpenIPC/firmware#2969. Not NAND: the
       # u-boot-*-nand.bin on `latest` are OpenIPC/u-boot-sigmastar's, in the
-      # vendor layout that firmware's NAND packages are built for. msc313e's
-      # 3.18 kernel cannot split firmware.bin: it is booted on the fixed
-      # slots only.
+      # vendor layout that firmware's NAND packages are built for.
       publish_targets:
         description: Targets to publish (space-separated matrix soc names, NOR only)
         type: string
