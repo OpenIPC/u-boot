@@ -363,14 +363,22 @@ static int recovery_write(const char *name, int type) {
 
   if (type == RECOVERY_ROOTFS) {
     char size_str[24];
+    struct ubi_volume_desc *data;
 
-    /* The volume is the image plus ROOTFS_HEADROOM, as the firmware's
-     * rootfs.ubi and sysupgrade make it, so the next image may grow that
-     * much without touching rootfs_data. Without room for that, the image
-     * alone; if even that does not fit, the data volume is dropped (UBI
-     * volumes cannot be resized) */
-    snprintf(size_str, sizeof(size_str), "0x%lx", size + ROOTFS_HEADROOM);
-    ret = recovery_recreate_volume("rootfs", size_str, false);
+    /* Beside an existing rootfs_data, the volume is the image plus
+     * ROOTFS_HEADROOM, as the firmware's rootfs.ubi and sysupgrade make
+     * it, so the next image may grow that much without touching
+     * rootfs_data. With no rootfs_data yet, the blocks are left to the one
+     * created below. Without room for the headroom, the image alone; if
+     * even that does not fit, the data volume is dropped (UBI volumes
+     * cannot be resized) */
+    ret = -1;
+    data = ubi_open_volume_nm(0, "rootfs_data", UBI_READONLY);
+    if (!IS_ERR(data)) {
+      ubi_close_volume(data);
+      snprintf(size_str, sizeof(size_str), "0x%lx", size + ROOTFS_HEADROOM);
+      ret = recovery_recreate_volume("rootfs", size_str, false);
+    }
     if (ret) {
       snprintf(size_str, sizeof(size_str), "0x%lx", size);
       ret = recovery_recreate_volume("rootfs", size_str, true);
