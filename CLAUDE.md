@@ -325,18 +325,16 @@ their wall clock queued, not building.
   infinity6c IPL's own "env bad CRC" is not U-Boot's).
 - **Release and publish:**
   - `release` uploads to the `sigmastar` tag.
-  - `publish` is commented out for now, with its input: SigmaStar images
-    go only to the `sigmastar` release. When it returns, it shares the
+  - `publish` uploads the NOR images of `publish_targets` (a dispatch
+    input; its default lists the SoCs openipc.org installs: infinity3,
+    the infinity6 dies, and `ssr621q`) to `latest`, shares the
     `publish-firmware-latest` concurrency group and reports a
-    `uboot-sigmastar-…` build id. No other repository
-    publishes `u-boot-msc31*` names to `latest`, and `PUBLISH_GLOB` keeps
-    `publish` to those: `u-boot-ssc*` in `latest` are
-    OpenIPC/u-boot-sigmastar's vendor U-Boot, which cameras flash, and the
-    ones built here have not run on silicon. `release` carries them all.
+    `uboot-sigmastar-…` build id. Not NAND: the `u-boot-*-nand.bin` in
+    `latest` are OpenIPC/u-boot-sigmastar's vendor layout, which
+    firmware's NAND packages are built for. `release` carries them all.
   - openipc.org accepts the report only from workflows it allowlists
-    (OpenIPC/website `service/internal/builds/verify.go`).
-    `build-sigmastar.yml` has to be added there before the first
-    `publish`.
+    (OpenIPC/website `service/internal/builds/verify.go`);
+    `build-sigmastar.yml` on `openipc` is there.
 
 ## `build-ingenic.yml`
 
