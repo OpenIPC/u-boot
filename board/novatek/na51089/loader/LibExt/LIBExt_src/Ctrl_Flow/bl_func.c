@@ -693,7 +693,7 @@ _THUMB2 int bl_flash_open(void)
 	//=  User define SPI-NAND id table sample code							   =
 	//=  You can remove // to use it										   =
 	//==========================================================================
-	//int_strg_obj->flash_setConfig(FLASH_CFG_ID_SPI_IDENTIFY_CB, (UINT32)nand_identify);
+	int_strg_obj->flash_setConfig(FLASH_CFG_ID_SPI_IDENTIFY_CB, (UINT32)nand_identify);
 
 	//==========================================================================
 	//=  User define SPI-NOR id table sample code							   =
