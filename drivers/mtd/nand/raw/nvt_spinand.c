@@ -159,6 +159,8 @@ static struct nand_flash_dev nvt_spinand_ids[] = {
 	 64, NAND_ECC_INFO(4, SZ_512) },
 	{"XT26G01C", {.id = {0x0b, 0x11} }, SZ_2K, 128, SZ_128K, 0, 2,
 	 128, NAND_ECC_INFO(8, SZ_512) },
+	{"FM25S01A", {.id = {0xa1, 0xe4} }, SZ_2K, 128, SZ_128K, 0, 2,
+	 64, NAND_ECC_INFO(1, SZ_512) },
 	{NULL}
 };
 
