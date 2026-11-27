@@ -117,7 +117,14 @@ static void mop_write(u8 reg, u16 mask, u16 val)
 int ms_disp_show(phys_addr_t nv12, int w, int h)
 {
 	int dw, dh, x, y;
-	u32 y16 = nv12 >> 4, c16 = (nv12 + w * h) >> 4, hr, vr;
+	/*
+	 * The MOP is a MIU client and takes MIU addresses, DDR from 0. Given
+	 * the CPU's address it shows the picture alike (the high bits are not
+	 * decoded), but the MIU flags each read as out of range, and once the
+	 * kernel's mi_sys arms MIU protection that interrupt is a BUG().
+	 */
+	u32 y16 = SS_MIU_ADDR(nv12) >> 4;
+	u32 c16 = SS_MIU_ADDR(nv12 + w * h) >> 4, hr, vr;
 
 	if (!cur_w || (w & 15) || (h & 1) || nv12 & 15 || w <= 0 || h <= 0)
 		return -EINVAL;
