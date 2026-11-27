@@ -1,0 +1,13 @@
+# The CI matrices of build-rockchip.yml: the one copy, read by
+# .github/scripts/ci-select.py, which narrows them to the legs a change
+# can reach and hands them to the workflow. Every leg has a `soc`.
+
+build:
+  # RV1106 / RV1103 (Cortex-A7, RKNS ID block, the SoC's own PHY),
+  # RV1103B / RV1106B (its peripherals from 0x20000000),
+  # RV1126 / RV1109 (header v1 ID block, an external PHY)
+  soc: [rv1106, rv1103, rv1103b, rv1126, rv1109]
+
+smoke:
+  soc: [rv1106, rv1103, rv1103b, rv1126, rv1109]
+  flash: [nor, nand]

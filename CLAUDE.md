@@ -79,7 +79,8 @@ OpenIPC boot layer. Read it before any
 change that touches both branches: `git show origin/openipc-hisilicon:CLAUDE.md`.
 Adding, removing or holding a SoC needs edits on both branches. On
 `openipc-hisilicon`, change `build.sh` and `openipc/<soc>_*`. Here, change
-both workflow matrices and the README.
+both matrices and the leg's `owners` entry in `.github/ci/hisilicon.yml`, and
+the README.
 
 ## Cross-branch CI wiring
 
@@ -98,6 +99,28 @@ The build logic lives here. Other branches call it:
 - Job graph: `resolve` → `build` (matrix, one SoC per leg) + `qemu` (builds
   `qemu-system-arm` from widgetii/qemu-hisilicon once) → `qemu_smoke` (hard
   gate) → `release` / `publish`. These last two run only on `workflow_dispatch`.
+
+## Which legs a run builds
+
+Every `build-<vendor>.yml` takes its `build` and `qemu_smoke` matrices from
+`.github/ci/<vendor>.yml`. That file is their only copy. `resolve` runs
+`.github/scripts/ci-select.py`, which narrows them to the legs a change can
+reach. Each leg queues for a hosted runner of its own, and runs spend most of
+their wall clock queued, not building.
+
+- `workflow_dispatch` and pull requests into `openipc` build every leg.
+- A pull request into `openipc-<vendor>` builds the legs its merge commit can
+  reach. Docs, `.github/` and `openipc/tools/` build nothing. Paths a leg owns
+  (`owners` in the vendor's file; only hisilicon has one so far) build that
+  leg. Anything else builds every leg. The `ci:full` label forces every leg.
+- A green pull request run leaves `refs/ci/built/<vendor>/<tree>` (or
+  `...-from-<base tree>` when narrowed). The push that lands it finds the
+  marker and builds nothing. Any other push builds what its range reaches.
+- A new push to a pull request cancels its earlier run. Dispatches queue.
+- `owners` values are what `make olddefconfig` resolves, not what the
+  fragment says. Check a new leg's values with
+  `ci-select.py <vendor> --src <tree> --self-test`, and replay history with
+  `git diff --name-only A B | ci-select.py <vendor> --src <tree> --stdin`.
 
 ## `build-xm.yml`
 

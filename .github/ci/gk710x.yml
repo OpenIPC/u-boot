@@ -1,0 +1,14 @@
+# The CI matrices of build-gk710x.yml: the one copy, read by
+# .github/scripts/ci-select.py, which narrows them to the legs a change
+# can reach and hands them to the workflow. Every leg has a `soc`.
+
+build:
+  include:
+    - { soc: gk7101, files: "output/u-boot-gk7101-*.bin" }
+    - { soc: gk7102, files: "output/u-boot-gk7102-*.bin" }
+    - { soc: gk7101s, files: "output/u-boot-gk7101s-*.bin" }
+    - { soc: gk7102s, files: "output/u-boot-gk7102s-*.bin" }
+
+smoke:
+  # gk7101s/gk7102s: qemu-hisilicon's GK710xS machines
+  soc: [gk7101, gk7102, gk7101s, gk7102s]

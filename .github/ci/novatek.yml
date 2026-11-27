@@ -1,0 +1,61 @@
+# The CI matrices of build-novatek.yml: the one copy, read by
+# .github/scripts/ci-select.py, which narrows them to the legs a change
+# can reach and hands them to the workflow. Every leg has a `soc`.
+
+build:
+  # image: the file released; limit_kb: the slot it is written to
+  # (the camera dies' whole 256 KiB boot partition, loader and device
+  # tree included; on SPI NAND their 2816 KiB boot area before the
+  # environment; on the NVRs U-Boot's slot in the board's own
+  # layout, behind the board's loader and BL31). target: what
+  # build.sh is asked for, when not the SoC (<soc>-nand).
+  include:
+    - { soc: nt98560, image: nor, limit_kb: 256 }
+    - { soc: nt98561, image: nor, limit_kb: 256 }
+    - { soc: nt98562, image: nor, limit_kb: 256 }
+    - { soc: nt98566, image: nor, limit_kb: 256 }
+    - { soc: nt98520, image: nor, limit_kb: 256 }
+    - { soc: nt98522, image: nor, limit_kb: 256 }
+    - { soc: nt98523, image: nor, limit_kb: 256 }
+    - { soc: nt98525, image: nor, limit_kb: 256 }
+    - { soc: nt98528, image: nor, limit_kb: 256 }
+    - { soc: nt98529, image: nor, limit_kb: 256 }
+    - { soc: nt98532, image: nor, limit_kb: 256 }
+    - { soc: nt98533, image: nor, limit_kb: 256 }
+    - { soc: nt98321, image: nor, limit_kb: 256 }
+    - { soc: nt98323, image: nor, limit_kb: 256 }
+    - { soc: nt98332, image: nor, limit_kb: 128 }
+    - { soc: nt98633, image: nand, limit_kb: 896 }
+    - { soc: nt98560, target: nt98560-nand, image: nand, limit_kb: 2816 }
+    - { soc: nt98562, target: nt98562-nand, image: nand, limit_kb: 2816 }
+    - { soc: nt98566, target: nt98566-nand, image: nand, limit_kb: 2816 }
+    - { soc: nt98525, target: nt98525-nand, image: nand, limit_kb: 2816 }
+
+smoke:
+  # machine: the qemu-hisilicon machine (the NT98520 and NT98522
+  # have none: they run on the NT98525's and NT98523's, the same
+  # dies); qemu: arm or aarch64; artifact/file: the image; mib: the
+  # flash it sits at the start of; args: extra qemu arguments.
+  include:
+    - { soc: nt98560, machine: nt98560, qemu: arm, artifact: u-boot-nt98560, file: u-boot-nt98560-nor.bin, mib: 8, args: "" }
+    - { soc: nt98561, machine: nt98561, qemu: arm, artifact: u-boot-nt98561, file: u-boot-nt98561-nor.bin, mib: 8, args: "" }
+    - { soc: nt98562, machine: nt98562, qemu: arm, artifact: u-boot-nt98562, file: u-boot-nt98562-nor.bin, mib: 8, args: "" }
+    - { soc: nt98566, machine: nt98566, qemu: arm, artifact: u-boot-nt98566, file: u-boot-nt98566-nor.bin, mib: 8, args: "" }
+    - { soc: nt98520, machine: nt98525, qemu: arm, artifact: u-boot-nt98520, file: u-boot-nt98520-nor.bin, mib: 8, args: "" }
+    - { soc: nt98522, machine: nt98523, qemu: arm, artifact: u-boot-nt98522, file: u-boot-nt98522-nor.bin, mib: 8, args: "" }
+    - { soc: nt98523, machine: nt98523, qemu: arm, artifact: u-boot-nt98523, file: u-boot-nt98523-nor.bin, mib: 8, args: "" }
+    - { soc: nt98525, machine: nt98525, qemu: arm, artifact: u-boot-nt98525, file: u-boot-nt98525-nor.bin, mib: 8, args: "" }
+    - { soc: nt98528, machine: nt98528, qemu: arm, artifact: u-boot-nt98528, file: u-boot-nt98528-nor.bin, mib: 8, args: "" }
+    - { soc: nt98529, machine: nt98529, qemu: arm, artifact: u-boot-nt98529, file: u-boot-nt98529-nor.bin, mib: 8, args: "" }
+    - { soc: nt98532, machine: nt98532, qemu: arm, artifact: u-boot-nt98532, file: u-boot-nt98532-nor.bin, mib: 8, args: "" }
+    - { soc: nt98533, machine: nt98533, qemu: arm, artifact: u-boot-nt98533, file: u-boot-nt98533-nor.bin, mib: 8, args: "" }
+    - { soc: nt98321, machine: nt98321, qemu: arm, artifact: u-boot-nt98321, file: u-boot-nt98321-nor.bin, mib: 8, args: "" }
+    - { soc: nt98323, machine: nt98323, qemu: arm, artifact: u-boot-nt98323, file: u-boot-nt98323-nor.bin, mib: 8, args: "" }
+    - { soc: nt98332, machine: nt98332, qemu: aarch64, artifact: qemu-image-nt98332, file: u-boot-nt98332-qemu.bin, mib: 16, args: "-smp 2" }
+    - { soc: nt98633, machine: nt98633, qemu: aarch64, artifact: qemu-image-nt98633, file: u-boot-nt98633-qemu.bin, mib: 128, args: "-smp 4" }
+    # SPI NAND: a 128 MiB image is a W25N01 to the machine, and its
+    # mask ROM model runs the image's NandSpi loader from block 0
+    - { soc: nt98560-nand, machine: nt98560, qemu: arm, artifact: u-boot-nt98560-nand, file: u-boot-nt98560-nand.bin, mib: 128, args: "" }
+    - { soc: nt98562-nand, machine: nt98562, qemu: arm, artifact: u-boot-nt98562-nand, file: u-boot-nt98562-nand.bin, mib: 128, args: "" }
+    - { soc: nt98566-nand, machine: nt98566, qemu: arm, artifact: u-boot-nt98566-nand, file: u-boot-nt98566-nand.bin, mib: 128, args: "" }
+    - { soc: nt98525-nand, machine: nt98525, qemu: arm, artifact: u-boot-nt98525-nand, file: u-boot-nt98525-nand.bin, mib: 128, args: "" }

@@ -1,0 +1,342 @@
+# The CI matrices of build-hisilicon.yml: the one copy, read by
+# .github/scripts/ci-select.py, which narrows them to the legs a change
+# can reach and hands them to the workflow. Every leg has a `soc`.
+
+build:
+  include:
+    # --- NOR + NAND ---
+    - { soc: hi3516cv500, kinds: "nor nand", files: "output/u-boot-hi3516cv500-*.bin" }
+    - { soc: hi3516dv300, kinds: "nor nand", files: "output/u-boot-hi3516dv300-*.bin" }
+    - { soc: hi3516av300, kinds: "nor nand", files: "output/u-boot-hi3516av300-*.bin" }
+    - { soc: gk7201v200, kinds: "nor nand", files: "output/u-boot-gk7201v200-*.bin" }
+    - { soc: gk7201v300, kinds: "nor nand", files: "output/u-boot-gk7201v300-*.bin" }
+    - { soc: gk7205v200, kinds: "nor nand", files: "output/u-boot-gk7205v200-*.bin" }
+    - { soc: gk7205v300, kinds: "nor nand", files: "output/u-boot-gk7205v300-*.bin" }
+    - { soc: gk7202v300, kinds: "nor nand", files: "output/u-boot-gk7202v300-*.bin" }
+    - { soc: gk7605v100, kinds: "nor nand", files: "output/u-boot-gk7605v100-*.bin" }
+    - { soc: hi3516dv200, kinds: "nor nand", files: "output/u-boot-hi3516dv200-*.bin" }
+    - { soc: hi3516ev200, kinds: "nor nand", files: "output/u-boot-hi3516ev200-*.bin" }
+    - { soc: hi3516ev300, kinds: "nor nand", files: "output/u-boot-hi3516ev300-*.bin" }
+    - { soc: hi3518ev300, kinds: "nor nand", files: "output/u-boot-hi3518ev300-*.bin" }
+    - { soc: gk7205v500, kinds: "nor nand", files: "output/u-boot-gk7205v500-*.bin" }
+    - { soc: gk7205v510, kinds: "nor nand", files: "output/u-boot-gk7205v510-*.bin" }
+    - { soc: gk7205v530, kinds: "nor nand", files: "output/u-boot-gk7205v530-*.bin" }
+    - { soc: hi3516cv300, kinds: "nor nand", files: "output/u-boot-hi3516cv300-*.bin" }
+    # Goke GK7206V1 (Lotus xmorca). Released without a smoke leg:
+    # qemu-hisilicon has no model that boots them from flash yet.
+    - { soc: gk7206v11a, kinds: "nor nand", files: "output/u-boot-gk7206v11a-*.bin" }
+    - { soc: gk7206v12a, kinds: "nor nand", files: "output/u-boot-gk7206v12a-*.bin" }
+    # --- NOR only ---
+    - { soc: hi3516cv610, kinds: "nor", files: "output/boot-hi3516cv610-*-nor.bin" }
+    - { soc: hi3516cv608, kinds: "nor", files: "output/boot-hi3516cv608-nor.bin" }
+    # arm64 (CROSS_COMPILE64); a signed boot image (GSL + DDR table + U-Boot)
+    # in a 512 KiB NOR boot partition (env at 0x80000, firmware at 0xc0000),
+    # or the usual 768 KiB NAND one (W25N04KV boards, e.g. the Taobao kit).
+    - { soc: hi3519dv500, kinds: "nor nand", files: "output/boot-hi3519dv500-*.bin", nor_kb: 512 }
+    - { soc: hi3516cv200, kinds: "nor", files: "output/u-boot-hi3516cv200-nor.bin" }
+    - { soc: hi3518ev200, kinds: "nor", files: "output/u-boot-hi3518ev200-nor.bin" }
+    - { soc: hi3516ev100, kinds: "nor", files: "output/u-boot-hi3516ev100-nor.bin" }
+    - { soc: hi3516av200, kinds: "nor", files: "output/u-boot-hi3516av200-nor.bin" }
+    - { soc: hi3519v101, kinds: "nor", files: "output/u-boot-hi3519v101-nor.bin" }
+    - { soc: hi3515av100, kinds: "nor", files: "output/u-boot-hi3515av100-nor.bin" }
+    - { soc: hi3520av100, kinds: "nor", files: "output/u-boot-hi3520av100-nor.bin" }
+    - { soc: hi3520dv100, kinds: "nor", files: "output/u-boot-hi3520dv100-nor.bin" }
+    - { soc: hi3520dv200, kinds: "nor", files: "output/u-boot-hi3520dv200-nor.bin" }
+    - { soc: hi3536cv100, kinds: "nor", files: "output/u-boot-hi3536cv100-nor.bin" }
+    - { soc: hi3536dv100, kinds: "nor", files: "output/u-boot-hi3536dv100-nor.bin" }
+    - { soc: hi3516av100, kinds: "nor", files: "output/u-boot-hi3516av100-nor.bin" }
+    - { soc: hi3516dv100, kinds: "nor", files: "output/u-boot-hi3516dv100-nor.bin" }
+    - { soc: hi3518av100, kinds: "nor", files: "output/u-boot-hi3518av100-nor.bin" }
+    - { soc: hi3518cv100, kinds: "nor", files: "output/u-boot-hi3518cv100-nor.bin" }
+    - { soc: hi3518ev100, kinds: "nor", files: "output/u-boot-hi3518ev100-nor.bin" }
+    - { soc: hi3516cv100, kinds: "nor", files: "output/u-boot-hi3516cv100-nor.bin" }
+
+smoke:
+  soc:
+    - hi3516cv500
+    - hi3516dv300
+    - hi3516av300
+    - hi3516cv610
+    - hi3516cv608
+    - hi3519dv500
+    - hi3516cv200
+    - hi3516cv300
+    - hi3516av200
+    - hi3519v101
+    - hi3520dv200
+    - hi3536cv100
+    - hi3536dv100
+    - hi3516av100
+    - hi3516dv100
+    - hi3518av100
+    - hi3518cv100
+    - hi3518ev100
+    - hi3516cv100
+    - gk7201v200
+    - gk7205v200
+    - gk7205v300
+    - gk7202v300
+    - gk7605v100
+    - hi3516dv200
+    - hi3516ev200
+    - hi3516ev300
+    - hi3518ev300
+    - gk7205v500
+    - gk7205v510
+    - gk7205v530
+
+# What only some legs build, from which a change narrows to those legs.
+# Anything not named here (openipc_config, nand_config, common/, drivers/,
+# arch/, build.sh, openipc-common.h, ...) reaches every leg.
+#   config: include/configs/<config>.h, with every include/configs header it
+#           includes (hi3516cv100.h pulls in hi3518ev100.h)
+#   board:  board/<vendor>/<board>/
+#   paths:  files (or directories, ending in /) build.sh feeds this leg
+# config/board are CONFIG_SYS_CONFIG_NAME and CONFIG_SYS_VENDOR/SYS_BOARD
+# after `make olddefconfig` of openipc_config + the leg's fragment, NOT the
+# fragment's own name: hi3516dv200 builds board xm76050100, as gk7605v100
+# does; hi3516ev200 builds xm72050200, as gk7205v200 does. The self-test
+# checks a fragment that names its board against these.
+owners:
+  hi3516cv500:
+    config: hi3516cv500
+    board: hisilicon/hi3516cv500
+    paths:
+      - openipc/hi3516cv500_config
+      - openipc/hi3516cv500_reginfo.bin
+  hi3516dv300:
+    config: hi3516dv300
+    board: hisilicon/hi3516dv300
+    paths:
+      - openipc/hi3516dv300_config
+      - openipc/hi3516dv300_reginfo.bin
+  hi3516av300:
+    config: hi3516av300
+    board: hisilicon/hi3516av300
+    paths:
+      - openipc/hi3516av300_config
+      - openipc/hi3516av300_reginfo.bin
+  gk7201v200:
+    config: xm72010200
+    board: xmedia/xm72010200
+    paths:
+      - openipc/gk7201v200_config
+      - openipc/gk7201v200_reginfo.bin
+  gk7201v300:
+    config: xm72010300
+    board: xmedia/xm72010300
+    paths:
+      - openipc/gk7201v300_config
+      - openipc/gk7201v300_reginfo.bin
+  gk7205v200:
+    config: xm72050200
+    board: xmedia/xm72050200
+    paths:
+      - openipc/gk7205v200_config
+      - openipc/gk7205v200_reginfo.bin
+  gk7205v300:
+    config: xm72050300
+    board: xmedia/xm72050300
+    paths:
+      - openipc/gk7205v300_config
+      - openipc/gk7205v300_reginfo.bin
+  gk7202v300:
+    config: xm72020300
+    board: xmedia/xm72020300
+    paths:
+      - openipc/gk7202v300_config
+      - openipc/gk7202v300_reginfo.bin
+  gk7605v100:
+    config: xm76050100
+    board: xmedia/xm76050100
+    paths:
+      - openipc/gk7605v100_config
+      - openipc/gk7605v100_reginfo.bin
+  hi3516dv200:
+    config: xm76050100
+    board: xmedia/xm76050100
+    paths:
+      - openipc/hi3516dv200_config
+      - openipc/hi3516dv200_reginfo.bin
+  hi3516ev200:
+    config: xm72050200
+    board: xmedia/xm72050200
+    paths:
+      - openipc/hi3516ev200_config
+      - openipc/hi3516ev200_reginfo.bin
+  hi3516ev300:
+    config: xm72050300
+    board: xmedia/xm72050300
+    paths:
+      - openipc/hi3516ev300_config
+      - openipc/hi3516ev300_reginfo.bin
+  hi3518ev300:
+    config: xm72020300
+    board: xmedia/xm72020300
+    paths:
+      - openipc/hi3518ev300_config
+      - openipc/hi3518ev300_reginfo.bin
+  gk7205v500:
+    config: xm720xxx
+    board: xmedia/xm720xxx
+    paths:
+      - openipc/xm720xxx_config
+      - openipc/gk7205v500_reginfo.bin
+  gk7205v510:
+    config: xm720xxx
+    board: xmedia/xm720xxx
+    paths:
+      - openipc/xm720xxx_config
+      - openipc/gk7205v510_reginfo.bin
+  gk7205v530:
+    config: xm720xxx
+    board: xmedia/xm720xxx
+    paths:
+      - openipc/xm720xxx_config
+      - openipc/gk7205v530_reginfo.bin
+  hi3516cv300:
+    config: hi3516cv300
+    board: hisilicon/hi3516cv300
+    paths:
+      - openipc/hi3516cv300_config
+      - openipc/hi3516cv300_reginfo.bin
+  gk7206v11a:
+    config: xmorca
+    board: xmedia/xmorca
+    paths:
+      - openipc/gk7206v100_config
+      - openipc/gk7206v11a_reginfo.bin
+  gk7206v12a:
+    config: xmorca
+    board: xmedia/xmorca
+    paths:
+      - openipc/gk7206v100_config
+      - openipc/gk7206v12a_reginfo.bin
+  hi3516cv610:
+    config: hi3516cv610
+    board: vendor/hi3516cv610
+    paths:
+      - openipc/hi3516cv610_config
+      - image_tool/
+      - gsl/
+      - reginfo/Hi3516CV610-DMEB_4L_DDR2_1333M_64MB_16bit-A7_950M_QFN.bin
+      - reginfo/Hi3516CV610-DMEB_4L_DDR3_2133M_128MB_16bit-A7_950M_QFN.bin
+      - reginfo/Hi3516CV610-DMEB_4L_DDR3_2133M_512MB_16bit-A7_950M_BGA.bin
+  hi3516cv608:
+    config: hi3516cv610
+    board: vendor/hi3516cv610
+    paths:
+      - openipc/hi3516cv608_config
+      - image_tool/
+      - reginfo/Hi3516CV608-DMEB_4L_DDR2_1333M_64MB_16bit-A7_950M_QFN.bin
+  hi3519dv500:
+    config: hi3519dv500
+    board: vendor/hi3519dv500
+    paths:
+      - openipc/hi3519dv500_config
+      - image_tool_hi3519dv500/
+      - gsl_hi3519dv500/
+      - reginfo/Hi3519DV500-DMEB_6L_T_DDR4_2666M-2GB_16bitx2-A55_1G.bin
+      - reginfo/Hi3519DV500-DMEBPRO_4L_flyby_DDR4_2666M-2GB_16bitx2-A55_1G.bin
+  hi3516cv200:
+    config: hi3516cv200
+    board: hisilicon/hi3518ev200
+    paths:
+      - openipc/hi3516cv200_config
+      - openipc/hi3516cv200_reginfo.bin
+  hi3518ev200:
+    config: hi3518ev200
+    board: hisilicon/hi3518ev200
+    paths:
+      - openipc/hi3518ev200_config
+      - openipc/hi3518ev200_reginfo.bin
+  hi3516ev100:
+    config: hi3516ev100
+    board: hisilicon/hi3516cv300
+    paths:
+      - openipc/hi3516ev100_config
+      - openipc/hi3516ev100_reginfo.bin
+  hi3516av200:
+    config: hi3516av200
+    board: hisilicon/hi3516av200
+    paths:
+      - openipc/hi3516av200_config
+      - openipc/hi3516av200_reginfo.bin
+  hi3519v101:
+    config: hi3519v101
+    board: hisilicon/hi3519v101
+    paths:
+      - openipc/hi3519v101_config
+      - openipc/hi3519v101_reginfo.bin
+  hi3515av100:
+    config: hi3520dv100
+    board: hisilicon/hi3520dv100
+    paths:
+      - openipc/hi3515av100_config
+      - openipc/hi3515av100_reginfo.bin
+  hi3520av100:
+    config: hi3520dv100
+    board: hisilicon/hi3520dv100
+    paths:
+      - openipc/hi3520av100_config
+      - openipc/hi3520av100_reginfo.bin
+  hi3520dv100:
+    config: hi3520dv100
+    board: hisilicon/hi3520dv100
+    paths:
+      - openipc/hi3520dv100_config
+      - openipc/hi3520dv100_reginfo.bin
+  hi3520dv200:
+    config: hi3520dv100
+    board: hisilicon/hi3520dv100
+    paths:
+      - openipc/hi3520dv200_config
+      - openipc/hi3520dv200_reginfo.bin
+  hi3536cv100:
+    config: hi3536cv100
+    board: hisilicon/hi3536c
+    paths:
+      - openipc/hi3536cv100_config
+      - openipc/hi3536cv100_reginfo.bin
+  hi3536dv100:
+    config: hi3536dv100
+    board: hisilicon/hi3536dv100
+    paths:
+      - openipc/hi3536dv100_config
+      - openipc/hi3536dv100_reginfo.bin
+  hi3516av100:
+    config: hi3516av100
+    board: hisilicon/hi3516av100
+    paths:
+      - openipc/hi3516av100_config
+      - openipc/hi3516av100_reginfo.bin
+  hi3516dv100:
+    config: hi3516dv100
+    board: hisilicon/hi3516av100
+    paths:
+      - openipc/hi3516dv100_config
+      - openipc/hi3516dv100_reginfo.bin
+  hi3518av100:
+    config: hi3518av100
+    board: hisilicon/hi3518ev100
+    paths:
+      - openipc/hi3518av100_config
+      - openipc/hi3518av100_reginfo.bin
+  hi3518cv100:
+    config: hi3518cv100
+    board: hisilicon/hi3518ev100
+    paths:
+      - openipc/hi3518cv100_config
+      - openipc/hi3518cv100_reginfo.bin
+  hi3518ev100:
+    config: hi3518ev100
+    board: hisilicon/hi3518ev100
+    paths:
+      - openipc/hi3518ev100_config
+      - openipc/hi3518ev100_reginfo.bin
+  hi3516cv100:
+    config: hi3516cv100
+    board: hisilicon/hi3518ev100
+    paths:
+      - openipc/hi3516cv100_config
+      - openipc/hi3516cv100_reginfo.bin

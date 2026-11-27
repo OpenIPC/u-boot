@@ -1,0 +1,19 @@
+# The CI matrices of build-anyka.yml: the one copy, read by
+# .github/scripts/ci-select.py, which narrows them to the legs a change
+# can reach and hands them to the workflow. Every leg has a `soc`.
+
+build:
+  include:
+    - { soc: ak3918ev200, files: "output/u-boot-ak3918ev200-*.bin" }
+    - { soc: ak3916ev300, files: "output/u-boot-ak3916ev300-*.bin" }
+    - { soc: ak3918ev300, files: "output/u-boot-ak3918ev300-*.bin" }
+    - { soc: ak3919ev300, files: "output/u-boot-ak3919ev300-*.bin" }
+    - { soc: ak3918ev300l, files: "output/u-boot-ak3918ev300l-*.bin" }
+    - { soc: ak3918av100, files: "output/u-boot-ak3918av100-*.bin" }
+    - { soc: ak3918av100x, files: "output/u-boot-ak3918av100x-*.bin" }
+    - { soc: ak3918ev330, files: "output/u-boot-ak3918ev330-*.bin" }
+    - { soc: ak3919ev330, files: "output/u-boot-ak3919ev330-*.bin" }
+    - { soc: ak3918ev331, files: "output/u-boot-ak3918ev331-*.bin" }
+
+smoke:
+  soc: [ak3918ev200, ak3916ev300, ak3918ev300, ak3919ev300, ak3918ev300l, ak3918av100, ak3918av100x, ak3918ev330, ak3919ev330, ak3918ev331]

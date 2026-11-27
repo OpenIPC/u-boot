@@ -1,0 +1,24 @@
+# The CI matrices of build-xm.yml: the one copy, read by
+# .github/scripts/ci-select.py, which narrows them to the legs a change
+# can reach and hands them to the workflow. Every leg has a `soc`.
+
+build:
+  include:
+    - { soc: xm510, kinds: "nor", files: "output/u-boot-xm510-nor.bin" }
+    - { soc: xm530, kinds: "nor", files: "output/u-boot-xm530-nor.bin" }
+    - { soc: xm550, kinds: "nor", files: "output/u-boot-xm550-nor.bin" }
+    # The V200 series (#90). qemu-hisilicon has no machine for these
+    # yet, so they have no qemu_smoke leg.
+    - { soc: xm530v200, kinds: "nor", files: "output/u-boot-xm530v200-nor.bin" }
+    - { soc: xm533, kinds: "nor", files: "output/u-boot-xm533-nor.bin" }
+    - { soc: xm535d1, kinds: "nor", files: "output/u-boot-xm535d1-nor.bin" }
+    - { soc: xm535d2, kinds: "nor", files: "output/u-boot-xm535d2-nor.bin" }
+    - { soc: xm535w1, kinds: "nor", files: "output/u-boot-xm535w1-nor.bin" }
+    # XM232: its 32-byte flash header in front of u-boot.bin
+    - { soc: xm232, kinds: "nor", files: "output/u-boot-xm232-nor.bin" }
+
+smoke:
+  include:
+    - { soc: xm510, kind: nor }
+    - { soc: xm530, kind: nor }
+    - { soc: xm550, kind: nor }

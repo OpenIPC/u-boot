@@ -9,6 +9,8 @@ on:
     branches: [openipc]
     paths:
       - .github/workflows/build-gk710x.yml
+      - .github/scripts/ci-select.py
+      - .github/ci/gk710x.yml
   workflow_call:
     inputs:
       ref:
@@ -32,38 +34,73 @@ on:
 #   openipc.org report, `publish` input).
 # build.sh takes SoCs as arguments; the matrix calls it with one SoC per leg.
 
+# One run per pull request: a new push to it cancels the run it replaces,
+# which used to go on to completion beside it (12 such overlaps in the five
+# days before this). Dispatched runs release and publish, so they queue
+# behind each other instead and are never cancelled; neither is a push.
+# The group names the vendor: in a called workflow github.workflow is the
+# caller's ("CI"), the same on every branch.
+concurrency:
+  group: build-gk710x-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  # Resolve the openipc-gk710x revision this run builds from. The workflow
-  # lives on the openipc branch, so github.sha is the openipc commit, not
-  # the revision being built; release provenance must name the commit that
-  # build.sh actually compiled.
+  # Resolve the openipc-gk710x revision this run builds from, and pick the
+  # legs it builds. The workflow itself lives on the openipc branch, so
+  # github.sha is the openipc commit, not the revision being built; release
+  # provenance must name the commit that build.sh actually compiled.
+  #
+  # The legs come from .github/scripts/ci-select.py over .github/ci/gk710x.yml
+  # (the matrices' one copy): a change no leg owns builds every leg, docs
+  # build none, a push whose tree its pull request already built green builds
+  # none. A dispatch always builds every leg. See the script for the rules.
   resolve:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       sha: ${{ steps.rev.outputs.sha }}
+      build_matrix: ${{ steps.select.outputs.build_matrix }}
+      smoke_matrix: ${{ steps.select.outputs.smoke_matrix }}
+      needs_build: ${{ steps.select.outputs.needs_build }}
+      needs_smoke: ${{ steps.select.outputs.needs_smoke }}
+      needs_qemu: ${{ steps.select.outputs.needs_qemu }}
+      legs: ${{ steps.select.outputs.legs }}
+      marker: ${{ steps.select.outputs.marker }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref || 'openipc-gk710x' }}
           path: src
+          # Two deep: on a pull request, the merge commit and the base it
+          # was merged onto, which is what the change is.
+          fetch-depth: 2
 
       - name: Resolve revision
         id: rev
         run: echo "sha=$(git -C src rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
+      # The selector and the matrices live on openipc beside this workflow.
+      # A pull request into openipc tests its own copy of them.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.base_ref == 'openipc' && github.sha || 'openipc' }}
+          path: ci
+          sparse-checkout: .github
+
+      - name: Select legs
+        id: select
+        run: |
+          python3 -c 'import yaml' 2>/dev/null || python3 -m pip install --user pyyaml
+          python3 ci/.github/scripts/ci-select.py gk710x --src src
+
   build:
     needs: resolve
+    if: needs.resolve.outputs.needs_build == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - { soc: gk7101, files: "output/u-boot-gk7101-*.bin" }
-          - { soc: gk7102, files: "output/u-boot-gk7102-*.bin" }
-          - { soc: gk7101s, files: "output/u-boot-gk7101s-*.bin" }
-          - { soc: gk7102s, files: "output/u-boot-gk7102s-*.bin" }
+      matrix: ${{ fromJSON(needs.resolve.outputs.build_matrix) }}
 
     steps:
       - name: Checkout
@@ -136,10 +173,32 @@ jobs:
 
   # Build qemu-system-arm once and share it with every smoke leg.
   qemu:
+    needs: resolve
+    if: needs.resolve.outputs.needs_qemu == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
+      # The QEMU build is minutes of every run and its source rarely moves.
+      # Keyed on the source commit and the runner image, it is built once
+      # and restored after that; caches written by the dispatches on openipc
+      # are visible to every branch's runs. Source: https://github.com/widgetii/qemu-hisilicon master.
+      - name: QEMU source and runner image
+        id: qsrc
+        run: |
+          echo "image=${ImageOS:-unknown}-${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+          rev=$(git ls-remote https://github.com/widgetii/qemu-hisilicon refs/heads/master | cut -f1)
+          echo "rev=${rev:-unpinned-$GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the QEMU build
+        id: qcache
+        uses: actions/cache@v4
+        with:
+          path: |
+            qemu-arm
+          key: qemu-arm-${{ steps.qsrc.outputs.image }}-${{ steps.qsrc.outputs.rev }}-v1
+
       - name: Install QEMU build deps
+        if: steps.qcache.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends \
@@ -148,6 +207,7 @@ jobs:
             libslirp-dev python3 python3-venv
 
       - name: Build qemu-system-arm
+        if: steps.qcache.outputs.cache-hit != 'true'
         run: |
           git clone --depth 1 --branch master \
             https://github.com/widgetii/qemu-hisilicon qemu-hisilicon
@@ -176,14 +236,13 @@ jobs:
   # must then load the environment the first saved, which proves the
   # driver's writes land where its reads find them.
   qemu_smoke:
-    needs: [build, qemu]
+    needs: [resolve, build, qemu]
+    if: needs.resolve.outputs.needs_smoke == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
       fail-fast: false
-      matrix:
-        # gk7101s/gk7102s: qemu-hisilicon's GK710xS machines
-        soc: [gk7101, gk7102, gk7101s, gk7102s]
+      matrix: ${{ fromJSON(needs.resolve.outputs.smoke_matrix) }}
     steps:
       - name: Download qemu-arm
         uses: actions/download-artifact@v4
@@ -365,3 +424,31 @@ jobs:
             --sha "$GK_SHA" \
             --built-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --assets 'published/*.bin'
+
+  # Leave the marker the push that lands this pull request looks for
+  # (ci-select.py, built_ref): this tree was built and smoke-tested green, so
+  # that push need not build it again. Squash-merging onto an unmoved base
+  # gives the push the very tree this pull request built. A fork's read-only
+  # token cannot write it; the push then builds, as it did before.
+  mark_built:
+    needs: [resolve, build, qemu_smoke]
+    if: >-
+      !cancelled() && github.event_name == 'pull_request'
+      && needs.resolve.outputs.marker != ''
+      && needs.build.result == 'success'
+      && (needs.qemu_smoke.result == 'success'
+          || (needs.qemu_smoke.result == 'skipped' && needs.resolve.outputs.needs_smoke != 'true'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Record the tree as built
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MARKER: ${{ needs.resolve.outputs.marker }}
+          SHA: ${{ needs.resolve.outputs.sha }}
+        run: |
+          gh api "repos/${{ github.repository }}/git/refs" \
+            -f ref="$MARKER" -f sha="$SHA" --jq .ref ||
+          gh api -X PATCH "repos/${{ github.repository }}/git/$MARKER" \
+            -f sha="$SHA" -F force=true --jq .ref

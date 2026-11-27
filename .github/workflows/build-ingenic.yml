@@ -9,6 +9,8 @@ on:
     branches: [openipc]
     paths:
       - .github/workflows/build-ingenic.yml
+      - .github/scripts/ci-select.py
+      - .github/ci/ingenic.yml
   workflow_call:
     inputs:
       ref:
@@ -45,66 +47,75 @@ on:
 # targets it is given, the T41 ones by default (see `publish_targets`).
 # build.sh takes targets as arguments; the matrix calls it with one per leg.
 
+# One run per pull request: a new push to it cancels the run it replaces,
+# which used to go on to completion beside it (12 such overlaps in the five
+# days before this). Dispatched runs release and publish, so they queue
+# behind each other instead and are never cancelled; neither is a push.
+# The group names the vendor: in a called workflow github.workflow is the
+# caller's ("CI"), the same on every branch.
+concurrency:
+  group: build-ingenic-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  # Resolve the openipc-ingenic revision this run builds from. The workflow
-  # lives on the openipc branch, so github.sha is the openipc commit, not
-  # the revision being built; release provenance must name the commit that
-  # build.sh actually compiled.
+  # Resolve the openipc-ingenic revision this run builds from, and pick the
+  # legs it builds. The workflow itself lives on the openipc branch, so
+  # github.sha is the openipc commit, not the revision being built; release
+  # provenance must name the commit that build.sh actually compiled.
+  #
+  # The legs come from .github/scripts/ci-select.py over .github/ci/ingenic.yml
+  # (the matrices' one copy): a change no leg owns builds every leg, docs
+  # build none, a push whose tree its pull request already built green builds
+  # none. A dispatch always builds every leg. See the script for the rules.
   resolve:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       sha: ${{ steps.rev.outputs.sha }}
+      build_matrix: ${{ steps.select.outputs.build_matrix }}
+      smoke_matrix: ${{ steps.select.outputs.smoke_matrix }}
+      needs_build: ${{ steps.select.outputs.needs_build }}
+      needs_smoke: ${{ steps.select.outputs.needs_smoke }}
+      needs_qemu: ${{ steps.select.outputs.needs_qemu }}
+      legs: ${{ steps.select.outputs.legs }}
+      marker: ${{ steps.select.outputs.marker }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref || 'openipc-ingenic' }}
           path: src
+          # Two deep: on a pull request, the merge commit and the base it
+          # was merged onto, which is what the change is.
+          fetch-depth: 2
 
       - name: Resolve revision
         id: rev
         run: echo "sha=$(git -C src rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
+      # The selector and the matrices live on openipc beside this workflow.
+      # A pull request into openipc tests its own copy of them.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.base_ref == 'openipc' && github.sha || 'openipc' }}
+          path: ci
+          sparse-checkout: .github
+
+      - name: Select legs
+        id: select
+        run: |
+          python3 -c 'import yaml' 2>/dev/null || python3 -m pip install --user pyyaml
+          python3 ci/.github/scripts/ci-select.py ingenic --src src
+
   build:
     needs: resolve
+    if: needs.resolve.outputs.needs_build == 'true'
     # Not ubuntu-latest: Ubuntu 26.04 has no gcc-mipsel-linux-gnu (Debian
     # and Ubuntu dropped the MIPS cross compilers); 24.04 still ships it.
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - { soc: t10, kinds: "nor", files: "output/u-boot-t10-nor.bin" }
-          - { soc: t10l, kinds: "nor", files: "output/u-boot-t10l-nor.bin" }
-          - { soc: t20, kinds: "nor", files: "output/u-boot-t20-nor.bin" }
-          - { soc: t20l, kinds: "nor", files: "output/u-boot-t20l-nor.bin" }
-          - { soc: t20x, kinds: "nor", files: "output/u-boot-t20x-nor.bin" }
-          - { soc: t21n, kinds: "nor", files: "output/u-boot-t21n-nor.bin" }
-          - { soc: t23n, kinds: "nor", files: "output/u-boot-t23n-nor.bin" }
-          - { soc: t23zn, kinds: "nor", files: "output/u-boot-t23zn-nor.bin" }
-          - { soc: t23x, kinds: "nor", files: "output/u-boot-t23x-nor.bin" }
-          - { soc: t30n, kinds: "nor", files: "output/u-boot-t30n-nor.bin" }
-          - { soc: t30l, kinds: "nor", files: "output/u-boot-t30l-nor.bin" }
-          - { soc: t30x, kinds: "nor", files: "output/u-boot-t30x-nor.bin" }
-          - { soc: t30a, kinds: "nor", files: "output/u-boot-t30a-nor.bin" }
-          - { soc: t30a1, kinds: "nor", files: "output/u-boot-t30a1-nor.bin" }
-          - { soc: t31n, kinds: "nor", files: "output/u-boot-t31n-nor.bin" }
-          - { soc: t31l, kinds: "nor", files: "output/u-boot-t31l-nor.bin" }
-          - { soc: t31x, kinds: "nor", files: "output/u-boot-t31x-nor.bin" }
-          - { soc: t31a, kinds: "nor", files: "output/u-boot-t31a-nor.bin" }
-          - { soc: t31al, kinds: "nor", files: "output/u-boot-t31al-nor.bin" }
-          - { soc: t31lc, kinds: "nor", files: "output/u-boot-t31lc-nor.bin" }
-          - { soc: t40n, kinds: "nor nand", files: "output/u-boot-t40n-*.bin" }
-          - { soc: t40xp, kinds: "nor nand", files: "output/u-boot-t40xp-*.bin" }
-          - { soc: t40a, kinds: "nor nand", files: "output/u-boot-t40a-*.bin" }
-          - { soc: t41l, kinds: "nor", files: "output/u-boot-t41l-nor.bin" }
-          - { soc: t41lq, kinds: "nor", files: "output/u-boot-t41lq-nor.bin" }
-          - { soc: t41n, kinds: "nor", files: "output/u-boot-t41n-nor.bin" }
-          - { soc: t41nq, kinds: "nor", files: "output/u-boot-t41nq-nor.bin" }
-          - { soc: t41a, kinds: "nor", files: "output/u-boot-t41a-nor.bin" }
-          - { soc: t41zx, kinds: "nor", files: "output/u-boot-t41zx-nor.bin" }
-          - { soc: t41xq, kinds: "nor", files: "output/u-boot-t41xq-nor.bin" }
+      matrix: ${{ fromJSON(needs.resolve.outputs.build_matrix) }}
 
     steps:
       - name: Checkout
@@ -295,3 +306,29 @@ jobs:
             --sha "$INGENIC_SHA" \
             --built-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --assets 'published/*.bin'
+
+  # Leave the marker the push that lands this pull request looks for
+  # (ci-select.py, built_ref): this tree was built green, so
+  # that push need not build it again. Squash-merging onto an unmoved base
+  # gives the push the very tree this pull request built. A fork's read-only
+  # token cannot write it; the push then builds, as it did before.
+  mark_built:
+    needs: [resolve, build]
+    if: >-
+      !cancelled() && github.event_name == 'pull_request'
+      && needs.resolve.outputs.marker != ''
+      && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Record the tree as built
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MARKER: ${{ needs.resolve.outputs.marker }}
+          SHA: ${{ needs.resolve.outputs.sha }}
+        run: |
+          gh api "repos/${{ github.repository }}/git/refs" \
+            -f ref="$MARKER" -f sha="$SHA" --jq .ref ||
+          gh api -X PATCH "repos/${{ github.repository }}/git/$MARKER" \
+            -f sha="$SHA" -F force=true --jq .ref
