@@ -35,7 +35,10 @@ on:
       # The infinity3 ones (msc313e, msc316dc, msc316dm) on the fixed slots
       # only, with local builds of firmware's boards for them: their 3.18
       # kernel cannot split firmware.bin, and firmware published none for
-      # them before OpenIPC/firmware#2969. Not NAND: the
+      # them before OpenIPC/firmware#2969. The SSR621Q NVR (infinity2m) with
+      # its split firmware.bin from 0x50000 to login, on the ssr621q
+      # machine at the real chip's bond 0x1B (OpenIPC/u-boot#212 gives it
+      # the IPL that sets that bond's DDR up). Not NAND: the
       # u-boot-*-nand.bin on `latest` are OpenIPC/u-boot-sigmastar's, in the
       # vendor layout that firmware's NAND packages are built for.
       publish_targets:
@@ -44,7 +47,7 @@ on:
         default: >-
           msc313e msc316dc msc316dm ssc325 ssc333 ssc335 ssc335de ssc337
           ssc337de ssc30kd ssc30kq ssc338q ssc377 ssc377d ssc377de ssc377qe
-          ssc378de ssc378qe
+          ssc378de ssc378qe ssr621q
 
 # The shape of build-hisilicon.yml:
 #   build (matrix, every SoC) -> qemu (prep) -> qemu_smoke (hard gate) ->
