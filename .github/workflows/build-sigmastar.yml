@@ -31,12 +31,14 @@ on:
       # written by this U-Boot, the fixed slots, and a camera on the vendor
       # U-Boot moved to this one with its overlay kept. Not NAND: the
       # u-boot-*-nand.bin on `latest` are OpenIPC/u-boot-sigmastar's, in the
-      # vendor layout that firmware's NAND packages are built for.
+      # vendor layout that firmware's NAND packages are built for. msc313e's
+      # 3.18 kernel cannot split firmware.bin: it is booted on the fixed
+      # slots only.
       publish_targets:
         description: Targets to publish (space-separated matrix soc names, NOR only)
         type: string
         default: >-
-          ssc325 ssc333 ssc335 ssc335de ssc337 ssc337de ssc30kd ssc30kq
+          msc313e ssc325 ssc333 ssc335 ssc335de ssc337 ssc337de ssc30kd ssc30kq
           ssc338q ssc377 ssc377d ssc377de ssc377qe ssc378de ssc378qe
 
 # The shape of build-hisilicon.yml:
