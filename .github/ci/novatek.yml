@@ -59,3 +59,160 @@ smoke:
     - { soc: nt98562-nand, machine: nt98562, qemu: arm, artifact: u-boot-nt98562-nand, file: u-boot-nt98562-nand.bin, mib: 128, args: "" }
     - { soc: nt98566-nand, machine: nt98566, qemu: arm, artifact: u-boot-nt98566-nand, file: u-boot-nt98566-nand.bin, mib: 128, args: "" }
     - { soc: nt98525-nand, machine: nt98525, qemu: arm, artifact: u-boot-nt98525-nand, file: u-boot-nt98525-nand.bin, mib: 128, args: "" }
+
+# What only some legs build, from which a change narrows to those legs.
+# Every leg shares include/configs/novatek.h, arch/arm/mach-novatek and
+# openipc_config, so those (and anything else not named here) reach every
+# leg.
+#   board: U-Boot's board directory, CONFIG_SYS_VENDOR/SYS_BOARD after
+#          `make olddefconfig`: na51089 for the NA51089, NA51055 and
+#          NS02501 legs alike, na51068, na511xx for the NVR legs
+#   paths: the SoC's fragment and device tree (with what it /include/s:
+#          the die's .dtsi, the NOR tree and nvt-nand.dtsi for -nand),
+#          nand_config for the -nand legs, the image packer, and the die's
+#          board/novatek/<die>/, whose loader/ build_loader builds for the
+#          leg (a die directory that is also a U-Boot board, na51089,
+#          over-claims: it costs legs, never coverage)
+owners:
+  nt98560:
+    board: novatek/na51089
+    paths:
+      - openipc/nt98560_config
+      - openipc/nt98560.dts
+      - openipc/nvt-image.py
+      - board/novatek/na51089/
+  nt98561:
+    board: novatek/na51089
+    paths:
+      - openipc/nt98561_config
+      - openipc/nt98561.dts
+      - openipc/nvt-image.py
+      - board/novatek/na51089/
+  nt98562:
+    board: novatek/na51089
+    paths:
+      - openipc/nt98562_config
+      - openipc/nt98562.dts
+      - openipc/nvt-image.py
+      - board/novatek/na51089/
+  nt98566:
+    board: novatek/na51089
+    paths:
+      - openipc/nt98566_config
+      - openipc/nt98566.dts
+      - openipc/nvt-image.py
+      - board/novatek/na51089/
+  nt98520:
+    board: novatek/na51089
+    paths:
+      - openipc/nt98520_config
+      - openipc/nt98520.dts
+      - openipc/nvt-image.py
+      - board/novatek/na51055/
+  nt98522:
+    board: novatek/na51089
+    paths:
+      - openipc/nt98522_config
+      - openipc/nt98522.dts
+      - openipc/nvt-image.py
+      - board/novatek/na51055/
+  nt98523:
+    board: novatek/na51089
+    paths:
+      - openipc/nt98523_config
+      - openipc/nt98523.dts
+      - openipc/nvt-image.py
+      - board/novatek/na51055/
+  nt98525:
+    board: novatek/na51089
+    paths:
+      - openipc/nt98525_config
+      - openipc/nt98525.dts
+      - openipc/nvt-image.py
+      - board/novatek/na51055/
+  nt98528:
+    board: novatek/na51089
+    paths:
+      - openipc/nt98528_config
+      - openipc/nt98528.dts
+      - openipc/nvt-image.py
+      - board/novatek/na51055/
+  nt98529:
+    board: novatek/na51089
+    paths:
+      - openipc/nt98529_config
+      - openipc/nt98529.dts
+      - openipc/nvt-image.py
+      - board/novatek/na51055/
+  nt98532:
+    board: novatek/na51089
+    paths:
+      - openipc/nt98532_config
+      - openipc/nt98532.dts
+      - openipc/nvt-image.py
+      - board/novatek/ns02501/
+  nt98533:
+    board: novatek/na51089
+    paths:
+      - openipc/nt98533_config
+      - openipc/nt98533.dts
+      - openipc/nvt-image.py
+      - board/novatek/ns02501/
+  nt98321:
+    board: novatek/na51068
+    paths:
+      - openipc/nt98321_config
+      - openipc/nt98321.dts
+      - openipc/nvt-image.py
+      - board/novatek/na51068/
+  nt98323:
+    board: novatek/na51068
+    paths:
+      - openipc/nt98323_config
+      - openipc/nt98323.dts
+      - openipc/nvt-image.py
+      - board/novatek/na51068/
+  nt98332:
+    board: novatek/na511xx
+    paths:
+      - openipc/nt98332_config
+      - openipc/nt98332.dts
+      - openipc/nvt-nvr-image.py
+  nt98633:
+    board: novatek/na511xx
+    paths:
+      - openipc/nt98633_config
+      - openipc/nt98633.dts
+      - openipc/nvt-nvr-image.py
+  nt98560-nand:
+    board: novatek/na51089
+    paths:
+      - openipc/nt98560_config
+      - openipc/nt98560-nand.dts
+      - openipc/nand_config
+      - openipc/nvt-image.py
+      - board/novatek/na51089/
+  nt98562-nand:
+    board: novatek/na51089
+    paths:
+      - openipc/nt98562_config
+      - openipc/nt98562-nand.dts
+      - openipc/nand_config
+      - openipc/nvt-image.py
+      - board/novatek/na51089/
+  nt98566-nand:
+    board: novatek/na51089
+    paths:
+      - openipc/nt98566_config
+      - openipc/nt98566-nand.dts
+      - openipc/nand_config
+      - openipc/nvt-image.py
+      - board/novatek/na51089/
+  nt98525-nand:
+    board: novatek/na51089
+    paths:
+      - openipc/nt98525_config
+      - openipc/nt98525-nand.dts
+      - openipc/nand_config
+      - openipc/nvt-image.py
+      - board/novatek/na51055/
