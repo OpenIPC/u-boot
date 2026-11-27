@@ -261,6 +261,9 @@ static ulong recovery_ram_room(void) {
 }
 
 #ifdef CONFIG_FMC_SPI_NAND
+/* Room left in the rootfs volume above its image (urwrite's 0x400000 too) */
+#define ROOTFS_HEADROOM SZ_4M
+
 static int recovery_ensure_volume(const char *name, const char *size) {
   struct ubi_volume_desc *desc;
   char cmd[64];
@@ -361,10 +364,17 @@ static int recovery_write(const char *name, int type) {
   if (type == RECOVERY_ROOTFS) {
     char size_str[24];
 
-    /* The volume is sized to the image; if it does not fit, the data
-     * volume is dropped (UBI volumes cannot be resized) */
-    snprintf(size_str, sizeof(size_str), "0x%lx", size);
-    ret = recovery_recreate_volume("rootfs", size_str, true);
+    /* The volume is the image plus ROOTFS_HEADROOM, as the firmware's
+     * rootfs.ubi and sysupgrade make it, so the next image may grow that
+     * much without touching rootfs_data. Without room for that, the image
+     * alone; if even that does not fit, the data volume is dropped (UBI
+     * volumes cannot be resized) */
+    snprintf(size_str, sizeof(size_str), "0x%lx", size + ROOTFS_HEADROOM);
+    ret = recovery_recreate_volume("rootfs", size_str, false);
+    if (ret) {
+      snprintf(size_str, sizeof(size_str), "0x%lx", size);
+      ret = recovery_recreate_volume("rootfs", size_str, true);
+    }
     if (ret) {
       printf("Recovery: cannot recreate rootfs volume (%d)\n", ret);
       return -1;

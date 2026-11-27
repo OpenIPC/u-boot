@@ -266,10 +266,13 @@ void hi_gpio_status(void);
  * the firmware's NAND packages (rootfs.ubi, rootfs.ubifs) and openipc.org's
  * installs write.
  *
- * Recovery rewrites the rootfs volume only, sized to the image, with
- * rootfs_data taking the rest. Only a rootfs that grew beyond what the old
- * volume could give costs the data volume, as U-Boot cannot resize UBI
- * volumes; else rootfs_data is preserved.
+ * Recovery rewrites the rootfs volume only, with rootfs_data taking the
+ * rest. The volume is the image plus 4 MiB of headroom, as the firmware's
+ * rootfs.ubi and sysupgrade make it, so the next image can grow that much
+ * into the blocks the old volume frees; without room for the headroom it is
+ * the image alone. Only a rootfs that grew beyond what the old volume could
+ * give costs the data volume, as U-Boot cannot resize UBI volumes; else
+ * rootfs_data is preserved.
  */
 /* bootm_size keeps the relocated FDT inside the kernel's lowmem
  * (mem=${osmem}): bootm otherwise puts it at the top of RAM, which the
@@ -281,7 +284,7 @@ void hi_gpio_status(void);
 	"ubfile=u-boot-" CONFIG_PRODUCT_SOC "-nand.bin\0" \
 	"urfile=rootfs.ubifs." CONFIG_PRODUCT_SOC "\0" \
 	"ubwrite=nand erase 0x0 0xc0000; nand write ${baseaddr} 0x0 ${filesize}\0" \
-	"urwrite=ubi part ubi; ubi check rootfs && ubi remove rootfs; if ubi create rootfs ${filesize} d; then ubi check rootfs; else ubi remove rootfs_data; ubi create rootfs ${filesize} d; fi; ubi check rootfs_data || ubi create rootfs_data 0 d; ubi write ${baseaddr} rootfs ${filesize}\0" \
+	"urwrite=ubi part ubi; ubi check rootfs && ubi remove rootfs; setexpr ursize ${filesize} + 0x400000; if ubi create rootfs ${ursize} d; then true; elif ubi create rootfs ${filesize} d; then true; else ubi remove rootfs_data; ubi create rootfs ${filesize} d; fi; setenv ursize; ubi check rootfs_data || ubi create rootfs_data 0 d; ubi write ${baseaddr} rootfs ${filesize}\0" \
 	"loadkernel=" OPENIPC_LOADKERNEL "\0" \
 	"bootm_size=0x2000000\0" \
 	"mtdids=nand0=" SFC "\0" \
