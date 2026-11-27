@@ -1,0 +1,16 @@
+# The CI matrices of build-grainmedia.yml: the one copy, read by
+# .github/scripts/ci-select.py, which narrows them to the legs a change
+# can reach and hands them to the workflow. Every leg has a `soc`.
+
+build:
+  include:
+    - { soc: gm8136, files: "output/u-boot-gm8136-*.bin" }
+    - { soc: gm8135, files: "output/u-boot-gm8135-*.bin" }
+    - { soc: gm8126, files: "output/u-boot-gm8126-*.bin" }
+
+smoke:
+  include:
+    - { soc: gm8136, machine: gm8136 }
+    - { soc: gm8136, machine: gm8136s }
+    - { soc: gm8135, machine: gm8135s }
+    - { soc: gm8126, machine: gm8126 }

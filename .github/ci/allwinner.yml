@@ -1,0 +1,21 @@
+# The CI matrices of build-allwinner.yml: the one copy, read by
+# .github/scripts/ci-select.py, which narrows them to the legs a change
+# can reach and hands them to the workflow. Every leg has a `soc`.
+
+build:
+  include:
+    - { soc: v3s, files: "output/u-boot-v3s-*.bin" }
+    - { soc: v831, files: "output/u-boot-v831-*.bin" }
+    - { soc: v833, files: "output/u-boot-v833-*.bin" }
+    - { soc: v851s, files: "output/u-boot-v851s-*.bin" }
+
+smoke:
+  include:
+    - { soc: v3s, kind: nor }
+    - { soc: v3s, kind: mmc }
+    - { soc: v831, kind: nor }
+    - { soc: v831, kind: mmc }
+    - { soc: v833, kind: nor }
+    - { soc: v833, kind: mmc }
+    - { soc: v851s, kind: nor }
+    - { soc: v851s, kind: mmc }

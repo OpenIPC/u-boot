@@ -1,0 +1,28 @@
+# The CI matrices of build-axera.yml: the one copy, read by
+# .github/scripts/ci-select.py, which narrows them to the legs a change
+# can reach and hands them to the workflow. Every leg has a `soc`.
+
+build:
+  include:
+    # AX620U (Cortex-A7, AArch32): SPI NAND, the boot partition
+    # from 0, up to the environment
+    - { soc: ax620u-nand }
+    # AX620E (Cortex-A53, AArch64): SPI NOR, the 256 KiB boot
+    # partition at 0 (first stage, then packed U-Boot at 0x10000)
+    - { soc: ax620e-nor }
+    # AX630C (Cortex-A53, AArch64): eMMC and SD card (Sipeed
+    # MaixCAM2). No first stage yet: U-Boot alone, which the board's
+    # own bootloader starts from the SD card; smoke-tested by
+    # qemu_smoke_ax630c, which starts it with QEMU's loader.
+    - { soc: ax630c-emmc }
+
+smoke:
+  include:
+    - { soc: ax620e-nor, machine: ax620e, spl: source }
+    - { soc: ax620e-nor, machine: ax620e, spl: stock }
+    - { soc: ax620u-nand, machine: ax620u, spl: source }
+    - { soc: ax620u-nand, machine: ax620u, spl: stock }
+
+# Smoke-tested by a job of its own (qemu_smoke_ax630c), not the matrix: the
+# qemu job has to run when it is selected.
+smoke_extra: [ax630c-emmc]

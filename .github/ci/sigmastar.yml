@@ -1,0 +1,116 @@
+# The CI matrices of build-sigmastar.yml: the one copy, read by
+# .github/scripts/ci-select.py, which narrows them to the legs a change
+# can reach and hands them to the workflow. Every leg has a `soc`.
+
+build:
+  include:
+    - { soc: msc313e, files: "output/u-boot-msc313e-nor.bin" }
+    - { soc: msc316dc, files: "output/u-boot-msc316dc-nor.bin" }
+    - { soc: msc316dm, files: "output/u-boot-msc316dm-nor.bin" }
+    - { soc: ssc029a-nand, files: "output/u-boot-ssc029a-nand.bin" }
+    - { soc: ssc029a, files: "output/u-boot-ssc029a-nor.bin" }
+    - { soc: ssc029b, files: "output/u-boot-ssc029b-nor.bin" }
+    - { soc: ssc029c, files: "output/u-boot-ssc029c-nor.bin" }
+    - { soc: ssc375, files: "output/u-boot-ssc375-nor.bin" }
+    - { soc: ssc034a, files: "output/u-boot-ssc034a-nor.bin" }
+    - { soc: ssc034b, files: "output/u-boot-ssc034b-nor.bin" }
+    - { soc: ssc034a-nand, files: "output/u-boot-ssc034a-nand.bin" }
+    - { soc: ssc034b-nand, files: "output/u-boot-ssc034b-nand.bin" }
+    - { soc: ssc30kd-nand, files: "output/u-boot-ssc30kd-nand.bin" }
+    - { soc: ssc30kd, files: "output/u-boot-ssc30kd-nor.bin" }
+    - { soc: ssc30kq-nand, files: "output/u-boot-ssc30kq-nand.bin" }
+    - { soc: ssc30kq, files: "output/u-boot-ssc30kq-nor.bin" }
+    - { soc: ssc325-nand, files: "output/u-boot-ssc325-nand.bin" }
+    - { soc: ssc325, files: "output/u-boot-ssc325-nor.bin" }
+    - { soc: ssc325de-nand, files: "output/u-boot-ssc325de-nand.bin" }
+    - { soc: ssc325de, files: "output/u-boot-ssc325de-nor.bin" }
+    - { soc: ssc327de-nand, files: "output/u-boot-ssc327de-nand.bin" }
+    - { soc: ssc327de, files: "output/u-boot-ssc327de-nor.bin" }
+    - { soc: ssc333-nand, files: "output/u-boot-ssc333-nand.bin" }
+    - { soc: ssc333, files: "output/u-boot-ssc333-nor.bin" }
+    - { soc: ssc335-nand, files: "output/u-boot-ssc335-nand.bin" }
+    - { soc: ssc335, files: "output/u-boot-ssc335-nor.bin" }
+    - { soc: ssc335de-nand, files: "output/u-boot-ssc335de-nand.bin" }
+    - { soc: ssc335de, files: "output/u-boot-ssc335de-nor.bin" }
+    - { soc: ssc337-nand, files: "output/u-boot-ssc337-nand.bin" }
+    - { soc: ssc337, files: "output/u-boot-ssc337-nor.bin" }
+    - { soc: ssc337de-nand, files: "output/u-boot-ssc337de-nand.bin" }
+    - { soc: ssc337de, files: "output/u-boot-ssc337de-nor.bin" }
+    - { soc: ssc338q-nand, files: "output/u-boot-ssc338q-nand.bin" }
+    - { soc: ssc338q, files: "output/u-boot-ssc338q-nor.bin" }
+    - { soc: ssc377-nand, files: "output/u-boot-ssc377-nand.bin" }
+    - { soc: ssc377, files: "output/u-boot-ssc377-nor.bin" }
+    - { soc: ssc377d-nand, files: "output/u-boot-ssc377d-nand.bin" }
+    - { soc: ssc377d, files: "output/u-boot-ssc377d-nor.bin" }
+    - { soc: ssc377de-nand, files: "output/u-boot-ssc377de-nand.bin" }
+    - { soc: ssc377de, files: "output/u-boot-ssc377de-nor.bin" }
+    - { soc: ssc377qe-nand, files: "output/u-boot-ssc377qe-nand.bin" }
+    - { soc: ssc377qe, files: "output/u-boot-ssc377qe-nor.bin" }
+    - { soc: ssc378de-nand, files: "output/u-boot-ssc378de-nand.bin" }
+    - { soc: ssc378de, files: "output/u-boot-ssc378de-nor.bin" }
+    - { soc: ssc378qe-nand, files: "output/u-boot-ssc378qe-nand.bin" }
+    - { soc: ssc378qe, files: "output/u-boot-ssc378qe-nor.bin" }
+    - { soc: ssd201-nand, files: "output/u-boot-ssd201-nand.bin" }
+    - { soc: ssd201, files: "output/u-boot-ssd201-nor.bin" }
+    - { soc: ssd202d-nand, files: "output/u-boot-ssd202d-nand.bin" }
+    - { soc: ssd202d, files: "output/u-boot-ssd202d-nor.bin" }
+    - { soc: ssr621q-nand, files: "output/u-boot-ssr621q-nand.bin" }
+    - { soc: ssr621q, files: "output/u-boot-ssr621q-nor.bin" }
+
+smoke:
+  # Every leg, on its own machine: the bond strap where the vendor
+  # IPL refuses the machine's default (ssc029b on ssc029; the
+  # infinity6e NAND IPLs past QFN88)
+  include:
+    - { soc: msc313e, machine: "msc313e", medium: nor }
+    - { soc: msc316dc, machine: "msc316dc", medium: nor }
+    - { soc: msc316dm, machine: "msc316dm", medium: nor }
+    - { soc: ssd201, machine: "ssd201", medium: nor }
+    - { soc: ssd202d, machine: "ssd202d", medium: nor }
+    - { soc: ssr621q, machine: "ssr621q", medium: nor }
+    - { soc: ssc325, machine: "ssc325", medium: nor }
+    - { soc: ssc325de, machine: "ssc325de", medium: nor }
+    - { soc: ssc327de, machine: "ssc327de", medium: nor }
+    - { soc: ssc333, machine: "ssc333", medium: nor }
+    - { soc: ssc335, machine: "ssc335", medium: nor }
+    - { soc: ssc335de, machine: "ssc335de", medium: nor }
+    - { soc: ssc337, machine: "ssc337", medium: nor }
+    - { soc: ssc337de, machine: "ssc337de", medium: nor }
+    - { soc: ssc30kd, machine: "ssc30kd", medium: nor }
+    - { soc: ssc30kq, machine: "ssc30kq", medium: nor }
+    - { soc: ssc338q, machine: "ssc338q", medium: nor }
+    - { soc: ssc377, machine: "ssc377", medium: nor }
+    - { soc: ssc377d, machine: "ssc377d", medium: nor }
+    - { soc: ssc377de, machine: "ssc377de", medium: nor }
+    - { soc: ssc377qe, machine: "ssc377qe", medium: nor }
+    - { soc: ssc378de, machine: "ssc378de", medium: nor }
+    - { soc: ssc378qe, machine: "ssc378qe", medium: nor }
+    - { soc: ssc029a, machine: "ssc029a", medium: nor }
+    - { soc: ssc029b, machine: "ssc029,bond=0x10", medium: nor }
+    - { soc: ssc029c, machine: "ssc029", medium: nor }
+    - { soc: ssc375, machine: "ssc375", medium: nor }
+    - { soc: ssc034a, machine: "ssc034a", medium: nor }
+    - { soc: ssc034b, machine: "ssc034b", medium: nor }
+    - { soc: ssd201-nand, machine: "ssd201", medium: nand }
+    - { soc: ssd202d-nand, machine: "ssd202d", medium: nand }
+    - { soc: ssr621q-nand, machine: "ssr621q", medium: nand }
+    - { soc: ssc325-nand, machine: "ssc325", medium: nand }
+    - { soc: ssc325de-nand, machine: "ssc325de", medium: nand }
+    - { soc: ssc327de-nand, machine: "ssc327de", medium: nand }
+    - { soc: ssc333-nand, machine: "ssc333", medium: nand }
+    - { soc: ssc335-nand, machine: "ssc335", medium: nand }
+    - { soc: ssc335de-nand, machine: "ssc335de", medium: nand }
+    - { soc: ssc337-nand, machine: "ssc337", medium: nand }
+    - { soc: ssc337de-nand, machine: "ssc337de", medium: nand }
+    - { soc: ssc30kd-nand, machine: "ssc30kd,bond=0x10", medium: nand }
+    - { soc: ssc30kq-nand, machine: "ssc30kq,bond=0x10", medium: nand }
+    - { soc: ssc338q-nand, machine: "ssc338q,bond=0x10", medium: nand }
+    - { soc: ssc377-nand, machine: "ssc377", medium: nand }
+    - { soc: ssc377d-nand, machine: "ssc377d", medium: nand }
+    - { soc: ssc377de-nand, machine: "ssc377de", medium: nand }
+    - { soc: ssc377qe-nand, machine: "ssc377qe", medium: nand }
+    - { soc: ssc378de-nand, machine: "ssc378de", medium: nand }
+    - { soc: ssc378qe-nand, machine: "ssc378qe", medium: nand }
+    - { soc: ssc029a-nand, machine: "ssc029a", medium: nand }
+    - { soc: ssc034a-nand, machine: "ssc034a", medium: nand }
+    - { soc: ssc034b-nand, machine: "ssc034b", medium: nand }

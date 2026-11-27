@@ -1,0 +1,35 @@
+# The CI matrices of build-fullhan.yml: the one copy, read by
+# .github/scripts/ci-select.py, which narrows them to the legs a change
+# can reach and hands them to the workflow. Every leg has a `soc`.
+
+build:
+  include:
+    - { soc: fh8852v200, files: "output/u-boot-fh8852v200-*.bin" }
+    - { soc: fh8856v200, files: "output/u-boot-fh8856v200-*.bin" }
+    - { soc: fh8858v200, files: "output/u-boot-fh8858v200-*.bin" }
+    - { soc: fh8852v210, files: "output/u-boot-fh8852v210-*.bin" }
+    - { soc: fh8856v210, files: "output/u-boot-fh8856v210-*.bin" }
+    - { soc: fh8858v210, files: "output/u-boot-fh8858v210-*.bin" }
+    - { soc: fh8652, files: "output/u-boot-fh8652-*.bin" }
+    - { soc: fh8656, files: "output/u-boot-fh8656-*.bin" }
+    - { soc: fh8658, files: "output/u-boot-fh8658-*.bin" }
+    - { soc: fh8852v100, files: "output/u-boot-fh8852v100-*.bin" }
+    - { soc: fh8856v100, files: "output/u-boot-fh8856v100-*.bin" }
+    - { soc: fh8626v100, files: "output/u-boot-fh8626v100-*.bin" }
+    - { soc: fh8833v100, files: "output/u-boot-fh8833v100-*.bin" }
+
+smoke:
+  include:
+    - { soc: fh8852v200, machine: fh8852v200 }
+    - { soc: fh8856v200, machine: fh8856v200 }
+    - { soc: fh8858v200, machine: fh8858v200 }
+    - { soc: fh8852v210, machine: fh8852v200 }
+    - { soc: fh8856v210, machine: fh8856v200 }
+    - { soc: fh8858v210, machine: fh8858v200 }
+    - { soc: fh8652, machine: fh8652 }
+    - { soc: fh8656, machine: fh8656 }
+    - { soc: fh8658, machine: fh8658 }
+    - { soc: fh8852v100, machine: fh8852v100 }
+    - { soc: fh8856v100, machine: fh8856v100 }
+    - { soc: fh8626v100, machine: fh8626v100 }
+    - { soc: fh8833v100, machine: fh8632 }
