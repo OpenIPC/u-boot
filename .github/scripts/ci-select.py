@@ -70,6 +70,7 @@ NO_BUILD = re.compile(
 )
 
 INCLUDE = re.compile(r'^\s*#\s*include\s*[<"](?:configs/)?([\w.+-]+\.h)[>"]', re.M)
+DTS_INCLUDE = re.compile(r'^\s*(?:/include/|#\s*include)\s*"([^"]+)"', re.M)
 
 
 def leg_key(entry):
@@ -114,17 +115,37 @@ def header_closure(src, name):
     return seen
 
 
+def dts_closure(src, path):
+    """A device tree and every file it reaches through /include/ (or
+    #include) "...", relative to its directory: nt98560-nand.dts pulls in
+    nt98560.dts and nvt-nand.dtsi, nt98560.dts pulls in na51089.dtsi."""
+    seen, todo = set(), [path]
+    while todo:
+        rel = os.path.normpath(todo.pop())
+        if rel in seen or not os.path.isfile(os.path.join(src, rel)):
+            continue
+        seen.add(rel)
+        with open(os.path.join(src, rel), errors="replace") as handle:
+            todo += [os.path.join(os.path.dirname(rel), inc)
+                     for inc in DTS_INCLUDE.findall(handle.read())]
+    return seen
+
+
 def ownership(cfg, src):
     """{path or directory prefix: {legs}} from the `owners` table.
 
-    A leg owns its own paths, its board directory, and its board header with
-    every include/configs header that header pulls in. Several legs can own
+    A leg owns its own paths (a device tree with every file it includes),
+    its board directory, and its board header with every include/configs
+    header that header pulls in. Several legs can own
     one path (the four hi3520d legs share hi3520dv100.h); a change there
     selects all of them.
     """
     owned = {}
     for leg, spec in (cfg.get("owners") or {}).items():
         claims = list(spec.get("paths", []))
+        for claim in spec.get("paths", []):
+            if claim.endswith((".dts", ".dtsi")):
+                claims += dts_closure(src, claim)
         if spec.get("board"):
             claims.append(f"board/{spec['board']}/")
         if spec.get("config"):
