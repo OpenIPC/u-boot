@@ -43,7 +43,8 @@ build_infinity3() {
 
 # SigmaStar infinity2m and infinity6*: the same IPL and IPL_CUST, the layout
 # of OpenIPC's vendor U-Boot (openipc/sigmastar-image.py). All parts of a die
-# share its stages; only U-Boot's Kconfig target differs.
+# share its stages; only U-Boot's Kconfig target differs. A part whose package
+# the die's IPL does not know brings its own, openipc/<die>-<soc>-ipl.bin.
 build_die() {
     soc=$1
     die=$2
@@ -58,7 +59,10 @@ build_die() {
     make ${make_opts} olddefconfig </dev/null >/dev/null && \
     make ${make_opts} </dev/null || return 1
 
-    python3 openipc/sigmastar-image.py --ipl openipc/${die}-ipl.bin \
+    ipl=openipc/${die}-ipl.bin
+    [ -f openipc/${die}-${soc}-ipl.bin ] && ipl=openipc/${die}-${soc}-ipl.bin
+
+    python3 openipc/sigmastar-image.py --ipl ${ipl} \
         --ipl-cust openipc/${die}-ipl-cust.bin ${table} --tag "${tag}" \
         --uboot "${builddir}/u-boot.bin" --soc "${soc}" \
         --out "output/u-boot-${soc}-nor.bin"

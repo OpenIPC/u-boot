@@ -23,7 +23,7 @@ release as `openipc-hisilicon`, `openipc-xm`, `openipc-gk710x` and
 | infinity6b0 | `ssc333` `ssc335` `ssc335de` `ssc337` `ssc337de` | same | **no silicon**; qemu per-die machine |
 | infinity6e | `ssc30kd` `ssc30kq` `ssc338q` | same | **no silicon**; qemu per-die machine |
 | infinity6c | `ssc377` `ssc377d` `ssc377de` `ssc377qe` `ssc378de` `ssc378qe` | same | **no silicon**; qemu per-die machine |
-| infinity2m | `ssr621q` | SDK `i2m` | **no silicon**; qemu `ssr621q` |
+| infinity2m | `ssr621q` | SDK `i2m`; IPL from a Xiongmai NBD80S16S NOR | U-Boot not yet on silicon (the SDK IPL hangs there); qemu `ssr621q` |
 | infinity6 | `ssc325de` `ssc327de` | as `ssc325` | **no silicon**; qemu per-part machine |
 | Iford | `ssc029a` `ssc029b` `ssc029c` | Iford SDK IMD00V2.1.0 boot.bin, `board/iford/boot/nor/ipl` | **no silicon**; only `ssc029c` boots in qemu |
 | Ifado | `ssc375` | Dahua IPC-HDW1433V-A-IL2 NOR (IPL, CIS, IPL_CUST) | **no silicon**; qemu `ssc375`, to the vendor kernel's userspace |
@@ -145,6 +145,17 @@ IPL_CUST at `0x10000`, the uImage at `0x20000`.
 
 - All parts of a die run the same IPL and IPL_CUST: the images in OpenIPC/firmware
   `latest` are byte-identical in that area, part to part.
+- Except the SSR621Q (`openipc/infinity2m-ssr621q-ipl.bin`, `build_die` takes
+  `<die>-<soc>-ipl.bin` over `<die>-ipl.bin`). Its package bond is `0x1B`
+  (the IPL prints `D-1b`). The i2m SDK's IPL, g6759541, knows only the SSD201
+  and SSD202D bonds: on a real SSR621Q it prints `unknown miupll` after
+  `HW Reset`, leaves the DDR unset and hangs after `cpupll init done`. Every
+  IPL in the i2m SDK is g6759541. The SSR621Q's IPL is the first `0x6460`
+  bytes (its header's size) of a Xiongmai NBD80S16S's NOR, gf77b33a: it sets
+  `miupll_233MHz` for bond `0x1B` (`266MHz` for `0x1E`), loads the SDK's
+  IPL_CUST from `0x10000` through the MXP table as g6759541 does, and the
+  rest of the boot partition is unchanged. qemu-bench's `ssr621q` machine
+  defaults to bond `0x1E`; run it with `bond=0x1B` to take the silicon's path.
 - The MXP table is the one blob for all of them, and also serves infinity2m,
   whose SDK has no such layout (it has MXP at `0x20000`, U-Boot at `0x30000`,
   environment at `0x5D000`, which collide with OpenIPC's). Its entries for IPL
